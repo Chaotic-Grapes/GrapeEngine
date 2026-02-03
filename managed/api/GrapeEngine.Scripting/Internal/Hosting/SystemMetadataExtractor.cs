@@ -95,7 +95,7 @@ public static class SystemMetadataExtractor
         }
 
         // Priority 2: [SystemGroup] attribute
-        var attr = systemType.GetCustomAttribute<SystemAttribute>();
+        var attr = systemType.GetCustomAttribute<SystemAttribute>(true);
         if (attr != null)
         {
             return attr.Group;
@@ -117,7 +117,7 @@ public static class SystemMetadataExtractor
         }
 
         // Priority 2: [SystemGroup] attribute
-        var attr = systemType.GetCustomAttribute<SystemAttribute>();
+        var attr = systemType.GetCustomAttribute<SystemAttribute>(true);
         if (attr != null) {
             return attr.RunMode;
         }

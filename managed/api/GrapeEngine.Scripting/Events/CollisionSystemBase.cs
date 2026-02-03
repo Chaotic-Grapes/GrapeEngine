@@ -1,5 +1,5 @@
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Systems;
+using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems.Attributes;
 
 namespace GrapeEngine.Scripting.Events;
@@ -14,10 +14,36 @@ namespace GrapeEngine.Scripting.Events;
 public abstract class CollisionSystemBase : SystemBase
 {
     private readonly Dictionary<ulong, Dictionary<ulong, CollisionEvent>> _active = [];
+    private int _lastProcessedFrame = -1;
+    private IntPtr _lastWorldPtr = IntPtr.Zero;
+    private readonly List<ulong> _removeEnterBuffers = [];
+    private readonly List<ulong> _removeExitBuffers = [];
 
     protected sealed override void OnUpdate()
     {
         var world = World!;
+
+        unsafe
+        {
+            var worldPtr = (IntPtr)world.NativePtr;
+            if (worldPtr != _lastWorldPtr)
+            {
+                _active.Clear();
+                _lastProcessedFrame = -1;
+                _lastWorldPtr = worldPtr;
+            }
+        }
+
+        var frame = Time.FrameCount;
+        if (_lastProcessedFrame == frame)
+            return;
+        _lastProcessedFrame = frame;
+        var enterCount = 0;
+        var exitCount = 0;
+        var stayCount = 0;
+
+        _removeEnterBuffers.Clear();
+        _removeExitBuffers.Clear();
 
         // Enter: CollisionEvent is only emitted on new collision pairs.
         foreach (var (entity, buffer) in world.Query<CollisionEventBuffer>())
@@ -38,8 +64,10 @@ public abstract class CollisionSystemBase : SystemBase
                 {
                     map[evt.OtherEntityId] = evt;
                     OnCollisionEnter(entity, evt);
+                    enterCount++;
                 }
             }
+            _removeEnterBuffers.Add(entity.Id);
         }
 
         // Exit: remove and notify.
@@ -54,8 +82,10 @@ public abstract class CollisionSystemBase : SystemBase
                 if (map.Remove(evt.OtherEntityId))
                 {
                     OnCollisionExit(entity, evt);
+                    exitCount++;
                 }
             }
+            _removeExitBuffers.Add(entity.Id);
         }
 
         // Stay: emit for all currently active pairs.
@@ -68,6 +98,25 @@ public abstract class CollisionSystemBase : SystemBase
             foreach (var entry in kvp.Value)
             {
                 OnCollisionStay(self, entry.Value);
+                stayCount++;
+            }
+        }
+
+        // Defensive: consume event buffers so stale data cannot re-enter.
+        foreach (var entityId in _removeEnterBuffers)
+        {
+            var entity = Entity.FromId(world, entityId);
+            if (entity.IsAlive && entity.HasComponent<CollisionEventBuffer>())
+            {
+                entity.RemoveComponent<CollisionEventBuffer>();
+            }
+        }
+        foreach (var entityId in _removeExitBuffers)
+        {
+            var entity = Entity.FromId(world, entityId);
+            if (entity.IsAlive && entity.HasComponent<CollisionExitEventBuffer>())
+            {
+                entity.RemoveComponent<CollisionExitEventBuffer>();
             }
         }
     }
@@ -86,4 +135,5 @@ public abstract class CollisionSystemBase : SystemBase
     /// Called when a collision ends.
     /// </summary>
     protected virtual void OnCollisionExit(Entity self, CollisionExitEvent evt) { }
+
 }

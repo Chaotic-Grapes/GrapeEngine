@@ -147,23 +147,42 @@ void LevelEditor::_buildDockLayout() {
     );
 
     ImGuiID leftCenterNode, rightNode;
-    // Split main area: carve right strip (25% width) for inspectors
+    // Split main area: carve right strip (28% width) for inspectors and tools
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
+    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.28f, &rightNode, &leftCenterNode);
 
     ImGuiID topSection, assetBrowserNode;
-    // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
-    ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
+    // Split left-center area vertically: top work area (70%), bottom asset browser (30%)
+    ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.70f, &topSection, &assetBrowserNode);
 
     ImGuiID leftTopNode, sceneGameNode;
-    // Split top work area horizontally: left hierarchy (33%), center scene/game (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &sceneGameNode); // Hierarchy strip
+    // Split top work area horizontally: left strip (28%), center scene/game (72%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.28f, &leftTopNode, &sceneGameNode);
 
     // Map panels to target nodes to realize the layout
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
-    ImGui::DockBuilderDockWindow("Game", sceneGameNode);
+    // Layout preset 1: single shared Scene/Game dock.
+    if (m_viewportLayoutPreset == 1) {
+        ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
+        ImGui::DockBuilderDockWindow("Game", sceneGameNode);
+    // Layout preset 2: split Scene/Game side-by-side.
+    } else if (m_viewportLayoutPreset == 2) {
+        ImGuiID sceneNode, gameNode;
+        ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Right, 0.5f, &gameNode, &sceneNode);
+        ImGui::DockBuilderDockWindow("Scene", sceneNode);
+        ImGui::DockBuilderDockWindow("Game", gameNode);
+    // Layout preset 4: quad split for multiple viewports.
+    } else {
+        ImGuiID topNode, bottomNode;
+        ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Down, 0.5f, &bottomNode, &topNode);
+        ImGuiID topLeft, topRight;
+        ImGui::DockBuilderSplitNode(topNode, ImGuiDir_Right, 0.5f, &topRight, &topLeft);
+        ImGuiID bottomLeft, bottomRight;
+        ImGui::DockBuilderSplitNode(bottomNode, ImGuiDir_Right, 0.5f, &bottomRight, &bottomLeft);
+        ImGui::DockBuilderDockWindow("Scene", topLeft);
+        ImGui::DockBuilderDockWindow("Game", topRight);
+    }
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Layers", rightNode);
@@ -309,6 +328,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         }
     );
 
+    // Subscribe to viewport layout requests from the scene viewport header
+    m_viewportLayoutSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorViewportLayoutRequested>(
+        [this](const Messaging::EditorViewportLayoutRequested& evt) {
+            // Clamp layout requests and rebuild dock layout next frame.
+            m_viewportLayoutPreset = std::max(1, std::min(4, evt.Layout));
+            m_dockLayoutBuilt = false;
+        }
+    );
+
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);
 
@@ -329,6 +357,9 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_playback.OnStateChanged([this](const EditorState oldState, const EditorState newState) {
                 _onPlaybackStateChanged(oldState, newState);
                 });
+            // Wire play controls into file menu dirty tracking.
+            m_playback.SetUnsavedChangesProvider([this]() { return m_fileMenu.HasUnsavedChanges(); });
+            m_playback.SetSaveSceneCallback([this]() { m_fileMenu.SaveScene(); });
         },
         [this]() { m_playback.Render(); },
         [this](ECS::World* w) {
@@ -517,11 +548,11 @@ void LevelEditor::_loadFonts() {
 
     if (!m_mainFont && io.Fonts->Fonts.empty()) {
         m_mainFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
+            "assets/fonts/Open_Sans/static/OpenSans-Medium.ttf",
             textFontSize
         );
         if (!m_mainFont) {
-            LOG_ERROR("Failed to load Inter Medium font");
+            LOG_ERROR("Failed to load Open Sans Medium font");
             m_mainFont = io.Fonts->AddFontDefault();
         }
     }
@@ -531,11 +562,11 @@ void LevelEditor::_loadFonts() {
 
     if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
         m_boldFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
+            "assets/fonts/Open_Sans/static/OpenSans-ExtraBold.ttf",
             textFontSize
         );
         if (!m_boldFont) {
-            LOG_ERROR("Failed to load Inter ExtraBold font");
+            LOG_ERROR("Failed to load Open Sans ExtraBold font");
             m_boldFont = io.Fonts->AddFontDefault();
         }
     }
@@ -649,12 +680,8 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
     // Handle state transitions
     if (newState == EditorState::Edit) {
-        // Note: Entity IDs are now preserved during restore, so selection can remain valid
-        // However, we still clear selection as a safe UX pattern when stopping play mode
-        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
-        m_inspector.ClearSelection();
-
-        // Rebuild entity order to reflect restored hierarchy
+        // Entity IDs are preserved during restore, so keep selection intact.
+        // Rebuild entity order to reflect restored hierarchy.
         m_hierarchyWindow.RebuildEntityOrder();
     }
 

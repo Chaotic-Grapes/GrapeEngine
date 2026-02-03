@@ -13,7 +13,7 @@ The layout system is responsible for:
 - Handling different layout modes (Box, Grid, Absolute)
 - Efficient layout invalidation and dirty tracking
 
-The layout system operates independently and can be used without the full GUISystem
+The layout system operates independently and can be used without the full GUI pipeline
 for headless layout calculations or testing.
 
 Copyright (C) 2025 DigiPen Institute of Technology.

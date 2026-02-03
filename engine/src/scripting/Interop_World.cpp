@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
+#include "ecs/events/EventComponents.h"
 #include "core/Logger.h"
 #include <cstring>
 #include <combaseapi.h>
@@ -67,6 +68,16 @@ namespace {
     // Convert World pointer
     ECS::World* GetWorld(void* worldPtr) {
         return static_cast<ECS::World*>(worldPtr);
+    }
+
+    constexpr uint32_t FNV1aHash(const char* str) {
+        uint32_t hash = 2166136261u;
+        while (*str) {
+            hash ^= static_cast<uint32_t>(*str);
+            hash *= 16777619u;
+            ++str;
+        }
+        return hash;
     }
 
     // Component type hash lookup
@@ -329,12 +340,22 @@ INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHas
     if (excludeCount < 0 || excludeCount > 8) return false;
 
     ECS::World* world = GetWorld(worldPtr);
+    const uint32_t collisionHash = FNV1aHash("CollisionEventBuffer");
+    const uint32_t collisionExitHash = FNV1aHash("CollisionExitEventBuffer");
+    bool hasCollision = false;
+    bool hasCollisionExit = false;
     
     // Convert hashes to component IDs
     std::vector<ECS::ComponentTypeId> componentIds;
     componentIds.reserve(componentCount);
     
     for (int i = 0; i < componentCount; ++i) {
+        if (componentHashes[i] == collisionHash) {
+            hasCollision = true;
+        }
+        if (componentHashes[i] == collisionExitHash) {
+            hasCollisionExit = true;
+        }
         ECS::ComponentTypeId id = GetComponentIdFromHash(componentHashes[i]);
         if (id == ECS::NULL_COMPONENT_ID) {
             LOG_WARNING("[WorldInterop] Unknown component type hash in query: " << componentHashes[i]);
@@ -390,6 +411,10 @@ INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEn
 
     ECS::World* world = GetWorld(iterator->worldPtr);
     const auto& archetypes = *static_cast<const std::vector<ECS::Archetype*>*>(iterator->archetypes);
+    const uint32_t collisionHash = FNV1aHash("CollisionEventBuffer");
+    const uint32_t collisionExitHash = FNV1aHash("CollisionExitEventBuffer");
+    const ECS::ComponentTypeId collisionId = ECS::ComponentRegistry::GetComponentIdFromHash(collisionHash);
+    const ECS::ComponentTypeId collisionExitId = ECS::ComponentRegistry::GetComponentIdFromHash(collisionExitHash);
     
     // Iterate through archetypes, chunks, and entities
     while (iterator->archetypeIndex < archetypes.size()) {
@@ -425,6 +450,27 @@ INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEn
                 
                 // Advance to next entity
                 iterator->entityIndex++;
+
+                if (iterator->componentCount == 1) {
+                    const ECS::ComponentTypeId queryId = iterator->componentTypeIds[0];
+                    if (queryId == collisionId || queryId == collisionExitId) {
+                        const bool hasComponent = world->HasById(entity, queryId);
+                        if (!hasComponent) {
+                            LOG_WARNING("[WorldInterop_QueryNext] Entity " << *outEntityId
+                                << " missing expected event component id=" << queryId);
+                        } else if (queryId == collisionId) {
+                            if (auto* buffer = world->TryGet<ECS::Events::CollisionEventBuffer>(entity)) {
+                                LOG_INFO("[WorldInterop_QueryNext] CollisionEventBuffer e=" << *outEntityId
+                                    << " count=" << buffer->Count);
+                            }
+                        } else if (queryId == collisionExitId) {
+                            if (auto* buffer = world->TryGet<ECS::Events::CollisionExitEventBuffer>(entity)) {
+                                LOG_INFO("[WorldInterop_QueryNext] CollisionExitEventBuffer e=" << *outEntityId
+                                    << " count=" << buffer->Count);
+                            }
+                        }
+                    }
+                }
                 
                 return true;
             }

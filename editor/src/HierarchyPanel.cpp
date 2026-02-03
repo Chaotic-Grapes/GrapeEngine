@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define NO_ERROR
 #include <windows.h>
 #include "HierarchyPanel.h"
+#include "EditorStyle.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include "EditorECSUtils.h"
@@ -474,7 +475,12 @@ void HierarchyPanel::_renderEntityTree() {
 
 // Render footer buttons (Clear All)
 void HierarchyPanel::_renderFooterButtons() {
-    // Clear All button: removes all entities from the scene
+    // Clear All button: removes all entities from the scene.
+    // Use danger styling to signal destructive action.
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
     if (ImGui::Button("Clear All")) {
         if (m_entityActions) {
             m_entityActions->ClearAllEntities();
@@ -485,6 +491,7 @@ void HierarchyPanel::_renderFooterButtons() {
         m_childOrder.clear(); // Clear order caches on delete-all.
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
+    ImGui::PopStyleColor(4);
 }
 
 // -------------------------------------------------------------------------

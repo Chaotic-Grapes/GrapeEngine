@@ -354,6 +354,29 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Creates a new scene slot and loads a scene file into it.
+    /// </summary>
+    /// <param name="filename">Path to the input file.</param>
+    /// <returns>The loaded scene, or null if the load failed.</returns>
+    public Scene? LoadScene(string filename)
+    {
+        if (string.IsNullOrEmpty(filename))
+            throw new ArgumentNullException(nameof(filename));
+
+        ulong sceneIndex = AddScene();
+        if (sceneIndex == ulong.MaxValue)
+            throw new InvalidOperationException("Failed to allocate a new scene slot.");
+
+        if (!LoadScene(sceneIndex, filename))
+        {
+            RemoveScene(sceneIndex);
+            return null;
+        }
+
+        return GetScene(sceneIndex);
+    }
+
+    /// <summary>
     /// Restarts a scene by reloading it from disk into the same slot.
     /// </summary>
     /// <param name="sceneIndex">The index of the scene slot to restart.</param>

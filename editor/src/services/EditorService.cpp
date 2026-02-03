@@ -109,9 +109,9 @@ void EditorService::Initialize() {
         io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
         io.FontGlobalScale = EditorStyle::FontScale;
 
-        ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.TabBarBorderSize = 0.0f;
+        // Apply the editor's modern theme overrides.
+        EditorStyle::ApplyModernTheme(style);
 
         GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
         if (!glfwHandle) {

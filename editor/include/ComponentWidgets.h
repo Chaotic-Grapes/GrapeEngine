@@ -106,8 +106,8 @@ namespace EditorUI {
     // Returns X position where property content starts after labels
     float GetContentStartX();
 
-    // Returns fixed content width used for consistent inspector panel layout
-    constexpr float GetContentWidth() { return 730.0f; }
+    // Returns content width for the current inspector panel layout
+    float GetContentWidth();
 
 } 
 

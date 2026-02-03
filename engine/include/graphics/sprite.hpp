@@ -45,6 +45,15 @@ struct Sprite {
     int textureWidth = 0;
     int textureHeight = 0;
 
+    // Material2D fields
+    GLuint normalTextureId = 0;
+    GLuint mraTextureId = 0;
+    float metallic = 0.0f;
+    float smoothness = 0.5f;
+    float aoStrength = 1.0f;
+    float normalStrength = 1.0f;
+    uint32_t materialFlags = 0;
+
     void handleInput(GLFWwindow* window, float deltaTime);
 };
 
@@ -61,7 +70,7 @@ public:
     void setRow(int rowIndex, int count = -1, int startCol = 0);
     void setRowFrameCounts(const std::vector<int>& counts);
 
-    // NEW: Emissive support
+    // Emissive support
     void setEmissive(GLuint emissiveTexId, float strength) {
         m_emissiveTextureId = emissiveTexId;
         m_emissiveStrength = strength;

@@ -27,6 +27,8 @@ public:
 
     void SetActive(bool active) { m_active = active; }
     bool IsActive() const { return m_active; }
+    // Gate viewport input handling to valid tile-editing state.
+    bool CanHandleViewportInput() const { return m_active && m_tileMap && m_tileset; }
 
 private:
     bool m_active = true;
