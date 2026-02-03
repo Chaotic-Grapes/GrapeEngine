@@ -40,7 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <scene/SceneManager.h>
-#include "ecs/systems/RendererSystem.h"  
+#include "ecs/systems/RendererSystem.h"
 #include "graphics/RenderGraph.hpp"
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
@@ -431,6 +431,11 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
+            if (auto* renderer = ECS::RendererSystem::GetInstance()) {
+                // GUI renders into the full LDR target; the scene image is a scaled blit of that target.
+                // Using the ImGui rect as a GUI viewport offsets/clips GUI relative to the image.
+                renderer->ResetGUIViewport();
+            }
 
             // Prepare interaction manager with current viewport state
             // IMPORTANT: Use viewportScreenPos which is the actual rendered image position

@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <unordered_map>
 #include <queue>
+#include <string>
 
 #include "graphics/TileMapRenderer.hpp"
 
@@ -84,8 +85,20 @@ namespace ECS {
         float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
 
+        struct GUIViewport {
+            Vector2D Origin{ 0.0f, 0.0f };
+            Vector2D Size{ 0.0f, 0.0f };
+            Vector2D DisplayScale{ 1.0f, 1.0f };
+            bool Active = false;
+        };
+
         // Static accessor for global access
         static RendererSystem* GetInstance();
+
+        Vector2D GetRenderTargetSize() const { return m_renderTargetSize; }
+        GUIViewport GetGUIViewport() const { return m_guiViewport; }
+        void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
+        void ResetGUIViewport();
 
 
         /**
@@ -204,6 +217,11 @@ namespace ECS {
         void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
                                      const glm::vec4& color);
 
+        void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
+                            const Color& color, float cornerRadius = 0.0f);
+        void SubmitGUIText(const Vector2D& position, const std::string& text,
+                           const std::string& fontPath, float pixelSize, const Color& color);
+
         // Call from editor when a tilemap should be rendered
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
         void ClearDebugTileMap();
@@ -289,6 +307,23 @@ namespace ECS {
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
 
+        struct GUIPanelSubmission {
+            Vector2D position;
+            Vector2D size;
+            Color color;
+            float cornerRadius = 0.0f;
+        };
+        std::vector<GUIPanelSubmission> m_guiPanelQueue;
+
+        struct GUITextSubmission {
+            Vector2D position;
+            std::string text;
+            std::string fontPath;
+            float pixelSize = 24.0f;
+            Color color;
+        };
+        std::vector<GUITextSubmission> m_guiTextQueue;
+
         Graphics::LightManager m_lightManager;
 
         // ====================================================================
@@ -296,6 +331,7 @@ namespace ECS {
         // ====================================================================
 
         std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
         std::unique_ptr<Shader> m_blitShader;
 
@@ -332,6 +368,8 @@ namespace ECS {
 
         std::optional<InFlightPick> m_inFlightPick;
 
+        Vector2D m_renderTargetSize{ 0.0f, 0.0f };
+        GUIViewport m_guiViewport{};
 
         // ====================================================================
         // Helper Methods - Camera

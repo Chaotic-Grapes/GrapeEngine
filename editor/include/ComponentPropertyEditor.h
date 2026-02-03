@@ -115,6 +115,11 @@ public:
     // Renders material component for assigning materials to renderers
 	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
 private:
     // -------------------------------------------------------------------------
     // State

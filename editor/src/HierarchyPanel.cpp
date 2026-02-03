@@ -385,6 +385,51 @@ void HierarchyPanel::_renderHeader() {
             ImGui::CloseCurrentPopup();
         }
 
+        if (ImGui::BeginMenu("Create GUI")) {
+            if (ImGui::MenuItem("Panel")) {
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI panel components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    // Add default GUIElement and GUIPanel components
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        
+                        // Add default GUIElement and GUIPanel components
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 300.0f, 200.0f };
+                        m_world->Add<ECS::Components::GUIPanel>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Text")) {
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI text components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    if (newId != ECS::Entity::NPOS32) {
+                        // Add default GUIElement and GUIText components
+                        ECS::Entity e = m_world->Resolve(newId);
+
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 40.0f };
+
+                        auto& text = m_world->Add<ECS::Components::GUIText>(e);
+                        text.SetText("Text");
+                        text.SetFontPath("");
+                        text.FontSize = 24.0f;
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+
         ImGui::EndPopup();
     }
 

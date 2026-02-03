@@ -63,6 +63,10 @@ namespace {
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
+    const uint32_t kHashGUICanvas = Editor::ECSUtils::FNV1aHash("GUICanvas");
+    const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
+    const uint32_t kHashGUIPanel = Editor::ECSUtils::FNV1aHash("GUIPanel");
+    const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
     template<typename T>
     nlohmann::json MakeDefaultJson() {
         T value{};
@@ -249,6 +253,22 @@ Without these, the macro would end early and break the expansion
         if (const auto id = GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); };
         }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUICanvas(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIElement(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIPanel, "GUIPanel"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIPanel(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIText(d, e, w); };
+        }
     }
     
     return renderers;
@@ -321,7 +341,7 @@ Without these, the macro would end early and break the expansion
                 {"TextureId", 0}, {"NormalTextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
-                {"RowIndex", 0}, {"RowStartColumn", 0}, {"RowFrameCount", 0},
+                {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
                 {"Loop", true}, {"Playing", false}, {"UseRow", false}
             }; 
             };
@@ -476,6 +496,48 @@ Without these, the macro would end early and break the expansion
             };
             };
         }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"ReferenceSize", {{"X", 1920.0f}, {"Y", 1080.0f}}},
+                {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
+                {"ScaleMode", 0}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Position", {{"X", 0.0f}, {"Y", 0.0f}}},
+                {"Size", {{"X", 100.0f}, {"Y", 100.0f}}},
+                {"Visible", true},
+                {"Alignment", 0},
+                {"ZOrder", 0}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIPanel, "GUIPanel"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Color", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f}}},
+                {"CornerRadius", 0.0f}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Text", "Text"},
+                {"FontPath", ""},
+                {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"FontSize", 24.0f}
+            };
+            };
+        }
     }
     
     return defaults;
@@ -572,7 +634,7 @@ static void _initializeDefaultRegistry() {
                 {"TextureId", 0}, {"NormalTextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
-                {"RowIndex", 0}, {"RowStartColumn", 0}, {"RowFrameCount", 0},
+                {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
                 {"Loop", true}, {"Playing", false}, {"UseRow", false}
             }; }),
             COMPONENT_OPS_HASH(SpriteSheetAnimation2D, kHashSpriteSheetAnimation2D)
@@ -760,6 +822,56 @@ static void _initializeDefaultRegistry() {
                 { "Flags", 0 }
             }; }),
             COMPONENT_OPS_HASH(Material2D, kHashMaterial2D)
+        },
+        // GUI Canvas
+        {
+            "GUI Canvas", "GUICanvas", "ECS::Components::GUICanvas",
+            GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"), kHashGUICanvas, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUICanvas(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "ReferenceSize", {{"X", 1920.0f}, {"Y", 1080.0f}} },
+                { "Offset", {{"X", 0.0f}, {"Y", 0.0f}} },
+                { "ScaleMode", 0 }
+            }; }),
+            COMPONENT_OPS_HASH(GUICanvas, kHashGUICanvas)
+        },
+        // GUI Element
+        {
+            "GUI Element", "GUIElement", "ECS::Components::GUIElement",
+            GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"), kHashGUIElement, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIElement(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Position", {{"X", 0.0f}, {"Y", 0.0f}} },
+                { "Size", {{"X", 100.0f}, {"Y", 100.0f}} },
+                { "Visible", true },
+                { "Alignment", 0 },
+                { "ZOrder", 0 }
+            }; }),
+            COMPONENT_OPS_HASH(GUIElement, kHashGUIElement)
+        },
+        // GUI Panel
+        {
+            "GUI Panel", "GUIPanel", "ECS::Components::GUIPanel",
+            GetComponentIdFromHashOrWarn(kHashGUIPanel, "GUIPanel"), kHashGUIPanel, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIPanel(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Color", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f}} },
+                { "CornerRadius", 0.0f }
+            }; }),
+            COMPONENT_OPS_HASH(GUIPanel, kHashGUIPanel)
+        },
+        // GUI Text
+        {
+            "GUI Text", "GUIText", "ECS::Components::GUIText",
+            GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"), kHashGUIText, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIText(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Text", "Text" },
+                { "FontPath", "" },
+                { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "FontSize", 24.0f }
+            }; }),
+            COMPONENT_OPS_HASH(GUIText, kHashGUIText)
         },
     };
 }

@@ -120,10 +120,10 @@ namespace {
         int windowCount = 0;
 
         if (anim->UseRow) {
-            const int rowIndex = std::clamp(anim->RowIndex, 0, totalRows - 1);
-            const int startCol = std::clamp(anim->RowStartColumn, 0, totalCols - 1);
+            const int rowIndex = std::clamp(anim->Row, 0, totalRows - 1);
+            const int startCol = std::clamp(anim->FrameOffset, 0, totalCols - 1);
             const int available = totalCols - startCol;
-            int rowCount = anim->RowFrameCount;
+            int rowCount = anim->FrameLength;
             if (rowCount <= 0 || rowCount > available)
                 rowCount = available;
             windowStart = rowIndex * totalCols + startCol;

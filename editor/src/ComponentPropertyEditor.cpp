@@ -54,6 +54,33 @@ namespace {
         }
     };
 
+    bool RenderClearTrashButton(const char* id, const char* tooltip, ImFont* symbolsFont) {
+        ImGui::SameLine();
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::PushID(id);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+
+        if (symbolsFont) ImGui::PushFont(symbolsFont);
+        const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
+        const bool clicked = ImGui::SmallButton(icon);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+        if (symbolsFont) ImGui::PopFont();
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+        return clicked;
+    }
+
     void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
         if (!world || entity.IsNull() || !world->IsAlive(entity))
             return;
@@ -77,10 +104,10 @@ namespace {
         int windowCount = 0;
 
         if (useRow) {
-            const int rowIndex = std::clamp(animData.value("RowIndex", 0), 0, totalRows - 1);
-            const int startCol = std::clamp(animData.value("RowStartColumn", 0), 0, totalCols - 1);
+            const int rowIndex = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(animData.value("FrameOffset", 0), 0, totalCols - 1);
             const int available = totalCols - startCol;
-            int rowCount = animData.value("RowFrameCount", 0);
+            int rowCount = animData.value("FrameLength", 0);
             if (rowCount <= 0 || rowCount > available)
                 rowCount = available;
             windowStart = rowIndex * totalCols + startCol;
@@ -476,6 +503,12 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
+    if (!texPath.empty() && RenderClearTrashButton("SpriteClear", "Clear sprite", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["Width"] = 0;
+        data["Height"] = 0;
+    }
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -548,6 +581,10 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    if (!normalPath.empty() && RenderClearTrashButton("NormalMapClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
+    }
     bool droppedNormal = false;
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
@@ -1072,10 +1109,16 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
     // Group all sprite sheet related rows under one aligned section
     EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
-        "Mode", "Start Frame", "Frame Count", "Row Index", "Row Start Column", "Row Frame Count", "FPS", "Loop", "Playing" });
+        "Mode", "Start Frame", "Frame Count", "Row", "Frame Offset", "Frame Length", "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
+    if (!texPath.empty() && RenderClearTrashButton("SpriteSheetClear", "Clear sprite sheet", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["SheetWidth"] = 0;
+        data["SheetHeight"] = 0;
+    }
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -1142,6 +1185,10 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    if (!normalPath.empty() && RenderClearTrashButton("SpriteSheetNormalClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
+    }
     bool droppedNormal = false;
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
@@ -1218,9 +1265,9 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         // How many frames in the animation sequence
         EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
     } else {
-        EditorUI::RenderIntProperty("Row Index", data, "RowIndex");
-        EditorUI::RenderIntProperty("Row Start Column", data, "RowStartColumn");
-        EditorUI::RenderIntProperty("Row Frame Count", data, "RowFrameCount");
+        EditorUI::RenderIntProperty("Row", data, "Row");
+        EditorUI::RenderIntProperty("Frame Offset", data, "FrameOffset");
+        EditorUI::RenderIntProperty("Frame Length", data, "FrameLength");
     }
 
     // Animation speed in frames per second
@@ -1377,6 +1424,163 @@ void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entit
     // Finished (boolean)
     EditorUI::RenderCheckboxProperty("Finished##AnimState", data, "Finished");
 
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUICanvas");
+
+    if (!data.contains("ReferenceSize")) data["ReferenceSize"] = { {"X", 1920.0f}, {"Y", 1080.0f} };
+    if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+
+    EditorUI::BeginPropertySection({ "Reference Size", "Offset", "Scale Mode" });
+    EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+
+    const char* scaleModes[] = { "Fit", "Fill", "Match Width", "Match Height" };
+    int scaleMode = data.value("ScaleMode", 0);
+    scaleMode = std::max(0, std::min(scaleMode, 3));
+    ImGui::Text("Scale Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIScaleMode", scaleModes[scaleMode])) {
+        for (int i = 0; i < 4; ++i) {
+            bool selected = (scaleMode == i);
+            if (ImGui::Selectable(scaleModes[i], selected)) {
+                scaleMode = i;
+                data["ScaleMode"] = scaleMode;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIElement");
+
+    if (!data.contains("Position")) data["Position"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Size")) data["Size"] = { {"X", 100.0f}, {"Y", 100.0f} };
+    if (!data.contains("Visible")) data["Visible"] = true;
+    if (!data.contains("Alignment")) data["Alignment"] = 0;
+    if (!data.contains("ZOrder")) data["ZOrder"] = 0;
+
+    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order" });
+    EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
+    EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
+    const char* alignmentOptions[] = {
+        "Top Left", "Top", "Top Right",
+        "Left", "Center", "Right",
+        "Bottom Left", "Bottom", "Bottom Right"
+    };
+    int alignment = data.value("Alignment", 0);
+    alignment = std::max(0, std::min(alignment, 8));
+    ImGui::Text("Alignment");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIAlignment", alignmentOptions[alignment])) {
+        for (int i = 0; i < 9; ++i) {
+            bool selected = (alignment == i);
+            if (ImGui::Selectable(alignmentOptions[i], selected)) {
+                alignment = i;
+                data["Alignment"] = alignment;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIPanel");
+
+    if (!data.contains("Color")) data["Color"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+
+    EditorUI::BeginPropertySection({ "Color", "Corner Radius" });
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIText");
+
+    if (!data.contains("Text")) data["Text"] = "Text";
+    if (!data.contains("FontPath")) data["FontPath"] = "";
+    if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("FontSize")) {
+        if (data.contains("PixelSize")) {
+            data["FontSize"] = data["PixelSize"];
+        } else {
+            data["FontSize"] = 24.0f;
+        }
+    }
+
+    EditorUI::BeginPropertySection({ "Text", "Font", "Color", "Font Size" });
+    EditorUI::RenderTextProperty("Text", data, "Text");
+
+    std::string fontPath = data.value("FontPath", std::string());
+    std::string fontValueText;
+    if (!fontPath.empty()) {
+        fontValueText = std::filesystem::path(fontPath).filename().string();
+    }
+    else {
+        fontValueText = "None (drag font here)";
+    }
+
+    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
+    if (!fontPath.empty() && RenderClearTrashButton("GUITextFontClear", "Clear font", m_symbolsFont)) {
+        data["FontPath"] = "";
+    }
+
+    if (ImGui::BeginDragDropTarget()) {
+        auto acceptPath = [&](const char* droppedPath) {
+            std::filesystem::path path(droppedPath);
+            std::string ext = path.extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".ttf" || ext == ".otf" || ext == ".ttc") {
+                data["FontPath"] = path.string();
+                return true;
+            }
+            return false;
+        };
+
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            acceptPath(droppedPath);
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payload->Data);
+            const char* end = dataBuf + payload->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                if (acceptPath(path.c_str())) {
+                    break;
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
     EditorUI::EndPropertySection();
 }
 

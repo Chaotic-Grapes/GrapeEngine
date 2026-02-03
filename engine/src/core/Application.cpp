@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
 #include "ecs/events/EventDispatcher.h"
@@ -331,8 +332,7 @@ namespace Engine {
         
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
-        
-        // Register GUI systems
+        m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();
 
         // Build dependency graphs (analyzes component access)
         m_systemManager.BuildDependencyGraphs();

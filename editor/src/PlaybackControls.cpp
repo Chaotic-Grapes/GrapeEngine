@@ -145,23 +145,34 @@ void Playback::Render() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
     ImGui::Begin("Game Controls", nullptr, flags);
 
-    const ImVec2 mainBtnSize(48.0f, 30.0f);
-    const ImVec2 smallBtnSize(26.0f, 20.0f);
+    const ImVec2 mainBtnSize(42.0f, 26.0f);
+    const ImVec2 smallBtnSize(22.0f, 18.0f);
 
     // Compact icon button with optional active palette.
     auto drawIconButton = [&](const char* icon, bool enabled, const ImVec2& size, const char* tooltip,
-                              bool active, const ImVec4& activeColor, std::function<void()> onClick) {
+                              bool active, const ImVec4& activeColor, std::function<void()> onClick,
+                              const ImVec4* baseColor = nullptr,
+                              const ImVec4* baseHover = nullptr,
+                              const ImVec4* baseActive = nullptr) {
         if (!enabled) ImGui::BeginDisabled();
-        if (active) {
+        if (active) { // Active state color override
             ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(activeColor, 1.1f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(activeColor, 0.9f));
             ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
         }
+        if (!active && baseColor && baseHover && baseActive) { // Custom base colors
+            ImGui::PushStyleColor(ImGuiCol_Button, *baseColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, *baseHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, *baseActive);
+        }
 
         bool clicked = false;
         ImGui::PushFont(m_symbolsFont);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
         clicked = ImGui::Button(icon, size);
+        ImGui::PopStyleVar(2);
         ImGui::PopFont();
 
         if (tooltip && ImGui::IsItemHovered()) {
@@ -172,6 +183,7 @@ void Playback::Render() {
             ImGui::EndTooltip();
         }
 
+        if (!active && baseColor && baseHover && baseActive) ImGui::PopStyleColor(3);
         if (active) ImGui::PopStyleColor(4);
         if (!enabled) ImGui::EndDisabled();
         if (clicked && onClick) onClick();
@@ -194,48 +206,88 @@ void Playback::Render() {
 
     // Top row: centered primary controls, state pill, time scrub on right.
     {
+        // Calculate centering offsets
         const float rowStartX = ImGui::GetCursorPosX();
         const float contentWidth = ImGui::GetContentRegionAvail().x;
         const float groupWidth = (mainBtnSize.x * 3.0f) + (style.ItemSpacing.x * 2.0f);
-        const float targetRightWidth = 460.0f;
-        const float reservedRight = std::max(0.0f, std::min(targetRightWidth, contentWidth - groupWidth - 20.0f));
-        float startX = (contentWidth - groupWidth) * 0.5f;
-        startX = std::max(startX, 0.0f);
-        ImGui::SetCursorPosX(rowStartX + startX);
 
+        // Background box around controls
+        const ImVec2 controlPadding(8.0f, 4.0f);
+        
+        // Rounded rectangle parameters
+        const float controlRounding = 10.0f;
+        const float boxWidth = groupWidth + (controlPadding.x * 2.0f);
+        const float boxHeight = mainBtnSize.y + (controlPadding.y * 2.0f);
+        const float targetRightWidth = 460.0f;
+        const float reservedRight = std::max(0.0f, std::min(targetRightWidth, contentWidth - boxWidth - 20.0f));
+
+        // Center the box within available content width
+        float startX = (contentWidth - boxWidth) * 0.5f;
+
+        // Ensure box does not overflow left edge
+        startX = std::max(startX, 0.0f);
+        ImVec2 rowStartScreen = ImGui::GetCursorScreenPos();
+        ImVec2 boxMin(rowStartScreen.x + startX, rowStartScreen.y);
+        ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
+
+        // Draw background box
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 1.1f)),
+            controlRounding
+        );
+        ImGui::GetWindowDrawList()->AddRect(
+            boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::Border, 0.8f)),
+            controlRounding
+        );
+
+        // Position cursor for first button
+        ImGui::SetCursorPosX(rowStartX + startX + controlPadding.x);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + controlPadding.y);
+
+        // Play/Pause button
         const bool canPlay = HasValidWorld();
         const bool canStep = (m_editorState == EditorState::Paused || m_editorState == EditorState::Step);
         const bool isPlaying = (m_editorState == EditorState::Play);
         const bool isPaused = (m_editorState == EditorState::Paused);
 
+        // Determine icon, tooltip, and color based on state
         const char* playIcon = isPlaying ? "\xEE\x80\xB4" : "\xEE\x80\xB7";
         const char* playTooltip = isPlaying ? "Pause (Ctrl+Shift+P)" : (m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         const ImVec4 playColor = isPlaying ? EditorStyle::WarningButton : EditorStyle::SuccessButton;
+        const bool playActive = isPlaying || isPaused;
 
+        // Draw Play/Pause button
         ImGui::PushID("PlayPause");
         drawIconButton(playIcon, canPlay, mainBtnSize, playTooltip,
-            isPlaying || isPaused, playColor,
+            playActive, playColor,
             [this]() {
+                // Toggle play/pause/resume based on current state
                 if (m_editorState == EditorState::Edit) {
                     if (_startPlayFromEdit()) {
                         LOG_INFO("Game started");
                     }
-                } else if (m_editorState == EditorState::Play) {
+                } else if (m_editorState == EditorState::Play) { // Pause
                     _changeState(EditorState::Paused);
                     LOG_INFO("Game paused");
-                } else {
+                } else { // Resume from Paused or Step
                     _changeState(EditorState::Play);
                     LOG_INFO("Game resumed");
                 }
-            });
+            },
+            !playActive ? &EditorStyle::SuccessButton : nullptr, // Custom base colors
+            !playActive ? &EditorStyle::SuccessButtonHover : nullptr, // Hover
+            !playActive ? &EditorStyle::SuccessButtonActive : nullptr); // Active
         ImGui::PopID();
 
+        // Stop button
         ImGui::SameLine();
         ImGui::PushID("Stop");
         ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        // Draw Stop button
         drawIconButton("\xEE\x81\x87", m_editorState != EditorState::Edit, mainBtnSize,
             "Stop (Ctrl+P)", false, EditorStyle::DangerButton,
             [this]() {
@@ -246,8 +298,11 @@ void Playback::Render() {
         ImGui::PopStyleColor(4);
         ImGui::PopID();
 
+        // Step button
         ImGui::SameLine();
         ImGui::PushID("StepPrimary");
+
+        // Draw Step button
         drawIconButton("\xEE\x81\x84", canStep, mainBtnSize, "Step (Alt+P)",
             m_editorState == EditorState::Step, EditorStyle::Accent,
             [this]() {
@@ -257,26 +312,30 @@ void Playback::Render() {
             });
         ImGui::PopID();
 
+        // State pill: aligned to right side before time scale controls
         float pillX = rowStartX + contentWidth - reservedRight - 72.0f;
-        if (pillX > ImGui::GetCursorPosX() + style.ItemSpacing.x) {
+        if (pillX > ImGui::GetCursorPosX() + style.ItemSpacing.x) { // Enough space to right-align
             ImGui::SameLine();
             ImGui::SetCursorPosX(pillX);
         } else {
             ImGui::SameLine();
         }
 
-        if (m_editorState == EditorState::Play) {
+        // Draw state pill based on current editor state
+        if (m_editorState == EditorState::Play) { // Green for Play
             drawStatePill("PLAY", EditorStyle::SuccessButton);
-        } else if (m_editorState == EditorState::Paused) {
+        } else if (m_editorState == EditorState::Paused) { // Yellow for Paused
             drawStatePill("PAUSED", EditorStyle::WarningButton);
-        } else if (m_editorState == EditorState::Step) {
+        } else if (m_editorState == EditorState::Step) { // Accent for Step
             drawStatePill("STEP", EditorStyle::Accent);
         }
 
+        // Time scale presets and slider on far right
         if (reservedRight > 0.0f) {
             ImGui::SameLine();
             ImGui::SetCursorPosX(rowStartX + contentWidth - reservedRight);
 
+            // Time scale presets
             ImGui::PushFont(m_mainFont);
             const float presets[] = { 0.25f, 0.5f, 1.0f, 2.0f };
             for (float preset : presets) {
@@ -289,6 +348,7 @@ void Playback::Render() {
                     ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
                 }
 
+                // Preset button
                 char label[12];
                 snprintf(label, sizeof(label), "%.2fx", preset);
                 if (ImGui::Button(label, ImVec2(52, 0))) {
@@ -326,7 +386,9 @@ void Playback::Render() {
     if (ImGui::BeginPopupModal("Unsaved Changes##PlayWarning", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Scene has unsaved changes. Save before entering Play?");
         ImGui::Separator();
-        if (ImGui::Button("Save && Play", ImVec2(120, 0))) {
+
+        // Popup buttons
+        if (ImGui::Button("Save & Play", ImVec2(120, 0))) {
             if (m_saveSceneCallback) m_saveSceneCallback();
             _saveWorldState();
             _changeState(EditorState::Play);

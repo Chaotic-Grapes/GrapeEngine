@@ -124,7 +124,11 @@ namespace ECS {
         REGISTER_COMPONENT(AudioSource);
 
         // Material2D
-		REGISTER_COMPONENT(Material2D);
+        REGISTER_COMPONENT(Material2D);
+        REGISTER_COMPONENT(GUICanvas);
+        REGISTER_COMPONENT(GUIElement);
+        REGISTER_COMPONENT(GUIPanel);
+        REGISTER_COMPONENT(GUIText);
 
 
         // Event buffers (physics events)
@@ -180,6 +184,10 @@ namespace ECS {
         LogComponentTypeIds("Light2D", FNV1a_Hash("Light2D"));
         LogComponentTypeIds("AudioSource", FNV1a_Hash("AudioSource"));
         LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
+        LogComponentTypeIds("GUICanvas", FNV1a_Hash("GUICanvas"));
+        LogComponentTypeIds("GUIElement", FNV1a_Hash("GUIElement"));
+        LogComponentTypeIds("GUIPanel", FNV1a_Hash("GUIPanel"));
+        LogComponentTypeIds("GUIText", FNV1a_Hash("GUIText"));
 
         LogComponentTypeIds("CollisionEventBuffer", FNV1a_Hash("CollisionEventBuffer"));
         LogComponentTypeIds("TriggerEventBuffer", FNV1a_Hash("TriggerEventBuffer"));

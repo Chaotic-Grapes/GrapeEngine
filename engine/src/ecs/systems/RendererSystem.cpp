@@ -58,6 +58,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Services
 // ============================================================================
 #include "services/TimeSystem.h"
+#include "services/ResourceManager.h"
 #include "platform/IPlatformContext.h"
 
 // ============================================================================
@@ -89,6 +90,22 @@ namespace ECS {
     // Implementation of static GetInstance method
     RendererSystem* RendererSystem::GetInstance() {
         return g_rendererSystemInstance;
+    }
+
+    // GUI viewport management
+    void RendererSystem::SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale) {
+        m_guiViewport.Origin = origin;
+        m_guiViewport.Size = size;
+        m_guiViewport.DisplayScale = displayScale;
+        m_guiViewport.Active = true;
+    }
+
+    // Reset GUI viewport to full render target size
+    void RendererSystem::ResetGUIViewport() {
+        m_guiViewport.Origin = { 0.0f, 0.0f };
+        m_guiViewport.Size = m_renderTargetSize;
+        m_guiViewport.DisplayScale = { 1.0f, 1.0f };
+        m_guiViewport.Active = true;
     }
 
     // Helper function to get the effective transform for rendering
@@ -163,16 +180,21 @@ namespace ECS {
         }
         const int width = mainWindow->GetWidth();
         const int height = mainWindow->GetHeight();
+        m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
+        ResetGUIViewport();
 
         // Shaders
         m_shader = std::make_unique<Shader>(
             "assets/shaders/batch.vert",
             "assets/shaders/batch.frag");
 
+        m_textShader = std::make_unique<Shader>(
+            "assets/shaders/sdf_text.vert",
+            "assets/shaders/sdf_text.frag");
+
         m_sdfCircleShader = std::make_unique<Shader>(
             "assets/shaders/sdf_circle.vert",
-            "assets/shaders/sdf_circle.frag"
-        );
+            "assets/shaders/sdf_circle.frag");
 
         m_bloomExtractShader = std::make_unique<Shader>(
             "assets/shaders/bloom_extract.vert",
@@ -239,6 +261,9 @@ namespace ECS {
 
                 // Resize picking FBO
                 m_pickingFBO.Resize(msg.Width, msg.Height, false, false);
+
+                m_renderTargetSize = { static_cast<float>(msg.Width), static_cast<float>(msg.Height) };
+                ResetGUIViewport();
             });
 
         // Projection matrix
@@ -664,6 +689,9 @@ namespace ECS {
                                 aoStrength = mat.AOStrength;
                                 normalStrength = mat.NormalStrength;
                                 flags = mat.Flags;
+                                if (normalTexId == 0) {
+                                    normalTexId = sr.NormalTextureId;
+                                }
                             }
 
                             m_renderer->submitSprite({
@@ -1215,6 +1243,114 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
+        // GUI Pass - Render GUI panels on top of scene
+        m_renderGraph->AddPass("GUI", { "LDR" }, { "LDR" },
+            [this](ResourceAccessor& res)
+            {
+                // Skip if no GUI elements queued
+                if (m_guiPanelQueue.empty() && m_guiTextQueue.empty()) return;
+
+                auto* ldr = res.GetFramebuffer("LDR");
+                if (!ldr) return;
+
+                // Setup orthographic projection for screen-space rendering
+                const float width = static_cast<float>(ldr->Width());
+                const float height = static_cast<float>(ldr->Height());
+
+                ldr->Bind();
+                glViewport(0, 0, ldr->Width(), ldr->Height());
+
+                // Enable blending for GUI rendering
+                GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                // Orthographic projection matrix
+                glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
+
+                // Setup scissor test based on GUI viewport
+                bool scissorEnabled = false;
+                GUIViewport viewport = m_guiViewport;
+                if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
+                    viewport.Origin = { 0.0f, 0.0f };
+                    viewport.Size = { width, height };
+                }
+
+                // Enable scissor test if viewport size is valid
+                if (viewport.Size.X > 0.0f && viewport.Size.Y > 0.0f) {
+                    glEnable(GL_SCISSOR_TEST);
+                    scissorEnabled = true;
+                    const int scissorX = static_cast<int>(std::round(viewport.Origin.X));
+                    const int scissorY = static_cast<int>(std::round(height - (viewport.Origin.Y + viewport.Size.Y)));
+                    const int scissorW = static_cast<int>(std::round(viewport.Size.X));
+                    const int scissorH = static_cast<int>(std::round(viewport.Size.Y));
+                    glScissor(scissorX, scissorY, scissorW, scissorH);
+                }
+
+                // Render GUI panels
+                if (!m_guiPanelQueue.empty()) {
+                    if (m_shader) {
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", screenOrtho);
+                        m_shader->setUniform("uLightingEnabled", 0);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& panel : m_guiPanelQueue) { // Render each panel
+                        const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
+                                               panel.position.Y + panel.size.Y * 0.5f);
+                        const glm::vec2 size(panel.size.X, panel.size.Y);
+                        const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
+                        GLuint textureId = 0;
+                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                    }
+                    m_renderer->endFrame();
+                }
+
+                // Render GUI text
+                if (!m_guiTextQueue.empty()) {
+                    const glm::mat4 textOrtho = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+                    if (m_textShader) {
+                        m_textShader->use();
+                        m_textShader->setMat4("uProjection", textOrtho);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& text : m_guiTextQueue) { // Render each text element
+                        if (text.text.empty()) {
+                            continue;
+                        }
+
+                        // Load font
+                        const std::string fontPath = text.fontPath.empty()
+                            ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
+                            : text.fontPath;
+                        const int pixelSize = std::max(1, static_cast<int>(std::round(text.pixelSize)));
+                        auto font = RM.GetFont(fontPath, pixelSize);
+                        if (!font) {
+                            continue;
+                        }
+
+                        // Calculate text position (flip Y for GUI space)
+                        const glm::vec2 textPos(text.position.X, height - text.position.Y);
+                        const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                        m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+                    }
+                    m_renderer->endFrame();
+                }
+
+                // Disable scissor test if it was enabled
+                if (scissorEnabled) {
+                    glDisable(GL_SCISSOR_TEST);
+                }
+
+                // Clear GUI queues for next frame
+                m_guiPanelQueue.clear();
+                m_guiTextQueue.clear();
+
+                if (!blendWasEnabled) glDisable(GL_BLEND);
+                Framebuffer::Unbind();
+            });
+
         // Blit LDR to backbuffer
         m_renderGraph->AddPass("Composite", { "LDR" }, { "Backbuffer" },
             [this, &win](ResourceAccessor& res)
@@ -1262,6 +1398,7 @@ namespace ECS {
         m_renderer.reset();
         m_renderGraph.reset();
         m_shader.reset();
+        m_textShader.reset();
         m_sdfCircleShader.reset();
         m_blitShader.reset();
         m_bloomBlurShader.reset();
@@ -1384,6 +1521,32 @@ namespace ECS {
         sub.closed = false;
         sub.filled = false;
         m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
+                                        const Color& color, float cornerRadius) {
+        (void)cornerRadius;
+        if (!m_renderer) return;
+
+        GUIPanelSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.color = color;
+        submission.cornerRadius = cornerRadius;
+        m_guiPanelQueue.push_back(submission);
+    }
+
+    void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
+                                       const std::string& fontPath, float pixelSize, const Color& color) {
+        if (!m_renderer) return;
+
+        GUITextSubmission submission;
+        submission.position = position;
+        submission.text = text;
+        submission.fontPath = fontPath;
+        submission.pixelSize = pixelSize;
+        submission.color = color;
+        m_guiTextQueue.push_back(std::move(submission));
     }
 
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,

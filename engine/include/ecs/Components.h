@@ -31,6 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/StringTable.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
+#include <string>
 #include <type_traits>
 
 /*
@@ -351,9 +352,9 @@ namespace ECS {
             int SheetHeight = 0;              // Total height of the sprite sheet
             int StartFrame = 0;               // First frame index in the animation
             int FrameCount = 0;               // Number of frames in the animation
-            int RowIndex = 0;                 // Row index when using row mode
-            int RowStartColumn = 0;           // Start column within the row
-            int RowFrameCount = 0;            // Frames to use in row (0 = rest of row)
+            int Row = 0;                     // Row index when using row mode (0 = top)
+            int FrameOffset = 0;             // Column offset in the row (0 = leftmost)
+            int FrameLength = 0;             // Frames to use in row (0 = rest of row)
             float FramesPerSecond = 10.0f;    // Animation speed (FPS)
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
@@ -518,6 +519,73 @@ namespace ECS {
             uint32_t _padding = 0;            // Alignment / if needed
         };
         static_assert(std::is_trivially_copyable_v<Material2D>, "Material2D must be trivially copyable");
+
+        // ---------- GUI ----------
+
+        enum class GUIScaleMode : uint8_t {
+            Fit = 0,
+            Fill = 1,
+            MatchWidth = 2,
+            MatchHeight = 3
+        };
+
+        struct GUICanvas {
+            Vector2D ReferenceSize{ 1920.0f, 1080.0f };
+            Vector2D Offset{ 0.0f, 0.0f };
+            GUIScaleMode ScaleMode = GUIScaleMode::Fit;
+        };
+        static_assert(std::is_trivially_copyable_v<GUICanvas>, "GUICanvas must be trivially copyable");
+
+        enum class GUIAlignment : uint8_t {
+            TopLeft = 0,
+            Top = 1,
+            TopRight = 2,
+            Left = 3,
+            Center = 4,
+            Right = 5,
+            BottomLeft = 6,
+            Bottom = 7,
+            BottomRight = 8
+        };
+
+        struct GUIElement {
+            Vector2D Position{ 0.0f, 0.0f };
+            Vector2D Size{ 100.0f, 100.0f };
+            bool Visible = true;
+            GUIAlignment Alignment = GUIAlignment::TopLeft;
+            int16_t ZOrder = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
+
+        struct GUIPanel {
+            Color Color{ 0.2f, 0.2f, 0.2f, 1.0f };
+            float CornerRadius = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIPanel>, "GUIPanel must be trivially copyable");
+
+        struct GUIText {
+            uint32_t TextId = 0;
+            uint32_t FontPathId = 0;
+            Color Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+            float FontSize = 24.0f;
+
+            void SetText(const std::string& text) {
+                TextId = text.empty() ? 0 : ECS::StringTable::Intern(text);
+            }
+
+            std::string GetText() const {
+                return TextId ? ECS::StringTable::Resolve(TextId) : std::string();
+            }
+
+            void SetFontPath(const std::string& path) {
+                FontPathId = path.empty() ? 0 : ECS::StringTable::Intern(path);
+            }
+
+            std::string GetFontPath() const {
+                return FontPathId ? ECS::StringTable::Resolve(FontPathId) : std::string();
+            }
+        };
+        static_assert(std::is_trivially_copyable_v<GUIText>, "GUIText must be trivially copyable");
 
     }
 }

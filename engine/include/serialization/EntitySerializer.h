@@ -238,9 +238,9 @@ namespace ECS {
 				{"SheetHeight", anim.SheetHeight},
 				{"StartFrame", anim.StartFrame},
 				{"FrameCount", anim.FrameCount},
-				{"RowIndex", anim.RowIndex},
-				{"RowStartColumn", anim.RowStartColumn},
-				{"RowFrameCount", anim.RowFrameCount},
+				{"Row", anim.Row},
+				{"FrameOffset", anim.FrameOffset},
+				{"FrameLength", anim.FrameLength},
 				{"FramesPerSecond", anim.FramesPerSecond},
 				{"Loop", anim.Loop},
 				{"Playing", anim.Playing},
@@ -300,9 +300,9 @@ namespace ECS {
 			anim.SheetHeight = j.value("SheetHeight", 0);
 			anim.StartFrame = j.value("StartFrame", 0);
 			anim.FrameCount = j.value("FrameCount", 0);
-			anim.RowIndex = j.value("RowIndex", 0);
-			anim.RowStartColumn = j.value("RowStartColumn", 0);
-			anim.RowFrameCount = j.value("RowFrameCount", 0);
+			anim.Row = j.value("Row", j.value("RowIndex", 0));
+			anim.FrameOffset = j.value("FrameOffset", j.value("RowStartColumn", 0));
+			anim.FrameLength = j.value("FrameLength", j.value("RowFrameCount", 0));
 			anim.FramesPerSecond = j.value("FramesPerSecond", 0.0f);
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
@@ -430,6 +430,35 @@ namespace ECS {
 
 			return defaultId;
 		}
+
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIElement, Position, Size, Visible, Alignment, ZOrder)
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
+	inline void to_json(nlohmann::json& j, const GUIText& text) {
+		const std::string value = ECS::StringTable::Resolve(text.TextId);
+		const std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
+		j = nlohmann::json{
+			{"Text", value},
+			{"FontPath", fontPath},
+			{"Color", text.Color},
+			{"FontSize", text.FontSize}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIText& text) {
+		const std::string value = j.value("Text", "");
+		const std::string fontPath = j.value("FontPath", "");
+		text.TextId = value.empty() ? 0 : ECS::StringTable::Intern(value);
+		text.FontPathId = fontPath.empty() ? 0 : ECS::StringTable::Intern(fontPath);
+		if (j.contains("Color")) {
+			text.Color = j.at("Color").get<::Color>();
+		}
+		if (j.contains("FontSize")) {
+			text.FontSize = j.at("FontSize").get<float>();
+		} else {
+			text.FontSize = j.value("PixelSize", 24.0f);
+		}
+	}
 
 	}
 }
@@ -838,6 +867,10 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 	REGISTER_COMPONENT_SERIALIZER(PrefabInstanceMetadata, ECS::Components::PrefabInstanceMetadata, "PrefabInstanceMetadata")
 	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
+	REGISTER_COMPONENT_SERIALIZER(GUICanvas, ECS::Components::GUICanvas, "GUICanvas")
+	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
+	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel");
+	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");
 }
 
 #endif

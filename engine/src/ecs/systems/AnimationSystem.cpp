@@ -73,7 +73,7 @@ namespace ECS {
                 SpriteSheetUtils::Window window{};
                 if (anim.UseRow) {
                     window = SpriteSheetUtils::ComputeRowWindow(
-                        anim.RowIndex, anim.RowStartColumn, anim.RowFrameCount,
+                        anim.Row, anim.FrameOffset, anim.FrameLength,
                         layout.TotalCols, layout.TotalRows);
                 } else {
                     window = SpriteSheetUtils::ComputeWindow(
