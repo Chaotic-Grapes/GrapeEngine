@@ -197,20 +197,21 @@ void SceneViewport::_renderViewport() {
         return clicked;
     };
 
-    static const char* ICON_CAMERA_3D = "\xEE\xA1\x8D";      // 3d_rotation
-    static const char* ICON_CAMERA_2D = "\xEE\x8F\x86";      // crop_square
-    static const char* ICON_MOVE = "\xEE\xA2\x9F";           // open_with
-    static const char* ICON_ROTATE = "\xEE\x90\x9D";         // rotate_right
-    static const char* ICON_SCALE = "\xEE\x8F\x82";          // crop_free
-    static const char* ICON_LOCAL = "\xEE\x95\x9C";          // my_location
-    static const char* ICON_WORLD = "\xEE\xA0\x8B";          // public
-    static const char* ICON_OVERLAYS = "\xEE\x94\xBB";       // layers
-    static const char* ICON_DEBUG = "\xEE\x90\xA9";          // tune
-    static const char* ICON_LAYOUT_1 = "\xEE\x8F\x86";       // crop_square
-    static const char* ICON_LAYOUT_2 = "\xEE\xA3\xB2";       // view_column
-    static const char* ICON_LAYOUT_4 = "\xEE\xA6\xA9";       // grid_view
-    static const char* ICON_MAX = "\xEE\x97\x90";            // fullscreen
-    static const char* ICON_RESTORE = "\xEE\x97\x91";        // fullscreen_exit
+    // Taken from https://github.com/juliettef/IconFontCppHeaders/tree/main
+    static const char* ICON_CAMERA_3D   = "\xEE\xA1\x8D";   // 3d_rotation
+    static const char* ICON_CAMERA_2D   = "\xEE\x8F\x86";   // crop_square
+    static const char* ICON_MOVE        = "\xEE\xA2\x9F";   // open_with
+    static const char* ICON_ROTATE      = "\xEE\x90\x9D";   // rotate_right
+    static const char* ICON_SCALE       = "\xEE\x8F\x82";   // crop_free
+    static const char* ICON_LOCAL       = "\xEE\x95\x9C";   // my_location
+    static const char* ICON_WORLD       = "\xEE\xA0\x8B";   // public
+    static const char* ICON_OVERLAYS    = "\xEE\x94\xBB";   // layers
+    static const char* ICON_DEBUG       = "\xEE\x90\xA9";   // tune
+    static const char* ICON_LAYOUT_1    = "\xEE\x8F\x86";   // crop_square
+    static const char* ICON_LAYOUT_2    = "\xEE\xA3\xB2";   // view_column
+    static const char* ICON_LAYOUT_4    = "\xEE\xA6\xA9";   // grid_view
+    static const char* ICON_MAX         = "\xEE\x97\x90";   // fullscreen
+    static const char* ICON_RESTORE     = "\xEE\x97\x91";   // fullscreen_exit
 
     // Per-group tints to visually separate control clusters.
     const ImVec4 cameraTint = ImVec4(0.20f, 0.38f, 0.66f, 1.0f);
@@ -313,7 +314,7 @@ void SceneViewport::_renderViewport() {
         ImGui::Checkbox("Colliders", &m_showColliders);
         ImGui::Checkbox("Lights", &m_showLights);
         ImGui::Separator();
-        ImGui::Checkbox("Camera Frustum", &m_showCameraFrustum);
+        ImGui::Checkbox("Camera Frustum", &m_showCameraFrustum); // TODO: (currently not working)
         ImGui::Checkbox("FPS Overlay", &m_showSceneFpsOverlay);
         ImGui::EndPopup();
     }
@@ -364,6 +365,7 @@ void SceneViewport::_renderViewport() {
         m_maximizeViewport ? "Restore Viewport (F11)" : "Maximize Viewport (F11)",
         m_maximizeViewport, maximizeTint, true)) {
         if (!m_maximizeViewport) {
+            // Cache docking state for restoring later.
             m_restoreDockId = ImGui::GetWindowDockID();
             m_restoreDockValid = true;
             m_restorePos = ImGui::GetWindowPos();
@@ -466,17 +468,25 @@ void SceneViewport::_renderViewport() {
                         double mx = 0, my = 0;
                         Input::GetMousePosition(mx, my);
                         const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+
+                        // Convert mouse position to world position
                         glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
                         glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
                         glm::vec2 localPos = glm::vec2(mx, my) - vpMin;
                         glm::vec4 ndc;
+
+                        // NDC coordinates
                         ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
                         ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y;
                         ndc.z = 0.0f;
                         ndc.w = 1.0f;
+
+                        // Unproject to world space
                         glm::mat4 invViewProj = glm::inverse(proj * view);
                         glm::vec4 world4 = invViewProj * ndc;
                         glm::vec2 worldPos = { world4.x, world4.y };
+
+                        // Let tile palette panel handle hover and clicks
                         m_tilePalettePanel->OnViewportHover(worldPos);
                         bool left = Input::IsMousePressed(MOUSE_LEFT);
                         bool right = Input::IsMousePressed(MOUSE_RIGHT);
@@ -524,15 +534,18 @@ void SceneViewport::_renderViewport() {
                             step = std::max(0.25f, halfHeight / 10.0f);
                         }
 
+                        // Calculate grid start and end positions aligned to step size
                         const float startX = std::floor((camPos.x - halfWidth) / step) * step;
                         const float endX = camPos.x + halfWidth;
                         const float startY = std::floor((camPos.y - halfHeight) / step) * step;
                         const float endY = camPos.y + halfHeight;
 
+                        // Draw grid lines and axes
                         const glm::vec4 gridColor{ 0.35f, 0.40f, 0.45f, 0.35f };
                         const glm::vec4 axisX{ 0.90f, 0.25f, 0.25f, 0.8f };
                         const glm::vec4 axisY{ 0.25f, 0.85f, 0.35f, 0.8f };
 
+                        // Draw grid lines, if enabled
                         if (m_showGrid) {
                             for (float x = startX; x <= endX; x += step) {
                                 rendererSystem->SubmitWireframeLine(glm::vec2(x, camPos.y - halfHeight),
@@ -544,6 +557,7 @@ void SceneViewport::_renderViewport() {
                             }
                         }
 
+                        // Draw axes, if enabled
                         if (m_showAxes) {
                             rendererSystem->SubmitWireframeLine(glm::vec2(camPos.x - halfWidth, 0.0f),
                                 glm::vec2(camPos.x + halfWidth, 0.0f), axisX, 0.10f);
@@ -570,6 +584,71 @@ void SceneViewport::_renderViewport() {
                     if (m_showColliders && !m_selectedEntity.IsNull() && m_world) {
                         const glm::vec4 colliderColor{ 1.0f, 0.64f, 0.0f, 0.45f }; // Orange with some transparency
                         rendererSystem->SubmitColliderDebugDraw(*m_world, m_selectedEntity.Index, colliderColor);
+                    }
+
+                    // Optional light debug overlays
+                    if (m_showLights && m_world) {
+                        // Determine arrow length based on camera distance/ortho size
+                        // Engine::Camera* camera = m_editorCamera ? m_editorCamera->GetCamera() : nullptr;
+                        float arrowLength = 1.0f;
+                        if (camera) {
+                            // Scale arrow length based on camera parameters
+                            if (camera->UsePerspective) {
+                                arrowLength = std::max(1.0f, std::abs(camera->Position.z) * 0.05f);
+                            } else {
+                                arrowLength = std::max(1.0f, camera->OrthoSize * 0.05f);
+                            }
+                        }
+                        // Precompute constants for arrow and circle rendering
+                        const float arrowHead = arrowLength * 0.25f;
+                        const float arrowWing = arrowHead * 0.6f;
+                        const float lineThickness = 0.08f;
+                        const float circleThickness = 0.08f;
+
+                        // Iterate through all Light2D components in the world
+                        auto* world = m_world;
+                        world->Each<ECS::Components::LocalTransform, ECS::Components::Light2D>(
+                            [&](ECS::Entity e, const ECS::Components::LocalTransform& lt, const ECS::Components::Light2D& light) {
+                                // Skip inactive lights
+                                if (const auto* active = world->TryGet<ECS::Components::Active>(e); active && !active->Enabled) {
+                                    return;
+                                }
+
+                                // Determine world position of the light
+                                Vector3D worldPos = lt.Position;
+                                if (const auto* wt = world->TryGet<ECS::Components::WorldTransform>(e)) {
+                                    worldPos = { wt->Matrix.m03, wt->Matrix.m13, wt->Matrix.m23 };
+                                }
+
+                                // Render directional light as arrow, point light as circle
+                                if (light.LightType == ECS::Components::Light2D::Type::Directional) {
+                                    glm::vec2 dir(light.Direction.X, light.Direction.Y);
+                                    const float len2 = dir.x * dir.x + dir.y * dir.y;
+                                    if (len2 < 1e-6f) {
+                                        dir = glm::vec2(0.0f, -1.0f);
+                                    } else {
+                                        dir *= 1.0f / std::sqrt(len2);
+                                    }
+
+                                    // Draw arrow representing light direction
+                                    const glm::vec2 start(worldPos.X, worldPos.Y);
+                                    const glm::vec2 end = start + dir * arrowLength;
+                                    const glm::vec4 tint(light.Color.R, light.Color.G, light.Color.B, 0.9f);
+                                    rendererSystem->SubmitWireframeLine(start, end, tint, lineThickness);
+
+                                    // Draw arrow head
+                                    const glm::vec2 perp(-dir.y, dir.x);
+                                    const glm::vec2 headBase = end - dir * arrowHead;
+                                    rendererSystem->SubmitWireframeLine(headBase + perp * arrowWing, end, tint, lineThickness);
+                                    rendererSystem->SubmitWireframeLine(headBase - perp * arrowWing, end, tint, lineThickness);
+                                } else {
+                                    // Draw circle representing point light range
+                                    glm::vec2 center(worldPos.X + light.Position.X, worldPos.Y + light.Position.Y);
+                                    const float range = std::max(0.01f, light.Range);
+                                    const glm::vec4 tint(light.Color.R, light.Color.G, light.Color.B, 0.55f);
+                                    rendererSystem->SubmitWireframeCircle(center, range, tint, circleThickness);
+                                }
+                            });
                     }
 
                     // Render gizmo via interaction manager
