@@ -33,7 +33,7 @@ public class MS_Manager : SystemBase
     public static MS_Manager instance;
     public static ulong poolContainerId;
 
-    private const ulong emptyId = 99999999999;
+    public ulong emptyId = 99999999999;
     private Vector3 poolLocation = new Vector3(10000, 10000, 0);
 
     protected override void OnCreate()
