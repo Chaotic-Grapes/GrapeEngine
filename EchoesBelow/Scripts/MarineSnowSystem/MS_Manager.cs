@@ -31,7 +31,7 @@ public class MS_Manager : SystemBase
     public static List<ulong>[] objPools = new List<ulong>[7];
 
     public static MS_Manager instance;
-    public static ulong poolContainerId;
+    public ulong poolContainerId;
 
     public ulong emptyId = 99999999999;
     private Vector3 poolLocation = new Vector3(10000, 10000, 0);
@@ -92,14 +92,13 @@ public class MS_Manager : SystemBase
                 ms06_ObjectPool = new List<ulong>();
                 ms07_ObjectPool = new List<ulong>();
 
-                int i = 0;
-                objPools[i++] = ms01_ObjectPool;
-                objPools[i++] = ms02_ObjectPool;
-                objPools[i++] = ms03_ObjectPool;
-                objPools[i++] = ms04_ObjectPool;
-                objPools[i++] = ms05_ObjectPool;
-                objPools[i++] = ms06_ObjectPool;
-                objPools[i++] = ms07_ObjectPool;
+                objPools[0] = ms01_ObjectPool;
+                objPools[1] = ms02_ObjectPool;
+                objPools[2] = ms03_ObjectPool;
+                objPools[3] = ms04_ObjectPool;
+                objPools[4] = ms05_ObjectPool;
+                objPools[5] = ms06_ObjectPool;
+                objPools[6] = ms07_ObjectPool;
                 break;
         }
 
@@ -186,6 +185,16 @@ public class MS_Manager : SystemBase
                 //Remove from parent
                 //pulledEntity.Detach();
 
+                //Add gravity and forces
+                ref Rigidbody2D rb = ref pulledEntity.AddComponent<Rigidbody2D>();
+                rb.GravityScale = 0.01f;
+                rb.Mass = 1;
+                rb.LinearDamping = 0.05f;
+                rb.Flags = 2u;
+                ref LinearVelocity2D lv = ref pulledEntity.AddComponent<LinearVelocity2D>();
+                lv.Value.X = GMath.Random(0.1f, 1.8f);
+                pulledEntity.AddComponent<AngularVelocity2D>();
+
                 Log($"Pulled from Pool {id_Iterator}!");
                 return pulledObjId;
             }
@@ -204,6 +213,14 @@ public class MS_Manager : SystemBase
                 //add the obj back into the pool, reset its transforms
                 objPool.Add(returningObjId);
                 ResetPoolObjPosAndParent(returningObjId);
+
+                Entity returningEntity = Entity.FromId(World!, returningObjId);
+                if (returningEntity.HasComponent<Rigidbody2D>()) returningEntity.RemoveComponent<Rigidbody2D>();
+                if (returningEntity.HasComponent<LinearVelocity2D>()) returningEntity.RemoveComponent<LinearVelocity2D>();
+                if (returningEntity.HasComponent<AngularVelocity2D>()) returningEntity.RemoveComponent<AngularVelocity2D>();
+
+                //returningEntity.GetComponent<Active>().Enabled = false;
+
                 Log($"Returned to Pool {id_Iterator}!");
                 return;
             }
