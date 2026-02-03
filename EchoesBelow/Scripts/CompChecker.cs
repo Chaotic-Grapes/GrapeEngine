@@ -22,6 +22,7 @@ public class CompChecker : SystemBase
 
     protected override void OnUpdate()
     {
+        return;
         //If an obj in the scene has Compchecker, this whole script is void!
         //Just a way to turn it on or off
         foreach (var result in World!.Query<CompCheckerComponent>())

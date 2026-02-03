@@ -20,17 +20,27 @@ namespace EchoesBelow.Scripts.MarineSnowSystem;
 public class MS_Manager : SystemBase
 {
     //default objs like MS_Managers (non obj pool objs will have an msID of 0)
-    public List<ulong> ms01_ObjectPool = new List<ulong>();
-    public List<ulong> ms02_ObjectPool = new List<ulong>();
-    public List<ulong> ms03_ObjectPool = new List<ulong>();
-    public List<ulong> ms04_ObjectPool = new List<ulong>();
-    public List<ulong> ms05_ObjectPool = new List<ulong>();
-    public List<ulong> ms06_ObjectPool = new List<ulong>();
-    public List<ulong> ms07_ObjectPool = new List<ulong>();
+    public static List<ulong> ms01_ObjectPool;
+    public static List<ulong> ms02_ObjectPool;
+    public static List<ulong> ms03_ObjectPool;
+    public static List<ulong> ms04_ObjectPool;
+    public static List<ulong> ms05_ObjectPool;
+    public static List<ulong> ms06_ObjectPool;
+    public static List<ulong> ms07_ObjectPool;
+
+    public static List<ulong>[] objPools = new List<ulong>[7];
+
+    public static MS_Manager instance;
+
+    private const ulong emptyId = 99999999999;
+    private Vector3 poolLocation = new Vector3(10000, 10000, 0);
 
     protected override void OnCreate()
     {
         Log("System MS_Manager initialized");
+        //This is only ever called once, so there is only one instance assignment
+        //initialize
+        instance = this;
     }
     private bool OnStart(ref bool startBool, ulong objID, int msID)
     {
@@ -40,30 +50,52 @@ public class MS_Manager : SystemBase
 
         switch (msID)
         {
-            case 1: 
+            case 1:
                 ms01_ObjectPool.Add(objID);
-                Log("Hey my msID is " + Entity.FromId(World,objID).GetComponent<MS_ManagerComponent>().msID);
+                ResetPoolPos(objID);
                 break;
-            case 2: 
+            case 2:
                 ms02_ObjectPool.Add(objID);
-                Log("Hey my msID is " + Entity.FromId(World, objID).GetComponent<MS_ManagerComponent>().msID);
+                ResetPoolPos(objID);
                 break;
-            case 3: 
+            case 3:
                 ms03_ObjectPool.Add(objID);
+                ResetPoolPos(objID);
                 break;
-            case 4: 
+            case 4:
                 ms04_ObjectPool.Add(objID);
+                ResetPoolPos(objID);
                 break;
             case 5:
                 ms05_ObjectPool.Add(objID);
+                ResetPoolPos(objID);
                 break;
             case 6:
                 ms06_ObjectPool.Add(objID);
+                ResetPoolPos(objID);
                 break;
             case 7:
                 ms07_ObjectPool.Add(objID);
+                ResetPoolPos(objID);
                 break;
             default: //nil
+                //For MS Manager instance
+                ms01_ObjectPool = new List<ulong>();
+                ms02_ObjectPool = new List<ulong>();
+                ms03_ObjectPool = new List<ulong>();
+                ms04_ObjectPool = new List<ulong>();
+                ms05_ObjectPool = new List<ulong>();
+                ms06_ObjectPool = new List<ulong>();
+                ms07_ObjectPool = new List<ulong>();
+
+                int i = 0;
+                objPools[i++] = ms01_ObjectPool;
+                objPools[i++] = ms02_ObjectPool;
+                objPools[i++] = ms03_ObjectPool;
+                objPools[i++] = ms04_ObjectPool;
+                objPools[i++] = ms05_ObjectPool;
+                objPools[i++] = ms06_ObjectPool;
+                objPools[i++] = ms07_ObjectPool;
                 break;
         }
 
@@ -73,6 +105,14 @@ public class MS_Manager : SystemBase
         //End of Start
         return true;
     }
+
+    private void ResetPoolPos(ulong objID)
+    {
+        Entity pulledEntity = Entity.FromId(World!, objID);
+        ref LocalTransform transform = ref pulledEntity.GetComponent<LocalTransform>();
+        transform.Position = poolLocation;
+    }
+
     protected override void OnUpdate()
     {
         foreach( var gameObject in World!.Query<MS_ManagerComponent>())
@@ -91,13 +131,10 @@ public class MS_Manager : SystemBase
             {
                 int i = 0;
                 Log("============================================");
-                Log($"list 0{++i} count: {ms01_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms02_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms03_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms04_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms05_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms06_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms07_ObjectPool.Count}");
+                foreach(List<ulong> objPool in objPools)
+                {
+                    Log($"list 0{++i} count: {objPool.Count}");
+                }
             }
 
 
@@ -136,7 +173,45 @@ public class MS_Manager : SystemBase
             }
         }
     }
-    
+    public ulong PullFromPool(int msID, Vector3 newPos)
+    {
+        int id_Iterator = 1;
+        foreach(List<ulong>objPool in objPools)
+        {
+            //Check if obj pool is empty
+            if (msID == id_Iterator && objPool.Count > 0)
+            {
+                ulong pulledObjId = objPool[objPool.Count - 1];
+                objPool.Remove(pulledObjId);
+                //Set to new transform
+                Entity pulledEntity = Entity.FromId(World!, pulledObjId);
+                ref LocalTransform transform = ref pulledEntity.GetComponent<LocalTransform>();
+                transform.Position = newPos;
+
+                Log($"Pulled from Pool {id_Iterator}!");
+                return pulledObjId;
+            }
+            id_Iterator++;
+        }
+        return emptyId;
+    }
+    public void ReturnToPool(ulong returningObjId)
+    {
+        int id_Iterator = 1;
+        foreach (List<ulong> objPool in objPools)
+        {
+            //check if i++ == target msID
+            if (Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID == id_Iterator)
+            {
+                //add the obj back into the pool, reset its transforms
+                objPool.Add(returningObjId);
+                ResetPoolPos(returningObjId);
+                Log($"Returned to Pool {id_Iterator}!");
+                return;
+            }
+            id_Iterator++;
+        }
+    }
     protected override void OnDestroy()
     {
         Log("System MS_Manager destroyed");
