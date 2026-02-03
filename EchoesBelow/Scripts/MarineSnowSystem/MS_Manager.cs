@@ -20,17 +20,31 @@ namespace EchoesBelow.Scripts.MarineSnowSystem;
 public class MS_Manager : SystemBase
 {
     //default objs like MS_Managers (non obj pool objs will have an msID of 0)
-    public List<ulong> ms01_ObjectPool = new List<ulong>();
-    public List<ulong> ms02_ObjectPool = new List<ulong>();
-    public List<ulong> ms03_ObjectPool = new List<ulong>();
-    public List<ulong> ms04_ObjectPool = new List<ulong>();
-    public List<ulong> ms05_ObjectPool = new List<ulong>();
-    public List<ulong> ms06_ObjectPool = new List<ulong>();
-    public List<ulong> ms07_ObjectPool = new List<ulong>();
+    public static List<ulong> ms01_ObjectPool = new List<ulong>();
+    public static List<ulong> ms02_ObjectPool = new List<ulong>();
+    public static List<ulong> ms03_ObjectPool = new List<ulong>();
+    public static List<ulong> ms04_ObjectPool = new List<ulong>();
+    public static List<ulong> ms05_ObjectPool = new List<ulong>();
+    public static List<ulong> ms06_ObjectPool = new List<ulong>();
+    public static List<ulong> ms07_ObjectPool = new List<ulong>();
+
+    public static List<ulong>[] objPools = new List<ulong>[7];
+
+    public static MS_Manager instance;
 
     protected override void OnCreate()
     {
         Log("System MS_Manager initialized");
+        //initialize
+        instance = this;
+        int i = 0;
+        objPools[i++] = ms01_ObjectPool;
+        objPools[i++] = ms02_ObjectPool;
+        objPools[i++] = ms03_ObjectPool;
+        objPools[i++] = ms04_ObjectPool;
+        objPools[i++] = ms05_ObjectPool;
+        objPools[i++] = ms06_ObjectPool;
+        objPools[i++] = ms07_ObjectPool;
     }
     private bool OnStart(ref bool startBool, ulong objID, int msID)
     {
@@ -42,11 +56,9 @@ public class MS_Manager : SystemBase
         {
             case 1: 
                 ms01_ObjectPool.Add(objID);
-                Log("Hey my msID is " + Entity.FromId(World,objID).GetComponent<MS_ManagerComponent>().msID);
                 break;
             case 2: 
                 ms02_ObjectPool.Add(objID);
-                Log("Hey my msID is " + Entity.FromId(World, objID).GetComponent<MS_ManagerComponent>().msID);
                 break;
             case 3: 
                 ms03_ObjectPool.Add(objID);
@@ -91,13 +103,10 @@ public class MS_Manager : SystemBase
             {
                 int i = 0;
                 Log("============================================");
-                Log($"list 0{++i} count: {ms01_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms02_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms03_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms04_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms05_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms06_ObjectPool.Count}");
-                Log($"list 0{++i} count: {ms07_ObjectPool.Count}");
+                foreach(List<ulong> objPool in objPools)
+                {
+                    Log($"list 0{++i} count: {objPool.Count}");
+                }
             }
 
 
@@ -136,7 +145,37 @@ public class MS_Manager : SystemBase
             }
         }
     }
-    
+    public ulong PullFromPool(int msID)
+    {
+        int i = 1;
+        foreach(List<ulong>objPool in objPools)
+        {
+            //check if i++ == target msID
+
+            //Check if obj pool is empty
+            if(objPool.Count <= 0)
+            {
+
+            }
+
+            //if not empty, remove an obj from the list
+
+            //return this obj to the corr script call request
+            
+        }
+        return 1;
+    }
+    public void ReturnToPool(ulong objID, int msID)
+    {
+        int i = 1;
+        foreach (List<ulong> objPool in objPools)
+        {
+            //check if i++ == target msID
+
+            //add the obj back into the pool, reset its transforms and set inactive
+
+        }
+    }
     protected override void OnDestroy()
     {
         Log("System MS_Manager destroyed");

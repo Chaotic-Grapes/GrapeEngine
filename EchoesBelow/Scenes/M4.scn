@@ -38,7 +38,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.608264446258545,
+                        "AspectRatio": 1.3619529008865356,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -832,13 +832,13 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 8,
+                        "NormalTextureId": 9,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
+                        "TextureId": 8,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
                         "Tiling": {
                             "X": 1.0,
@@ -940,7 +940,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 9,
+                        "TextureId": 10,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Whiskaris.png",
                         "Tiling": {
                             "X": 1.0,
@@ -972,6 +972,164 @@
                         }
                     },
                     "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 10.303380012512207,
+                            "Y": -1.0547144412994385,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Player"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 0.1599999964237213,
+                            "Y": 0.3400000035762787
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": -0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": -5.063745104651185e-13,
+                            "Y": -2.9575411672651264e-13
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 32,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.0
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 2.4000000953674316,
+                        "Flags": 0,
+                        "GravityScale": 1.0,
+                        "InverseMass": 1.0,
+                        "LinearDamping": 1.0,
+                        "Mass": 1.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9999392032623291,
+                            "R": 0.9998999834060669
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 11,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Dash_Fast_000.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 10.303380012512207,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -1.0547144412994385,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "angularVelocity": 179,
+                        "driftSpeed": 1,
+                        "moveSpeed": 105,
+                        "periodicForceInterval": 1,
+                        "start": false
+                    },
+                    "TypeName": "Player"
+                },
+                {
+                    "Data": {},
+                    "TypeName": "Collision Test"
                 }
             ]
         },
@@ -1149,164 +1307,6 @@
                         "Time": 0
                     },
                     "TypeName": "Comp Checker"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 10.303380012512207,
-                            "Y": -1.0547144412994385,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Player"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.1599999964237213,
-                            "Y": 0.3400000035762787
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": -0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": -5.063745104651185e-13,
-                            "Y": -2.9575411672651264e-13
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 32,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.0
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 2.4000000953674316,
-                        "Flags": 0,
-                        "GravityScale": 1.0,
-                        "InverseMass": 1.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 1.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9999392032623291,
-                            "R": 0.9998999834060669
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureId": 10,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Dash_Fast_000.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 10.303380012512207,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": -1.0547144412994385,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "angularVelocity": 179,
-                        "driftSpeed": 1,
-                        "moveSpeed": 105,
-                        "periodicForceInterval": 1,
-                        "start": false
-                    },
-                    "TypeName": "Player"
-                },
-                {
-                    "Data": {},
-                    "TypeName": "Collision Test"
                 }
             ]
         },
@@ -1523,20 +1523,20 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 13.447985649108887,
-                            "Y": -2.201230049133301,
+                            "X": 12.417970657348633,
+                            "Y": -2.160571575164795,
                             "Z": 0.0
                         },
                         "Rotation": {
-                            "W": 0.9545438289642334,
+                            "W": 0.9538279175758362,
                             "X": 0.0,
                             "Y": 0.0,
-                            "Z": -0.3005790114402771
+                            "Z": -0.30035358667373657
                         },
                         "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
+                            "X": 2.0,
+                            "Y": 2.0,
+                            "Z": 2.0
                         }
                     },
                     "TypeName": "LocalTransform"
@@ -1648,7 +1648,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 11,
+                        "TextureId": 12,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\SpawnGrape_Bulb.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1661,17 +1661,17 @@
                     "Data": {
                         "Dirty": false,
                         "Matrix": {
-                            "m00": 0.8195754289627075,
-                            "m01": 0.5729712843894958,
+                            "m00": 1.639150857925415,
+                            "m01": 1.1459425687789917,
                             "m02": 0.0,
-                            "m03": 13.447985649108887,
-                            "m10": -0.5729712843894958,
-                            "m11": 0.8195754289627075,
+                            "m03": 12.417970657348633,
+                            "m10": -1.1459425687789917,
+                            "m11": 1.639150857925415,
                             "m12": 0.0,
-                            "m13": -2.201230049133301,
+                            "m13": -2.160571575164795,
                             "m20": 0.0,
                             "m21": 0.0,
-                            "m22": 1.0,
+                            "m22": 2.0,
                             "m23": 0.0,
                             "m30": 0.0,
                             "m31": 0.0,
@@ -1821,7 +1821,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 12,
+                        "TextureId": 13,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3101,8 +3101,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 6.361567974090576,
-                            "Y": -0.45755207538604736,
+                            "X": 7.404979228973389,
+                            "Y": -0.6390153169631958,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -3233,7 +3233,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 12,
+                        "TextureId": 13,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3249,11 +3249,11 @@
                             "m00": 0.8195754289627075,
                             "m01": 0.5729712843894958,
                             "m02": 0.0,
-                            "m03": 6.361567974090576,
+                            "m03": 7.404979228973389,
                             "m10": -0.5729712843894958,
                             "m11": 0.8195754289627075,
                             "m12": 0.0,
-                            "m13": -0.45755207538604736,
+                            "m13": -0.6390153169631958,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -3413,7 +3413,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 12,
+                        "TextureId": 13,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3455,17 +3455,119 @@
                     "TypeName": "Grav Switcher"
                 }
             ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 15.556404113769531,
+                            "Y": -1.9611716270446777,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "New Entity"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 1,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.12999999523162842,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 9,
+                        "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 15.556404113769531,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -1.9611716270446777,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
         }
     ],
-    "EntityCount": 32,
+    "EntityCount": 33,
     "Hierarchy": [
         {
             "child": 18,
             "parent": 17
         },
         {
-            "child": 14,
-            "parent": 13
+            "child": 15,
+            "parent": 14
         },
         {
             "child": 19,
@@ -3476,8 +3578,8 @@
             "parent": 17
         },
         {
-            "child": 15,
-            "parent": 13
+            "child": 16,
+            "parent": 14
         },
         {
             "child": 21,
