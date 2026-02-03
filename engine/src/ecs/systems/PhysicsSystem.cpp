@@ -459,7 +459,10 @@ namespace ECS {
         int triggerExitCount = 0;
         int triggerStayCount = 0;
 
-        //  Choose substep count; make it a tunable or cvar if you like.
+        // =====================
+        // Simulation Settings
+        // =====================
+        // Choose substep count; make it a tunable or cvar if you like.
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
@@ -477,8 +480,11 @@ namespace ECS {
         // Get LayerManager for layer-wide physics gating
         auto* layerManager = world.GetLayerManager();
 
-        //  Collect entity sets once per frame (usually fine).
-        //  AngularVelocity2D, Layer, and Active are now optional.
+        // =====================
+        // Entity Collection
+        // =====================
+        // Collect entity sets once per frame (usually fine).
+        // AngularVelocity2D, Layer, and Active are now optional.
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);
 
@@ -629,7 +635,10 @@ namespace ECS {
                         }
                     });
 
-            // Broad phase for this substep (rebuild grid because poses changed).
+            // =====================
+            // Broad Phase (Uniform Grid)
+            // =====================
+            // Rebuild grid each substep because poses changed.
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
                 const auto* t = world.TryGet<Components::LocalTransform>(e);
@@ -648,6 +657,9 @@ namespace ECS {
             for (Entity e : dynamicEntities) insertEntity(e);
             for (Entity e : staticEntities)  insertEntity(e);
 
+            // =====================
+            // Pair Generation
+            // =====================
             // Candidate pairs deduped per substep.
             std::vector<std::pair<Entity, Entity>> pairs;
             std::unordered_set<uint64_t>           seen;
@@ -672,7 +684,9 @@ namespace ECS {
                 }
             }
 
-            // Narrow phase + resolution for this substep.
+            // =====================
+            // Narrow Phase + Resolution
+            // =====================
             // You can reduce the inner iterative solver because substeps already help stability.
 
             const int solverIters = 4;
@@ -701,7 +715,9 @@ namespace ECS {
                     // If either side has no collider, this pair cannot collide.
                     if ((!circA && !boxA) || (!circB && !boxB)) continue;
 
-                    // --- Layer mask filtering ---
+                    // =====================
+                    // Layer Mask
+                    // =====================
                     // Check if both entities have Layer components
                     const auto* la = world.TryGet<Components::Layer>(A);
                     const auto* lb = world.TryGet<Components::Layer>(B);
@@ -714,9 +730,9 @@ namespace ECS {
                     uint16_t layerAId = la->Id;
                     uint16_t layerBId = lb->Id;
 
-                    // Read collision masks directly from LayerManager (not from collider components)
-                    // This ensures we always use the current, authoritative layer collision settings
-                    // regardless of whether collider masks have been synced yet
+                    // Read collision masks directly from LayerManager (not from collider components).
+                    // This ensures we always use current, authoritative layer collision settings
+                    // regardless of whether collider masks have been synced yet.
                     uint32_t maskA = layerManager->GetLayerMask(layerAId);
                     uint32_t maskB = layerManager->GetLayerMask(layerBId);
 
@@ -796,6 +812,9 @@ namespace ECS {
 
                     if (!hasCollision) continue;
 
+                    // =====================
+                    // Trigger Handling (no resolution)
+                    // =====================
                     // Check for triggers on either side
                     const bool isTriggerA = (circA && (circA->Flags & 0x1u)) || (boxA && (boxA->Flags & 0x1u));
                     const bool isTriggerB = (circB && (circB->Flags & 0x1u)) || (boxB && (boxB->Flags & 0x1u));
@@ -815,6 +834,9 @@ namespace ECS {
                         continue;
                     }
 
+                    // =====================
+                    // Constraint Resolution
+                    // =====================
                     // Require at least one side to be physically simulated (has rb + velocity).
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                     const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
@@ -864,7 +886,7 @@ namespace ECS {
                         (mA.PositionCorrectPercent + mB.PositionCorrectPercent) * 0.5f
                     };
 
-                    // Resolve
+                    // Resolve velocity + positional correction for this manifold.
                     Engine::Physics::ResolveCollisionManifold(rbA, rbB, vA, vB, *tA, *tB, manifold, mCombined);
 
                     // Write back
@@ -873,7 +895,7 @@ namespace ECS {
 
                     ++resolved;
                     {
-                        // Compute impact magnitude from relative velocity along normal BEFORE the next iteration changes it further.
+                        // Compute impact magnitude from relative velocity along normal before the next iteration changes it further.
                         const Vector2D rel = vB.Value - vA.Value;
                         const float vn = rel.X * manifold.normal.X + rel.Y * manifold.normal.Y;
                         const float    impactSpeed = std::abs(vn);
