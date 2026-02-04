@@ -1,6 +1,6 @@
 @echo off
 set CONFIG=%1
-if "%CONFIG%"=="" set CONFIG=Debug
+if "%CONFIG%"=="" set CONFIG=Release
 
 echo.
 echo ==========================================================
@@ -8,7 +8,7 @@ echo            Running Standalone Game (%CONFIG%)
 echo ==========================================================
 echo.
 
-set "EXE_DIR=build_game\%CONFIG%"
+set "EXE_DIR=build_game\export\EchoesBelow\%CONFIG%"
 set "EXE_NAME="
 
 REM Check if engine DLL exists

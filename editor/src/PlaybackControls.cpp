@@ -26,6 +26,8 @@ Reference:
 #include "services/TimeSystem.h"
 #include "services/MemoryManager.h"
 #include "ecs/World.h"
+#include "ecs/Components.h"
+#include "ecs/PrefabManager.h"
 #include "core/Logger.h"
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
@@ -560,10 +562,10 @@ void Playback::_restoreWorldState() {
         }
     }
 
-    // Fourth pass: Restore hierarchy relationships
-    if (m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array()) {
-        const auto& hierarchyArray = m_savedWorldState["hierarchy"];
-        for (const auto& hierarchyEntry : hierarchyArray) {
+      // Fourth pass: Restore hierarchy relationships
+      if (m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array()) {
+          const auto& hierarchyArray = m_savedWorldState["hierarchy"];
+          for (const auto& hierarchyEntry : hierarchyArray) {
             if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
                 continue;
             }
@@ -576,12 +578,34 @@ void Playback::_restoreWorldState() {
             
             if (m_world->IsAlive(child) && m_world->IsAlive(parent)) {
                 m_world->Attach(child, parent);
-            }
-        }
-    }
+              }
+          }
+      }
 
-    LOG_INFO("Restored " << restoredCount << " entities, recreated " << recreatedCount << " entities with hierarchy.");
-}
+      // Rebuild prefab instance tracking so editor links remain valid after restore.
+      if (auto* prefabManager = m_world->GetPrefabManager()) {
+          prefabManager->ClearInstanceTracking();
+          size_t tracked = 0;
+          size_t skipped = 0;
+          m_world->Each<ECS::Components::PrefabInstanceMetadata>(
+              [&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
+                  if (!prefabManager->IsRegistered(meta.PrefabHash)) {
+                      ++skipped;
+                      return;
+                  }
+                  prefabManager->TrackInstance(entity, meta.PrefabHash);
+                  ++tracked;
+              }
+          );
+          if (skipped > 0) {
+              LOG_WARNING("Prefab tracking rebuild skipped " << skipped << " instance(s) with unregistered prefab hashes.");
+          } else {
+              LOG_INFO("Prefab tracking rebuild tracked " << tracked << " instance(s).");
+          }
+      }
+
+      LOG_INFO("Restored " << restoredCount << " entities, recreated " << recreatedCount << " entities with hierarchy.");
+  }
 
 // Internal state change handler that manages time scale and callbacks
 void Playback::_changeState(EditorState newState) {

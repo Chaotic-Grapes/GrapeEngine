@@ -68,6 +68,11 @@ namespace {
     const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
     const uint32_t kHashGUIPanel = Editor::ECSUtils::FNV1aHash("GUIPanel");
     const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
+    const uint32_t kHashGUIImage = Editor::ECSUtils::FNV1aHash("GUIImage");
+    const uint32_t kHashGUIInput = Editor::ECSUtils::FNV1aHash("GUIInput");
+    const uint32_t kHashGUIStateStyle = Editor::ECSUtils::FNV1aHash("GUIStateStyle");
+    const uint32_t kHashGUIButton = Editor::ECSUtils::FNV1aHash("GUIButton");
+    const uint32_t kHashGUISlider = Editor::ECSUtils::FNV1aHash("GUISlider");
     
     template<typename T>
     nlohmann::json MakeDefaultJson() {
@@ -275,6 +280,26 @@ Without these, the macro would end early and break the expansion
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIText(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIImage, "GUIImage"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIImage(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIInput, "GUIInput"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIInput(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIStateStyle(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIButton(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUISlider, "GUISlider"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUISlider(d, e, w); };
         }
     }
     
@@ -541,7 +566,9 @@ Without these, the macro would end early and break the expansion
                 {"Size", {{"X", 100.0f}, {"Y", 100.0f}}},
                 {"Visible", true},
                 {"Alignment", 0},
-                {"ZOrder", 0}
+                {"ZOrder", 0},
+                {"Margin", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}},
+                {"Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}}
             };
             };
         }
@@ -561,7 +588,92 @@ Without these, the macro would end early and break the expansion
                 {"Text", "Text"},
                 {"FontPath", ""},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-                {"FontSize", 24.0f}
+                {"FontSize", 24.0f},
+                {"Wrap", false},
+                {"HAlign", 0},
+                {"VAlign", 0}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIImage, "GUIImage"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"TexturePath", ""},
+                {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"UVRect", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f}}},
+                {"ScaleMode", 0},
+                {"UseSlicing", false},
+                {"SliceBorder", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIInput, "GUIInput"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Hovered", false},
+                {"Pressed", false},
+                {"Clicked", false},
+                {"Released", false},
+                {"Dragging", false},
+                {"Entered", false},
+                {"Exited", false}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"NormalColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"HoverColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}}},
+                {"PressedColor", {{"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f}}},
+                {"DisabledColor", {{"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f}}}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Text", "Button"},
+                {"FontPath", ""},
+                {"IconPath", ""},
+                {"NormalColor", {{"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f}}},
+                {"HoverColor", {{"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f}}},
+                {"PressedColor", {{"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f}}},
+                {"DisabledColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f}}},
+                {"TextColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"IconColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"FontSize", 24.0f},
+                {"CornerRadius", 0.0f},
+                {"IconSize", {{"X", 24.0f}, {"Y", 24.0f}}},
+                {"IconOffset", {{"X", 0.0f}, {"Y", 0.0f}}},
+                {"Padding", {{"X", 8.0f}, {"Y", 6.0f}, {"Z", 8.0f}, {"W", 6.0f}}},
+                {"Disabled", false},
+                {"Toggle", false},
+                {"Toggled", false}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUISlider, "GUISlider"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"Value", 0.0f},
+                {"Min", 0.0f},
+                {"Max", 1.0f},
+                {"Step", 0.0f},
+                {"TrackColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f}}},
+                {"FillColor", {{"R", 0.4f}, {"G", 0.4f}, {"B", 0.4f}, {"A", 1.0f}}},
+                {"KnobColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}}},
+                {"CornerRadius", 0.0f},
+                {"KnobSize", {{"X", 16.0f}, {"Y", 16.0f}}},
+                {"Padding", {{"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f}}},
+                {"Horizontal", true},
+                {"Disabled", false},
+                {"ValueChanged", false}
             };
             };
         }
@@ -895,7 +1007,9 @@ static void _initializeDefaultRegistry() {
                 { "Size", {{"X", 100.0f}, {"Y", 100.0f}} },
                 { "Visible", true },
                 { "Alignment", 0 },
-                { "ZOrder", 0 }
+                { "ZOrder", 0 },
+                { "Margin", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} },
+                { "Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} }
             }; }),
             COMPONENT_OPS_HASH(GUIElement, kHashGUIElement)
         },
@@ -919,9 +1033,104 @@ static void _initializeDefaultRegistry() {
                 { "Text", "Text" },
                 { "FontPath", "" },
                 { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
-                { "FontSize", 24.0f }
+                { "FontSize", 24.0f },
+                { "Wrap", false },
+                { "HAlign", 0 },
+                { "VAlign", 0 }
             }; }),
             COMPONENT_OPS_HASH(GUIText, kHashGUIText)
+        },
+        // GUI State Style
+        {
+            "GUI State Style", "GUIStateStyle", "ECS::Components::GUIStateStyle",
+            GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"), kHashGUIStateStyle, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIStateStyle(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "NormalColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "HoverColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}} },
+                { "PressedColor", {{"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f}} },
+                { "DisabledColor", {{"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f}} }
+            }; }),
+            COMPONENT_OPS_HASH(GUIStateStyle, kHashGUIStateStyle)
+        },
+        // GUI Image
+        {
+            "GUI Image", "GUIImage", "ECS::Components::GUIImage",
+            GetComponentIdFromHashOrWarn(kHashGUIImage, "GUIImage"), kHashGUIImage, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIImage(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "TexturePath", "" },
+                { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "UVRect", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f}} },
+                { "ScaleMode", 0 },
+                { "UseSlicing", false },
+                { "SliceBorder", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} }
+            }; }),
+            COMPONENT_OPS_HASH(GUIImage, kHashGUIImage)
+        },
+        // GUI Input
+        {
+            "GUI Input", "GUIInput", "ECS::Components::GUIInput",
+            GetComponentIdFromHashOrWarn(kHashGUIInput, "GUIInput"), kHashGUIInput, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIInput(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Hovered", false },
+                { "Pressed", false },
+                { "Clicked", false },
+                { "Released", false },
+                { "Dragging", false },
+                { "Entered", false },
+                { "Exited", false }
+            }; }),
+            COMPONENT_OPS_HASH(GUIInput, kHashGUIInput)
+        },
+        // GUI Button
+        {
+            "GUI Button", "GUIButton", "ECS::Components::GUIButton",
+            GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"), kHashGUIButton, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIButton(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Text", "Button" },
+                { "FontPath", "" },
+                { "IconPath", "" },
+                { "NormalColor", {{"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f}} },
+                { "HoverColor", {{"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f}} },
+                { "PressedColor", {{"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f}} },
+                { "DisabledColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f}} },
+                { "TextColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "IconColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "FontSize", 24.0f },
+                { "CornerRadius", 0.0f },
+                { "IconSize", {{"X", 24.0f}, {"Y", 24.0f}} },
+                { "IconOffset", {{"X", 0.0f}, {"Y", 0.0f}} },
+                { "Padding", {{"X", 8.0f}, {"Y", 6.0f}, {"Z", 8.0f}, {"W", 6.0f}} },
+                { "Disabled", false },
+                { "Toggle", false },
+                { "Toggled", false }
+            }; }),
+            COMPONENT_OPS_HASH(GUIButton, kHashGUIButton)
+        },
+        // GUI Slider
+        {
+            "GUI Slider", "GUISlider", "ECS::Components::GUISlider",
+            GetComponentIdFromHashOrWarn(kHashGUISlider, "GUISlider"), kHashGUISlider, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUISlider(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Value", 0.0f },
+                { "Min", 0.0f },
+                { "Max", 1.0f },
+                { "Step", 0.0f },
+                { "TrackColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f}} },
+                { "FillColor", {{"R", 0.4f}, {"G", 0.4f}, {"B", 0.4f}, {"A", 1.0f}} },
+                { "KnobColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}} },
+                { "CornerRadius", 0.0f },
+                { "KnobSize", {{"X", 16.0f}, {"Y", 16.0f}} },
+                { "Padding", {{"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f}} },
+                { "Horizontal", true },
+                { "Disabled", false },
+                { "ValueChanged", false }
+            }; }),
+            COMPONENT_OPS_HASH(GUISlider, kHashGUISlider)
         },
     };
 }

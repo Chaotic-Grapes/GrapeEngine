@@ -441,6 +441,11 @@ file(GLOB_RECURSE ALL_PROJECT_SETTINGS_FOR_COPY
 )
 
 foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
+    file(TO_CMAKE_PATH "${SETTINGS_FILE}" SETTINGS_FILE_CMAKE)
+    if(SETTINGS_FILE_CMAKE MATCHES "/build/|/build_game/|/build_editor/|/export/|/x64/")
+        continue()
+    endif()
+
     get_filename_component(PROJECT_DIR ${SETTINGS_FILE} DIRECTORY)
     get_filename_component(PROJECT_NAME ${PROJECT_DIR} NAME)
     
@@ -505,6 +510,77 @@ elseif(BUILD_EDITOR)
     message(STATUS "GrapeEngine configured successfully! (Editor only)")
 elseif(BUILD_GAME)
     message(STATUS "GrapeEngine configured successfully! (Game only)")
+endif()
+
+# ======================= Game Export Packaging =========================
+# Stages a standalone game build + project content to a distributable folder.
+if(BUILD_GAME AND TARGET GrapeRuntime)
+    set(EXPORT_PROJECT_NAME "" CACHE STRING "Project folder name to export for game packaging")
+
+    file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json")
+    list(LENGTH PROJECT_SETTINGS_FILES PROJECT_SETTINGS_COUNT)
+
+    if(EXPORT_PROJECT_NAME STREQUAL "")
+        if(PROJECT_SETTINGS_COUNT EQUAL 1)
+            list(GET PROJECT_SETTINGS_FILES 0 EXPORT_PROJECT_SETTINGS)
+            get_filename_component(EXPORT_PROJECT_DIR "${EXPORT_PROJECT_SETTINGS}" DIRECTORY)
+            get_filename_component(EXPORT_PROJECT_NAME "${EXPORT_PROJECT_DIR}" NAME)
+            message(STATUS "Export: Auto-detected project '${EXPORT_PROJECT_NAME}'")
+        elseif(PROJECT_SETTINGS_COUNT GREATER 1)
+            message(WARNING "Export: Multiple projects found. Set EXPORT_PROJECT_NAME to choose one.")
+        else()
+            message(WARNING "Export: No ProjectSettings.json found; export target will be incomplete.")
+        endif()
+    endif()
+
+    if(EXPORT_PROJECT_NAME)
+        set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
+        set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
+
+        add_custom_target(ExportGame
+            COMMAND ${CMAKE_COMMAND} -E echo "Exporting game to ${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+            COMMAND ${CMAKE_COMMAND} -E remove_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "$<TARGET_FILE_DIR:GrapeRuntime>"
+                "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${EXPORT_PROJECT_DIR}"
+                "${EXPORT_OUTPUT_DIR}/$<CONFIG>/${EXPORT_PROJECT_NAME}"
+            DEPENDS GrapeRuntime
+            COMMENT "Staging standalone game export"
+        )
+
+        if(BUILD_ENGINE_SHARED)
+            add_custom_command(TARGET ExportGame POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:GrapeEngineLib>"
+                    "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+                COMMENT "Copying engine DLL to export output"
+            )
+        endif()
+
+        if(TARGET Copy_Assets_Runtime)
+            add_dependencies(ExportGame Copy_Assets_Runtime)
+        endif()
+        if(TARGET Copy_FMOD_Runtime)
+            add_dependencies(ExportGame Copy_FMOD_Runtime)
+        endif()
+        if(TARGET Copy_Nethost_Runtime)
+            add_dependencies(ExportGame Copy_Nethost_Runtime)
+        endif()
+        if(TARGET Copy_Scripting_Runtime)
+            add_dependencies(ExportGame Copy_Scripting_Runtime)
+        endif()
+        if(TARGET Copy_RuntimeConfig_Runtime)
+            add_dependencies(ExportGame Copy_RuntimeConfig_Runtime)
+        endif()
+    else()
+        add_custom_target(ExportGame
+            COMMAND ${CMAKE_COMMAND} -E echo "ExportGame: No project selected. Set -DEXPORT_PROJECT_NAME=<ProjectFolder>."
+            COMMAND ${CMAKE_COMMAND} -E false
+        )
+    endif()
 endif()
 
 # ======================= DOCUMENTATION GENERATION =========================

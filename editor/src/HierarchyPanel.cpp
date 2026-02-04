@@ -427,6 +427,52 @@ void HierarchyPanel::_renderHeader() {
                 }
             }
 
+            if (ImGui::MenuItem("Image")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 128.0f, 128.0f };
+                        m_world->Add<ECS::Components::GUIImage>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Button")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 160.0f, 40.0f };
+                        auto& button = m_world->Add<ECS::Components::GUIButton>(e);
+                        button.TextId = ECS::StringTable::Intern("Button");
+                        button.FontPathId = 0;
+                        m_world->Add<ECS::Components::GUIInput>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Slider")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 24.0f };
+                        m_world->Add<ECS::Components::GUISlider>(e);
+                        m_world->Add<ECS::Components::GUIInput>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
             ImGui::EndMenu();
         }
 

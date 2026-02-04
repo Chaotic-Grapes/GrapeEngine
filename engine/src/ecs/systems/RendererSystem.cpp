@@ -1245,7 +1245,7 @@ namespace ECS {
             [this](ResourceAccessor& res)
             {
                 // Skip if no GUI elements queued
-                if (m_guiPanelQueue.empty() && m_guiTextQueue.empty()) return;
+                if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
 
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
@@ -1258,14 +1258,14 @@ namespace ECS {
                 glViewport(0, 0, ldr->Width(), ldr->Height());
 
                 // Enable blending for GUI rendering
-                GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+                GLboolean blendWasEnabled = glIsEnabled(GL_BLEND); // preserve blend state for GUI pass
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-                // Orthographic projection matrix
+                // Orthographic projection for GUI panels/images (top-left origin).
                 glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
 
-                // Setup scissor test based on GUI viewport
+                // Setup scissor test based on GUI viewport.
                 bool scissorEnabled = false;
                 GUIViewport viewport = m_guiViewport;
                 if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
@@ -1273,7 +1273,7 @@ namespace ECS {
                     viewport.Size = { width, height };
                 }
 
-                // Enable scissor test if viewport size is valid
+                // Enable scissor test if viewport size is valid.
                 if (viewport.Size.X > 0.0f && viewport.Size.Y > 0.0f) {
                     glEnable(GL_SCISSOR_TEST);
                     scissorEnabled = true;
@@ -1284,7 +1284,7 @@ namespace ECS {
                     glScissor(scissorX, scissorY, scissorW, scissorH);
                 }
 
-                // Render GUI panels
+                // Render GUI panels (solid quads with optional corner radius).
                 if (!m_guiPanelQueue.empty()) {
                     if (m_shader) {
                         m_shader->use();
@@ -1304,7 +1304,27 @@ namespace ECS {
                     m_renderer->endFrame();
                 }
 
-                // Render GUI text
+                // Render GUI images/icons (textured quads).
+                if (!m_guiImageQueue.empty()) {
+                    if (m_shader) {
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", screenOrtho);
+                        m_shader->setUniform("uLightingEnabled", 0);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& image : m_guiImageQueue) {
+                        const glm::vec2 center(image.position.X + image.size.X * 0.5f,
+                                               image.position.Y + image.size.Y * 0.5f);
+                        const glm::vec2 size(image.size.X, image.size.Y);
+                        const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
+                        const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                        const GLuint textureId = image.textureId;
+                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                    }
+                    m_renderer->endFrame();
+                }
+
+                // Render GUI text (SDF font rendering in screen space).
                 if (!m_guiTextQueue.empty()) {
                     const glm::mat4 textOrtho = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
                     if (m_textShader) {
@@ -1317,7 +1337,7 @@ namespace ECS {
                             continue;
                         }
 
-                        // Load font
+                        // Load font (fallback to default if path is empty).
                         const std::string fontPath = text.fontPath.empty()
                             ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
                             : text.fontPath;
@@ -1327,21 +1347,24 @@ namespace ECS {
                             continue;
                         }
 
-                        // Calculate text position (flip Y for GUI space)
-                        const glm::vec2 textPos(text.position.X, height - text.position.Y);
+                        // Calculate text position (flip Y for GUI space, anchor from top).
+                        const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                        const float ascent = font->getAscent() * scale;
+                        const glm::vec2 textPos(text.position.X, height - text.position.Y - ascent);
                         const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
                         m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
                     }
                     m_renderer->endFrame();
                 }
 
-                // Disable scissor test if it was enabled
+                // Disable scissor test if it was enabled.
                 if (scissorEnabled) {
                     glDisable(GL_SCISSOR_TEST);
                 }
 
-                // Clear GUI queues for next frame
+                // Clear GUI queues for next frame.
                 m_guiPanelQueue.clear();
+                m_guiImageQueue.clear();
                 m_guiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
@@ -1816,7 +1839,7 @@ namespace ECS {
     }
 
     void RendererSystem::RenderGUI(Viewport& vp) {
-        if (m_guiPanelQueue.empty() && m_guiTextQueue.empty()) return;
+        if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
 
         vp.LDR->Bind();
         glViewport(0, 0, vp.Size.x, vp.Size.y);
@@ -1842,6 +1865,22 @@ namespace ECS {
             m_renderer->endFrame();
         }
 
+        // Images
+        if (!m_guiImageQueue.empty()) {
+            m_shader->use();
+            m_shader->setMat4("uViewProj", screenOrtho);
+            m_shader->setUniform("uLightingEnabled", 0);
+            m_renderer->beginFrame();
+            for (const auto& image : m_guiImageQueue) {
+                glm::vec2 center(image.position.X + image.size.X * 0.5f, image.position.Y + image.size.Y * 0.5f);
+                glm::vec2 size(image.size.X, image.size.Y);
+                glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
+                glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+            }
+            m_renderer->endFrame();
+        }
+
         // Text
         if (!m_guiTextQueue.empty()) {
             glm::mat4 textOrtho = glm::ortho(0.0f, w, 0.0f, h, -1.0f, 1.0f);
@@ -1853,7 +1892,9 @@ namespace ECS {
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
                 if (!font) continue;
-                glm::vec2 pos(text.position.X, h - text.position.Y);
+                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float ascent = font->getAscent() * scale;
+                glm::vec2 pos(text.position.X, h - text.position.Y - ascent);
                 glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
                 m_renderer->submitText(*font, text.text, pos, color, text.pixelSize);
             }
@@ -2113,6 +2154,7 @@ namespace ECS {
         (void)cornerRadius;
         if (!m_renderer) return;
 
+        // Queue GUI panel draw for the GUI pass.
         GUIPanelSubmission submission;
         submission.position = position;
         submission.size = size;
@@ -2121,10 +2163,25 @@ namespace ECS {
         m_guiPanelQueue.push_back(submission);
     }
 
+    void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
+                                        uint32_t textureId, const Vector4D& uvRect, const Color& color) {
+        if (!m_renderer) return;
+
+        // Queue GUI image/icon draw for the GUI pass.
+        GUIImageSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.textureId = textureId;
+        submission.uvRect = uvRect;
+        submission.color = color;
+        m_guiImageQueue.push_back(submission);
+    }
+
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
                                        const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
 
+        // Queue GUI text draw for the GUI pass.
         GUITextSubmission submission;
         submission.position = position;
         submission.text = text;

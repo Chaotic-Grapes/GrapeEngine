@@ -1,19 +1,23 @@
 @echo off
 set CONFIG=%1
-if "%CONFIG%"=="" set CONFIG=Debug
+if "%CONFIG%"=="" set CONFIG=Release
 
-TITLE Build Game (%CONFIG%)
+set PROJECT=%2
+if "%PROJECT%"=="" set PROJECT=EchoesBelow
 
-REM Optional second arg: number of parallel jobs (defaults to number of processors)
-set JOBS=%2
+REM Optional third arg: number of parallel jobs (defaults to number of processors)
+set JOBS=%3
 if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
+
+TITLE Export Game (%CONFIG%)
 
 echo.
 echo ==========================================================
-echo           Building Standalone Game (%CONFIG%)
+echo           Exporting Standalone Game (%CONFIG%)
 echo ----------------------------------------------------------
 echo   Engine: GrapeEngineLib (DLL)
 echo   Runtime: GrapeRuntime -^> Game executable
+echo   Output: build_game\export\%PROJECT%\%CONFIG%
 echo ==========================================================
 
 REM Create build folder if it doesn't exist
@@ -23,7 +27,9 @@ cd build_game
 REM Configure with CMake for GAME ONLY
 REM Engine is built as a library (GrapeEngineNative.dll)
 REM Runtime links against it and outputs game executable
-cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON
+set EXTRA_ARGS=
+if not "%PROJECT%"=="" set EXTRA_ARGS=-DEXPORT_PROJECT_NAME=%PROJECT%
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON %EXTRA_ARGS%
 if %errorlevel% neq 0 (
     echo ERROR: CMake configuration failed
     cd ..
@@ -31,10 +37,10 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Build the project (builds both engine library and runtime executable)
-cmake --build . --config %CONFIG% --parallel %JOBS%
+REM Build and export the game
+cmake --build . --config %CONFIG% --target ExportGame --parallel %JOBS%
 if %errorlevel% neq 0 (
-    echo ERROR: Build failed
+    echo ERROR: Export failed
     cd ..
     pause
     exit /b 1
@@ -43,31 +49,8 @@ if %errorlevel% neq 0 (
 cd ..
 echo.
 echo ==========================================================
-echo  Standalone Game build %CONFIG% completed successfully!
+echo  Standalone Game export %CONFIG% completed successfully!
 echo ==========================================================
-REM Try to detect the produced executable name
-set "EXE_DIR=build_game\%CONFIG%"
-set "EXE_NAME="
-
-for /f "delims=" %%F in ('dir "%EXE_DIR%\*.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
-
-if defined EXE_NAME (
-    echo Executable location: %EXE_DIR%\%EXE_NAME%
-) else (
-    echo Executable location: %EXE_DIR%\^<not found^>
-)
+echo Export location: build_game\export\%PROJECT%\%CONFIG%
 echo.
-echo NOTE: Engine DLL should be copied to game executable directory.
-echo       Checking if copy is needed (copy only if source is newer)...
-echo   Attempting to copy build\engine\%CONFIG%\GrapeEngineNative.dll -> %EXE_DIR%\
-xcopy /Y /D "build\engine\%CONFIG%\GrapeEngineNative.dll" "%EXE_DIR%\" >nul
-if %errorlevel% equ 0 (
-    echo   Copy successful!
-) else (
-    if %errorlevel% equ 1 (
-        echo   DLL already up-to-date in game directory.
-    ) else (
-        echo   WARNING: Failed to copy DLL - game may not run!
-    )
-)
 pause

@@ -64,8 +64,6 @@ public:
     */
     static bool IsMouseDown(int button);
 
-    static bool IsMouseReleased(const int button);
-
     /*!
     \brief Check if a mouse button was just released this frame.
     \param button The mouse button to check (use MOUSE_* constants).
