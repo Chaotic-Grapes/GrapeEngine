@@ -334,7 +334,7 @@ INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t entityId,
 
 namespace {
     uint64_t InvalidPackedEntityId() {
-        return std::numeric_limits<uint64_t>::max();
+        return (std::numeric_limits<uint64_t>::max)();
     }
 }
 
