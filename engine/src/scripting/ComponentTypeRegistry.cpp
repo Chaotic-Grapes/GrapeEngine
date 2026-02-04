@@ -132,6 +132,7 @@ namespace ECS {
         REGISTER_COMPONENT(GUIText);
         REGISTER_COMPONENT(GUIImage);
         REGISTER_COMPONENT(GUIInput);
+        REGISTER_COMPONENT(GUIStateStyle);
         REGISTER_COMPONENT(GUIButton);
         REGISTER_COMPONENT(GUISlider);
 
@@ -196,6 +197,7 @@ namespace ECS {
         LogComponentTypeIds("GUIText", FNV1a_Hash("GUIText"));
         LogComponentTypeIds("GUIImage", FNV1a_Hash("GUIImage"));
         LogComponentTypeIds("GUIInput", FNV1a_Hash("GUIInput"));
+        LogComponentTypeIds("GUIStateStyle", FNV1a_Hash("GUIStateStyle"));
         LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));
         LogComponentTypeIds("GUISlider", FNV1a_Hash("GUISlider"));
 

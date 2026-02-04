@@ -522,7 +522,10 @@ namespace ECS {
 			{"Text", value},
 			{"FontPath", fontPath},
 			{"Color", text.Color},
-			{"FontSize", text.FontSize}
+			{"FontSize", text.FontSize},
+			{"Wrap", text.Wrap},
+			{"HAlign", static_cast<uint8_t>(text.HAlign)},
+			{"VAlign", static_cast<uint8_t>(text.VAlign)}
 		};
 	}
 
@@ -539,6 +542,9 @@ namespace ECS {
 		} else {
 			text.FontSize = j.value("PixelSize", 24.0f);
 		}
+		text.Wrap = j.value("Wrap", false);
+		text.HAlign = static_cast<GUIText::HorizontalAlign>(j.value("HAlign", 0));
+		text.VAlign = static_cast<GUIText::VerticalAlign>(j.value("VAlign", 0));
 	}
 
 	inline void to_json(nlohmann::json& j, const GUIImage& image) {
@@ -571,7 +577,9 @@ namespace ECS {
 			{"Pressed", input.Pressed},
 			{"Clicked", input.Clicked},
 			{"Released", input.Released},
-			{"Dragging", input.Dragging}
+			{"Dragging", input.Dragging},
+			{"Entered", input.Entered},
+			{"Exited", input.Exited}
 		};
 	}
 
@@ -581,6 +589,24 @@ namespace ECS {
 		input.Clicked = j.value("Clicked", false);
 		input.Released = j.value("Released", false);
 		input.Dragging = j.value("Dragging", false);
+		input.Entered = j.value("Entered", false);
+		input.Exited = j.value("Exited", false);
+	}
+
+	inline void to_json(nlohmann::json& j, const GUIStateStyle& style) {
+		j = nlohmann::json{
+			{"NormalColor", style.NormalColor},
+			{"HoverColor", style.HoverColor},
+			{"PressedColor", style.PressedColor},
+			{"DisabledColor", style.DisabledColor}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIStateStyle& style) {
+		if (j.contains("NormalColor")) style.NormalColor = j.at("NormalColor").get<::Color>();
+		if (j.contains("HoverColor")) style.HoverColor = j.at("HoverColor").get<::Color>();
+		if (j.contains("PressedColor")) style.PressedColor = j.at("PressedColor").get<::Color>();
+		if (j.contains("DisabledColor")) style.DisabledColor = j.at("DisabledColor").get<::Color>();
 	}
 
 	inline void to_json(nlohmann::json& j, const GUIButton& button) {
@@ -1072,6 +1098,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");
 	REGISTER_COMPONENT_SERIALIZER(GUIImage, ECS::Components::GUIImage, "GUIImage");
 	REGISTER_COMPONENT_SERIALIZER(GUIInput, ECS::Components::GUIInput, "GUIInput");
+	REGISTER_COMPONENT_SERIALIZER(GUIStateStyle, ECS::Components::GUIStateStyle, "GUIStateStyle");
 	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton");
 	REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider");
 }

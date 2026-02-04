@@ -187,6 +187,23 @@ public record struct GUIText
     public StringId FontPathId;
     public Color Color;
     public float FontSize;
+    public bool Wrap;
+    public GUITextHAlign HAlign;
+    public GUITextVAlign VAlign;
+}
+
+public enum GUITextHAlign : byte
+{
+    Left = 0,
+    Center = 1,
+    Right = 2
+}
+
+public enum GUITextVAlign : byte
+{
+    Top = 0,
+    Middle = 1,
+    Bottom = 2
 }
 
 public enum GUIImageScaleMode : byte
@@ -216,6 +233,17 @@ public record struct GUIInput
     public bool Clicked;
     public bool Released;
     public bool Dragging;
+    public bool Entered;
+    public bool Exited;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIStateStyle
+{
+    public Color NormalColor;
+    public Color HoverColor;
+    public Color PressedColor;
+    public Color DisabledColor;
 }
 
 [StructLayout(LayoutKind.Sequential)]

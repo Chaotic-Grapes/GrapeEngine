@@ -10,6 +10,7 @@ namespace ECS {
         (void)world;
     }
 
+    // Compute canvas scale based on reference size and scale mode.
     static Vector2D ComputeScale(const Components::GUICanvas& canvas, const Vector2D& viewportSize) {
         Vector2D scale{ 1.0f, 1.0f };
         if (canvas.ReferenceSize.X <= 0.0f || canvas.ReferenceSize.Y <= 0.0f) {
@@ -39,6 +40,7 @@ namespace ECS {
         return scale;
     }
 
+    // Resolve anchor position based on alignment within a given rect.
     static Vector2D AlignAnchor(const Vector2D& origin, const Vector2D& size, Components::GUIAlignment alignment) {
         switch (alignment) {
         case Components::GUIAlignment::Top:
@@ -69,6 +71,7 @@ namespace ECS {
             return;
         }
 
+        // Query the active GUI viewport (editor may override it).
         RendererSystem::GUIViewport viewport = renderer->GetGUIViewport();
         if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
             const Vector2D renderSize = renderer->GetRenderTargetSize();
@@ -76,6 +79,7 @@ namespace ECS {
             viewport.Size = renderSize;
         }
 
+        // Use the first canvas found; if none exists, fall back to viewport size.
         Components::GUICanvas canvas{};
         bool foundCanvas = false;
         world.Each<Components::GUICanvas>([&](Entity, const Components::GUICanvas& c) {
@@ -88,6 +92,7 @@ namespace ECS {
             canvas.ScaleMode = Components::GUIScaleMode::Fit;
         }
 
+        // Compute scale from reference size and scale mode.
         const Vector2D scale = ComputeScale(canvas, viewport.Size);
         const Vector2D contentSize = {
             canvas.ReferenceSize.X * scale.X,
@@ -98,18 +103,21 @@ namespace ECS {
             viewport.Origin.Y + (viewport.Size.Y - contentSize.Y) * 0.5f
         };
 
+        // Collect GUI elements for recursive layout.
         std::vector<Entity> elements;
         world.Each<Components::GUIElement>([&](Entity entity, Components::GUIElement&) {
             elements.push_back(entity);
         });
 
-        std::unordered_map<Entity, bool, EntityHash> resolved;
-        std::unordered_set<Entity, EntityHash> resolving;
+        std::unordered_map<Entity, bool, EntityHash> resolved;   // cache layout completion per element
+        std::unordered_set<Entity, EntityHash> resolving;        // cycle guard for parent chains
 
         auto resolveElement = [&](auto&& self, Entity entity) -> void {
+            // Skip elements already computed this frame.
             if (resolved[entity]) {
                 return;
             }
+            // Guard against recursive parent loops.
             if (resolving.count(entity) > 0) {
                 return;
             }
@@ -117,6 +125,7 @@ namespace ECS {
             resolving.insert(entity);
 
             auto& element = world.Get<Components::GUIElement>(entity);
+            // Default anchor origin and size come from canvas space.
             Vector2D anchorOrigin = { contentOrigin.X + canvas.Offset.X, contentOrigin.Y + canvas.Offset.Y };
             Vector2D anchorSize = contentSize;
 
@@ -125,6 +134,7 @@ namespace ECS {
                 const Entity parentEntity = parent.ParentEntity;
                 if (!parentEntity.IsNull() && world.IsAlive(parentEntity) &&
                     world.Has<Components::GUIElement>(parentEntity)) {
+                    // Ensure parent is laid out before applying child offsets.
                     self(self, parentEntity);
                     const auto& parentElement = world.Get<Components::GUIElement>(parentEntity);
                     anchorOrigin = parentElement.ContentPosition;
@@ -132,6 +142,7 @@ namespace ECS {
                 }
             }
 
+            // Apply scale to size and margin/padding so layout matches rendering.
             Vector2D size = { element.Size.X * scale.X, element.Size.Y * scale.Y };
             Vector4D margin = {
                 element.Margin.X * scale.X,
@@ -146,15 +157,18 @@ namespace ECS {
                 element.Padding.W * scale.Y
             };
 
+            // Margins reduce the final size and offset the anchor position.
             size.X = std::max(0.0f, size.X - margin.X - margin.Z);
             size.Y = std::max(0.0f, size.Y - margin.Y - margin.W);
 
+            // Resolve the anchor point based on alignment within the anchor rect.
             Vector2D anchor = AlignAnchor(anchorOrigin, anchorSize, element.Alignment);
             Vector2D position = {
                 anchor.X + element.Position.X * scale.X + margin.X,
                 anchor.Y + element.Position.Y * scale.Y + margin.Y
             };
 
+            // Offset position by element size for alignments that are not top-left.
             switch (element.Alignment) {
             case Components::GUIAlignment::Top:
                 position.X -= size.X * 0.5f;
@@ -189,9 +203,11 @@ namespace ECS {
                 break;
             }
 
+            // Cache resolved rect for rendering and input.
             element.ResolvedPosition = position;
             element.ResolvedSize = size;
 
+            // Content rect excludes padding for child alignment and text layout.
             Vector2D contentPos = { position.X + padding.X, position.Y + padding.Y };
             Vector2D contentSizeFinal = {
                 std::max(0.0f, size.X - padding.X - padding.Z),

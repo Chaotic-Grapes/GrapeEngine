@@ -124,6 +124,7 @@ public:
     void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIStateStyle(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 

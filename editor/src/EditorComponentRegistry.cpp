@@ -70,6 +70,7 @@ namespace {
     const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
     const uint32_t kHashGUIImage = Editor::ECSUtils::FNV1aHash("GUIImage");
     const uint32_t kHashGUIInput = Editor::ECSUtils::FNV1aHash("GUIInput");
+    const uint32_t kHashGUIStateStyle = Editor::ECSUtils::FNV1aHash("GUIStateStyle");
     const uint32_t kHashGUIButton = Editor::ECSUtils::FNV1aHash("GUIButton");
     const uint32_t kHashGUISlider = Editor::ECSUtils::FNV1aHash("GUISlider");
     
@@ -287,6 +288,10 @@ Without these, the macro would end early and break the expansion
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIInput, "GUIInput"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIInput(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIStateStyle(d, e, w); };
         }
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"); id != ECS::NULL_COMPONENT_ID) {
@@ -583,7 +588,10 @@ Without these, the macro would end early and break the expansion
                 {"Text", "Text"},
                 {"FontPath", ""},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-                {"FontSize", 24.0f}
+                {"FontSize", 24.0f},
+                {"Wrap", false},
+                {"HAlign", 0},
+                {"VAlign", 0}
             };
             };
         }
@@ -608,7 +616,20 @@ Without these, the macro would end early and break the expansion
                 {"Pressed", false},
                 {"Clicked", false},
                 {"Released", false},
-                {"Dragging", false}
+                {"Dragging", false},
+                {"Entered", false},
+                {"Exited", false}
+            };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                {"NormalColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                {"HoverColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}}},
+                {"PressedColor", {{"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f}}},
+                {"DisabledColor", {{"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f}}}
             };
             };
         }
@@ -1012,9 +1033,25 @@ static void _initializeDefaultRegistry() {
                 { "Text", "Text" },
                 { "FontPath", "" },
                 { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
-                { "FontSize", 24.0f }
+                { "FontSize", 24.0f },
+                { "Wrap", false },
+                { "HAlign", 0 },
+                { "VAlign", 0 }
             }; }),
             COMPONENT_OPS_HASH(GUIText, kHashGUIText)
+        },
+        // GUI State Style
+        {
+            "GUI State Style", "GUIStateStyle", "ECS::Components::GUIStateStyle",
+            GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"), kHashGUIStateStyle, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIStateStyle(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "NormalColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
+                { "HoverColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}} },
+                { "PressedColor", {{"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f}} },
+                { "DisabledColor", {{"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f}} }
+            }; }),
+            COMPONENT_OPS_HASH(GUIStateStyle, kHashGUIStateStyle)
         },
         // GUI Image
         {
@@ -1041,7 +1078,9 @@ static void _initializeDefaultRegistry() {
                 { "Pressed", false },
                 { "Clicked", false },
                 { "Released", false },
-                { "Dragging", false }
+                { "Dragging", false },
+                { "Entered", false },
+                { "Exited", false }
             }; }),
             COMPONENT_OPS_HASH(GUIInput, kHashGUIInput)
         },

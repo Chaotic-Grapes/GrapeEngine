@@ -1482,8 +1482,11 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
             data["FontSize"] = 24.0f;
         }
     }
+    if (!data.contains("Wrap")) data["Wrap"] = false;
+    if (!data.contains("HAlign")) data["HAlign"] = 0;
+    if (!data.contains("VAlign")) data["VAlign"] = 0;
 
-    EditorUI::BeginPropertySection({ "Text", "Font", "Color", "Font Size" });
+    EditorUI::BeginPropertySection({ "Text", "Font", "Color", "Font Size", "Wrap", "H Align", "V Align" });
     EditorUI::RenderTextProperty("Text", data, "Text");
 
     std::string fontPath = data.value("FontPath", std::string());
@@ -1509,6 +1512,43 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     EditorUI::RenderColorRow("Color", data["Color"]);
     EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::RenderCheckboxProperty("Wrap", data, "Wrap");
+
+    const char* hAlignOptions[] = { "Left", "Center", "Right" };
+    int hAlign = data.value("HAlign", 0);
+    hAlign = std::max(0, std::min(hAlign, 2));
+    ImGui::Text("H Align");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUITextHAlign", hAlignOptions[hAlign])) {
+        for (int i = 0; i < 3; ++i) {
+            bool selected = (hAlign == i);
+            if (ImGui::Selectable(hAlignOptions[i], selected)) {
+                hAlign = i;
+                data["HAlign"] = hAlign;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    const char* vAlignOptions[] = { "Top", "Middle", "Bottom" };
+    int vAlign = data.value("VAlign", 0);
+    vAlign = std::max(0, std::min(vAlign, 2));
+    ImGui::Text("V Align");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUITextVAlign", vAlignOptions[vAlign])) {
+        for (int i = 0; i < 3; ++i) {
+            bool selected = (vAlign == i);
+            if (ImGui::Selectable(vAlignOptions[i], selected)) {
+                vAlign = i;
+                data["VAlign"] = vAlign;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -1580,15 +1620,37 @@ void ComponentUI::RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::
     if (!data.contains("Clicked")) data["Clicked"] = false;
     if (!data.contains("Released")) data["Released"] = false;
     if (!data.contains("Dragging")) data["Dragging"] = false;
+    if (!data.contains("Entered")) data["Entered"] = false;
+    if (!data.contains("Exited")) data["Exited"] = false;
 
-    EditorUI::BeginPropertySection({ "Hovered", "Pressed", "Clicked", "Released", "Dragging" });
+    EditorUI::BeginPropertySection({ "Hovered", "Pressed", "Clicked", "Released", "Dragging", "Entered", "Exited" });
     ImGui::BeginDisabled();
     EditorUI::RenderCheckboxProperty("Hovered", data, "Hovered");
     EditorUI::RenderCheckboxProperty("Pressed", data, "Pressed");
     EditorUI::RenderCheckboxProperty("Clicked", data, "Clicked");
     EditorUI::RenderCheckboxProperty("Released", data, "Released");
     EditorUI::RenderCheckboxProperty("Dragging", data, "Dragging");
+    EditorUI::RenderCheckboxProperty("Entered", data, "Entered");
+    EditorUI::RenderCheckboxProperty("Exited", data, "Exited");
     ImGui::EndDisabled();
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIStateStyle(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIStateStyle");
+
+    if (!data.contains("NormalColor")) data["NormalColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("HoverColor")) data["HoverColor"] = { {"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f} };
+    if (!data.contains("PressedColor")) data["PressedColor"] = { {"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f} };
+    if (!data.contains("DisabledColor")) data["DisabledColor"] = { {"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f} };
+
+    EditorUI::BeginPropertySection({ "Normal Color", "Hover Color", "Pressed Color", "Disabled Color" });
+    EditorUI::RenderColorRow("Normal Color", data["NormalColor"]);
+    EditorUI::RenderColorRow("Hover Color", data["HoverColor"]);
+    EditorUI::RenderColorRow("Pressed Color", data["PressedColor"]);
+    EditorUI::RenderColorRow("Disabled Color", data["DisabledColor"]);
     EditorUI::EndPropertySection();
 }
 
