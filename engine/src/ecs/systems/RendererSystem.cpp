@@ -183,34 +183,21 @@ namespace ECS {
         m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
         ResetGUIViewport();
 
-        // Shaders
-        m_shader = std::make_unique<Shader>(
-            "assets/shaders/batch.vert",
-            "assets/shaders/batch.frag");
+        // Use RM instead!
+        m_shader = RM.Get<Shader>("assets/shaders/batch");
+        m_textShader = RM.Get<Shader>("assets/shaders/sdf_text");
+        m_sdfCircleShader = RM.Get<Shader>("assets/shaders/sdf_circle");
+        m_bloomExtractShader = RM.Get<Shader>("assets/shaders/bloom_extract");
 
-        m_textShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_text.vert",
-            "assets/shaders/sdf_text.frag");
-
-        m_sdfCircleShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_circle.vert",
-            "assets/shaders/sdf_circle.frag");
-
-        m_bloomExtractShader = std::make_unique<Shader>(
-            "assets/shaders/bloom_extract.vert",
-            "assets/shaders/bloom_extract.frag");
-
-        m_bloomBlurShader = std::make_unique<Shader>(
+        m_bloomBlurShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_blur.frag");
 
-        m_bloomCombineShader = std::make_unique<Shader>(
+        m_bloomCombineShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
-        m_blitShader = std::make_unique<Shader>(
-            "assets/shaders/blit.vert",
-            "assets/shaders/blit.frag");
+        m_blitShader = RM.Get<Shader>("assets/shaders/blit");
 
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
@@ -2131,7 +2118,7 @@ namespace ECS {
     }
 
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
-                                                  const glm::vec4& color) {
+        const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
             return;
         }
@@ -2159,12 +2146,12 @@ namespace ECS {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
-        };
+            };
 
         // Render 2D Box Collider
         if (world.Has<ECS::Components::BoxCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
-        
+
             // Compute box corners
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
@@ -2197,13 +2184,13 @@ namespace ECS {
         // Render 2D Circle Collider - render as polygon for accuracy
         if (world.Has<ECS::Components::CircleCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::CircleCollider2D>(entity);
-        
+
             // Compute circle center and radius
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
             const glm::vec2 center = worldPos2D + rotatedOffset;
             const float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
-        
+
             // Submit as filled circle
             WireframeSubmission sub;
             sub.type = WireframeSubmission::Type::Circle;

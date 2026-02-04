@@ -22,6 +22,8 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/src/*.c
 )
 
+# GlobalMemoryOverride.cpp is already picked up by GLOB_RECURSE above
+
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS 
     ${CMAKE_CURRENT_LIST_DIR}/include/*.h
     ${CMAKE_CURRENT_LIST_DIR}/include/*.hpp

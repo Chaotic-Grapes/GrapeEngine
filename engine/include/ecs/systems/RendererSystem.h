@@ -387,15 +387,18 @@ namespace ECS {
         // Member Variables - Shaders
         // ====================================================================
 
-        std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
-        std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
-        std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
-        std::unique_ptr<Shader> m_blitShader;
+        // MAKE IT SHARED SO THAT RM OWNS THE LIBRARY COPY AND THE SAME 
+        // TEXTURE/SHADER/FONT CAN BE REUSED WITHOUT DUPLICATING MEMORY
+
+        std::shared_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::shared_ptr<Shader> m_textShader;      ///< SDF text rendering shader
+        std::shared_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
+        std::shared_ptr<Shader> m_blitShader;
 
         // Post-process shaders
-        std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
-        std::unique_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
-        std::unique_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+        std::shared_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
+        std::shared_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
+        std::shared_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
 
         // ====================================================================
         // Member Variables - Object Picking
