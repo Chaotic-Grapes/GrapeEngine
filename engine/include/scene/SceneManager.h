@@ -32,27 +32,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
-#include "services/TimeSystem.h"
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
-#include "ecs/systems/AudioSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "services/ResourceManager.h"
 
 using json = nlohmann::json;
 
 namespace Scenes {
-    /**
-     * @brief Defines how audio should behave during scene transitions
-     */
-    enum class SceneTransitionMode {
-        Immediate,      // Instant switch, stop all audio immediately
-        FadeOut,        // Fade out current scene audio, then switch
-        CrossFade       // Overlap: fade out old scene while fading in new scene
-    };
-
     class SceneManager {
     public:
         // Default constructor
@@ -158,70 +147,36 @@ namespace Scenes {
             if (index >= m_scenes.size())
                 return;
 
+            _notifySceneChanging(index);
             _performTransition(index);
         }
 
         /**
-         * @brief Sets active scene with audio fade support
-         * @param index The index of the scene to activate
-         * @param mode Transition mode (Immediate, FadeOut, or CrossFade)
-         * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes)
-         * @note This queues the transition for the next Update boundary
+         * @brief Configure the next scene change to trigger audio transitions.
+         * @param fadeDuration Duration of fade in seconds (0 for immediate stop).
+         * @param allowCrossfade True to allow overlap between old and new audio.
          */
-        void SetActiveWithTransition(const size_t index, SceneTransitionMode mode = SceneTransitionMode::Immediate, float fadeDuration = 1.0f) {
-            if (index >= m_scenes.size())
-                return;
-            if (index == m_active) {
-                LOG_WARNING("SceneManager: Ignoring transition to already active scene (index=" << index << ")");
-                return;
-            }
-
-            m_pendingActive = index;
-            m_transitionMode = mode;
-            m_transitionFadeDuration = fadeDuration;
+        void SetNextAudioTransition(float fadeDuration, bool allowCrossfade) {
+            m_pendingAudioTransitionFade = fadeDuration;
+            m_pendingAudioTransitionCrossfade = allowCrossfade;
+            m_hasPendingAudioTransition = true;
         }
 
         /**
-         * @brief Sets active scene with audio fade support by path (loads scene if needed).
-         * @param scenePath Path to the scene (absolute or project-relative).
-         * @param mode Transition mode (Immediate, FadeOut, or CrossFade).
-         * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes).
-         * @return true if the scene was found/loaded and a transition was queued.
+         * @brief Consume the pending audio transition, if any.
+         * @param outFadeDuration Output fade duration in seconds.
+         * @param outAllowCrossfade Output crossfade flag.
+         * @return true if a pending transition was consumed.
          */
-        bool SetActiveWithTransitionByPath(const std::string& scenePath, SceneTransitionMode mode = SceneTransitionMode::Immediate, float fadeDuration = 1.0f) {
-            if (scenePath.empty()) {
+        bool ConsumeNextAudioTransition(float& outFadeDuration, bool& outAllowCrossfade) {
+            if (!m_hasPendingAudioTransition) {
                 return false;
             }
 
-            const std::string normalizedTarget = _normalizePath(_resolveScenePath(scenePath));
-            if (normalizedTarget.empty()) {
-                return false;
-            }
-
-            const size_t existingIndex = _findSceneIndexByPath(normalizedTarget);
-            if (existingIndex != NPOS) {
-                SetActiveWithTransition(existingIndex, mode, fadeDuration);
-                return true;
-            }
-
-            auto* scene = new Scene();
-            size_t sceneIndex = AddScene(scene);
-            if (!LoadScene(sceneIndex, normalizedTarget)) {
-                LOG_WARNING("SceneManager: Failed to load scene for transition: " << normalizedTarget);
-                RemoveScene(sceneIndex);
-                return false;
-            }
-
-            SetActiveWithTransition(sceneIndex, mode, fadeDuration);
+            outFadeDuration = m_pendingAudioTransitionFade;
+            outAllowCrossfade = m_pendingAudioTransitionCrossfade;
+            m_hasPendingAudioTransition = false;
             return true;
-        }
-
-        /**
-         * @brief Sets the AudioSystem reference for scene transition coordination
-         * @param audioSystem Pointer to the AudioSystem (can be nullptr)
-         */
-        void SetAudioSystem(ECS::AudioSystem* audioSystem) {
-            m_audioSystem = audioSystem;
         }
 
         /**
@@ -545,50 +500,10 @@ namespace Scenes {
             if (m_pendingActive == NPOS)
                 return;
 
-            // Handle fade-aware transitions
-            if (m_transitionMode != SceneTransitionMode::Immediate && m_audioSystem) {
-                if (m_transitionMode == SceneTransitionMode::CrossFade) {
-                    if (!m_crossfadeTriggered) {
-                        m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, true);
-                        m_crossfadeTriggered = true;
-                    }
-                }
-                else if (!m_waitingForFadeOut) {
-                    // Start fade-out on first call
-                    m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, false);
-                    m_waitingForFadeOut = true;
-                    m_transitionFadeTimer = 0.0f;
-                    const float maxRemaining = m_audioSystem->GetMaxFadeOutRemaining();
-                    if (maxRemaining > m_transitionFadeDuration) {
-                        m_transitionFadeDuration = maxRemaining;
-                    }
-                    return; // Don't transition yet, wait for fade
-                }
-                else {
-                    // Update fade timer
-                    m_transitionFadeTimer += static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-
-                    // Check if fade is complete
-                    bool fadeComplete = !m_audioSystem->HasActiveFadeOuts();
-                    bool timeoutReached = m_transitionFadeTimer >= (m_transitionFadeDuration + 0.1f); // Small buffer
-
-                    if (!fadeComplete && !timeoutReached) {
-                        return; // Still fading, wait
-                    }
-
-                    // Fade complete or timeout - proceed with transition
-                    m_waitingForFadeOut = false;
-                }
-            }
-
-            // Perform the actual transition
+            _notifySceneChanging(m_pendingActive);
             _performTransition(m_pendingActive);
             m_pendingActive = NPOS;
-
-            // Reset transition settings
-            m_transitionMode = SceneTransitionMode::Immediate;
-            m_transitionFadeDuration = 1.0f;
-            m_crossfadeTriggered = false;
+            m_hasPendingAudioTransition = false;
         }
 
         void _performTransition(const size_t toIndex) {
@@ -619,6 +534,23 @@ namespace Scenes {
             if (!oldTag.empty()) {
                 RM.UnloadAssetsByOwner(oldTag);
             }
+        }
+
+        void _notifySceneChanging(const size_t toIndex) {
+            // Notify listeners of scene changing
+            std::string oldName;
+            std::string newName;
+
+            // Get old scene name
+            if (m_active != NPOS && m_active < m_scenes.size() && m_scenes[m_active]) {
+                oldName = m_scenes[m_active]->GetName();
+            }
+            // Get new scene name
+            if (toIndex < m_scenes.size() && m_scenes[toIndex]) {
+                newName = m_scenes[toIndex]->GetName();
+            }
+
+            Messaging::MessageSystem::Notify(Messaging::SceneChanging{std::move(oldName), std::move(newName)});
         }
 
         // Generate a unique owner tag for a scene based on its pointer
@@ -728,13 +660,9 @@ namespace Scenes {
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;
 
-        // Audio fade transition support
-        ECS::AudioSystem* m_audioSystem = nullptr;
-        SceneTransitionMode m_transitionMode = SceneTransitionMode::Immediate;
-        float m_transitionFadeDuration = 1.0f;
-        float m_transitionFadeTimer = 0.0f;
-        bool m_waitingForFadeOut = false;
-        bool m_crossfadeTriggered = false;
+        bool m_hasPendingAudioTransition = false; // Whether there is a pending audio transition
+        float m_pendingAudioTransitionFade = 0.0f; // Fade duration in seconds
+        bool m_pendingAudioTransitionCrossfade = false; // Whether to allow crossfade
     };
 }
 

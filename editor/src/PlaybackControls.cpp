@@ -659,6 +659,12 @@ EditorState Playback::GetEditorState() const {
     return m_editorState;
 }
 
+void Playback::ClearSavedState() {
+    // Explicitly drop snapshot when the world changes during Play.
+    m_savedWorldState = nullptr;
+    m_savedWorldPtr = nullptr;
+}
+
 // Update the world reference safely when scenes change
 // Update the bound world reference used by playback operations.
 // Clears saved snapshot since it no longer matches the world.
@@ -667,8 +673,7 @@ void Playback::SetWorld(ECS::World* world, bool preserveState) {
     if (!world) {
         m_editorState = EditorState::Edit;
         m_stepRequested = false;
-        m_savedWorldState.clear();
-        m_savedWorldPtr = nullptr;
+        ClearSavedState();
         return;
     }
 
@@ -676,8 +681,7 @@ void Playback::SetWorld(ECS::World* world, bool preserveState) {
     // keep playback state but drop any snapshot tied to another world.
     if (preserveState) {
         if (m_savedWorldPtr && m_savedWorldPtr != world) {
-            m_savedWorldState.clear();
-            m_savedWorldPtr = nullptr;
+            ClearSavedState();
         }
         return;
     }
@@ -686,8 +690,7 @@ void Playback::SetWorld(ECS::World* world, bool preserveState) {
     m_stepRequested = false;
     // Reset time scale on world swap to avoid stale values.
     m_userTimeScale = 1.0f;
-    m_savedWorldState.clear();
-    m_savedWorldPtr = nullptr;
+    ClearSavedState();
 }
 
 // Helper: Restore an entity's state in-place from a JSON snapshot

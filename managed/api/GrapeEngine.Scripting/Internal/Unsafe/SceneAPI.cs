@@ -63,14 +63,9 @@ internal static partial class SceneAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void SetActiveImmediate(void* sceneManagerPtr, ulong sceneIndex);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_SetActiveWithTransition")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_SetNextAudioTransition")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial void SetActiveWithTransition(void* sceneManagerPtr, ulong sceneIndex, int transitionMode, float fadeDuration);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_SetActiveWithTransitionByPath", StringMarshalling = StringMarshalling.Utf8)]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    [return: MarshalAs(UnmanagedType.I1)]
-    public static unsafe partial bool SetActiveWithTransitionByPath(void* sceneManagerPtr, string scenePath, int transitionMode, float fadeDuration);
+    public static unsafe partial void SetNextAudioTransition(void* sceneManagerPtr, float fadeDuration, [MarshalAs(UnmanagedType.I1)] bool allowCrossfade);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_GetActive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -91,23 +86,6 @@ internal static partial class SceneAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_Update")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void Update(void* sceneManagerPtr);
-
-    // ========================================================================
-    // Scene List Queries
-    // ========================================================================
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneListInterop_GetCount", StringMarshalling = StringMarshalling.Utf8)]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial ulong GetSceneListCount(string? listPath);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneListInterop_GetEntry", StringMarshalling = StringMarshalling.Utf8)]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial void GetSceneListEntry(string? listPath, ulong index, byte* buffer, int bufferSize);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_LoadSceneList", StringMarshalling = StringMarshalling.Utf8)]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static unsafe partial bool LoadSceneList(void* sceneManagerPtr, string? listPath, [MarshalAs(UnmanagedType.Bool)] bool keepActive);
 
     // ============================================================================
     // Scene Serialization

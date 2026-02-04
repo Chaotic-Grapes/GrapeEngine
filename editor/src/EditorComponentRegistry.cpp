@@ -1056,21 +1056,6 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         );
         auto defaultFunc = static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); });
 
-        const bool isSceneButton =
-            nativeName == "Scene Button" ||
-            nativeName == "SceneButton";
-
-        if (isSceneButton || nativeMeta.TypeHash == kHashSceneButton || nativeMeta.TypeHash == kHashSceneButtonNoSpace) {
-            renderFunc = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSceneButton(d, e, w); };
-            defaultFunc = []() {
-                return nlohmann::json{
-                    { "TargetSceneIndex", 0 },
-                    { "TransitionMode", 0 },
-                    { "FadeDuration", 1.0f }
-                };
-            };
-        }
-
         s_registry.emplace_back(
             displayName,
             typeName,

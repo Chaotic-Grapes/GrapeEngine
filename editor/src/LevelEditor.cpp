@@ -26,7 +26,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "UndoSystem.h"
 #include "ViewportPicking.h"
 #include <core/Application.h>
-#include "scene/SceneListLoader.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
@@ -285,6 +284,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Wire up playback state getter to file menu for edit/play mode checking
     m_fileMenu.SetEditorStateGetter([this]() { return m_playback.GetEditorState(); });
+    // Ensure play-mode scene reloads don't reuse stale snapshots.
+    m_fileMenu.SetPlaybackSnapshotClearCallback([this]() { m_playback.ClearSavedState(); });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -684,11 +685,6 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
     if (newState == EditorState::Play && m_console.IsClearOnPlayBuildEnabled()) {
         m_console.Clear();
-    }
-
-    if (newState == EditorState::Play && Engine::CORE) {
-        auto& sceneManager = Engine::CORE->GetSceneManager();
-        Scenes::SceneListLoader::LoadFromDefault(sceneManager, true);
     }
 }
 

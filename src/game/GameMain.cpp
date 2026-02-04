@@ -18,7 +18,6 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include "platform/IPlatformContext.h"
 #include "physics/Physics.h"
 #include "scene/SceneManager.h"
-#include "scene/SceneListLoader.h"
 
 /**
  * @brief Main entry point for standalone game builds
@@ -90,24 +89,24 @@ int main() {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
-    auto& sceneManager = engine.GetSceneManager();
-    if (!Scenes::SceneListLoader::LoadFromDefault(sceneManager, false)) {
-        const std::string& startupScene = projectSettings.StartupScene;
-        if (startupScene.empty()) {
-            LOG_ERROR("No startup scene specified and SceneList.json failed to load.");
-            engine.Shutdown();
-            return 1;
-        }
+    // Load startup scene
+    const std::string& startupScene = projectSettings.StartupScene;
+    if (startupScene.empty()) {
+        LOG_ERROR("No startup scene specified in ProjectSettings.json");
+        engine.Shutdown();
+        return 1;
+    }
 
-        LOG_INFO("Loading startup scene: " << startupScene);
-        auto* scene = new Scenes::Scene();
-        size_t sceneIndex = sceneManager.AddScene(scene);
-        if (!sceneManager.LoadScene(sceneIndex, startupScene)) {
-            LOG_ERROR("Failed to load startup scene: " << startupScene);
-            engine.Shutdown();
-            return 1;
-        }
-        sceneManager.SetActive(sceneIndex);
+    LOG_INFO("Loading startup scene: " << startupScene);
+
+    auto& sceneManager = engine.GetSceneManager();
+    auto* scene = new Scenes::Scene();
+    size_t sceneIndex = sceneManager.AddScene(scene);
+
+    if (!sceneManager.LoadScene(sceneIndex, startupScene)) {
+        LOG_ERROR("Failed to load startup scene: " << startupScene);
+        engine.Shutdown();
+        return 1;
     }
 
     // Game main loop

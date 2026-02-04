@@ -528,6 +528,12 @@ void EditorFileMenu::_openScene(const std::string& path) {
                 m_hierarchyPanel->SetEntityOrder(entityOrder);
             }
             m_hasUnsavedChanges = false;
+            if (m_getEditorState && m_getEditorState() != EditorState::Edit) {
+                // Reloading while playing should not restore an old snapshot later.
+                if (m_clearPlaybackSnapshot) {
+                    m_clearPlaybackSnapshot();
+                }
+            }
             LOG_INFO("Reloaded active scene: " << path);
         }
         else {
