@@ -24,7 +24,7 @@ public class CamFollow : SystemBase
             ref LocalTransform transform = ref gameObject.Component2;
 
             transform.Position = new Vector3(GMath.Lerp(transform.Position.X, Player.instance.currentPos.X, 0.1f),
-                                             GMath.Lerp(transform.Position.Y, Player.instance.currentPos.Y, 0.1f), 0f);
+                                             GMath.Lerp(transform.Position.Y, Player.instance.currentPos.Y, 0.1f), transform.Position.Z);
         }
     }
 
