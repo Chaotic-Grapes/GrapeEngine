@@ -20,6 +20,8 @@ public class InventoryController : SystemBase
 
     public static List<ulong> ms01_List;
     public static List<ulong> ms02_List;
+    static bool isDown_Q;
+    static bool leftSlotIsSelected;
     protected override void OnCreate()
     {
         instance = this;
@@ -34,6 +36,8 @@ public class InventoryController : SystemBase
         ms01_Count = 0;
         ms02_Count = 0;
 
+        leftSlotIsSelected = true;
+
         //Initialize our lists!
         ms01_List = new List<ulong>();
         ms02_List = new List<ulong>();
@@ -42,12 +46,26 @@ public class InventoryController : SystemBase
     }
     protected override void OnUpdate()
     {
+        //check for input
+        isDown_Q = Input.IsKeyDown(KeyCode.Q);
+
         foreach(var gameObject in World!.Query<InventoryControllerComponent>())
         {
             bool start = gameObject.Component1.start;
             gameObject.Component1.start = OnStart(ref start);
             //Todo
         }
+        //MS01 slot is always first
+        if (isDown_Q)
+        {
+            leftSlotIsSelected = false;
+            foreach (var gameObject in World!.Query<GUIElement, MatchSignifierComponent>())
+            {
+                //Toggle!
+                gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible = !gameObject.Entity.GetFirstChild().GetComponent<GUIElement>().Visible;
+            }
+        }
+
 
     }
     public void IncrementInStackSlot(int msID)
@@ -62,7 +80,7 @@ public class InventoryController : SystemBase
                     {
                         if(ui.Component1.signifierID == inventory.Component1.ms01_signifier) 
                         {
-                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"ms01: {ms01_Count}");          
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"{ms01_Count}");          
                         }
                     }
                 }
@@ -75,7 +93,7 @@ public class InventoryController : SystemBase
                     {
                         if (ui.Component1.signifierID == inventory.Component1.ms02_signifier)
                         {
-                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"ms02: {ms02_Count}");
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"{ms02_Count}");
                         }
                     }
                 }

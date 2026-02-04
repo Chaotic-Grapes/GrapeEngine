@@ -21,6 +21,7 @@ public class MS_Test : SystemBase
     //Purely to test out obj pool
     protected override void OnUpdate()
     {
+        return;
         foreach ( var result in World!.Query<MS_TestComponent>())
         {
             if (Input.IsKeyPressed(KeyCode.P))
