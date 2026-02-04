@@ -5,6 +5,7 @@ using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
+using EchoesBelow.Scripts.MarineSnowSystem;
 
 namespace EchoesBelow.Scripts;
 
@@ -19,13 +20,19 @@ namespace EchoesBelow.Scripts;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Player : SystemBase
 {
+    public static Player instance;
+
     public static Compass abs_InputDirection = Compass.N;
+    public Vector3 currentPos;
     const float lerpFac = 1;
-    const float maxSpeed = 10;
+    const float maxSpeed = 8;
     float timer_forRotation = 0;
     float timer_forPeriodicForce = 0;
+    float dashCoolDownTimer;
+    bool isCoolingDown;
     protected override void OnCreate()
     {
+        instance = this;
         Log("System Player initialized");
     }
     private bool OnStart(ref bool startBool)
@@ -33,8 +40,9 @@ public class Player : SystemBase
         if (startBool == true) return true;
         startBool = true;
         //Todo
-        
 
+        dashCoolDownTimer = 0;
+        isCoolingDown = false;
 
 
 
@@ -120,9 +128,33 @@ public class Player : SystemBase
                 AddDriftForce(ref lv, playerDir, driftSpeed, maxSpeed);
                 AddPeriodicalForce(ref lv, periodicForceInterval, ref timer_forPeriodicForce, playerDir, moveSpeed);
             }
-            if(Input.IsKeyPressed(KeyCode.Space)) AddRelativeForce(ref lv, playerDir, moveSpeed);
+            if(Input.IsKeyPressed(KeyCode.Space) && !isCoolingDown)
+            { 
+                AddRelativeForce(ref lv, playerDir, moveSpeed);
+                isCoolingDown = true;
+                dashCoolDownTimer = 1.5f;
+            }
+            if (isCoolingDown)
+            {
+                dashCoolDownTimer -= Time.DeltaTime;
+                if(dashCoolDownTimer < 0)
+                {
+                    isCoolingDown = false;
+                }
+            }
 
+
+            //Finally
+            SpeedLimit(ref lv, maxSpeed);
+
+            //update Position
+            currentPos = transform.Position;
         }
+    }
+    private void SpeedLimit(ref LinearVelocity2D lv,float maxSpeed)
+    {
+        lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
+        lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
     }
     private void AddRelativeForce(ref LinearVelocity2D lv, Vector2 playerDir, float moveSpeed)
     {
@@ -211,10 +243,41 @@ public class Player : SystemBase
     }
 }
 
-//public class CollisionTestSystem : CollisionSystemBase
-//{
-//    protected void override OnCollisionEnter()
-//    {
+//[Component] public record struct PlayerCollisionHandler();
+[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
+public class PlayerCollisionHandler : CollisionSystemBase
+{
+    protected override void OnCreate()
+    {
+        Log("System CollisionTest initialized");
+    }
 
-//    }
-//}
+    protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
+    {
+        base.OnCollisionEnter(self, evt);
+
+        if (self.HasComponent<PlayerComponent>()) CollisionEntered(self, evt);
+    }
+
+    private void CollisionEntered(Entity self, CollisionEvent evt)
+    {
+        //do Everything in here
+        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
+        Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        if (other.HasComponent<MS_ManagerComponent>())
+        {
+            MS_Manager.instance.SendToPool(other.Id);
+            InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
+        }
+    }
+
+    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
+    {
+        base.OnCollisionExit(self, evt);
+        //foreach (var gameObject in World!.Query<CollisionTestComponent>())
+        //{
+        //    Log("Hello I Exited");
+        //}
+    }
+
+}
