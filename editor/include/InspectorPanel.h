@@ -299,16 +299,18 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
 
         // Use symbol font for the reset icon
         if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
-        const bool resetClicked = ImGui::SmallButton(resetIcon);
+        const bool resetClicked = ImGui::Button(resetIcon, ImVec2(buttonSize, buttonSize));
+        if (m_symbolsFont) ImGui::PopFont();
+
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Reset component to defaults");
         }
-        if (m_symbolsFont) ImGui::PopFont();
 
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
         ImGui::PopID();
 
@@ -337,6 +339,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
 
         // Use a unicode cross symbol for the button label
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
         ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
@@ -344,13 +347,13 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
         // Remove component if button is clicked
-        if (ImGui::SmallButton((std::string("\xEE\xA1\xB2##RemoveComponent") + componentType).c_str())) {
+        if (ImGui::Button((std::string("\xEE\xA1\xB2##RemoveComponent") + componentType).c_str(), ImVec2(buttonSize, buttonSize))) {
             m_componentsToDelete.push_back(componentType);
         }
 
         // Pop styles and font after button rendering
         ImGui::PopStyleColor(5);
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         if (pushedFont) {
             ImGui::PopFont();
         }

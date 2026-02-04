@@ -192,6 +192,7 @@ namespace {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
 
         // Render the clear trash button with optional symbols font
         if (symbolsFont) ImGui::PushFont(symbolsFont);
@@ -202,7 +203,7 @@ namespace {
         }
         if (symbolsFont) ImGui::PopFont();
 
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
         ImGui::PopID();
         return clicked;

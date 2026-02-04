@@ -869,16 +869,7 @@ void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
     }
 
     if (id == ECS::Entity::NPOS32) {
-        // Clear palette if nothing is selected.
-        m_activeTileMap.reset();
-        m_activeTileset.reset();
-        m_activeTileMapPath.clear();
-        m_activeTilesetPath.clear();
-        m_activeTileMapEntityId = ECS::Entity::NPOS32;
-        m_tilePalette.SetEditingContext(nullptr, nullptr, std::string());
-        if (auto* renderer = ECS::RendererSystem::GetInstance()) {
-            renderer->ClearDebugTileMap();
-        }
+        // Keep the current tile palette context when selection is cleared.
         return;
     }
 
@@ -888,7 +879,8 @@ void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
     }
 
     if (!m_world->Has<ECS::Components::TileMapComponent>(entity)) {
-        return; // Only sync when a tilemap component is present.
+        // Keep the current tile palette context when selecting non-tilemap entities.
+        return;
     }
 
     const auto& comp = m_world->Get<ECS::Components::TileMapComponent>(entity); // Read the component data.
