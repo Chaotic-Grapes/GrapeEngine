@@ -68,12 +68,6 @@ namespace Engine {
         static std::string GetScenesPath();
 
         /**
-         * @brief Get the SceneList.json file path
-         * @return Full path to project/Scenes/SceneList.json
-         */
-        static std::string GetSceneListPath();
-        
-        /**
          * @brief Get temporary directory for build outputs (e.g., compiled scripts)
          * Uses system temp directory: <system-temp>/GrapeEngine/<project-name>/
          * @return Full path to temporary build output directory

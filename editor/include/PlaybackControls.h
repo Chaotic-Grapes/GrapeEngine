@@ -42,6 +42,7 @@ public:
     // World management
     void SetWorld(ECS::World* world, bool preserveState = false);
     bool HasValidWorld() const { return m_world != nullptr; }
+    void ClearSavedState(); // Clears any saved snapshot to avoid stale restores.
 
 private:
     void _saveWorldState();
@@ -61,6 +62,7 @@ private:
     EditorState m_editorState = EditorState::Edit;
     bool m_stepRequested = false;
     nlohmann::json m_savedWorldState;
+    bool m_suppressRestoreWarning = false;
 
     // UI fonts
     ImFont* m_mainFont = nullptr;

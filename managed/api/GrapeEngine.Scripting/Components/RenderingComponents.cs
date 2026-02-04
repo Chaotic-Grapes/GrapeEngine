@@ -56,9 +56,9 @@ public record struct SpriteSheetAnimation2D
     public int SheetHeight;
     public int StartFrame;
     public int FrameCount;
-    public int RowIndex;
-    public int RowStartColumn;
-    public int RowFrameCount;
+    public int Row;
+    public int FrameOffset;
+    public int FrameLength;
     public float FramesPerSecond;
     public bool Loop;
     public bool Playing;

@@ -385,29 +385,45 @@ void HierarchyPanel::_renderHeader() {
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::BeginMenu("Create UI")) {
-            if (ImGui::MenuItem("Button")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
-                    selectAndMark(e);
-                }
-            }
+        if (ImGui::BeginMenu("Create GUI")) {
             if (ImGui::MenuItem("Panel")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
-                    selectAndMark(e);
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI panel components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    // Add default GUIElement and GUIPanel components
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        
+                        // Add default GUIElement and GUIPanel components
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 300.0f, 200.0f };
+                        m_world->Add<ECS::Components::GUIPanel>(e);
+                        selectAndMark(e);
+                    }
                 }
             }
-            if (ImGui::MenuItem("Label")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
-                    selectAndMark(e);
-                }
-            }
-            if (ImGui::MenuItem("Input Field")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
-                    selectAndMark(e);
+
+            if (ImGui::MenuItem("Text")) {
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI text components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    if (newId != ECS::Entity::NPOS32) {
+                        // Add default GUIElement and GUIText components
+                        ECS::Entity e = m_world->Resolve(newId);
+
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 40.0f };
+
+                        auto& text = m_world->Add<ECS::Components::GUIText>(e);
+                        text.SetText("Text");
+                        text.SetFontPath("");
+                        text.FontSize = 24.0f;
+                        selectAndMark(e);
+                    }
                 }
             }
 
@@ -1492,7 +1508,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
+        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {

@@ -81,6 +81,21 @@ namespace ECS {
             LOG_DEBUG("AudioSystem: Cleaned up audio state after scene change (from '"
                      << msg.OldScene << "' to '" << msg.NewScene << "')");
         });
+
+        // Subscribe to scene changing events to prepare for audio transitions
+        Messaging::MessageSystem::Subscribe<Messaging::SceneChanging>([this](const Messaging::SceneChanging&) {
+            if (!Engine::CORE) {
+                return;
+            }
+
+            auto& sceneMgr = Engine::CORE->GetSceneManager();
+            float fadeDuration = 0.0f;
+            bool allowCrossfade = false;
+            if (sceneMgr.ConsumeNextAudioTransition(fadeDuration, allowCrossfade)) {
+                OnSceneWillUnload(fadeDuration, allowCrossfade);
+            }
+        });
+
     }
 
     void AudioSystem::OnUpdate(World& world)

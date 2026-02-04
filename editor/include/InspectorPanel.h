@@ -258,33 +258,105 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
     // DefaultOpen: Component starts expanded for immediate editing access
     // Framed: Adds visual border around header for clear section separation
     // SpanFullWidth: Header uses entire available width regardless of content
+    ImGui::SetNextItemAllowOverlap();
+    if (m_boldFont) ImGui::PushFont(m_boldFont);
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(),
         ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanFullWidth);
+    if (m_boldFont) ImGui::PopFont();
 
-    if (ImGui::BeginPopupContextItem(("ComponentHeaderContext##" + componentType).c_str())) {
-        if (!canDelete) ImGui::BeginDisabled();
-        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
-        if (ImGui::MenuItem("Remove Component")) {
-            if (canDelete) {
-                m_componentsToDelete.push_back(componentType);
-            }
+    // Render delete button aligned to the right of the header
+    float buttonSize = ImGui::GetFrameHeight();
+    float buttonX = ImGui::GetWindowContentRegionMax().x - buttonSize - ImGui::GetStyle().FramePadding.x;
+
+    // Only show delete button if component is removable
+    if (canDelete) {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorPosX(buttonX);
+
+        // Style the remove button with danger colors and symbol font
+        bool pushedFont = false;
+        if (m_symbolsFont) {
+            ImGui::PushFont(m_symbolsFont);
+            pushedFont = true;
         }
-        ImGui::PopStyleColor(3);
-        if (!canDelete) {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("Transform cannot be removed");
-            }
-            ImGui::EndDisabled();
+
+        // Use a unicode cross symbol for the button label
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+
+        // Remove component if button is clicked
+        if (ImGui::SmallButton((std::string("\xEE\xA1\xB2##RemoveComponent") + componentType).c_str())) {
+            m_componentsToDelete.push_back(componentType);
         }
-        ImGui::EndPopup();
+
+        // Pop styles and font after button rendering
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar();
+        if (pushedFont) {
+            ImGui::PopFont();
+        }
     }
 
     // Create collapsing header with specific behavior flags
     if (nodeOpen) {
         // After header, display component-specific UI
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const float boxPaddingX = 10.0f;
+        const float boxPaddingY = 6.0f;
+        const float boxRounding = 6.0f;
+
+        // Calculate box positions for background rendering
+        const ImVec2 windowPos = ImGui::GetWindowPos();
+
+        // Get available width for the content box
+        const float boxWidth = ImGui::GetContentRegionAvail().x;
+        const float gap = ImGui::GetStyle().ItemSpacing.y;
+
+        // Adjust cursor position to account for spacing
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - gap);
+        ImVec2 boxMinScreen = ImGui::GetCursorScreenPos();
+
+        // Split draw list into layers for background and content
+        drawList->ChannelsSplit(2);
+        drawList->ChannelsSetCurrent(1);
+
+        // Render content within padded box area
+        ImGui::BeginGroup();
+        ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+        ImGui::Indent(boxPaddingX);
         renderContent(data);
+        ImGui::Unindent(boxPaddingX);
+        ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+        ImGui::EndGroup();
+
+        // Calculate box max position based on content size
+        ImVec2 boxMaxScreen = ImGui::GetItemRectMax();
+        boxMaxScreen.x = boxMinScreen.x + boxWidth;
+
+        // Render background box with rounded corners
+        drawList->ChannelsSetCurrent(0);
+        drawList->AddRectFilled(
+            boxMinScreen,
+            boxMaxScreen,
+            ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 0.85f)),
+            boxRounding,
+            ImDrawFlags_RoundCornersBottom
+        );
+        drawList->AddRect(
+            boxMinScreen,
+            boxMaxScreen,
+            ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::Border, 0.85f)),
+            boxRounding,
+            ImDrawFlags_RoundCornersBottom
+        );
+
+        // Merge draw channels back together
+        drawList->ChannelsMerge();
+        ImGui::SetCursorScreenPos(ImVec2(boxMinScreen.x, boxMaxScreen.y));
 
         ImGui::Spacing();
         ImGui::Spacing();

@@ -238,9 +238,9 @@ namespace ECS {
 				{"SheetHeight", anim.SheetHeight},
 				{"StartFrame", anim.StartFrame},
 				{"FrameCount", anim.FrameCount},
-				{"RowIndex", anim.RowIndex},
-				{"RowStartColumn", anim.RowStartColumn},
-				{"RowFrameCount", anim.RowFrameCount},
+				{"Row", anim.Row},
+				{"FrameOffset", anim.FrameOffset},
+				{"FrameLength", anim.FrameLength},
 				{"FramesPerSecond", anim.FramesPerSecond},
 				{"Loop", anim.Loop},
 				{"Playing", anim.Playing},
@@ -300,9 +300,9 @@ namespace ECS {
 			anim.SheetHeight = j.value("SheetHeight", 0);
 			anim.StartFrame = j.value("StartFrame", 0);
 			anim.FrameCount = j.value("FrameCount", 0);
-			anim.RowIndex = j.value("RowIndex", 0);
-			anim.RowStartColumn = j.value("RowStartColumn", 0);
-			anim.RowFrameCount = j.value("RowFrameCount", 0);
+			anim.Row = j.value("Row", j.value("RowIndex", 0));
+			anim.FrameOffset = j.value("FrameOffset", j.value("RowStartColumn", 0));
+			anim.FrameLength = j.value("FrameLength", j.value("RowFrameCount", 0));
 			anim.FramesPerSecond = j.value("FramesPerSecond", 0.0f);
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
@@ -462,296 +462,35 @@ namespace ECS {
 			return defaultId;
 		}
 
-		inline void to_json(nlohmann::json& j, const GUICanvas& canvas) {
-			j = nlohmann::json{
-				{"ReferenceSize", canvas.ReferenceSize},
-				{"ScaleFactor", canvas.ScaleFactor},
-				{"Alignment", canvas.Alignment},
-				{"Offset", canvas.Offset},
-				{"ScaleMode", static_cast<uint8_t>(canvas.ScaleMode)},
-				{"DebugDraw", canvas.DebugDraw},
-				{"DebugBoundsColor", canvas.DebugBoundsColor},
-				{"DebugPaddingColor", canvas.DebugPaddingColor},
-				{"DebugAnchorColor", canvas.DebugAnchorColor}
-			};
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIElement, Position, Size, Visible, Alignment, ZOrder)
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
+	inline void to_json(nlohmann::json& j, const GUIText& text) {
+		const std::string value = ECS::StringTable::Resolve(text.TextId);
+		const std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
+		j = nlohmann::json{
+			{"Text", value},
+			{"FontPath", fontPath},
+			{"Color", text.Color},
+			{"FontSize", text.FontSize}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIText& text) {
+		const std::string value = j.value("Text", "");
+		const std::string fontPath = j.value("FontPath", "");
+		text.TextId = value.empty() ? 0 : ECS::StringTable::Intern(value);
+		text.FontPathId = fontPath.empty() ? 0 : ECS::StringTable::Intern(fontPath);
+		if (j.contains("Color")) {
+			text.Color = j.at("Color").get<::Color>();
 		}
-
-		inline void from_json(const nlohmann::json& j, GUICanvas& canvas) {
-			const GUICanvas defaults{};
-			canvas.ReferenceSize = j.value("ReferenceSize", defaults.ReferenceSize);
-			canvas.ScaleFactor = j.value("ScaleFactor", defaults.ScaleFactor);
-			canvas.Alignment = j.value("Alignment", defaults.Alignment);
-			canvas.Offset = j.value("Offset", defaults.Offset);
-			canvas.ScaleMode = static_cast<GUICanvasScaleMode>(
-				j.value("ScaleMode", static_cast<uint8_t>(defaults.ScaleMode)));
-			canvas.DebugDraw = j.value("DebugDraw", defaults.DebugDraw);
-			canvas.DebugBoundsColor = j.value("DebugBoundsColor", defaults.DebugBoundsColor);
-			canvas.DebugPaddingColor = j.value("DebugPaddingColor", defaults.DebugPaddingColor);
-			canvas.DebugAnchorColor = j.value("DebugAnchorColor", defaults.DebugAnchorColor);
+		if (j.contains("FontSize")) {
+			text.FontSize = j.at("FontSize").get<float>();
+		} else {
+			text.FontSize = j.value("PixelSize", 24.0f);
 		}
-		inline void to_json(nlohmann::json& j, const GUITextSettings& settings) {
-			j = nlohmann::json{
-				{"FontPath", ResolveStringId(settings.FontPath)},
-				{"FontSize", settings.FontSize},
-				{"Color", settings.TextColor},
-				{"Alignment", static_cast<uint8_t>(settings.Alignment)},
-				{"ShadowColor", settings.ShadowColor},
-				{"ShadowOffset", settings.ShadowOffset}
-			};
-		}
+	}
 
-		inline void from_json(const nlohmann::json& j, GUITextSettings& settings) {
-			const GUITextSettings defaults{};
-			settings.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
-			settings.FontSize = j.value("FontSize", defaults.FontSize);
-			settings.TextColor = j.value("Color", defaults.TextColor);
-			settings.Alignment = static_cast<GUIText::TextAlignment>(j.value(
-				"Alignment", static_cast<uint8_t>(defaults.Alignment)));
-			settings.ShadowColor = j.value("ShadowColor", defaults.ShadowColor);
-			settings.ShadowOffset = j.value("ShadowOffset", defaults.ShadowOffset);
-		}
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIElement, Position, Size, AnchorMin, AnchorMax, Offset, Active, Visible, Raycast, HAlign, VAlign, ElementType, PaddingLeft, PaddingRight, PaddingTop, PaddingBottom, ZOrder, WorldPosition, DirtyLayout)
-		inline void to_json(nlohmann::json& j, const GUIStyleRef& style) {
-			j = nlohmann::json{
-				{"StyleId", ResolveStringId(style.StyleId)}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUIStyleRef& style) {
-			const GUIStyleRef defaults{};
-			style.StyleId = ReadStringId(j, "StyleId", defaults.StyleId);
-		}
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIContainer, Layout, Spacing, ChildForceExpandWidth, ChildForceExpandHeight, GridColumns, GridCellPaddingX, GridCellPaddingY, PreferredWidthDynamic, PreferredHeightDynamic, MinWidth, MinHeight)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, BackgroundColor, BorderColor, BorderThickness, BorderRadius, CastShadow, ShadowColor, ShadowOffset, ShadowBlur, ClipContent)
-
-		inline void to_json(nlohmann::json& j, const GUIButton& button) {
-			j = nlohmann::json{
-				{"State", static_cast<uint8_t>(button.State)},
-				{"ColorNormal", button.ColorNormal},
-				{"ColorHovered", button.ColorHovered},
-				{"ColorPressed", button.ColorPressed},
-				{"ColorDisabled", button.ColorDisabled},
-				{"Interactable", button.Interactable},
-				{"ActionID", button.ActionID},
-				{"Label", ResolveStringId(button.Label)},
-				{"UseLabelTextSettings", button.UseLabelTextSettings},
-				{"LabelTextSettings", button.LabelTextSettings},
-				{"TransitionDuration", button.TransitionDuration},
-				{"TransitionTimer", button.TransitionTimer}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUIButton& button) {
-			const GUIButton defaults{};
-			button.State = static_cast<ButtonState>(j.value("State", static_cast<uint8_t>(defaults.State)));
-			button.ColorNormal = j.value("ColorNormal", defaults.ColorNormal);
-			button.ColorHovered = j.value("ColorHovered", defaults.ColorHovered);
-			button.ColorPressed = j.value("ColorPressed", defaults.ColorPressed);
-			button.ColorDisabled = j.value("ColorDisabled", defaults.ColorDisabled);
-			button.Interactable = j.value("Interactable", defaults.Interactable);
-			button.ActionID = j.value("ActionID", defaults.ActionID);
-			button.Label = ReadStringId(j, "Label", defaults.Label);
-			button.UseLabelTextSettings = j.value("UseLabelTextSettings", defaults.UseLabelTextSettings);
-			button.LabelTextSettings = j.value("LabelTextSettings", defaults.LabelTextSettings);
-			button.TransitionDuration = j.value("TransitionDuration", defaults.TransitionDuration);
-			button.TransitionTimer = j.value("TransitionTimer", defaults.TransitionTimer);
-		}
-
-		inline void to_json(nlohmann::json& j, const GUIInputField& input) {
-			j = nlohmann::json{
-				{"Content", ResolveStringId(input.Content)},
-				{"Placeholder", ResolveStringId(input.Placeholder)},
-				{"TextColor", input.TextColor},
-				{"BackgroundColor", input.BackgroundColor},
-				{"CaretColor", input.CaretColor},
-				{"SelectionColor", input.SelectionColor},
-				{"FontSize", input.FontSize},
-				{"FontPath", ResolveStringId(input.FontPath)},
-				{"UseTextSettings", input.UseTextSettings},
-				{"TextSettings", input.TextSettings},
-				{"UsePlaceholderSettings", input.UsePlaceholderSettings},
-				{"PlaceholderSettings", input.PlaceholderSettings},
-				{"MaxCharacters", input.MaxCharacters},
-				{"CurrentCharCount", input.CurrentCharCount},
-				{"Interactable", input.Interactable},
-				{"CaretPosition", input.CaretPosition},
-				{"SelectionStart", input.SelectionStart},
-				{"SelectionEnd", input.SelectionEnd},
-				{"MultiLine", input.MultiLine},
-				{"PasswordMode", input.PasswordMode},
-				{"Type", static_cast<uint8_t>(input.Type)}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUIInputField& input) {
-			const GUIInputField defaults{};
-			input.Content = ReadStringId(j, "Content", defaults.Content);
-			input.Placeholder = ReadStringId(j, "Placeholder", defaults.Placeholder);
-			input.TextColor = j.value("TextColor", defaults.TextColor);
-			input.BackgroundColor = j.value("BackgroundColor", defaults.BackgroundColor);
-			input.CaretColor = j.value("CaretColor", defaults.CaretColor);
-			input.SelectionColor = j.value("SelectionColor", defaults.SelectionColor);
-			input.FontSize = j.value("FontSize", defaults.FontSize);
-			input.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
-			input.UseTextSettings = j.value("UseTextSettings", defaults.UseTextSettings);
-			input.TextSettings = j.value("TextSettings", defaults.TextSettings);
-			input.UsePlaceholderSettings = j.value("UsePlaceholderSettings", defaults.UsePlaceholderSettings);
-			input.PlaceholderSettings = j.value("PlaceholderSettings", defaults.PlaceholderSettings);
-			input.MaxCharacters = j.value("MaxCharacters", defaults.MaxCharacters);
-			input.CurrentCharCount = j.value("CurrentCharCount", defaults.CurrentCharCount);
-			input.Interactable = j.value("Interactable", defaults.Interactable);
-			input.CaretPosition = j.value("CaretPosition", defaults.CaretPosition);
-			input.SelectionStart = j.value("SelectionStart", defaults.SelectionStart);
-			input.SelectionEnd = j.value("SelectionEnd", defaults.SelectionEnd);
-			input.MultiLine = j.value("MultiLine", defaults.MultiLine);
-			input.PasswordMode = j.value("PasswordMode", defaults.PasswordMode);
-			input.Type = static_cast<GUIInputField::InputType>(j.value("Type", static_cast<uint8_t>(defaults.Type)));
-		}
-
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUISlider, MinValue, MaxValue, CurrentValue, StepSize, BackgroundColor, FillColor, HandleColor, HandleSize, Interactable, ShowValue, ActionID)
-
-		inline void to_json(nlohmann::json& j, const GUICheckbox& checkbox) {
-			j = nlohmann::json{
-				{"IsChecked", checkbox.IsChecked},
-				{"Interactable", checkbox.Interactable},
-				{"CheckedColor", checkbox.CheckedColor},
-				{"UncheckedColor", checkbox.UncheckedColor},
-				{"BorderColor", checkbox.BorderColor},
-				{"BorderThickness", checkbox.BorderThickness},
-				{"CheckSize", checkbox.CheckSize},
-				{"LabelFontSize", checkbox.LabelFontSize},
-				{"LabelAlignment", static_cast<uint8_t>(checkbox.LabelAlignment)},
-				{"UseLabelTextSettings", checkbox.UseLabelTextSettings},
-				{"LabelTextSettings", checkbox.LabelTextSettings},
-				{"ActionID", checkbox.ActionID},
-				{"Label", ResolveStringId(checkbox.Label)}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUICheckbox& checkbox) {
-			const GUICheckbox defaults{};
-			checkbox.IsChecked = j.value("IsChecked", defaults.IsChecked);
-			checkbox.Interactable = j.value("Interactable", defaults.Interactable);
-			checkbox.CheckedColor = j.value("CheckedColor", defaults.CheckedColor);
-			checkbox.UncheckedColor = j.value("UncheckedColor", defaults.UncheckedColor);
-			checkbox.BorderColor = j.value("BorderColor", defaults.BorderColor);
-			checkbox.BorderThickness = j.value("BorderThickness", defaults.BorderThickness);
-			checkbox.CheckSize = j.value("CheckSize", defaults.CheckSize);
-			checkbox.LabelFontSize = j.value("LabelFontSize", defaults.LabelFontSize);
-			checkbox.LabelAlignment = static_cast<HorizontalAlignment>(j.value(
-				"LabelAlignment", static_cast<uint8_t>(defaults.LabelAlignment)));
-			checkbox.UseLabelTextSettings = j.value("UseLabelTextSettings", defaults.UseLabelTextSettings);
-			checkbox.LabelTextSettings = j.value("LabelTextSettings", defaults.LabelTextSettings);
-			checkbox.ActionID = j.value("ActionID", defaults.ActionID);
-			checkbox.Label = ReadStringId(j, "Label", defaults.Label);
-		}
-
-		inline void to_json(nlohmann::json& j, const GUIDropdown& dropdown) {
-			j = nlohmann::json{
-				{"Options", ResolveStringId(dropdown.Options)},
-				{"OptionCount", dropdown.OptionCount},
-				{"SelectedIndex", dropdown.SelectedIndex},
-				{"IsOpen", dropdown.IsOpen},
-				{"Interactable", dropdown.Interactable},
-				{"BackgroundColor", dropdown.BackgroundColor},
-				{"HighlightColor", dropdown.HighlightColor},
-				{"ItemHeight", dropdown.ItemHeight},
-				{"MaxHeight", dropdown.MaxHeight},
-				{"UseOptionTextSettings", dropdown.UseOptionTextSettings},
-				{"OptionTextSettings", dropdown.OptionTextSettings},
-				{"ActionID", dropdown.ActionID},
-				{"ScrollPosition", dropdown.ScrollPosition}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUIDropdown& dropdown) {
-			const GUIDropdown defaults{};
-			dropdown.Options = ReadStringId(j, "Options", defaults.Options);
-			dropdown.OptionCount = j.value("OptionCount", defaults.OptionCount);
-			dropdown.SelectedIndex = j.value("SelectedIndex", defaults.SelectedIndex);
-			dropdown.IsOpen = j.value("IsOpen", defaults.IsOpen);
-			dropdown.Interactable = j.value("Interactable", defaults.Interactable);
-			dropdown.BackgroundColor = j.value("BackgroundColor", defaults.BackgroundColor);
-			dropdown.HighlightColor = j.value("HighlightColor", defaults.HighlightColor);
-			dropdown.ItemHeight = j.value("ItemHeight", defaults.ItemHeight);
-			dropdown.MaxHeight = j.value("MaxHeight", defaults.MaxHeight);
-			dropdown.UseOptionTextSettings = j.value("UseOptionTextSettings", defaults.UseOptionTextSettings);
-			dropdown.OptionTextSettings = j.value("OptionTextSettings", defaults.OptionTextSettings);
-			dropdown.ActionID = j.value("ActionID", defaults.ActionID);
-			dropdown.ScrollPosition = j.value("ScrollPosition", defaults.ScrollPosition);
-		}
-
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIScrollView, ScrollPosition, ContentSize, HorizontalScroll, VerticalScroll, ScrollBarWidth, ScrollBarColor, ScrollBarHoverColor, ScrollSensitivity, ScrollDamping, Inertia, ClipContent)
-
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUISeparator, Orient, Color, Thickness, Margin)
-
-		inline void to_json(nlohmann::json& j, const GUIText& text) {
-			j = nlohmann::json{
-				{"Content", ResolveStringId(text.Content)},
-				{"FontPath", ResolveStringId(text.FontPath)},
-				{"FontSize", text.FontSize},
-				{"FontColor", text.FontColor},
-				{"Alignment", static_cast<uint8_t>(text.Alignment)},
-				{"BestFit", text.BestFit},
-				{"MinFontSize", text.MinFontSize},
-				{"MaxFontSize", text.MaxFontSize},
-				{"RichText", text.RichText},
-				{"WordWrap", text.WordWrap},
-				{"CastShadow", text.CastShadow},
-				{"ShadowColor", text.ShadowColor},
-				{"ShadowOffset", text.ShadowOffset},
-				{"HasOutline", text.HasOutline},
-				{"OutlineColor", text.OutlineColor},
-				{"OutlineWidth", text.OutlineWidth}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUIText& text) {
-			const GUIText defaults{};
-			text.Content = ReadStringId(j, "Content", defaults.Content);
-			text.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
-			text.FontSize = j.value("FontSize", defaults.FontSize);
-			text.FontColor = j.value("FontColor", defaults.FontColor);
-			text.Alignment = static_cast<GUIText::TextAlignment>(j.value("Alignment", static_cast<uint8_t>(defaults.Alignment)));
-			text.BestFit = j.value("BestFit", defaults.BestFit);
-			text.MinFontSize = j.value("MinFontSize", defaults.MinFontSize);
-			text.MaxFontSize = j.value("MaxFontSize", defaults.MaxFontSize);
-			text.RichText = j.value("RichText", defaults.RichText);
-			text.WordWrap = j.value("WordWrap", defaults.WordWrap);
-			text.CastShadow = j.value("CastShadow", defaults.CastShadow);
-			text.ShadowColor = j.value("ShadowColor", defaults.ShadowColor);
-			text.ShadowOffset = j.value("ShadowOffset", defaults.ShadowOffset);
-			text.HasOutline = j.value("HasOutline", defaults.HasOutline);
-			text.OutlineColor = j.value("OutlineColor", defaults.OutlineColor);
-			text.OutlineWidth = j.value("OutlineWidth", defaults.OutlineWidth);
-		}
-
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUILayoutGroup, PreferredWidth, PreferredHeight, FlexibleWidth, FlexibleHeight, LayoutPriority, DirtyPreferredSize)
-
-		inline void to_json(nlohmann::json& j, const GUITooltip& tooltip) {
-			j = nlohmann::json{
-				{"Text", ResolveStringId(tooltip.Text)},
-				{"DelaySeconds", tooltip.DelaySeconds},
-				{"ShowDuration", tooltip.ShowDuration},
-				{"Visible", tooltip.Visible},
-				{"ShowTimer", tooltip.ShowTimer},
-				{"Offset", tooltip.Offset},
-				{"BackgroundColor", tooltip.BackgroundColor},
-				{"TextColor", tooltip.TextColor}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, GUITooltip& tooltip) {
-			const GUITooltip defaults{};
-			tooltip.Text = ReadStringId(j, "Text", defaults.Text);
-			tooltip.DelaySeconds = j.value("DelaySeconds", defaults.DelaySeconds);
-			tooltip.ShowDuration = j.value("ShowDuration", defaults.ShowDuration);
-			tooltip.Visible = j.value("Visible", defaults.Visible);
-			tooltip.ShowTimer = j.value("ShowTimer", defaults.ShowTimer);
-			tooltip.Offset = j.value("Offset", defaults.Offset);
-			tooltip.BackgroundColor = j.value("BackgroundColor", defaults.BackgroundColor);
-			tooltip.TextColor = j.value("TextColor", defaults.TextColor);
-		}
 	}
 }
 
@@ -1069,24 +808,6 @@ namespace Serialization {
 				ECS::Entity parent = world.Resolve(parentId);
 				if (!parent.IsNull() && world.IsAlive(parent)) {
 					world.Attach(entity, parent);
-					if (world.Has<ECS::Components::GUIContainer>(parent)) {
-						if (!world.Has<ECS::Components::GUIChildList>(parent)) {
-							world.Add<ECS::Components::GUIChildList>(parent);
-						}
-
-						auto& childList = world.Get<ECS::Components::GUIChildList>(parent);
-						bool exists = false;
-						for (uint16_t i = 0; i < childList.ChildCount; ++i) {
-							if (childList.Children[i] == entity) {
-								exists = true;
-								break;
-							}
-						}
-
-						if (!exists && childList.ChildCount < ECS::Components::GUIChildList::MaxChildren) {
-							childList.Children[childList.ChildCount++] = entity;
-						}
-					}
 				}
 			}
 
@@ -1179,19 +900,8 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
 	REGISTER_COMPONENT_SERIALIZER(GUICanvas, ECS::Components::GUICanvas, "GUICanvas")
 	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
-	REGISTER_COMPONENT_SERIALIZER(GUIStyleRef, ECS::Components::GUIStyleRef, "GUIStyleRef")
-	REGISTER_COMPONENT_SERIALIZER(GUIContainer, ECS::Components::GUIContainer, "GUIContainer")
-	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel")
-	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton")
-	REGISTER_COMPONENT_SERIALIZER(GUIInputField, ECS::Components::GUIInputField, "GUIInputField")
-	REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider")
-	REGISTER_COMPONENT_SERIALIZER(GUICheckbox, ECS::Components::GUICheckbox, "GUICheckbox")
-	REGISTER_COMPONENT_SERIALIZER(GUIDropdown, ECS::Components::GUIDropdown, "GUIDropdown")
-	REGISTER_COMPONENT_SERIALIZER(GUIScrollView, ECS::Components::GUIScrollView, "GUIScrollView")
-	REGISTER_COMPONENT_SERIALIZER(GUISeparator, ECS::Components::GUISeparator, "GUISeparator")
-	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText")
-	REGISTER_COMPONENT_SERIALIZER(GUILayoutGroup, ECS::Components::GUILayoutGroup, "GUILayoutGroup")
-	REGISTER_COMPONENT_SERIALIZER(GUITooltip, ECS::Components::GUITooltip, "GUITooltip");
+	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel");
+	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");
 }
 
 #endif
