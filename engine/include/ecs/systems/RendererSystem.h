@@ -100,6 +100,32 @@ namespace ECS {
         void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
         void ResetGUIViewport();
 
+        // ====================================================================
+        // Viewport Management
+        // ====================================================================
+
+        struct Viewport {
+            std::string Name;
+            Engine::Camera* Camera = nullptr;
+            glm::ivec2 Size{ 1, 1 };
+            bool Active = true;
+
+            // Per-viewport render targets
+            std::unique_ptr<Framebuffer> HDR;
+            std::unique_ptr<Framebuffer> LDR;
+            std::unique_ptr<Framebuffer> BloomExtract;
+            std::unique_ptr<Framebuffer> BloomBlur;
+            std::unique_ptr<Framebuffer> PickingFBO;
+        };
+
+        void AddViewport(const std::string& name, Engine::Camera* camera, int w, int h);
+        void RemoveViewport(const std::string& name);
+        void ResizeViewport(const std::string& name, int w, int h);
+        void SetViewportCamera(const std::string& name, Engine::Camera* camera);
+        Viewport* GetViewport(const std::string& name);
+        GLuint GetViewportTexture(const std::string& name) const;
+
+        // ====================================================================
 
         /**
          * @brief Set the camera to use for rendering
@@ -384,6 +410,25 @@ namespace ECS {
          * @return true if a valid camera was found, false otherwise
          */
         bool GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize);
+
+        // ====================================================================
+        // Viewport State
+        // ====================================================================
+        std::vector<Viewport> m_viewports;
+
+        // ====================================================================
+        // Extracted Render Helpers (for multi-viewport)
+        // ====================================================================
+        void CollectLights(World& world);
+        void BucketEntities(World& world, std::vector<std::vector<Entity>>& buckets, int& maxLayerId);
+        void RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
+            const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
+        void RenderBloom(Viewport& vp, float bloomRadius);
+        void ToneMap(Viewport& vp);
+        void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
+        void RenderGUI(Viewport& vp);
+        void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
+            const std::vector<std::vector<Entity>>& buckets);
 
     };
 
