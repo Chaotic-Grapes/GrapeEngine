@@ -28,6 +28,7 @@ active scene.
 
 // Forward declarations
 namespace Scenes { class SceneManager; }
+namespace Editor { class UndoSystem; }
 class HierarchyPanel;
 #include <functional>
 
@@ -53,6 +54,11 @@ public:
         m_hierarchyPanel = hierarchyPanel;
     }
 
+    // Set undo system for edit menu actions.
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) {
+        m_undoSystem = undoSystem;
+    }
+
     // Set a getter to query current editor state (decouples FileMenu from Playback)
     void SetEditorStateGetter(std::function<EditorState()> getter) {
         m_getEditorState = std::move(getter);
@@ -61,6 +67,11 @@ public:
     // Called when the active scene is reloaded during play to clear playback snapshot.
     void SetPlaybackSnapshotClearCallback(std::function<void()> callback) {
         m_clearPlaybackSnapshot = std::move(callback);
+    }
+
+    // Called before scene save to persist external assets (e.g., tilemaps).
+    void SetPreSaveCallback(std::function<void(const std::string&)> callback) {
+        m_preSaveCallback = std::move(callback);
     }
 
     // -------------------------------------------------------------------------
@@ -91,6 +102,9 @@ public:
 
     // Saves to current scene path if known; otherwise falls back to Save As
     void SaveScene();
+
+    // Expose the current scene path for editor systems.
+    const std::string& GetCurrentScenePath() const { return m_currentScenePath; }
 
     // Mark the scene as having unsaved changes (only if it was loaded from a file)
     void MarkSceneDirty() {
@@ -127,10 +141,14 @@ private:
     Scenes::SceneManager* m_sceneManager = nullptr;
     // Hierarchy panel for entity order preservation
     HierarchyPanel* m_hierarchyPanel = nullptr;
+    // Undo system for edit actions
+    Editor::UndoSystem* m_undoSystem = nullptr;
     // Getter used to query current EditorState; optional (defaults to Edit)
     std::function<EditorState()> m_getEditorState = nullptr;
     // Optional callback to clear playback snapshot on in-place reload.
     std::function<void()> m_clearPlaybackSnapshot;
+    // Optional callback to sync external assets before scene serialization.
+    std::function<void(const std::string&)> m_preSaveCallback;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes

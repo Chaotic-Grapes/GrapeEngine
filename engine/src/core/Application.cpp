@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
+#include "services/MemoryManager.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
@@ -54,6 +55,9 @@ namespace Engine {
 
         // Set global pointer to this application instance
         CORE = this;
+
+        // Force memory manager pool creation at load time
+        (void)MemoryManager::GetInstance();
 
         // Initialize crash dumping system
         CrashDumping::Initialize();

@@ -7,6 +7,8 @@
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 #include "../include/core/World/TileTypes.hpp"
 #include <cstring>
 
@@ -36,7 +38,9 @@ void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const
 {
     m_world = world; // Store world pointer for physics syncing.
     // Initialize editing context in one place so state resets stay consistent.
-    SetEditingContext(tileMap, tileset, std::string());
+    const std::vector<std::shared_ptr<Tileset>> tilesets = tileset ? std::vector<std::shared_ptr<Tileset>>{ tileset } : std::vector<std::shared_ptr<Tileset>>{};
+    const std::vector<std::string> paths;
+    SetEditingContext(tileMap, tilesets, paths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 }
 
 void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
@@ -47,7 +51,18 @@ void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
     }
 }
 
-void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, const std::string& tileMapPath)
+void TilePalettePanel::SetTileMapList(const std::vector<TileMapListEntry>& entries, EntityId activeId)
+{
+    m_tileMapList = entries; // Replace the list of tilemaps for the dropdown.
+    m_activeTileMapId = activeId; // Track which tilemap is currently active.
+}
+
+void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap,
+    const std::vector<std::shared_ptr<Tileset>>& tilesets,
+    const std::vector<std::string>& tilesetPaths,
+    uint8_t activeTilesetIndex,
+    const std::string& tileMapPath,
+    const glm::vec2& worldOrigin)
 {
     // Remove any cached physics entities tied to the previous map.
     if (m_world) {
@@ -61,8 +76,15 @@ void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap
 
     m_physicsEntities.clear(); // Reset cached physics entity map.
     m_tileMap = tileMap; // Assign the new active tilemap.
-    m_tileset = tileset; // Assign the new active tileset.
+    m_tilesets = tilesets; // Assign the tileset list for this tilemap.
+    m_tilesetPaths = tilesetPaths; // Cache tileset paths for UI labels.
+    m_activeTilesetIndex = activeTilesetIndex; // Track active tileset index for packing.
+    if (m_activeTilesetIndex >= m_tilesets.size()) {
+        m_activeTilesetIndex = 0;
+    }
+    m_tileset = m_tilesets.empty() ? nullptr : m_tilesets[m_activeTilesetIndex]; // Assign active tileset.
     m_tileMapPath = tileMapPath; // Track map path for auto-save on edits.
+    m_worldOrigin = worldOrigin; // Cache the tilemap origin in world space.
     m_selectedTileID = 0; // Reset tile selection when swapping tilesets.
     m_currentRotation = 0; // Reset rotation to default.
     m_isEraser = false; // Reset eraser toggle.
@@ -72,11 +94,17 @@ void TilePalettePanel::Render()
 {
     if (!m_active) return;
 
-    if (ImGui::Begin("Tile Palette", &m_active))
+    if (ImGui::Begin("Tile Palette"))
     {
-        if (!m_tileset)
-        {
-            ImGui::Text("No Tileset Loaded");
+        // Allow drag-and-drop of assets directly onto the palette window.
+        const ImVec2 contentMinLocal = ImGui::GetWindowContentRegionMin(); // Content region min (local).
+        const ImVec2 contentMaxLocal = ImGui::GetWindowContentRegionMax(); // Content region max (local).
+        const ImVec2 contentSize(contentMaxLocal.x - contentMinLocal.x, contentMaxLocal.y - contentMinLocal.y);
+        if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
+            const ImVec2 cursorPos = ImGui::GetCursorPos(); // Cache cursor in local coordinates.
+            ImGui::SetCursorPos(contentMinLocal);
+            ImGui::SetNextItemAllowOverlap(); // Keep the invisible target from blocking palette interaction.
+            ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
                     const std::string assetPath = ParseFirstAssetPath(payload);
@@ -86,6 +114,76 @@ void TilePalettePanel::Render()
                 }
                 ImGui::EndDragDropTarget();
             }
+            ImGui::SetCursorPos(cursorPos);
+        }
+
+        if (!m_tileMapList.empty()) {
+            const char* currentLabel = "None";
+            for (const auto& entry : m_tileMapList) {
+                if (entry.Id == m_activeTileMapId) {
+                    currentLabel = entry.Name.c_str();
+                    break;
+                }
+            }
+
+            ImGui::Text("Active Tilemap");
+            ImGui::SameLine();
+            if (ImGui::BeginCombo("##ActiveTilemap", currentLabel)) {
+                for (const auto& entry : m_tileMapList) {
+                    const bool isSelected = (entry.Id == m_activeTileMapId);
+                    if (ImGui::Selectable(entry.Name.c_str(), isSelected)) {
+                        m_activeTileMapId = entry.Id;
+                        if (m_activeTileMapCallback) {
+                            m_activeTileMapCallback(entry.Id); // Let the editor switch the active tilemap.
+                        }
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::Separator();
+        }
+
+        if (!m_tilesetPaths.empty()) {
+            std::string tilesetLabel = "None";
+            if (m_activeTilesetIndex < m_tilesetPaths.size()) {
+                const std::string& fullPath = m_tilesetPaths[m_activeTilesetIndex];
+                const size_t slash = fullPath.find_last_of("\\/");
+                tilesetLabel = (slash == std::string::npos) ? fullPath : fullPath.substr(slash + 1);
+            }
+
+            ImGui::Text("Active Tileset");
+            ImGui::SameLine();
+            if (ImGui::BeginCombo("##ActiveTileset", tilesetLabel.c_str())) {
+                for (size_t i = 0; i < m_tilesetPaths.size(); ++i) {
+                    const bool isSelected = (i == m_activeTilesetIndex);
+                    const std::string& fullPath = m_tilesetPaths[i];
+                    const size_t slash = fullPath.find_last_of("\\/");
+                    const std::string displayName = (slash == std::string::npos) ? fullPath : fullPath.substr(slash + 1);
+                    if (ImGui::Selectable(displayName.c_str(), isSelected)) {
+                        m_activeTilesetIndex = static_cast<uint8_t>(i);
+                        m_tileset = (i < m_tilesets.size()) ? m_tilesets[i] : nullptr;
+                        m_selectedTileID = 0; // Reset tile selection on tileset switch.
+                        if (m_activeTilesetCallback) {
+                            m_activeTilesetCallback(m_activeTilesetIndex);
+                        }
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::Separator();
+        }
+
+        if (!m_tileset)
+        {
+            ImGui::Text("No Tileset Loaded");
             ImGui::End();
             return;
         }
@@ -169,26 +267,6 @@ void TilePalettePanel::Render()
              m_currentRotation = (m_currentRotation + 1) % 4;
         }
 
-        // Allow drag-and-drop of assets directly onto the palette window.
-        const ImVec2 contentMinLocal = ImGui::GetWindowContentRegionMin(); // Content region min (local).
-        const ImVec2 contentMaxLocal = ImGui::GetWindowContentRegionMax(); // Content region max (local).
-        const ImVec2 contentSize(contentMaxLocal.x - contentMinLocal.x, contentMaxLocal.y - contentMinLocal.y);
-        if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
-            const ImVec2 cursorPos = ImGui::GetCursorPos(); // Cache cursor in local coordinates.
-            ImGui::SetCursorPos(contentMinLocal);
-            ImGui::SetNextItemAllowOverlap(); // Keep the invisible target from blocking palette interaction.
-            ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-                    const std::string assetPath = ParseFirstAssetPath(payload);
-                    if (!assetPath.empty()) {
-                        HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
-                    }
-                }
-                ImGui::EndDragDropTarget();
-            }
-            ImGui::SetCursorPos(cursorPos);
-        }
     }
     ImGui::End();
 }
@@ -203,43 +281,37 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
         m_currentRotation = (m_currentRotation + 1) % 4;
     }
 
-    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
-        // TileMap::WorldToTile asserts on negative coordinates; skip out-of-bounds positions.
-        return;
-    }
-
-    uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
-    uint32_t ty = m_tileMap->WorldToTile(worldPos.y);
+    const glm::vec2 localPos = worldPos - m_worldOrigin; // Convert world space to tilemap-local space.
+    const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x); // Signed tile coordinate in map space.
+    const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y); // Signed tile coordinate in map space.
 
     float tileSize = m_tileMap->TileSize();
-    glm::vec2 tilePos(m_tileMap->TileToWorld(tx), m_tileMap->TileToWorld(ty));
+    glm::vec2 tilePos(m_tileMap->TileToWorldSigned(tx), m_tileMap->TileToWorldSigned(ty)); // Tile origin in local space.
+    tilePos += m_worldOrigin; // Shift tile origin into world space.
     glm::vec2 size(tileSize, tileSize);
 
     ECS::RendererSystem* rs = ECS::RendererSystem::GetInstance();
     if (rs) {
-        auto* r = rs->GetRenderer();
-        if (r) {
-            glm::vec2 min(tilePos.x, tilePos.y);
-            glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
-            if (m_isEraser) {
-                glm::vec4 color(1.0f, 0.0f, 0.0f, 0.35f); // Red translucent preview for eraser.
-                DebugDraw2D::RectFill(*r, min, max, color, 0);
-                return;
-            }
-
-            TileUV uv;
-            if (!m_tileset->GetTileUV(m_selectedTileID, uv)) {
-                glm::vec4 color(1.0f, 1.0f, 1.0f, 0.25f); // Fallback to a light fill if UV is missing.
-                DebugDraw2D::RectFill(*r, min, max, color, 0);
-                return;
-            }
-
-            const glm::vec4 uvRect(uv.u0, uv.v0, uv.u1, uv.v1); // Pack UVs for submitQuad.
-            const glm::vec2 center(tilePos.x + size.x * 0.5f, tilePos.y + size.y * 0.5f);
-            const glm::vec4 tint(1.0f, 1.0f, 1.0f, 0.5f); // Translucent tile preview.
-            const float rotation = static_cast<float>(m_currentRotation) * 1.57079632679f;
-            r->submitQuad(center, size, m_tileset->GetTextureId(), uvRect, tint, rotation, 1.0f, 0);
+        glm::vec2 min(tilePos.x, tilePos.y);
+        glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
+        if (m_isEraser) {
+            glm::vec4 color(1.0f, 0.0f, 0.0f, 0.35f); // Red translucent preview for eraser.
+            rs->SubmitFilledQuad(min, max, color);
+            return;
         }
+
+        TileUV uv;
+        if (!m_tileset->GetTileUV(m_selectedTileID, uv)) {
+            glm::vec4 color(1.0f, 1.0f, 1.0f, 0.25f); // Fallback to a light fill if UV is missing.
+            rs->SubmitFilledQuad(min, max, color);
+            return;
+        }
+
+        const glm::vec4 uvRect(uv.u0, uv.v0, uv.u1, uv.v1); // Pack UVs for submitQuad.
+        const glm::vec2 center(tilePos.x + size.x * 0.5f, tilePos.y + size.y * 0.5f);
+        const glm::vec4 tint(1.0f, 1.0f, 1.0f, 0.5f); // Translucent tile preview.
+        const float rotation = static_cast<float>(m_currentRotation) * 1.57079632679f;
+        rs->SubmitOverlayQuad(center, size, m_tileset->GetTextureId(), uvRect, tint, rotation);
     }
 }
 
@@ -247,33 +319,35 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
 {
     if (!m_tileMap || !m_tileset) return false;
 
-    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
-        // TileMap::WorldToTile asserts on negative coordinates; ignore clicks outside the map quadrant.
-        return false;
-    }
-
-    uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
-    uint32_t ty = m_tileMap->WorldToTile(worldPos.y);
+    const glm::vec2 localPos = worldPos - m_worldOrigin; // Convert world space to tilemap-local space.
+    const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x); // Signed tile coordinate in map space.
+    const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y); // Signed tile coordinate in map space.
     
     // Check bounds? TileMap expands? TileMap has fixed size layers.
     // Assuming layer 0.
     if (m_tileMap->LayerCount() == 0) return false;
-    const auto& layer = m_tileMap->GetLayer(0);
-    if (tx >= layer.Width() || ty >= layer.Height()) return false;
+    const uint32_t kExpandMargin = 2; // Expand when painting within N tiles of the edge.
+    const uint32_t kExpandStep = 16; // Grow by this many tiles per expansion.
+
+    m_tileMap->ExpandLayerToFit(0, tx, ty, kExpandMargin, kExpandStep); // Grow the layer to fit signed coords.
+    if (!m_tileMap->IsTileInBounds(tx, ty)) return false; // Bail out if still out of bounds.
 
     bool erasing = isRightClick || m_isEraser;
     
     if (erasing)
     {
-        m_tileMap->SetTile(0, tx, ty, EMPTY_TILE);
+        m_tileMap->SetTileSigned(0, tx, ty, EMPTY_TILE);
         SyncPhysics(tx, ty, EMPTY_TILE, true);
     }
     else
     {
-        TileID packed = PackTile(m_selectedTileID, m_currentRotation);
-        m_tileMap->SetTile(0, tx, ty, packed);
+        TileID packed = PackTile(m_selectedTileID, m_currentRotation, m_activeTilesetIndex);
+        m_tileMap->SetTileSigned(0, tx, ty, packed);
         SyncPhysics(tx, ty, packed, false);
     }
+
+    // Mark the scene dirty so saves are enabled and tracked.
+    Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap paint"));
 
     if (!m_tileMapPath.empty()) {
         // Persist edits immediately so the tilemap asset stays in sync.
@@ -283,11 +357,11 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     return true;
 }
 
-void TilePalettePanel::SyncPhysics(uint32_t x, uint32_t y, TileID id, bool isEraser)
+void TilePalettePanel::SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser)
 {
     if (!m_world) return;
 
-    uint32_t key = PackCoord(x, y);
+    int64_t key = PackCoord(x, y);
     
     // Always remove existing entity at this location
     auto it = m_physicsEntities.find(key);
@@ -304,7 +378,11 @@ void TilePalettePanel::SyncPhysics(uint32_t x, uint32_t y, TileID id, bool isEra
 
     // If adding a tile, check collision
     TileID baseID = GetTileBaseID(id);
-    CollisionType type = m_tileset->GetCollisionType(baseID);
+    uint8_t tilesetIndex = GetTileTilesetIndex(id);
+    if (tilesetIndex >= m_tilesets.size() || !m_tilesets[tilesetIndex]) {
+        return; // Missing tileset, so skip collider setup.
+    }
+    CollisionType type = m_tilesets[tilesetIndex]->GetCollisionType(baseID);
     
     if (type == CollisionType::NONE) return;
 
@@ -313,7 +391,8 @@ void TilePalettePanel::SyncPhysics(uint32_t x, uint32_t y, TileID id, bool isEra
     // BoxCollider2D expects center.
     float tileSize = m_tileMap->TileSize();
     float halfSize = tileSize * 0.5f;
-    glm::vec2 pos(m_tileMap->TileToWorld(x) + halfSize, m_tileMap->TileToWorld(y) + halfSize);
+    glm::vec2 pos(m_tileMap->TileToWorldSigned(x) + halfSize, m_tileMap->TileToWorldSigned(y) + halfSize);
+    pos += m_worldOrigin; // Move collider position into world space using tilemap origin.
     
     // Create Entity
     ECS::Entity e = m_world->Create();

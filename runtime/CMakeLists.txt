@@ -19,10 +19,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ======================= Game Entry Point =========================
 set(RUNTIME_SOURCES 
     ${CMAKE_CURRENT_LIST_DIR}/../src/game/GameMain.cpp
+    # Force global new/delete override to be compiled into the Runtime EXE
+    ${CMAKE_CURRENT_LIST_DIR}/../engine/src/services/GlobalMemoryOverride.cpp
 )
 
 # ======================= Create Runtime Executable =========================
 add_executable(GrapeRuntime ${RUNTIME_SOURCES})
+
+# ======================= Precompiled Headers =========================
+set(GRAPEENGINE_PCH_HEADER "${CMAKE_CURRENT_LIST_DIR}/../engine/include/pch.h")
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.16 AND EXISTS "${GRAPEENGINE_PCH_HEADER}")
+    target_precompile_headers(GrapeRuntime PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${GRAPEENGINE_PCH_HEADER}>"
+    )
+else()
+    message(STATUS "Runtime: Precompiled headers disabled (CMake >= 3.16 required)")
+endif()
 
 # ======================= Auto-detect Game Project Name =========================
 # Try to find a game project folder containing ProjectSettings.json

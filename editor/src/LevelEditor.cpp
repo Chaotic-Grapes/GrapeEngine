@@ -109,13 +109,19 @@ namespace {
     std::shared_ptr<TileMap> LoadOrCreateTileMap(const std::string& mapPath, float tileWorldSize, uint32_t width, uint32_t height) {
         auto map = std::make_shared<TileMap>(tileWorldSize); // Create a tilemap with the requested world scale.
 
-        if (!mapPath.empty() && std::filesystem::exists(mapPath)) {
-            if (map->LoadMap(mapPath)) {
-                return map; // Use the loaded map if it succeeds.
+        if (!mapPath.empty()) {
+            if (std::filesystem::exists(mapPath)) {
+                if (map->LoadMap(mapPath)) {
+                    LOG_INFO("[TileMap] Loaded tilemap: " << mapPath);
+                    return map; // Use the loaded map if it succeeds.
+                }
+                LOG_WARNING("[TileMap] Failed to load tilemap, creating a new one: " << mapPath);
+            } else {
+                LOG_WARNING("[TileMap] Tilemap file does not exist: " << mapPath);
             }
-            LOG_WARNING("[TileMap] Failed to load tilemap, creating a new one: " << mapPath);
         }
 
+        LOG_INFO("[TileMap] Creating new tilemap in memory for path=\"" << mapPath << "\"");
         map->AddLayer(width, height); // Create the base layer for a new map.
 
         return map;
@@ -363,11 +369,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
+    // Wire up undo system so the Edit menu can call Undo/Redo.
+    m_fileMenu.SetUndoSystem(&m_undoSystem);
 
     // Wire up playback state getter to file menu for edit/play mode checking
     m_fileMenu.SetEditorStateGetter([this]() { return m_playback.GetEditorState(); });
     // Ensure play-mode scene reloads don't reuse stale snapshots.
     m_fileMenu.SetPlaybackSnapshotClearCallback([this]() { m_playback.ClearSavedState(); });
+    // Ensure tilemaps are flushed to disk before the scene serializer runs.
+    m_fileMenu.SetPreSaveCallback([this](const std::string& scenePath) { _saveActiveTileMapAsset(scenePath); });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -594,6 +604,21 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
     m_sceneViewport.SetTilePalette(&m_tilePalette);
+    m_tilePalette.SetActiveTileMapCallback([this](const EntityId id) { _setActiveTileMap(id); });
+    m_tilePalette.SetActiveTilesetCallback([this](const uint8_t index) {
+        const auto it = m_tileMapCache.find(m_activeTileMapEntityId);
+        if (it == m_tileMapCache.end()) {
+            return;
+        }
+
+        TileMapCacheEntry& entry = it->second;
+        entry.ActiveTilesetIndex = index; // Persist active tileset selection for this tilemap.
+
+        if (index < entry.Tilesets.size()) {
+            m_activeTileset = entry.Tilesets[index];
+            m_activeTilesetPath = (index < entry.TilesetPaths.size()) ? entry.TilesetPaths[index] : std::string();
+        }
+    });
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
@@ -634,30 +659,55 @@ void LevelEditor::_loadFonts() {
     auto& io = ImGui::GetIO();
     float textFontSize = m_config.TextFontSize;
 
+    // Helper to load font via RM
+    auto loadFont = [&](const std::string& path, float size, ImFontConfig* config = nullptr, const ImWchar* ranges = nullptr) -> ImFont* {
+        // WE'RE USING RAWDATA BECAUSE ENGINE VS IMGUI FONTS ARE DIFFERENT
+        // IMGUI FONTS NEED RAW TTF BYTES
+        auto raw = RM.Get<RawData>(path);
+        
+        // Load from memory if valid
+        if (raw && raw->IsValid) {
+            ImFontConfig cfg = config ? *config : ImFontConfig();
+            cfg.FontDataOwnedByAtlas = false; // Data is owned by RM (shared_ptr)
+
+            // Make a name for debug    
+            strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
+            return io.Fonts->AddFontFromMemoryTTF(raw->Data.data(), (int)raw->Data.size(), size, &cfg, ranges);
+        }
+        else {
+            LOG_ERROR("Failed to load font via RM: " << path);
+            return nullptr;
+        }
+    };
+
+	// Load main text font (caching handled by RM)
     if (!m_mainFont && io.Fonts->Fonts.empty()) {
-        m_mainFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Open_Sans/static/OpenSans-Medium.ttf",
-            textFontSize
-        );
+        m_mainFont = loadFont("assets/fonts/Inter/static/Inter_24pt-Medium.ttf", textFontSize);
+
+		// Safety check (fallback to default font)
         if (!m_mainFont) {
             LOG_ERROR("Failed to load Open Sans Medium font");
             m_mainFont = io.Fonts->AddFontDefault();
         }
     }
+
+	// Use first font if already loaded
     else if (!m_mainFont) {
         m_mainFont = io.Fonts->Fonts[0];
     }
 
+	// Load bold font
     if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
-        m_boldFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Open_Sans/static/OpenSans-ExtraBold.ttf",
-            textFontSize
-        );
+        m_boldFont = loadFont("assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf", textFontSize);
+
+		// Safety check (fallback to default font)
         if (!m_boldFont) {
             LOG_ERROR("Failed to load Open Sans ExtraBold font");
             m_boldFont = io.Fonts->AddFontDefault();
         }
     }
+
+	// Use second font if already loaded
     else if (!m_boldFont) {
         m_boldFont = io.Fonts->Fonts[1];
     }
@@ -670,8 +720,9 @@ void LevelEditor::_loadFonts() {
     iconsConfig.OversampleH = 3;
     iconsConfig.OversampleV = 3;
 
+	// Load icon font (Material Symbols); AGAIN, caching via RM
     if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
-        m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+        m_symbolsFont = loadFont(
             "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
             iconFontSize,
             &iconsConfig,
@@ -734,12 +785,16 @@ void LevelEditor::Update() {
     if (Engine::CORE) {
         auto* rendererSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
         if (rendererSystem) {
+            m_gameViewport.PrepareFrame();
             auto* editorCam = m_sceneViewport.GetEditorCamera();
             if (editorCam) {
                 rendererSystem->SetCamera(editorCam->GetCamera());
             }
         }
     }
+
+    // Update tilemap cache and push all visible tilemaps to the renderer.
+    _refreshTileMapCache();
 
     // SceneManager::Update is already called in EditorService::Update.
 }
@@ -824,43 +879,54 @@ void LevelEditor::_onAssetSelected(const std::string& assetPath) {
         return; // Only handle image assets as tilesets.
     }
 
-    // Pick a target entity: use the selected one if possible, otherwise create a new tilemap entity.
-    ECS::Entity target = ECS::NULL_ENTITY; // Start with a null entity until we find or create one.
-    const EntityId selectedId = m_hierarchyWindow.GetPrimarySelectedEntity(); // Read the current hierarchy selection.
+    // Apply tileset to selected/active tilemap entity, otherwise prompt to create one.
+    ECS::Entity target = ECS::NULL_ENTITY;
+    const EntityId selectedId = m_hierarchyWindow.GetPrimarySelectedEntity();
     if (selectedId != ECS::Entity::NPOS32) {
-        target = m_world->Resolve(selectedId); // Resolve the selected entity to the latest generation.
+        target = m_world->Resolve(selectedId);
     }
 
-    if (!m_world->IsAlive(target) || !m_world->Has<ECS::Components::TileMapComponent>(target)) {
-        target = m_world->Create(); // Create a new entity for the tilemap.
-
-        ECS::Components::Name name; // Add a readable name for the hierarchy.
-        name.Value = ECS::StringTable::Intern("TileMap");
-        m_world->Set<ECS::Components::Name>(target, name);
-
-        ECS::Components::LocalTransform transform; // Ensure a transform exists for editor tooling.
-        m_world->Set<ECS::Components::LocalTransform>(target, transform);
+    if (m_world->IsAlive(target) && m_world->Has<ECS::Components::TileMapComponent>(target)) {
+        _applyTilesetToTilemap(target, assetPath);
+        return;
     }
 
-    // Fetch or create the tilemap component and update its tileset path.
-    ECS::Components::TileMapComponent comp{}; // Local copy for edits before writing back to the world.
-    if (m_world->Has<ECS::Components::TileMapComponent>(target)) {
-        comp = m_world->Get<ECS::Components::TileMapComponent>(target); // Pull existing data if present.
+    // If the palette already has an active tilemap, prefer that before prompting.
+    if (m_activeTileMapEntityId != ECS::Entity::NPOS32) {
+        ECS::Entity activeEntity = m_world->Resolve(m_activeTileMapEntityId);
+        if (m_world->IsAlive(activeEntity) && m_world->Has<ECS::Components::TileMapComponent>(activeEntity)) {
+            _applyTilesetToTilemap(activeEntity, assetPath);
+            return;
+        }
     }
 
-    comp.TilesetTexturePath = ECS::StringTable::Intern(assetPath); // Store tileset texture path.
-
-    if (comp.TileMapPath == 0) {
-        // Default tilemap path: same folder + same stem with .tilemap extension.
-        std::filesystem::path mapPath = path;
-        mapPath.replace_extension(".tilemap");
-        comp.TileMapPath = ECS::StringTable::Intern(mapPath.string());
+    // If no tilemap is selected, reuse the first tilemap in the cache or scene.
+    if (!m_tileMapCache.empty()) {
+        for (const auto& [id, entry] : m_tileMapCache) {
+            (void)entry; // Cache entry is unused; we only need the entity id.
+            ECS::Entity cachedEntity = m_world->Resolve(id);
+            if (m_world->IsAlive(cachedEntity) && m_world->Has<ECS::Components::TileMapComponent>(cachedEntity)) {
+                _applyTilesetToTilemap(cachedEntity, assetPath);
+                return;
+            }
+        }
     }
 
-    m_world->Set<ECS::Components::TileMapComponent>(target, comp); // Persist component changes to the world.
+    // Final fallback: scan the world for any tilemap component.
+    ECS::Entity fallback = ECS::NULL_ENTITY;
+    m_world->Each<ECS::Components::TileMapComponent>([&fallback](const ECS::Entity entity, ECS::Components::TileMapComponent&) {
+        if (fallback.IsNull()) {
+            fallback = entity;
+        }
+    });
 
-    // Sync the palette/editor to this tilemap component immediately.
-    _syncTilePaletteToSelection(target.Index); // Rebuild tile palette and renderer from this component.
+    if (m_world->IsAlive(fallback)) {
+        _applyTilesetToTilemap(fallback, assetPath);
+        return;
+    }
+
+    m_pendingTilesetPath = assetPath; // Cache tileset path for the create prompt.
+    m_showTilemapCreateModal = true; // Trigger the modal to create a tilemap.
 }
 
 void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
@@ -883,47 +949,427 @@ void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
         return;
     }
 
-    const auto& comp = m_world->Get<ECS::Components::TileMapComponent>(entity); // Read the component data.
-    std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
-    const std::string tilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Resolve tileset path.
+    _setActiveTileMap(id); // Activate the tilemap for the palette without hiding others.
+}
 
-    if (tilesetPath.empty()) {
-        return; // Can't build a tileset without a texture path.
+void LevelEditor::_refreshTileMapCache() {
+    if (!m_world) {
+        return; // No world available to refresh tilemaps.
     }
 
-    if (mapPath.empty()) {
-        // Synthesize a default tilemap path when none is stored yet.
-        std::filesystem::path defaultPath = tilesetPath;
-        defaultPath.replace_extension(".tilemap");
-        mapPath = defaultPath.string();
+    const std::string scenePath = m_fileMenu.GetCurrentScenePath(); // Use saved scene path for tilemap derivation.
+    std::unordered_set<EntityId> seen; // Track which entities still have tilemaps.
+    m_tileMapList.clear(); // Rebuild the list of tilemaps for the palette dropdown.
 
-        // Write the synthesized path back to the component so it persists in the scene.
-        ECS::Components::TileMapComponent updated = comp;
-        updated.TileMapPath = ECS::StringTable::Intern(mapPath);
-        m_world->Set<ECS::Components::TileMapComponent>(entity, updated);
-    }
+    m_world->Each<ECS::Components::TileMapComponent>([this, &seen, &scenePath](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
+        seen.insert(entity.Index); // Mark this tilemap entity as active.
 
-    // Build runtime tileset and tilemap instances from the component data.
-    m_activeTileset = BuildTilesetFromTexture(tilesetPath, comp.TilePixelSize); // Create tileset from texture grid.
-    m_activeTileMap = LoadOrCreateTileMap(mapPath, comp.TileWorldSize, comp.DefaultWidth, comp.DefaultHeight); // Load or create tilemap data.
-    m_activeTileMapPath = mapPath; // Cache map path for palette auto-save.
-    m_activeTilesetPath = tilesetPath; // Cache tileset path for debugging and reloads.
-    m_activeTileMapEntityId = entity.Index; // Track which entity owns the active tilemap.
+        std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
+        const std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path.
+        LOG_INFO("[TileMap] Refresh entity " << entity.Index
+            << " mapPath=\"" << mapPath
+            << "\" legacyTileset=\"" << legacyTilesetPath << "\"");
 
-    if (m_activeTileMap && m_activeTileset) {
-        m_tilePalette.SetEditingContext(m_activeTileMap, m_activeTileset, m_activeTileMapPath);
-        if (auto* renderer = ECS::RendererSystem::GetInstance()) {
-            if (comp.Visible) {
-                renderer->SetDebugTileMap(*m_activeTileMap, *m_activeTileset);
-            } else {
-                renderer->ClearDebugTileMap();
+        if (mapPath.empty() && !scenePath.empty()) {
+            // Derive a tilemap path from the saved scene path when none exists.
+            std::filesystem::path derived = scenePath;
+            derived.replace_extension(".tilemap");
+            mapPath = derived.string();
+            comp.TileMapPath = ECS::StringTable::Intern(mapPath);
+        }
+
+        glm::vec2 origin(0.0f, 0.0f);
+        if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+            const auto& transform = m_world->Get<ECS::Components::LocalTransform>(entity);
+            origin = glm::vec2(transform.Position.X, transform.Position.Y); // Use entity position as tilemap origin.
+        }
+
+        std::string displayName = "Tilemap " + std::to_string(entity.Index);
+        if (m_world->Has<ECS::Components::Name>(entity)) {
+            const auto& name = m_world->Get<ECS::Components::Name>(entity);
+            displayName = ECS::StringTable::Resolve(name.Value); // Prefer the entity name when available.
+        }
+
+        m_tileMapList.push_back({ entity.Index, displayName });
+
+        TileMapCacheEntry& entry = m_tileMapCache[entity.Index];
+        const bool generationChanged = (entry.Generation != entity.Generation);
+        if (generationChanged) {
+            // Scene reload can reuse entity indices; reset cache when generation changes.
+            entry.Map.reset();
+            entry.Tilesets.clear();
+            entry.TilesetPaths.clear();
+            entry.MapPath.clear();
+        }
+        entry.Generation = entity.Generation;
+        const bool missingTilesetList = (!mapPath.empty() &&
+            entry.Map &&
+            entry.MapPath == mapPath &&
+            entry.Map->GetTilesetPaths().empty() &&
+            !legacyTilesetPath.empty() &&
+            std::filesystem::exists(mapPath));
+        const bool mapNeedsReload = generationChanged ||
+            (!entry.Map) ||
+            (!mapPath.empty() && entry.MapPath != mapPath) ||
+            missingTilesetList ||
+            entry.TileWorldSize != comp.TileWorldSize ||
+            entry.DefaultWidth != comp.DefaultWidth ||
+            entry.DefaultHeight != comp.DefaultHeight;
+        LOG_INFO("[TileMap] Cache state entity " << entity.Index
+            << " mapNeedsReload=" << (mapNeedsReload ? "true" : "false")
+            << " entryMapPath=\"" << entry.MapPath << "\""
+            << " hasMap=" << (entry.Map ? "true" : "false")
+            << " missingTilesetList=" << (missingTilesetList ? "true" : "false")
+            << " generationChanged=" << (generationChanged ? "true" : "false"));
+
+        if (mapNeedsReload) {
+            entry.Map = mapPath.empty() ? nullptr : LoadOrCreateTileMap(mapPath, comp.TileWorldSize, comp.DefaultWidth, comp.DefaultHeight);
+            entry.MapPath = mapPath;
+            entry.TileWorldSize = comp.TileWorldSize;
+            entry.DefaultWidth = comp.DefaultWidth;
+            entry.DefaultHeight = comp.DefaultHeight;
+            if (entry.Map) {
+                LOG_INFO("[TileMap] Cache reload entity " << entity.Index
+                    << " tilesets=" << entry.Map->GetTilesetPaths().size()
+                    << " layers=" << entry.Map->LayerCount());
+            }
+        } else if (mapPath.empty() && !entry.MapPath.empty()) {
+            // Drop stale map paths when the component no longer points to a file.
+            entry.MapPath.clear();
+        }
+
+        if (!entry.Map) {
+            // Keep an in-memory tilemap when no path is assigned yet.
+            entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+            entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
+            entry.MapPath.clear();
+            entry.TileWorldSize = comp.TileWorldSize;
+            entry.DefaultWidth = comp.DefaultWidth;
+            entry.DefaultHeight = comp.DefaultHeight;
+            LOG_INFO("[TileMap] Created in-memory tilemap for entity " << entity.Index);
+        }
+
+        bool addedLegacyTileset = false;
+        if (entry.Map && !legacyTilesetPath.empty()) {
+            // Ensure the legacy tileset path exists in the map's tileset list.
+            if (entry.Map->FindTilesetPath(legacyTilesetPath) < 0) {
+                entry.Map->AddTilesetPath(legacyTilesetPath);
+                addedLegacyTileset = true;
             }
         }
-    } else {
-        // Clear palette and debug draw if we failed to build the runtime data.
-        m_tilePalette.SetEditingContext(nullptr, nullptr, std::string());
-        if (auto* renderer = ECS::RendererSystem::GetInstance()) {
-            renderer->ClearDebugTileMap();
+
+        const std::vector<std::string>& mapTilesetPaths = entry.Map->GetTilesetPaths();
+        LOG_INFO("[TileMap] Map tileset paths entity " << entity.Index
+            << " count=" << mapTilesetPaths.size());
+        if (legacyTilesetPath.empty() && !mapTilesetPaths.empty()) {
+            // Keep the legacy component field in sync so scenes retain a usable tileset path.
+            comp.TilesetTexturePath = ECS::StringTable::Intern(mapTilesetPaths.front());
+        }
+        const bool tilesetListChanged = entry.TilePixelSize != comp.TilePixelSize ||
+            entry.TilesetPaths != mapTilesetPaths ||
+            (entry.Tilesets.empty() && !mapTilesetPaths.empty());
+
+        if (tilesetListChanged) {
+            entry.Tilesets.clear();
+            entry.TilesetPaths = mapTilesetPaths;
+            entry.Tilesets.reserve(mapTilesetPaths.size());
+            for (const auto& tilesetPath : mapTilesetPaths) {
+                entry.Tilesets.push_back(BuildTilesetFromTexture(tilesetPath, comp.TilePixelSize));
+            }
+            entry.TilePixelSize = comp.TilePixelSize;
+            if (!entry.Tilesets.empty()) {
+                entry.ActiveTilesetIndex = std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+            } else {
+                entry.ActiveTilesetIndex = 0;
+            }
+            LOG_INFO("[TileMap] Tileset rebuild entity " << entity.Index
+                << " count=" << entry.Tilesets.size());
+        }
+
+        entry.Origin = origin; // Update origin every frame to follow entity transforms.
+        entry.Visible = comp.Visible; // Cache visibility so debug rendering matches component state.
+        entry.DisplayName = displayName;
+
+        if (addedLegacyTileset && !entry.MapPath.empty()) {
+            // Persist legacy tileset migration so future reloads include the tileset list.
+            entry.Map->SaveMap(entry.MapPath);
+            LOG_INFO("[TileMap] Persisted legacy tileset to " << entry.MapPath);
+        }
+    });
+
+    for (auto it = m_tileMapCache.begin(); it != m_tileMapCache.end(); ) {
+        if (!seen.contains(it->first)) {
+            it = m_tileMapCache.erase(it); // Drop cache entries for deleted tilemaps.
+        } else {
+            ++it;
+        }
+    }
+
+    // Auto-select the only tilemap if none is active yet.
+    if (m_activeTileMapEntityId == ECS::Entity::NPOS32 && m_tileMapList.size() == 1) {
+        _setActiveTileMap(m_tileMapList[0].Id);
+    }
+
+    // Update palette dropdown list and active selection.
+    m_tilePalette.SetTileMapList(m_tileMapList, m_activeTileMapEntityId);
+
+    if (m_activeTileMapEntityId != ECS::Entity::NPOS32 &&
+        !m_tileMapCache.contains(m_activeTileMapEntityId)) {
+        // Clear active state if the tilemap entity was removed.
+        m_activeTileMapEntityId = ECS::Entity::NPOS32;
+        m_activeTileMap.reset();
+        m_activeTileset.reset();
+        m_activeTileMapPath.clear();
+        m_activeTilesetPath.clear();
+        const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
+        const std::vector<std::string> emptyPaths;
+        m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
+    } else if (m_activeTileMapEntityId != ECS::Entity::NPOS32) {
+        const auto it = m_tileMapCache.find(m_activeTileMapEntityId);
+        if (it != m_tileMapCache.end()) {
+            const TileMapCacheEntry& entry = it->second;
+
+            if (entry.Map) {
+                const uint8_t activeTilesetIndex = entry.Tilesets.empty() ? 0 : std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+                const std::shared_ptr<Tileset> activeTileset = entry.Tilesets.empty() ? nullptr : entry.Tilesets[activeTilesetIndex];
+
+                if (m_activeTileMap != entry.Map || m_activeTileset != activeTileset) {
+                    // Refresh the palette context if the cached assets changed.
+                    m_activeTileMap = entry.Map;
+                    m_activeTileset = activeTileset;
+                    m_activeTileMapPath = entry.MapPath;
+                    m_activeTilesetPath = (activeTilesetIndex < entry.TilesetPaths.size()) ? entry.TilesetPaths[activeTilesetIndex] : std::string();
+                    m_tilePalette.SetEditingContext(m_activeTileMap, entry.Tilesets, entry.TilesetPaths, activeTilesetIndex, m_activeTileMapPath, entry.Origin);
+                } else {
+                    // Keep selection state but update origin as the entity moves.
+                    m_tilePalette.SetTileMapOrigin(entry.Origin);
+                }
+            }
+        }
+    }
+
+    if (auto* renderer = ECS::RendererSystem::GetInstance()) {
+        std::vector<ECS::RendererSystem::DebugTileMapEntry> debugMaps;
+        debugMaps.reserve(m_tileMapCache.size());
+
+    const bool hasMultiple = (m_tileMapCache.size() > 1);
+    for (auto& [id, entry] : m_tileMapCache) {
+        if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
+            continue; // Skip hidden or incomplete tilemaps.
+        }
+
+        std::vector<const Tileset*> tilesets;
+        tilesets.reserve(entry.Tilesets.size());
+        for (const auto& tileset : entry.Tilesets) {
+            tilesets.push_back(tileset.get());
+        }
+        debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
+    }
+
+        renderer->SetDebugTileMaps(debugMaps);
+    }
+}
+
+void LevelEditor::_renderTilemapCreateModal() {
+    if (m_showTilemapCreateModal) {
+        ImGui::OpenPopup("Create Tilemap");
+        m_showTilemapCreateModal = false;
+    }
+
+    if (ImGui::BeginPopupModal("Create Tilemap", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("No Tilemap entity is selected. Create a new Tilemap entity to use this tileset?");
+        ImGui::Separator();
+
+        if (ImGui::Button("Create Tilemap", ImVec2(160, 0))) {
+            if (m_world && !m_pendingTilesetPath.empty()) {
+                ECS::Entity target = m_world->Create();
+
+                ECS::Components::Name name;
+                name.Value = ECS::StringTable::Intern("Tilemap");
+                m_world->Set<ECS::Components::Name>(target, name);
+
+                ECS::Components::LocalTransform transform;
+                m_world->Set<ECS::Components::LocalTransform>(target, transform);
+
+                _applyTilesetToTilemap(target, m_pendingTilesetPath);
+
+                m_hierarchyWindow.SetSelectedEntity(target.Index);
+                m_inspector.InspectEntity(target.Index);
+                if (m_sceneViewport.HasValidWorld()) {
+                    m_sceneViewport.SetSelectedEntity(target.Index);
+                }
+                if (m_gameViewport.HasValidWorld()) {
+                    m_gameViewport.SetSelectedEntity(target.Index);
+                }
+            }
+
+            m_pendingTilesetPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
+            m_pendingTilesetPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+void LevelEditor::_applyTilesetToTilemap(ECS::Entity entity, const std::string& assetPath) {
+    if (!m_world || !m_world->IsAlive(entity)) {
+        return;
+    }
+
+    ECS::Components::TileMapComponent comp{};
+    if (m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+        comp = m_world->Get<ECS::Components::TileMapComponent>(entity);
+    }
+
+    comp.TilesetTexturePath = ECS::StringTable::Intern(assetPath);
+
+    m_world->Set<ECS::Components::TileMapComponent>(entity, comp);
+    LOG_INFO("[TileMap] Apply tileset \"" << assetPath << "\" to entity " << entity.Index);
+
+    // Ensure the tilemap cache entry exists so we can add the tileset path.
+    TileMapCacheEntry& entry = m_tileMapCache[entity.Index];
+    if (!entry.Map) {
+        entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+        entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
+    }
+
+    if (entry.MapPath.empty()) {
+        // Prefer the component path if it already exists so we can persist tileset changes.
+        const std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath);
+        if (!mapPath.empty()) {
+            entry.MapPath = mapPath;
+        }
+    }
+
+    const uint8_t tilesetIndex = entry.Map->AddTilesetPath(assetPath); // Add tileset path to the map list.
+    entry.TilesetPaths = entry.Map->GetTilesetPaths();
+    entry.Tilesets.clear();
+    entry.Tilesets.reserve(entry.TilesetPaths.size());
+    for (const auto& tilesetPath : entry.TilesetPaths) {
+        entry.Tilesets.push_back(BuildTilesetFromTexture(tilesetPath, comp.TilePixelSize));
+    }
+    entry.TilePixelSize = comp.TilePixelSize;
+    entry.ActiveTilesetIndex = tilesetIndex; // Switch active tileset to the newly added one.
+
+    if (!entry.MapPath.empty()) {
+        // Save immediately so tileset paths are available on the next reload.
+        entry.Map->SaveMap(entry.MapPath);
+        LOG_INFO("[TileMap] Saved tilemap after tileset add: " << entry.MapPath);
+    }
+
+    _setActiveTileMap(entity.Index);
+}
+
+void LevelEditor::_setActiveTileMap(EntityId id) {
+    if (!m_world || id == ECS::Entity::NPOS32) {
+        return;
+    }
+
+    ECS::Entity entity = m_world->Resolve(id);
+    if (!m_world->IsAlive(entity) || !m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+        return;
+    }
+
+    m_activeTileMapEntityId = id;
+
+    const auto it = m_tileMapCache.find(id);
+    if (it != m_tileMapCache.end() && it->second.Map) {
+        const TileMapCacheEntry& entry = it->second;
+        const uint8_t activeTilesetIndex = entry.Tilesets.empty() ? 0 : std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+        const std::shared_ptr<Tileset> activeTileset = entry.Tilesets.empty() ? nullptr : entry.Tilesets[activeTilesetIndex];
+        m_activeTileMap = entry.Map;
+        m_activeTileset = activeTileset;
+        m_activeTileMapPath = entry.MapPath;
+        m_activeTilesetPath = (activeTilesetIndex < entry.TilesetPaths.size()) ? entry.TilesetPaths[activeTilesetIndex] : std::string();
+        m_tilePalette.SetEditingContext(m_activeTileMap, entry.Tilesets, entry.TilesetPaths, activeTilesetIndex, m_activeTileMapPath, entry.Origin);
+        return;
+    }
+
+    // Cache is expected to populate via _refreshTileMapCache.
+}
+
+void LevelEditor::_saveActiveTileMapAsset(const std::string& scenePath) {
+    if (m_tileMapCache.empty()) {
+        return; // No cached tilemaps to save.
+    }
+
+    const bool hasMultiple = (m_tileMapCache.size() > 1);
+    for (auto& [id, entry] : m_tileMapCache) {
+        if (!entry.Map) {
+            continue; // Skip missing tilemaps.
+        }
+
+        ECS::Entity entity = m_world->Resolve(id); // Resolve entity for component reads.
+        std::string legacyTilesetPath;
+        if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+            const auto& comp = m_world->Get<ECS::Components::TileMapComponent>(entity);
+            legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy fallback for tileset list.
+        }
+
+        std::string mapPathString = entry.MapPath;
+        if (mapPathString.empty() && !scenePath.empty()) {
+            // Derive the tilemap path from the scene path when saving for the first time.
+            std::filesystem::path derived = scenePath;
+            if (hasMultiple) {
+                derived.replace_extension("");
+                derived += "_tilemap_" + std::to_string(id);
+                derived.replace_extension(".tilemap");
+            } else {
+                derived.replace_extension(".tilemap");
+            }
+            mapPathString = derived.string();
+
+            if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+                auto comp = m_world->Get<ECS::Components::TileMapComponent>(entity);
+                comp.TileMapPath = ECS::StringTable::Intern(mapPathString);
+                if (comp.TilesetTexturePath == 0 && !entry.Map->GetTilesetPaths().empty()) {
+                    comp.TilesetTexturePath = ECS::StringTable::Intern(entry.Map->GetTilesetPaths().front());
+                }
+                m_world->Set<ECS::Components::TileMapComponent>(entity, comp);
+            }
+            entry.MapPath = mapPathString; // Cache the derived path for future saves.
+        }
+
+        if (mapPathString.empty()) {
+            continue; // Still no path to save to.
+        }
+
+        LOG_INFO("[TileMap] Save pre-scene: entity " << id
+            << " mapPath=\"" << mapPathString
+            << "\" tilesets=" << entry.Map->GetTilesetPaths().size());
+
+        if (!legacyTilesetPath.empty() && entry.Map->GetTilesetPaths().empty()) {
+            // Ensure legacy tileset paths are written into the tilemap before save.
+            entry.Map->AddTilesetPath(legacyTilesetPath);
+        }
+
+        if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+            auto comp = m_world->Get<ECS::Components::TileMapComponent>(entity);
+            if (comp.TilesetTexturePath == 0 && !entry.Map->GetTilesetPaths().empty()) {
+                // Persist a tileset path into the scene so reloads can rebuild tilesets.
+                comp.TilesetTexturePath = ECS::StringTable::Intern(entry.Map->GetTilesetPaths().front());
+                m_world->Set<ECS::Components::TileMapComponent>(entity, comp);
+            }
+        }
+
+        const std::filesystem::path mapPath(mapPathString); // Convert to path for directory handling.
+        const std::filesystem::path mapDir = mapPath.parent_path(); // Save directory so we can create it if missing.
+
+        if (!mapDir.empty() && !std::filesystem::exists(mapDir)) {
+            std::filesystem::create_directories(mapDir); // Ensure the tilemap folder exists before writing.
+        }
+
+        if (!entry.Map->SaveMap(mapPathString)) {
+            LOG_WARNING("[TileMap] Failed to save tilemap before scene save: " << mapPathString);
+        } else {
+            LOG_INFO("[TileMap] Saved tilemap before scene save: " << mapPathString);
         }
     }
 }
@@ -956,6 +1402,9 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         ImGui::End();
     }
+
+    // Render tilemap creation modal after panels so it shows on top.
+    _renderTilemapCreateModal();
 }
 
 // -------------------------------------------------------------------------
@@ -990,10 +1439,17 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTileMapPath.clear();
     m_activeTilesetPath.clear();
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
-    m_tilePalette.SetEditingContext(nullptr, nullptr, std::string());
+    m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
+    m_tileMapList.clear(); // Drop tilemap list for the new scene.
+    m_pendingTilesetPath.clear();
+    m_showTilemapCreateModal = false;
+    const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
+    const std::vector<std::string> emptyPaths;
+    m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 
     if (auto* renderer = ECS::RendererSystem::GetInstance()) {
-        renderer->ClearDebugTileMap(); // Remove any previous debug tilemap.
+        renderer->ClearDebugTileMaps(); // Remove any previous debug tilemaps.
+        renderer->ClearDebugTileMap(); // Clear the legacy single debug map as well.
     }
 }
 

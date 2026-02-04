@@ -16,33 +16,34 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "CameraFrustumRenderer.h"
 #include "ecs/Components.h"
 #include "EditorECSUtils.h"
-#include "graphics/debugDraw2D.hpp"
-#include "graphics/renderer.hpp"
-#include "graphics/shader.hpp"
+#include "ecs/systems/RendererSystem.h"
+#include "helpers/TransformUtils.h"
 #include <glm/glm.hpp>
+#include <algorithm>
+#include <cmath>
 
 namespace Editor {
 
     void CameraFrustumRenderer::RenderFrustum(
         ECS::World& world,
-        Renderer& renderer,
-        Shader& shader,
-        const glm::mat4& viewProj,
+        ECS::RendererSystem* rendererSystem,
         float cameraOrthoSize,
         float windowHeight,
         uint32_t excludeEntityId)
     {
-        shader.use();
-        shader.setMat4("uViewProj", viewProj);
-        renderer.beginFrame();
+        if (!rendererSystem) {
+            return;
+        }
 
         const ECS::ComponentTypeId localTransformId = Editor::ECSUtils::GetComponentIdFromName("LocalTransform");
+        const ECS::ComponentTypeId worldTransformId = Editor::ECSUtils::GetComponentIdFromName("WorldTransform");
         const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
 
         if (localTransformId == ECS::NULL_COMPONENT_ID || cameraId == ECS::NULL_COMPONENT_ID) {
-            renderer.endFrame();
             return;
         }
+
+        constexpr float kFrustumPlaneZ = 0.0f;
 
         // Find active game cameras (excluding editor camera if specified)
         world.Each([&](ECS::Entity entity) {
@@ -59,6 +60,17 @@ namespace Editor {
                     return;
                 }
 
+                Vector3D position = camTransform->Position;
+                Quaternion rotation = camTransform->Rotation;
+                if (worldTransformId != ECS::NULL_COMPONENT_ID && world.HasById(entity, worldTransformId)) {
+                    const auto* wt = static_cast<const ECS::Components::WorldTransform*>(
+                        world.GetRawComponentPtr(entity, worldTransformId));
+                    if (wt) {
+                        Vector3D scale;
+                        TransformUtils::DecomposeTRS(wt->Matrix, position, rotation, scale);
+                    }
+                }
+
                 // Skip the excluded entity (typically the editor camera)
                 if (excludeEntityId != 0 && entity.Index == excludeEntityId) {
                     return;
@@ -69,29 +81,84 @@ namespace Editor {
                     return;
                 }
 
-                // Calculate camera frustum bounds in world space
-                const float halfH = camera->OrthoSize * 0.5f;
-                const float halfW = halfH * camera->AspectRatio;
+                // Build camera basis from rotation.
+                Vector3D forward = rotation.Rotate(Vector3D{0.0f, 0.0f, -1.0f});
+                Vector3D right = rotation.Rotate(Vector3D{1.0f, 0.0f, 0.0f});
+                Vector3D up = rotation.Rotate(Vector3D{0.0f, 1.0f, 0.0f});
+                forward.Normalize();
+                right.Normalize();
+                up.Normalize();
 
-                // Camera position in world space
-                const glm::vec2 camPos(camTransform->Position.X, camTransform->Position.Y);
+                auto intersectPlaneZ = [&](const Vector3D& origin, const Vector3D& direction, glm::vec2& out) -> bool {
+                    if (std::abs(direction.Z) < 1e-6f) {
+                        return false;
+                    }
+                    const float t = (kFrustumPlaneZ - origin.Z) / direction.Z;
+                    if (t <= 0.0f) {
+                        return false;
+                    }
+                    const Vector3D hit = origin + direction * t;
+                    out = glm::vec2(hit.X, hit.Y);
+                    return true;
+                };
 
-                // Frustum corners (centered on camera position)
-                const glm::vec2 frustumMin = camPos - glm::vec2(halfW, halfH);
-                const glm::vec2 frustumMax = camPos + glm::vec2(halfW, halfH);
+                glm::vec2 corners[4];
+                bool valid = true;
+                if (camera->UsePerspective) {
+                    const float tanHalfFov = std::tan(glm::radians(camera->FOV * 0.5f));
+                    const float halfW = tanHalfFov * camera->AspectRatio;
+                    const float halfH = tanHalfFov;
+                    const Vector3D dirs[4] = {
+                        (right * -halfW) + (up * -halfH) + forward,
+                        (right *  halfW) + (up * -halfH) + forward,
+                        (right *  halfW) + (up *  halfH) + forward,
+                        (right * -halfW) + (up *  halfH) + forward
+                    };
+
+                    for (int i = 0; i < 4; ++i) {
+                        Vector3D dir = dirs[i].Normalized();
+                        if (!intersectPlaneZ(position, dir, corners[i])) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    const float halfH = camera->OrthoSize;
+                    const float halfW = halfH * camera->AspectRatio;
+                    const Vector3D origins[4] = {
+                        position + (right * -halfW) + (up * -halfH),
+                        position + (right *  halfW) + (up * -halfH),
+                        position + (right *  halfW) + (up *  halfH),
+                        position + (right * -halfW) + (up *  halfH)
+                    };
+
+                    for (int i = 0; i < 4; ++i) {
+                        if (!intersectPlaneZ(origins[i], forward, corners[i])) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!valid) {
+                    return;
+                }
 
                 // Calculate constant screen-space thickness (always 2 pixels)
                 const float desiredPixelThickness = 2.0f;
-                const float worldThickness = (cameraOrthoSize / windowHeight) * desiredPixelThickness;
+                const float safeHeight = std::max(windowHeight, 1.0f);
+                const float worldThickness = (cameraOrthoSize / safeHeight) * desiredPixelThickness;
 
                 // Draw frustum rectangle with cyan color
                 const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
 
-                DebugDraw2D::RectStroke(renderer, frustumMin, frustumMax,
-                    worldThickness, frustumColor, 0);
+                for (int i = 0; i < 4; ++i) {
+                    const glm::vec2& a = corners[i];
+                    const glm::vec2& b = corners[(i + 1) % 4];
+                    rendererSystem->SubmitWireframeLine(a, b, frustumColor, worldThickness);
+                }
             });
-
-        renderer.endFrame();
     }
 
 }

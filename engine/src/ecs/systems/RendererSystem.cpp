@@ -183,34 +183,21 @@ namespace ECS {
         m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
         ResetGUIViewport();
 
-        // Shaders
-        m_shader = std::make_unique<Shader>(
-            "assets/shaders/batch.vert",
-            "assets/shaders/batch.frag");
+        // Use RM instead!
+        m_shader = RM.Get<Shader>("assets/shaders/batch");
+        m_textShader = RM.Get<Shader>("assets/shaders/sdf_text");
+        m_sdfCircleShader = RM.Get<Shader>("assets/shaders/sdf_circle");
+        m_bloomExtractShader = RM.Get<Shader>("assets/shaders/bloom_extract");
 
-        m_textShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_text.vert",
-            "assets/shaders/sdf_text.frag");
-
-        m_sdfCircleShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_circle.vert",
-            "assets/shaders/sdf_circle.frag");
-
-        m_bloomExtractShader = std::make_unique<Shader>(
-            "assets/shaders/bloom_extract.vert",
-            "assets/shaders/bloom_extract.frag");
-
-        m_bloomBlurShader = std::make_unique<Shader>(
+        m_bloomBlurShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_blur.frag");
 
-        m_bloomCombineShader = std::make_unique<Shader>(
+        m_bloomCombineShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
-        m_blitShader = std::make_unique<Shader>(
-            "assets/shaders/blit.vert",
-            "assets/shaders/blit.frag");
+        m_blitShader = RM.Get<Shader>("assets/shaders/blit");
 
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
@@ -363,105 +350,73 @@ namespace ECS {
         if (!m_renderer)
             return;
 
-        // Batching pipeline and render graph
-        glm::mat4 view = glm::mat4(1.0f);
-        glm::mat4 projection = glm::mat4(1.0f);
-        m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
-
-        // ============================================================
-        // 1. Acquire camera matrices from active source (camera agnostic)
-        // ============================================================
-        GetCameraMatrices(world, view, projection, m_cameraOrthoSize);
-
-        // ============================================================
-        // BLOOM RADIUS CALCULATION (world-space consistent)
-        // ============================================================
         auto* context = Engine::CORE->GetPlatformContext();
         auto* win = context ? context->GetMainWindow() : nullptr;
         if (!win) return;
+
+        // ============================================================
+        // SHARED WORK (once per frame)
+        // ============================================================
+        CollectLights(world);
+
+        std::vector<std::vector<Entity>> buckets;
+        int maxLayerId = -1;
+        BucketEntities(world, buckets, maxLayerId);
+
+        // ============================================================
+        // MULTI-VIEWPORT RENDERING (if viewports registered)
+        // ============================================================
+        if (!m_viewports.empty()) {
+            for (auto& vp : m_viewports) {
+                if (!vp.Active || !vp.Camera) continue;
+                if (vp.Size.x <= 0 || vp.Size.y <= 0) continue;
+
+                glm::mat4 view = vp.Camera->GetViewMatrix();
+                glm::mat4 proj = vp.Camera->GetProjectionMatrix();
+                glm::mat4 viewProj = proj * view;
+
+                float orthoSize = vp.Camera->OrthoSize;
+                float zoomScale = kReferenceOrthoSize / orthoSize;
+                float bloomRadius = (kDesiredBloomWorldSpread / kReferenceOrthoSize)
+                    * (vp.Size.y / 2.0f) * zoomScale;
+
+                RenderSceneToHDR(world, vp, viewProj, buckets, maxLayerId);
+                RenderBloom(vp, bloomRadius);
+                ToneMap(vp);
+                RenderWireframes(vp, viewProj);
+                RenderGUI(vp);
+                RenderPicking(world, vp, viewProj, buckets);
+            }
+
+            m_wireframeQueue.clear();
+            m_guiPanelQueue.clear();
+            m_guiTextQueue.clear();
+
+            Framebuffer::Unbind();
+            return;  // EXIT HERE - skip RenderGraph path
+        }
+
+        // ============================================================
+        // FALLBACK: Original RenderGraph path (unchanged for backwards compatibility)
+        // ============================================================
+
+        glm::mat4 view = glm::mat4(1.0f);
+        glm::mat4 projection = glm::mat4(1.0f);
+        m_cameraOrthoSize = kReferenceOrthoSize;
+
+        GetCameraMatrices(world, view, projection, m_cameraOrthoSize);
+
         const float bloomBufferHeight = static_cast<float>(win->GetHeight()) / 2.0f;
-
-        // How zoomed in we are relative to the default ortho size
         const float zoomScale = kReferenceOrthoSize / m_cameraOrthoSize;
-
-        // Convert desired world-space bloom spread to texel space
         const float bloomRadiusTexels =
             (kDesiredBloomWorldSpread / kReferenceOrthoSize) *
             bloomBufferHeight * zoomScale;
 
-        // We only send (Projection * View) here instead of the full (Projection * View * Model)
-        // because each sprite/shape's model transform (position, rotation, scale) is already
-        // baked into its vertex positions on the CPU during batching. By the time vertices
-        // reach the GPU, they are in world space, so the shader only needs to transform them
-        // into camera (view) space and then into clip space.
         const glm::mat4 viewProj = projection * view;
 
-        // ============================================================
-        // LIGHT COLLECTION (per-frame) - using Components::Light2D
-        // ============================================================
-        m_lightManager.BeginFrame();
-
-        // Policy: if multiple directional lights exist, keep the LAST one encountered.
-        // (If you want "first wins", just guard with if (!m_lightManager.HasDirectionalLight()) ...)
-        world.Each<Components::LocalTransform, Components::Light2D>(
-            [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l)
-            {
-                // Skip inactive
-                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
-                    return;
-
-                // Use render/world transform if you want lights to follow hierarchy.
-                // Otherwise, lt.Position is fine.
-                Vector3D position, scale;
-                Quaternion rotation;
-                GetRenderTransform(world, e, lt, position, rotation, scale);
-
-                // Color: use your existing conversion style.
-                // Our color use floating point representation [0,1], so DON'T divide by 255 here
-                // If Color is actually 0..255, then use /255.0f 
-                glm::vec3 color = glm::vec3(ToGlm(l.Color));
-
-                if (l.LightType == Components::Light2D::Type::Directional) {
-                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
-                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
-                    dir = glm::normalize(dir);
-
-                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
-                }
-
-                else { // Point
-                    // Decide how we want position:
-                    // Option A: entity transform is the light position
-                    glm::vec3 worldPos(position.X, position.Y, position.Z);
-
-                    // Option B: add l.Position as a local offset
-                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
-
-                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
-                }
-            });
-
-        m_lightManager.Upload();
-
-        // Collect entities that have LocalTransform + Layer for layered rendering
-        // Determine max layer id present this frame (for bucket sizing)
-        int maxLayerId = -1;
-        world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer& ly) {
-            maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
-            });
-
-        // Render per-layer from LayerManager's DrawOrder()
-        // Single-pass collection: bucket entities by layer then process each
-        std::vector<std::vector<ECS::Entity>> buckets;
-        buckets.resize(std::max(1, maxLayerId + 1));
-
-        // Collect entities that have LocalTransform + Layer
-        world.Each<Components::LocalTransform, Components::Layer>([&](const ECS::Entity entity, Components::LocalTransform& lt, const Components::Layer& ly){
-            (void)lt;
-        	const uint16_t lid = ly.Id;
-            if (lid < buckets.size())
-                buckets[lid].push_back(entity);
-            });
+        // NOTE: we remove the duplicate light collection and entity bucketing
+        // since we now do it above. The RenderGraph passes can use the
+        // already-populated `buckets` and `maxLayerId` variables.
 
         // Reusable temporary buffers to avoid per-entity allocations
         std::vector<glm::vec2> transformedCorners;
@@ -583,12 +538,29 @@ namespace ECS {
                     // ===============================
                     if (m_debugTileMap && m_debugTileset)
                     {
+                        // Backward-compatible single debug tilemap path.
                         TileMapRenderer tileRenderer;
+                        const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
                         tileRenderer.Submit(
-                            *m_debugTileMap,
-                            *m_debugTileset,
-                            *m_renderer
+                            m_debugTileMap->get(),
+                            tilesets,
+                            *m_renderer,
+                            m_debugTileMapOffset
                         );
+                    }
+
+                    if (!m_debugTileMaps.empty())
+                    {
+                        // Render all tilemaps requested by the editor.
+                        TileMapRenderer tileRenderer;
+                        for (const auto& entry : m_debugTileMaps) {
+                            tileRenderer.Submit(
+                                entry.Map.get(),
+                                entry.Tilesets,
+                                *m_renderer,
+                                entry.Offset
+                            );
+                        }
                     }
 
                     for (ECS::Entity entity : list) {
@@ -678,7 +650,7 @@ namespace ECS {
                             float smoothness = 0.5f;
                             float aoStrength = 1.0f;
                             float normalStrength = 1.0f;
-							float flags = 0.0f;
+                            uint32_t flags = 0;
 
                             if (world.Has<Components::Material2D>(entity)) {
                                 const auto& mat = world.Get<Components::Material2D>(entity);
@@ -712,7 +684,7 @@ namespace ECS {
                                 smoothness,         // Material2D: smoothness value
                                 aoStrength,         // Material2D: AO strength
                                 normalStrength,     // Material2D: normal strength
-                                static_cast<uint32_t>(flags)
+                                flags
                                 });
                         }
                     }
@@ -1095,8 +1067,8 @@ namespace ECS {
         m_renderGraph->AddPass("Wireframe", { "LDR" }, { "LDR" },
             [this, &viewProj](ResourceAccessor& res)
             {
-                // Skip if no wireframes queued
-                if (m_wireframeQueue.empty()) return;
+                // Skip if nothing is queued for overlays or wireframes
+                if (m_wireframeQueue.empty() && m_overlayQuadQueue.empty()) return;
 
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
@@ -1108,6 +1080,30 @@ namespace ECS {
                 GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                // Process all queued overlay quads (textured previews, etc.)
+                if (!m_overlayQuadQueue.empty()) {
+                    if (m_shader) {
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", viewProj);
+                        m_shader->setUniform("uPicking", 0);
+                        m_shader->setUniform("uLightingEnabled", 0);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& quad : m_overlayQuadQueue) {
+                        m_renderer->submitQuad(
+                            quad.center,
+                            quad.size,
+                            quad.textureId,
+                            quad.uvRect,
+                            quad.color,
+                            quad.rotation,
+                            1.0f,
+                            0
+                        );
+                    }
+                    m_renderer->endFrame();
+                }
 
                 // Process all queued wireframe submissions
                 for (const auto& sub : m_wireframeQueue) {
@@ -1234,7 +1230,8 @@ namespace ECS {
 
                 m_renderer->endFrame();
 
-                // Clear wireframe queue for next frame
+                // Clear overlay/wireframe queues for next frame
+                m_overlayQuadQueue.clear();
                 m_wireframeQueue.clear();
 
                 // Restore blend state
@@ -1409,6 +1406,557 @@ namespace ECS {
         m_lightManager.Shutdown();
     }
 
+    // ====================================================================
+    // Viewport Management Implementation
+    // ====================================================================
+
+    void RendererSystem::AddViewport(const std::string& name, Engine::Camera* camera, int w, int h) {
+        // Check if viewport already exists
+        for (auto& vp : m_viewports) {
+            if (vp.Name == name) {
+                vp.Camera = camera;
+                ResizeViewport(name, w, h);
+                return;
+            }
+        }
+
+        Viewport vp;
+        vp.Name = name;
+        vp.Camera = camera;
+        vp.Size = { std::max(1, w), std::max(1, h) };
+        vp.Active = true;
+
+        // Create per-viewport FBOs
+        vp.HDR = std::make_unique<Framebuffer>();
+        vp.HDR->Create(vp.Size.x, vp.Size.y, true, true, 1);
+
+        vp.LDR = std::make_unique<Framebuffer>();
+        vp.LDR->Create(vp.Size.x, vp.Size.y, false, false, 1);
+
+        vp.BloomExtract = std::make_unique<Framebuffer>();
+        vp.BloomExtract->Create(vp.Size.x / 2, vp.Size.y / 2, true, false, 1);
+
+        vp.BloomBlur = std::make_unique<Framebuffer>();
+        vp.BloomBlur->Create(vp.Size.x / 2, vp.Size.y / 2, true, false, 1);
+
+        vp.PickingFBO = std::make_unique<Framebuffer>();
+        vp.PickingFBO->Create(vp.Size.x, vp.Size.y, false, false, 1);
+
+        m_viewports.push_back(std::move(vp));
+
+        LOG_DEBUG("[Viewport] Created '" << name << "' (" << w << "x" << h << ")");
+    }
+
+    void RendererSystem::RemoveViewport(const std::string& name) {
+        m_viewports.erase(
+            std::remove_if(m_viewports.begin(), m_viewports.end(),
+                [&](const Viewport& vp) { return vp.Name == name; }),
+            m_viewports.end());
+
+        LOG_DEBUG("[Viewport] Removed '" << name << "'");
+    }
+
+    void RendererSystem::ResizeViewport(const std::string& name, int w, int h) {
+        Viewport* vp = GetViewport(name);
+        if (!vp) return;
+
+        w = std::max(1, w);
+        h = std::max(1, h);
+
+        if (vp->Size.x == w && vp->Size.y == h) return;
+
+        vp->Size = { w, h };
+
+        vp->HDR->Resize(w, h, true, true);
+        vp->LDR->Resize(w, h, false, false);
+        vp->BloomExtract->Resize(w / 2, h / 2, true, false);
+        vp->BloomBlur->Resize(w / 2, h / 2, true, false);
+        vp->PickingFBO->Resize(w, h, false, false);
+
+        LOG_DEBUG("[Viewport] Resized '" << name << "' to " << w << "x" << h);
+    }
+
+    void RendererSystem::SetViewportCamera(const std::string& name, Engine::Camera* camera) {
+        if (Viewport* vp = GetViewport(name))
+            vp->Camera = camera;
+    }
+
+    RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
+        for (auto& vp : m_viewports)
+            if (vp.Name == name) return &vp;
+        return nullptr;
+    }
+
+    GLuint RendererSystem::GetViewportTexture(const std::string& name) const {
+        for (const auto& vp : m_viewports)
+            if (vp.Name == name && vp.LDR)
+                return vp.LDR->GetColorTexture(0);
+        return 0;
+    }
+
+    // ====================================================================
+// Extracted Render Helpers
+// ====================================================================
+
+    void RendererSystem::CollectLights(World& world) {
+        m_lightManager.BeginFrame();
+
+        world.Each<Components::LocalTransform, Components::Light2D>(
+            [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
+                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
+                    return;
+
+                Vector3D position, scale;
+                Quaternion rotation;
+                GetRenderTransform(world, e, lt, position, rotation, scale);
+
+                glm::vec3 color = glm::vec3(ToGlm(l.Color));
+
+                if (l.LightType == Components::Light2D::Type::Directional) {
+                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
+                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
+                    dir = glm::normalize(dir);
+                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
+                }
+                else {
+                    glm::vec3 worldPos(position.X, position.Y, position.Z);
+                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
+                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
+                }
+            });
+
+        m_lightManager.Upload();
+    }
+
+    void RendererSystem::BucketEntities(World& world,
+        std::vector<std::vector<Entity>>& buckets,
+        int& maxLayerId) {
+        maxLayerId = -1;
+        world.Each<Components::Layer>([&](Entity, const Components::Layer& ly) {
+            maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
+            });
+
+        buckets.clear();
+        buckets.resize(std::max(1, maxLayerId + 1));
+
+        world.Each<Components::LocalTransform, Components::Layer>(
+            [&](Entity entity, Components::LocalTransform&, const Components::Layer& ly) {
+                if (ly.Id < buckets.size())
+                    buckets[ly.Id].push_back(entity);
+            });
+    }
+
+    void RendererSystem::RenderBloom(Viewport& vp, float bloomRadius) {
+        // Extract
+        vp.BloomExtract->BindAndClear(0, 0, 0, 1);
+        glViewport(0, 0, vp.BloomExtract->Width(), vp.BloomExtract->Height());
+        m_bloomExtractShader->use();
+        m_bloomExtractShader->setUniform("uThreshold", 1.1f);
+        m_bloomExtractShader->setUniform("uScene", 0);
+        vp.HDR->BindColorTexture(0);
+        m_renderer->drawFullscreenQuad();
+
+        // Blur Horizontal
+        vp.BloomBlur->BindAndClear(0, 0, 0, 1);
+        glViewport(0, 0, vp.BloomBlur->Width(), vp.BloomBlur->Height());
+        m_bloomBlurShader->use();
+        m_bloomBlurShader->setUniform("uHorizontal", 1);
+        m_bloomBlurShader->setUniform("uImage", 0);
+        m_bloomBlurShader->setUniform("uRadius", bloomRadius);
+        m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadius * 0.6f)));
+        m_bloomBlurShader->setUniform("uFalloff", 0.15f);
+        vp.BloomExtract->BindColorTexture(0);
+        m_renderer->drawFullscreenQuad();
+
+        // Blur Vertical
+        vp.BloomExtract->BindAndClear(0, 0, 0, 1);
+        m_bloomBlurShader->setUniform("uHorizontal", 0);
+        vp.BloomBlur->BindColorTexture(0);
+        m_renderer->drawFullscreenQuad();
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::ToneMap(Viewport& vp) {
+        vp.LDR->BindAndClear(0, 0, 0, 1);
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+
+        m_bloomCombineShader->use();
+        m_bloomCombineShader->setUniform("uScene", 0);
+        m_bloomCombineShader->setUniform("uBloomBlur", 1);
+        m_bloomCombineShader->setUniform("uExposure", 1.3f);
+        m_bloomCombineShader->setUniform("uBloomStrength", 5.2f);
+        m_bloomCombineShader->setUniform("uGamma", 1.5f);
+
+        vp.HDR->BindColorTexture(0, 0);
+        vp.BloomExtract->BindColorTexture(0, 1);
+        m_renderer->drawFullscreenQuad();
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
+        const std::vector<std::vector<Entity>>& buckets,
+        int maxLayerId) {
+        vp.HDR->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+
+        auto* layerManager = world.GetLayerManager();
+        std::vector<uint16_t> renderOrder;
+        if (layerManager) {
+            renderOrder = layerManager->DrawOrder();
+        }
+        else {
+            for (int layer = 0; layer <= maxLayerId; ++layer)
+                renderOrder.push_back(static_cast<uint16_t>(layer));
+        }
+
+        std::vector<glm::vec2> transformedCorners;
+
+        for (uint16_t layerId : renderOrder) {
+            if (layerManager) {
+                const auto& layerData = layerManager->Get(layerId);
+                if (!layerData.renderEnabled || !layerData.editorVisible) continue;
+            }
+
+            int layer = static_cast<int>(layerId);
+            if (layer >= static_cast<int>(buckets.size())) continue;
+
+            auto list = buckets[layer];
+            std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
+                int za = 0, zb = 0;
+                if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
+                if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                if (za != zb) return za < zb;
+                return A.Index < B.Index;
+                });
+
+            // SDF circles
+            m_sdfCircleShader->use();
+            m_sdfCircleShader->setMat4("uViewProj", viewProj);
+            m_sdfCircleShader->setUniform("uStrokePx", 0.0f);
+            m_sdfCircleShader->setUniform("uUseOverrideColor", 0);
+            m_renderer->beginFrame();
+
+            for (Entity entity : list) {
+                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                const auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position, scale; Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                DebugDraw2D::Circle(*m_renderer,
+                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
+                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
+                    ToGlm(sc.Color),
+                    sc.Filled ? 0.0f : sc.Thickness, 0);
+            }
+            m_renderer->endFrame();
+
+            // Everything else
+            m_shader->use();
+            m_shader->setMat4("uViewProj", viewProj);
+            m_shader->setUniform("uPicking", 0);
+            m_shader->setUniform("uLightingEnabled", 1);
+            m_lightManager.Bind(*m_shader);
+            m_renderer->beginFrame();
+
+            // Tilemap
+            if (m_debugTileMap && m_debugTileset) {
+                TileMapRenderer tileRenderer;
+           
+                // Wrap the debug tileset into a vector, since Submit expects multiple tilesets
+                const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
+
+				// Submit the debug tilemap for rendering
+                tileRenderer.Submit(*m_debugTileMap, tilesets, *m_renderer, m_debugTileMapOffset);
+            }
+
+			// Render all other tilemaps stored in m_debugTileMaps
+            if (!m_debugTileMaps.empty()) {
+                TileMapRenderer tileRenderer;
+				// Same thing here, but for multiple tilemaps
+                for (const auto& entry : m_debugTileMaps) {
+                    tileRenderer.Submit(entry.Map.get(), entry.Tilesets, *m_renderer, entry.Offset);
+                }
+            }
+
+            for (Entity entity : list) {
+                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position, scale; Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                // Boxes
+                if (world.Has<Components::ShapeBox2D>(entity)) {
+                    const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+                    const float rotationAngle = 2.0f * std::acos(rotation.W);
+                    const bool hasRotation = std::abs(rotationAngle) > 0.01f;
+
+                    if (!hasRotation) {
+                        const glm::vec2 halfExtents = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
+                        const glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
+                        const glm::vec2 min = center - halfExtents;
+                        const glm::vec2 max = center + halfExtents;
+                        if (sb.Filled) DebugDraw2D::RectFill(*m_renderer, min, max, ToGlm(sb.Color), 0);
+                        else DebugDraw2D::RectStroke(*m_renderer, min, max, sb.Thickness, ToGlm(sb.Color), 0);
+                    }
+                    else {
+                        const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                        transformedCorners.clear();
+                        const Vector2D he = sb.HalfExtents;
+                        const Vector3D corners[4] = { {-he.X,-he.Y,0},{he.X,-he.Y,0},{he.X,he.Y,0},{-he.X,he.Y,0} };
+                        for (auto c : corners) {
+                            const Vector4D hc = m * Vector4D{ c.X, c.Y, c.Z, 1.0f };
+                            transformedCorners.push_back(ToGlm(Vector2D{ hc.X, hc.Y }) + ToGlm(sb.Offset));
+                        }
+                        if (sb.Filled) DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
+                        else for (int i = 0; i < 4; ++i)
+                            DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
+                    }
+                }
+
+                // Lines
+                if (world.Has<Components::ShapeLine2D>(entity)) {
+                    const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                    const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                    const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
+                    const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
+                    DebugDraw2D::Line(*m_renderer, ToGlm(Vector2D{ worldA.X, worldA.Y }), ToGlm(Vector2D{ worldB.X, worldB.Y }), sl.Thickness, ToGlm(sl.Color), 0);
+                }
+
+                // Sprites
+                if (world.Has<Components::SpriteRenderer2D>(entity)) {
+                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                    const float angleZ = std::atan2(
+                        2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
+                        1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
+
+                    GLuint normalTexId = 0, mraTexId = 0;
+                      float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
+                      uint32_t flags = 0;
+
+                    if (world.Has<Components::Material2D>(entity)) {
+                        const auto& mat = world.Get<Components::Material2D>(entity);
+                        normalTexId = mat.NormalTextureId;
+                        mraTexId = mat.MRA_TextureId;
+                        metallic = mat.Metallic;
+                        smoothness = mat.Smoothness;
+                        aoStrength = mat.AOStrength;
+                        normalStrength = mat.NormalStrength;
+                          flags = mat.Flags;
+                        if (normalTexId == 0) normalTexId = sr.NormalTextureId;
+                    }
+
+                    m_renderer->submitSprite({
+                        ToGlm(Vector2D{position.X, position.Y}),
+                        ToGlm(Vector2D{scale.X, scale.Y}),
+                        {sr.Offset.X, sr.Offset.Y, sr.Offset.X + sr.Tiling.X, sr.Offset.Y + sr.Tiling.Y},
+                        ToGlm(sr.Color), sr.TextureId, angleZ, 1.0f,
+                        sr.EmissiveTextureId, sr.EmissiveStrength, sr.Width, sr.Height,
+                        normalTexId, mraTexId, metallic, smoothness, aoStrength, normalStrength,
+                          flags
+                          });
+                }
+            }
+            m_renderer->endFrame();
+        }
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderWireframes(Viewport& vp, const glm::mat4& viewProj) {
+        if (m_wireframeQueue.empty()) return;
+
+        vp.LDR->Bind();
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        for (const auto& sub : m_wireframeQueue) {
+            if (sub.type == WireframeSubmission::Type::Circle) {
+                m_sdfCircleShader->use();
+                m_sdfCircleShader->setMat4("uViewProj", viewProj);
+                m_sdfCircleShader->setUniform("uPicking", 0);
+                m_renderer->beginFrame();
+                DebugDraw2D::Circle(*m_renderer, sub.center, sub.radius, sub.color, sub.filled ? 0.0f : sub.thickness, 0);
+                m_renderer->endFrame();
+            }
+            else {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+                m_renderer->beginFrame();
+
+                if (sub.type == WireframeSubmission::Type::Quad && sub.vertices.size() == 4) {
+                    if (sub.filled) DebugDraw2D::RectFill(*m_renderer, sub.vertices[0], sub.vertices[2], sub.color, 0);
+                    else DebugDraw2D::RectStroke(*m_renderer, sub.vertices[0], sub.vertices[2], sub.thickness, sub.color, 0);
+                }
+                else if (sub.type == WireframeSubmission::Type::Line && sub.vertices.size() == 2) {
+                    DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1], sub.thickness, sub.color, 0);
+                }
+                else if (sub.type == WireframeSubmission::Type::Polygon && sub.vertices.size() >= 2) {
+                    if (sub.filled && sub.vertices.size() >= 3) DebugDraw2D::Polygon(*m_renderer, sub.vertices, sub.color, 0);
+                    else for (size_t i = 0; i < sub.vertices.size(); ++i) {
+                        size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
+                        if (next < sub.vertices.size())
+                            DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next], sub.thickness, sub.color, 0);
+                    }
+                }
+                m_renderer->endFrame();
+            }
+        }
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderGUI(Viewport& vp) {
+        if (m_guiPanelQueue.empty() && m_guiTextQueue.empty()) return;
+
+        vp.LDR->Bind();
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        const float w = static_cast<float>(vp.Size.x);
+        const float h = static_cast<float>(vp.Size.y);
+        glm::mat4 screenOrtho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
+
+        // Panels
+        if (!m_guiPanelQueue.empty()) {
+            m_shader->use();
+            m_shader->setMat4("uViewProj", screenOrtho);
+            m_shader->setUniform("uLightingEnabled", 0);
+            m_renderer->beginFrame();
+            for (const auto& panel : m_guiPanelQueue) {
+                glm::vec2 center(panel.position.X + panel.size.X * 0.5f, panel.position.Y + panel.size.Y * 0.5f);
+                glm::vec2 size(panel.size.X, panel.size.Y);
+                glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                m_renderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Text
+        if (!m_guiTextQueue.empty()) {
+            glm::mat4 textOrtho = glm::ortho(0.0f, w, 0.0f, h, -1.0f, 1.0f);
+            m_textShader->use();
+            m_textShader->setMat4("uProjection", textOrtho);
+            m_renderer->beginFrame();
+            for (const auto& text : m_guiTextQueue) {
+                if (text.text.empty()) continue;
+                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
+                if (!font) continue;
+                glm::vec2 pos(text.position.X, h - text.position.Y);
+                glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                m_renderer->submitText(*font, text.text, pos, color, text.pixelSize);
+            }
+            m_renderer->endFrame();
+        }
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
+        const std::vector<std::vector<Entity>>& buckets) {
+        // Only run if there are pending pick requests
+        if (m_pendingPickRequests.empty() && !m_currentPickRequest.has_value() && !m_inFlightPick.has_value())
+            return;
+
+        // Process in-flight pick from last frame
+        if (m_inFlightPick.has_value()) {
+            const int idx = m_inFlightPick->PBOIndex;
+            if (idx >= 0 && idx < 2) {
+                m_pbos[idx].Bind(GL_PIXEL_PACK_BUFFER);
+                void* mapped = m_pbos[idx].Map(GL_READ_ONLY);
+                if (mapped) {
+                    uint8_t* bytes = static_cast<uint8_t*>(mapped);
+                    uint32_t encoded = (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16);
+                    uint32_t pickedEntity = (encoded == 0) ? INVALID_ENTITY_ID : (encoded - 1);
+                    m_completedPickResults[m_inFlightPick->RequestId] = pickedEntity;
+                    m_pbos[idx].Unmap();
+                }
+                m_pbos[idx].Unbind(GL_PIXEL_PACK_BUFFER);
+            }
+            m_inFlightPick.reset();
+        }
+
+        // Dequeue next request
+        if (!m_currentPickRequest.has_value() && !m_pendingPickRequests.empty()) {
+            m_currentPickRequest = m_pendingPickRequests.front();
+            m_pendingPickRequests.pop();
+        }
+
+        if (!m_currentPickRequest.has_value()) return;
+
+        // Resize picking FBO if needed
+        if (vp.PickingFBO->Width() != vp.Size.x || vp.PickingFBO->Height() != vp.Size.y)
+            vp.PickingFBO->Resize(vp.Size.x, vp.Size.y, false, false);
+
+        vp.PickingFBO->BindAndClear(0, 0, 0, 1);
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+        glDisable(GL_BLEND);
+
+        // Render entities with ID colors (simplified - just sprites/boxes)
+        m_shader->use();
+        m_shader->setMat4("uViewProj", viewProj);
+        m_shader->setUniform("uPicking", 1);
+        m_shader->setUniform("uLightingEnabled", 0);
+        m_renderer->beginFrame();
+
+        for (const auto& bucket : buckets) {
+            for (Entity entity : bucket) {
+                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+
+                uint32_t id = entity.Index + 1;
+                glm::vec4 idColor(((id >> 0) & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f);
+
+                const auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position, scale; Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                if (world.Has<Components::SpriteRenderer2D>(entity)) {
+                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                    float angleZ = std::atan2(2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
+                        1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
+                    m_renderer->submitSprite({ ToGlm(Vector2D{position.X, position.Y}), ToGlm(Vector2D{scale.X, scale.Y}),
+                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f, 0, 0.0f });
+                }
+
+                if (world.Has<Components::ShapeBox2D>(entity)) {
+                    const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+                    glm::vec2 he = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
+                    glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
+                    DebugDraw2D::RectFill(*m_renderer, center - he, center + he, idColor, static_cast<GLuint>(-1));
+                }
+            }
+        }
+        m_renderer->endFrame();
+
+        // Read pixel (convert screen coords to local viewport coords)
+        const float localX = m_currentPickRequest->ScreenX - m_currentPickRequest->ViewportPos.x;
+        const float localY = m_currentPickRequest->ScreenY - m_currentPickRequest->ViewportPos.y;
+        int readX = glm::clamp(static_cast<int>(localX), 0, vp.Size.x - 1);
+        int readY = glm::clamp(static_cast<int>(vp.Size.y - localY - 1), 0, vp.Size.y - 1);
+
+        m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
+        glReadPixels(readX, readY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
+
+        m_inFlightPick = InFlightPick{ m_currentPickRequest->RequestId, m_currentPBO };
+        m_currentPickRequest.reset();
+        m_currentPBO = 1 - m_currentPBO;
+
+        glEnable(GL_BLEND);
+        Framebuffer::Unbind();
+    }
+
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
         // Check if within viewport bounds
         if (screenX < viewportPos.x || screenX >= (viewportPos.x + viewportSize.x) ||
@@ -1459,6 +2007,25 @@ namespace ECS {
         sub.thickness = thickness;
         sub.closed = true;
         sub.filled = false;
+        m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
+                                          const glm::vec4& color) {
+        if (!m_renderer) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Quad;
+        sub.vertices = {
+            { min.x, min.y },
+            { max.x, min.y },
+            { max.x, max.y },
+            { min.x, max.y }
+        };
+        sub.color = color;
+        sub.thickness = 0.0f;
+        sub.closed = true;
+        sub.filled = true;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1523,6 +2090,24 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    void RendererSystem::SubmitOverlayQuad(const glm::vec2& center,
+                                           const glm::vec2& size,
+                                           GLuint textureId,
+                                           const glm::vec4& uvRect,
+                                           const glm::vec4& color,
+                                           float rotation) {
+        if (!m_renderer) return;
+
+        OverlayQuadSubmission sub;
+        sub.center = center;
+        sub.size = size;
+        sub.textureId = textureId;
+        sub.uvRect = uvRect;
+        sub.color = color;
+        sub.rotation = rotation;
+        m_overlayQuadQueue.push_back(sub);
+    }
+
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                                         const Color& color, float cornerRadius) {
         (void)cornerRadius;
@@ -1550,7 +2135,7 @@ namespace ECS {
     }
 
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
-                                                  const glm::vec4& color) {
+        const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
             return;
         }
@@ -1578,12 +2163,12 @@ namespace ECS {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
-        };
+            };
 
         // Render 2D Box Collider
         if (world.Has<ECS::Components::BoxCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
-        
+
             // Compute box corners
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
@@ -1616,13 +2201,13 @@ namespace ECS {
         // Render 2D Circle Collider - render as polygon for accuracy
         if (world.Has<ECS::Components::CircleCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::CircleCollider2D>(entity);
-        
+
             // Compute circle center and radius
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
             const glm::vec2 center = worldPos2D + rotatedOffset;
             const float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
-        
+
             // Submit as filled circle
             WireframeSubmission sub;
             sub.type = WireframeSubmission::Type::Circle;
@@ -1636,15 +2221,27 @@ namespace ECS {
         }
     }
 
-    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)
+    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset)
     {
         m_debugTileMap = map;
         m_debugTileset = tileset;
+        m_debugTileMapOffset = worldOffset;
+    }
+
+    void RendererSystem::SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps)
+    {
+        m_debugTileMaps = maps; // Store references to editor-owned tilemaps for this frame.
     }
 
     void RendererSystem::ClearDebugTileMap()
     {
         m_debugTileMap.reset();
         m_debugTileset.reset();
+        m_debugTileMapOffset = glm::vec2(0.0f, 0.0f);
+    }
+
+    void RendererSystem::ClearDebugTileMaps()
+    {
+        m_debugTileMaps.clear(); // Clear multi-tilemap debug rendering state.
     }
 }
