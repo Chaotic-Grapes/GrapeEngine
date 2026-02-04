@@ -1537,7 +1537,7 @@ namespace ECS {
     }
 
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
-                                                  const glm::vec4& color) {
+        const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
             return;
         }
@@ -1565,12 +1565,12 @@ namespace ECS {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
-        };
+            };
 
         // Render 2D Box Collider
         if (world.Has<ECS::Components::BoxCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
-        
+
             // Compute box corners
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
@@ -1603,13 +1603,13 @@ namespace ECS {
         // Render 2D Circle Collider - render as polygon for accuracy
         if (world.Has<ECS::Components::CircleCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::CircleCollider2D>(entity);
-        
+
             // Compute circle center and radius
             const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
             const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
             const glm::vec2 center = worldPos2D + rotatedOffset;
             const float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
-        
+
             // Submit as filled circle
             WireframeSubmission sub;
             sub.type = WireframeSubmission::Type::Circle;
@@ -1621,259 +1621,6 @@ namespace ECS {
             sub.filled = true;
             m_wireframeQueue.push_back(sub);
         }
-    }
-
-    // ========================================================================
-    // GUI Rendering APIs
-    // ========================================================================
-
-    void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                                       const Color& color, float cornerRadius) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Panel;
-        submission.position = position;
-        submission.size = size;
-        submission.color = color;
-        submission.cornerRadius = cornerRadius;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUIText(const std::string& fontPath, const std::string& text,
-                                      const Vector2D& position, const Color& color,
-                                      float fontSize, const Color& shadowColor,
-                                      const Vector2D& shadowOffset) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Text;
-        submission.fontPath = fontPath;
-        submission.text = text;
-        submission.position = position;
-        submission.color = color;
-        submission.fontSize = fontSize;
-        submission.shadowColor = shadowColor;
-        submission.shadowOffset = shadowOffset;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUISlider(const Vector2D& position, const Vector2D& size,
-                                        float value, const Color& backgroundColor,
-                                        const Color& handleColor, const Color& borderColor,
-                                        float borderRadius) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Slider;
-        submission.position = position;
-        submission.size = size;
-        submission.value = value;
-        submission.color = backgroundColor;
-        submission.secondaryColor = handleColor;
-        submission.borderColor = borderColor;
-        submission.cornerRadius = borderRadius;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUICheckbox(const Vector2D& position, const Vector2D& size,
-                                          bool checked, const Color& boxColor,
-                                          const Color& checkColor, const Color& borderColor) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Checkbox;
-        submission.position = position;
-        submission.size = size;
-        submission.checked = checked;
-        submission.color = boxColor;
-        submission.secondaryColor = checkColor;
-        submission.borderColor = borderColor;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
-                                      const Color& color, float thickness) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Line;
-        submission.startPos = startPos;
-        submission.endPos = endPos;
-        submission.color = color;
-        submission.thickness = thickness;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    // ========================================================================
-    // Internal: Process GUI Submissions
-    // ========================================================================
-
-    void RendererSystem::ProcessGUISubmissions() {
-        if (!m_renderer) return;
-
-        for (const auto& submission : m_guiSubmissionQueue) {
-            if (submission.type == GUISubmission::Type::Panel) {
-                ProcessGUIPanel(submission);
-            } else if (submission.type == GUISubmission::Type::Text) {
-                ProcessGUIText(submission);
-            } else if (submission.type == GUISubmission::Type::Slider) {
-                ProcessGUISlider(submission);
-            } else if (submission.type == GUISubmission::Type::Checkbox) {
-                ProcessGUICheckbox(submission);
-            } else if (submission.type == GUISubmission::Type::Line) {
-                ProcessGUILine(submission);
-            }
-        }
-
-        m_guiSubmissionQueue.clear();
-    }
-
-    void RendererSystem::ProcessGUIPanel(const GUISubmission& submission) {
-        // Convert engine types to GLM
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 glmColor(submission.color.R, submission.color.G,
-                          submission.color.B, submission.color.A);
-
-        // Submit quad representing the panel (no texture)
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0; // no texture (solid color)
-        m_renderer->submitQuad(glmPos, glmSize, textureId, uvRect, glmColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-    }
-
-    void RendererSystem::ProcessGUIText(const GUISubmission& submission) {
-        if (!m_textShader || !m_renderer) return;
-
-        std::string fontPath = submission.fontPath;
-        
-        // Use ResourceManager to get the font (using 96px for high quality SDF)
-        auto font = RM.GetFont(fontPath, 96);
-
-        if (!font) {
-            // Error already logged by RM
-            return;
-        }
-
-        // Use text shader for SDF rendering
-        m_textShader->use();
-
-        // Convert color from 0-255 to 0.0-1.0
-        glm::vec4 glmColor(
-            submission.color.R,
-            submission.color.G,
-            submission.color.B,
-            submission.color.A
-        );
-
-        // Screen-space position
-        glm::vec2 screenPos(submission.position.X, submission.position.Y);
-
-        // Submit text to renderer for SDF rendering
-        // The renderer's submitText handles font geometry generation and batching
-        m_renderer->submitText(
-            *font,
-            submission.text,
-            screenPos,
-            glmColor,
-            submission.fontSize
-        );
-    }
-
-    void RendererSystem::ProcessGUISlider(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Slider consists of: background track + handle
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 bgColor(submission.color.R, submission.color.G,
-                         submission.color.B, submission.color.A);
-        glm::vec4 handleColor(submission.secondaryColor.R,
-                             submission.secondaryColor.G,
-                             submission.secondaryColor.B,
-                             submission.secondaryColor.A);
-
-        // Draw background track (full width, small height)
-        float trackHeight = glmSize.y * 0.3f; // Track is 30% of slider height
-        glm::vec2 trackPos = glmPos + glm::vec2(0, (glmSize.y - trackHeight) * 0.5f);
-        glm::vec2 trackSize(glmSize.x, trackHeight);
-
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        m_renderer->submitQuad(trackPos, trackSize, textureId, uvRect, bgColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-
-        // Draw handle (circle/rounded rect at value position)
-        float handleWidth = glmSize.y * 0.8f; // Handle width = slider height * 0.8
-        float handleX = glmPos.x + (glmSize.x - handleWidth) * submission.value;
-        glm::vec2 handlePos(handleX, glmPos.y);
-        glm::vec2 handleSize(handleWidth, glmSize.y);
-
-        m_renderer->submitQuad(handlePos, handleSize, textureId, uvRect, handleColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-    }
-
-    void RendererSystem::ProcessGUICheckbox(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Checkbox consists of: box outline + checkmark if checked
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 boxColor(submission.color.R, submission.color.G,
-                          submission.color.B, submission.color.A);
-        glm::vec4 checkColor(submission.secondaryColor.R,
-                            submission.secondaryColor.G,
-                            submission.secondaryColor.B,
-                            submission.secondaryColor.A);
-
-        // Draw checkbox box
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        m_renderer->submitQuad(glmPos, glmSize, textureId, uvRect, boxColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-
-        // Draw checkmark if checked (as a simple X shape with two diagonal lines)
-        if (submission.checked) {
-            // Simplified: submit small quad in center as checkmark indicator
-            float inset = glmSize.x * 0.2f;
-            glm::vec2 checkPos = glmPos + glm::vec2(inset, inset);
-            glm::vec2 checkSize = glmSize - glm::vec2(inset * 2.0f, inset * 2.0f);
-            m_renderer->submitQuad(checkPos, checkSize, textureId, uvRect, checkColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-        }
-    }
-
-    void RendererSystem::ProcessGUILine(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Convert engine types to GLM
-        glm::vec2 start(submission.startPos.X, submission.startPos.Y);
-        glm::vec2 end(submission.endPos.X, submission.endPos.Y);
-        glm::vec4 color(submission.color.R, submission.color.G,
-                       submission.color.B, submission.color.A);
-
-        // Calculate line direction and perpendicular
-        glm::vec2 direction = glm::normalize(end - start);
-        glm::vec2 perpendicular(-direction.y, direction.x); // Rotate 90 degrees
-
-        // Create a quad that represents the line (like a thick line)
-        glm::vec2 halfThickness = perpendicular * (submission.thickness * 0.5f);
-
-        // Calculate the four corners of the line quad
-        glm::vec2 p1 = start - halfThickness;
-        glm::vec2 p2 = start + halfThickness;
-        glm::vec2 p3 = end + halfThickness;
-        glm::vec2 p4 = end - halfThickness;
-
-        // Submit as a quad (using average position and approximate size)
-        glm::vec2 center = (start + end) * 0.5f;
-        float lineLength = glm::distance(start, end);
-        glm::vec2 size(lineLength, submission.thickness);
-
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        m_renderer->submitQuad(center - size * 0.5f, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
     }
 
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)

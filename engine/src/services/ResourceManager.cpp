@@ -69,6 +69,21 @@ template<>
 std::unordered_map<std::string, std::unordered_set<std::string>>&
 ResourceManager::GetOwnerMap<Font>() { return m_fontOwners; }
 
+// When T = Shader, return shader owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<Shader>() { return m_shaderOwners; }
+
+// When T = PrefabData, return prefab owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<PrefabData>() { return m_prefabOwners; }
+
+// When T = RawData, return raw data owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<RawData>() { return m_rawDataOwners; }
+
 // Generic Get function: handles caching logic for all asset types
 template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     // Get reference to appropriate cache (m_textures or m_audioFiles)
@@ -402,6 +417,9 @@ void ResourceManager::ClearCache() {
     m_textureOwners.clear();
     m_audioOwners.clear();
     m_fontOwners.clear();
+    m_shaderOwners.clear();
+    m_prefabOwners.clear();
+    m_rawDataOwners.clear();
     LOG_INFO("Cleared all cached assets");
 }
 
@@ -437,6 +455,9 @@ void ResourceManager::UnloadAsset(const std::string& name) {
     m_textureOwners.erase(name);
     m_audioOwners.erase(name);
     m_fontOwners.erase(name);
+    m_shaderOwners.erase(name);
+    m_prefabOwners.erase(name);
+    m_rawDataOwners.erase(name);
 
     if (removed) {
         LOG_INFO("Unloaded asset: " << name);
@@ -500,6 +521,9 @@ void ResourceManager::PrintCacheInfo() const {
     dumpOwners("Texture", m_textureOwners);
     dumpOwners("Audio", m_audioOwners);
     dumpOwners("Font", m_fontOwners);
+    dumpOwners("Shader", m_shaderOwners);
+    dumpOwners("Prefab", m_prefabOwners);
+    dumpOwners("RawData", m_rawDataOwners);
 }
 
 // Get cached audio paths for Audio to load in library
@@ -687,6 +711,9 @@ void ResourceManager::UnloadAssetsByOwner(const std::string& ownerTag) {
     removeOwner(m_textureOwners, m_textures);
     removeOwner(m_audioOwners, m_audioFiles);
     removeOwner(m_fontOwners, m_fonts);
+    removeOwner(m_shaderOwners, m_shaders);
+    removeOwner(m_prefabOwners, m_prefabs);
+    removeOwner(m_rawDataOwners, m_rawData);
 }
 
 // Define the global ResourceManager instance

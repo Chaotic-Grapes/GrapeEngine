@@ -164,6 +164,9 @@ private:
     std::unordered_map<std::string, std::unordered_set<std::string>> m_textureOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_audioOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_fontOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_shaderOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_prefabOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_rawDataOwners;
 
     std::string m_ownerTag;
 };
