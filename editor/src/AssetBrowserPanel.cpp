@@ -772,9 +772,16 @@ void AssetBrowserPanel::_loadPrefab() {
                 std::filesystem::path p(m_selectedAsset);
                 std::string normalizedPath = p.lexically_normal().string();
 
-                uint32_t hash = ECS::PrefabManager::ComputeHash(
-                    ECS::PrefabManager::NormalizePath(normalizedPath)
-                );
+                uint32_t hash = 0;
+                ECS::PrefabManager* prefabManager = m_world->GetPrefabManager();
+                if (prefabManager) {
+                    hash = prefabManager->RegisterPrefab(normalizedPath);
+                    prefabManager->TrackInstance(entity, hash);
+                } else {
+                    hash = ECS::PrefabManager::ComputeHash(
+                        ECS::PrefabManager::NormalizePath(normalizedPath)
+                    );
+                }
 
                 ECS::Components::PrefabInstanceMetadata meta;
                 meta.PrefabHash = hash;

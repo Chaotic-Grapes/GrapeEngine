@@ -45,6 +45,63 @@ namespace {
         return id;
     }
 
+    const std::unordered_set<std::string> kImageExtensions = { ".png", ".jpg", ".jpeg" };
+    const std::unordered_set<std::string> kFontExtensions = { ".ttf", ".otf", ".ttc" };
+    const std::unordered_set<std::string> kAudioExtensions = { ".wav", ".ogg", ".mp3", ".flac" };
+
+    std::string GetLowercaseExtension(const std::string& path) {
+        std::string ext = std::filesystem::path(path).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext;
+    }
+
+    bool HandleAssetDragDropTarget(const std::unordered_set<std::string>& allowedExtensions,
+        const std::function<bool(const std::string&)>& onAccepted,
+        const std::function<void(const std::string&)>& onRejected = nullptr) {
+        if (!ImGui::BeginDragDropTarget()) {
+            return false;
+        }
+
+        bool accepted = false;
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            if (droppedPath && *droppedPath) {
+                std::string path(droppedPath);
+                std::string ext = GetLowercaseExtension(path);
+                if (!allowedExtensions.empty() && allowedExtensions.find(ext) == allowedExtensions.end()) {
+                    if (onRejected) {
+                        onRejected(path);
+                    }
+                } else {
+                    accepted = onAccepted(path);
+                }
+            }
+        }
+
+        if (!accepted) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* dataBuf = static_cast<const char*>(payload->Data);
+                const char* end = dataBuf + payload->DataSize;
+                while (dataBuf < end) {
+                    std::string path(dataBuf);
+                    dataBuf += path.size() + 1;
+                    if (path.empty()) {
+                        continue;
+                    }
+                    std::string ext = GetLowercaseExtension(path);
+                    if (!allowedExtensions.empty() && allowedExtensions.find(ext) == allowedExtensions.end()) {
+                        continue;
+                    }
+                    accepted = onAccepted(path);
+                    break;
+                }
+            }
+        }
+
+        ImGui::EndDragDropTarget();
+        return accepted;
+    }
+
     struct ImGuiIdScope {
         explicit ImGuiIdScope(const char* id) {
             ImGui::PushID(id);
@@ -510,68 +567,19 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         data["Height"] = 0;
     }
 
-    // Tracks whether a valid texture was dropped this frame
-    bool dropped = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Payload data is a char buffer containing the file path
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-            // Extract file extension and normalise to lowercase for comparison
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as sprite textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                // Load texture through the resource manager using the dropped path
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    // Store texture ID and path in JSON so renderer can use them
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = droppedPath;
-
-                    // Cache width and height for UV or layout calculations
-                    data["Width"] = tex->Width();
-                    data["Height"] = tex->Height();
-
-                    dropped = true;
-                    LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped texture: " << droppedPath);
-                }
-            }
+    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["TextureId"] = static_cast<uint32_t>(tex->ID());
+            data["TexturePath"] = droppedPath;
+            data["Width"] = tex->Width();
+            data["Height"] = tex->Height();
+            LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
+            return true;
         }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = path;
-                    data["Width"] = tex->Width();
-                    data["Height"] = tex->Height();
-                    dropped = true;
-                    LOG_INFO("Dropped texture: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped texture: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+        LOG_ERROR("Failed to load dropped texture: " << droppedPath);
+        return false;
+    });
 
     // If a valid texture was dropped, show a small success message inline
     if (dropped) {
@@ -585,50 +593,17 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         data["NormalTextureId"] = 0;
         data["NormalTexturePath"] = "";
     }
-    bool droppedNormal = false;
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = droppedPath;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
-                }
-            }
+    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["NormalTexturePath"] = droppedPath;
+            LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
+            return true;
         }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = path;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal map: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal map: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+        LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
+        return false;
+    });
 
     if (droppedNormal) {
         ImGui::SameLine();
@@ -637,72 +612,17 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Emissive map row
     EditorUI::RenderStaticValueRow("Emissive Map", emissiveValueText, emissivePath.empty());
-    bool droppedEmissive = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as emissive textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-
-                // If successful, store texture ID and path in JSON so renderer can use them
-                if (tex) {
-                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["EmissiveTexturePath"] = droppedPath;
-                    droppedEmissive = true;
-                    LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
-                }
-            }
+    const bool droppedEmissive = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["EmissiveTexturePath"] = droppedPath;
+            LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
+            return true;
         }
-
-        // Support multiple paths payloads
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-
-            // Process each path in the payload
-            while (dataBuf < end) {
-                // Extract null-terminated path string
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-
-                // Skip empty paths
-                if (path.empty()) continue;
-
-                // Extract file extension and normalise to lowercase for comparison
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-                // Only accept common image formats as emissive textures
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-
-                // Try to load the texture
-                auto tex = RM.Get<Texture>(path);
-
-                // If successful, store texture ID and path in JSON so renderer can use them
-                if (tex) {
-                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["EmissiveTexturePath"] = path;
-                    droppedEmissive = true;
-                    LOG_INFO("Dropped emissive map: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped emissive map: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+        LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
+        return false;
+    });
 
     if (droppedEmissive) {
         ImGui::SameLine();
@@ -1120,68 +1040,20 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         data["SheetHeight"] = 0;
     }
 
-    // Tracks whether a valid texture was dropped this frame
-    bool dropped = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Payload data is a char buffer containing the file path
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-            // Extract file extension and normalise to lowercase for comparison
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as sprite sheet textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                // Load texture through the resource manager using the dropped path
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    // Store texture ID and path in JSON so renderer can use them
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = droppedPath;
-
-                    // Cache sheet dimensions from the texture
-                    data["SheetWidth"] = tex->Width();
-                    data["SheetHeight"] = tex->Height();
-
-                    dropped = true;
-                    LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
-                }
-            }
+    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["TextureId"] = static_cast<uint32_t>(tex->ID());
+            data["TexturePath"] = droppedPath;
+            data["SheetWidth"] = tex->Width();
+            data["SheetHeight"] = tex->Height();
+            LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
+            return true;
         }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = path;
-                    data["SheetWidth"] = tex->Width();
-                    data["SheetHeight"] = tex->Height();
-                    dropped = true;
-                    LOG_INFO("Dropped sprite sheet: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped sprite sheet: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+        LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
+        return false;
+    });
+    (void)dropped; // suppress for now, could be used for feedback
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
@@ -1189,50 +1061,17 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         data["NormalTextureId"] = 0;
         data["NormalTexturePath"] = "";
     }
-    bool droppedNormal = false;
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = droppedPath;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
-                }
-            }
+    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["NormalTexturePath"] = droppedPath;
+            LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
+            return true;
         }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = path;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal sheet: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal sheet: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+        LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
+        return false;
+    });
 
     if (droppedNormal) {
         ImGui::SameLine();
@@ -1548,36 +1387,10 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
         data["FontPath"] = "";
     }
 
-    if (ImGui::BeginDragDropTarget()) {
-        auto acceptPath = [&](const char* droppedPath) {
-            std::filesystem::path path(droppedPath);
-            std::string ext = path.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext == ".ttf" || ext == ".otf" || ext == ".ttc") {
-                data["FontPath"] = path.string();
-                return true;
-            }
-            return false;
-        };
-
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            const char* droppedPath = static_cast<const char*>(payload->Data);
-            acceptPath(droppedPath);
-        }
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payload->Data);
-            const char* end = dataBuf + payload->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                if (acceptPath(path.c_str())) {
-                    break;
-                }
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
+        data["FontPath"] = droppedPath;
+        return true;
+    });
 
     EditorUI::RenderColorRow("Color", data["Color"]);
     EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
@@ -1675,44 +1488,14 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
 
     // Drag-drop support
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            const char* droppedPath = static_cast<const char*>(payload->Data);
-            std::filesystem::path path(droppedPath);
-
-            std::string ext = path.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
-
-            if (supported) {
-                const auto& clipInfo = lib.Register(path.string());
-                data["CueId"] = clipInfo.Id;
-            }
-            else {
-                s_showUnsupportedPopup = true;
-                s_unsupportedPath = path.string();
-            }
-        }
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payload->Data);
-            const char* end = dataBuf + payload->DataSize;
-            while (dataBuf < end) {
-                std::string pathStr(dataBuf);
-                dataBuf += pathStr.size() + 1;
-                if (pathStr.empty()) continue;
-                std::filesystem::path p(pathStr);
-                std::string ext = p.extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
-                if (!supported) continue;
-                const auto& clipInfo = lib.Register(p.string());
-                data["CueId"] = clipInfo.Id;
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+    HandleAssetDragDropTarget(kAudioExtensions, [&](const std::string& droppedPath) {
+        const auto& clipInfo = lib.Register(droppedPath);
+        data["CueId"] = clipInfo.Id;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        s_showUnsupportedPopup = true;
+        s_unsupportedPath = rejectedPath;
+    });
 
     // Volume + Pitch sliders using EditorUI helpers
     EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
@@ -1880,47 +1663,15 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
         // Render a read-only row displaying the current texture
         EditorUI::RenderStaticValueRow(label, valueText, texPath.empty());
 
-        // Drag-and-drop target for texture assignment
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-                // Extract dropped file path
-                std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-                // Validate file extension
-                auto ext = std::filesystem::path(droppedPath).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-                // Accept only image formats
-                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                    auto tex = RM.Get<Texture>(droppedPath);
-                    if (tex) {
-                        // Store texture ID and path in serialized material data
-                        data[idKey] = static_cast<uint32_t>(tex->ID());
-                        data[pathKey] = droppedPath;
-                    }
-                }
+        HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data[idKey] = static_cast<uint32_t>(tex->ID());
+                data[pathKey] = droppedPath;
+                return true;
             }
-            // Lowkey copied from audio
-            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-                const char* dataBuf = static_cast<const char*>(payLoad->Data);
-                const char* end = dataBuf + payLoad->DataSize;
-                while (dataBuf < end) {
-                    std::string path(dataBuf);
-                    dataBuf += path.size() + 1;
-                    if (path.empty()) continue;
-                    auto ext = std::filesystem::path(path).extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                    auto tex = RM.Get<Texture>(path);
-                    if (tex) {
-                        data[idKey] = static_cast<uint32_t>(tex->ID());
-                        data[pathKey] = path;
-                    }
-                    break; // Only accept the first valid texture
-                }
-            }
-            ImGui::EndDragDropTarget();
-        }
+            return false;
+        });
     };
 
     // Texture slots

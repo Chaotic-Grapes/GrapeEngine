@@ -501,30 +501,26 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     ImGui::TextDisabled("%s (ID: %u)", entityName.c_str(), (unsigned)m_entityId);
 
     // If this entity came from a prefab show the link and an Open Prefab button
-    if (Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
-        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
-        if (!meta) {
-            ImGui::Separator();
-            return;
-        }
+    if (m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
         ImGui::Separator();
         ImGui::Text("Prefab Instance");
 
         // Show the prefab path (looked up from PrefabManager)
         std::string prefabPath;
         if (m_prefabManager) {
-            prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
+            prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
         }
         
         ImGui::SameLine();
         if (!prefabPath.empty()) {
             ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
         } else {
-            ImGui::TextDisabled("0x%08X", meta->PrefabHash);
+            ImGui::TextDisabled("0x%08X", meta.PrefabHash);
         }
 
         // Show modification indicator if modified
-        if (PrefabUtils::IsModified(*meta)) {
+        if (PrefabUtils::IsModified(meta)) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Modified)");
         }
@@ -560,9 +556,15 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                 // Only allow .prefab files to be dropped here
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
                     // Add PrefabInstanceMetadata with registered hash
-                    uint32_t hash = ECS::PrefabManager::ComputeHash(
-                        ECS::PrefabManager::NormalizePath(droppedPath)
-                    );
+                    uint32_t hash = 0;
+                    if (m_prefabManager) {
+                        hash = m_prefabManager->RegisterPrefab(droppedPath);
+                        m_prefabManager->TrackInstance(entity, hash);
+                    } else {
+                        hash = ECS::PrefabManager::ComputeHash(
+                            ECS::PrefabManager::NormalizePath(droppedPath)
+                        );
+                    }
 
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
@@ -587,9 +589,15 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     if (std::filesystem::path(path).extension() != ".prefab") continue;
 
                     // Add PrefabInstanceMetadata with registered hash
-                    uint32_t hash = ECS::PrefabManager::ComputeHash(
-                        ECS::PrefabManager::NormalizePath(path)
-                    );
+                    uint32_t hash = 0;
+                    if (m_prefabManager) {
+                        hash = m_prefabManager->RegisterPrefab(path);
+                        m_prefabManager->TrackInstance(entity, hash);
+                    } else {
+                        hash = ECS::PrefabManager::ComputeHash(
+                            ECS::PrefabManager::NormalizePath(path)
+                        );
+                    }
 
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;

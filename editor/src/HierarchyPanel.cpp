@@ -529,13 +529,13 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     bool hasChildren = !children.empty();
 
     // Check if this is a prefab instance FIRST (needed for color, both parent and child)
-    bool isPrefabInstance = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
+    bool isPrefabInstance = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
     if (!isPrefabInstance) {
         // Check if any parent has prefab component
         ECS::Entity parent = m_world->ParentOf(entity);
         while (!parent.IsNull()) {
-            if (Editor::ECSUtils::HasComponent(m_world, parent, "PrefabInstanceMetadata")) {
+            if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(parent)) {
                 isPrefabInstance = true;
                 break;
             }
@@ -559,32 +559,29 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (isPrefabInstance && Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
-        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
-        if (!meta) {
-            return;
-        }
+    if (isPrefabInstance && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
         oss << " [Prefab";
         
         // Try to show prefab name if manager is available, otherwise show hash
         if (m_prefabManager) {
-            std::string prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
+            std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
             if (!prefabPath.empty()) {
                 std::string prefabName = std::filesystem::path(prefabPath).stem().string();
                 oss << ":" << prefabName;
             }
             else {
-                oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
+                oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
             }
         }
         else {
-            oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
+            oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
         }
         
         oss << "]";
 
         // Show modification indicator
-        if (PrefabUtils::IsModified(*meta)) {
+        if (PrefabUtils::IsModified(meta)) {
             oss << " *";
         }
     }
@@ -1306,11 +1303,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
             // Detach Prefab: removes prefab metadata from entity
             if (selectionCount == 1) {
-                bool hasMeta = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
+            bool hasMeta = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
-                        Editor::ECSUtils::RemoveComponent(m_world, entity, "PrefabInstanceMetadata");
+                        m_world->Remove<ECS::Components::PrefabInstanceMetadata>(entity);
                         if (m_prefabManager) {
                             m_prefabManager->RemoveInstance(entity);
                         }
@@ -1500,9 +1497,15 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         std::string normalizedPath = p.lexically_normal().string();
 
         // Register prefab and compute hash
-        uint32_t hash = ECS::PrefabManager::ComputeHash(
-            ECS::PrefabManager::NormalizePath(normalizedPath)
-        );
+        uint32_t hash = 0;
+        if (m_prefabManager) {
+            hash = m_prefabManager->RegisterPrefab(normalizedPath);
+            m_prefabManager->TrackInstance(rootEntity, hash);
+        } else {
+            hash = ECS::PrefabManager::ComputeHash(
+                ECS::PrefabManager::NormalizePath(normalizedPath)
+            );
+        }
 
         // Create and add metadata component
         ECS::Components::PrefabInstanceMetadata meta;
