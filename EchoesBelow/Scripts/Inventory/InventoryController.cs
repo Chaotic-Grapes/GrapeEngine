@@ -62,7 +62,12 @@ public class InventoryController : SystemBase
             foreach (var gameObject in World!.Query<GUIElement, MatchSignifierComponent>())
             {
                 //Toggle!
-                gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible = !gameObject.Entity.GetFirstChild().GetComponent<GUIElement>().Visible;
+                if(gameObject.Entity.GetComponent<MatchSignifierComponent>().signifierID == 1234 ||
+                   gameObject.Entity.GetComponent<MatchSignifierComponent>().signifierID == 2345)
+                {
+                gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible = !gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible;
+                }
+                
             }
         }
 
