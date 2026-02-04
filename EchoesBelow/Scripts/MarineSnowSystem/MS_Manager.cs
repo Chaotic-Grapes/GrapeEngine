@@ -58,7 +58,7 @@ public class MS_Manager : SystemBase
                 //For MS Manager instance
                 poolContainerId = objID;
 
-                Log("Initialize Pools ! poolContainerId: " + poolContainerId);
+                Log("Initialize Pools ! poolContainerId: " + poolContainerId, LogLevel.Debug);
 
                 ms01_ObjectPool = new List<ulong>();
                 ms02_ObjectPool = new List<ulong>();
@@ -141,7 +141,7 @@ public class MS_Manager : SystemBase
 
                 InitPoolObj(newPos, pulledObjId, decayTime);
 
-                Log($"Taken from Pool {id_Iterator}!");
+                Log($"Taken from Pool {id_Iterator}!",LogLevel.Debug);
                 return pulledObjId;
             }
             id_Iterator++;
@@ -165,7 +165,7 @@ public class MS_Manager : SystemBase
 
                 //returningEntity.GetComponent<Active>().Enabled = false;
 
-                Log($"Sent ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!");
+                Log($"Sent ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!", LogLevel.Debug);
                 return;
             }
             id_Iterator++;
@@ -212,9 +212,5 @@ public class MS_Manager : SystemBase
 
         returningEntity.GetComponent<Active>().Enabled = false;
         //targetEntity.AttachTo(Entity.FromId(World!,poolContainerId));
-    }
-    protected override void OnDestroy()
-    {
-        Log("System MS_Manager destroyed");
     }
 }

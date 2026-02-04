@@ -1073,7 +1073,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 8,
+                        "TextureId": 6,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\SpawnGrape_Bulb.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1246,7 +1246,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
+                        "TextureId": 8,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1566,7 +1566,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
+                        "TextureId": 8,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1746,7 +1746,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
+                        "TextureId": 8,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2424,8 +2424,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 10.303380012512207,
-                            "Y": -1.0547144412994385,
+                            "X": 8.415946006774902,
+                            "Y": 6.04563045501709,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -2544,11 +2544,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 10.303380012512207,
+                            "m03": 8.415946006774902,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -1.0547144412994385,
+                            "m13": 6.04563045501709,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -2669,7 +2669,7 @@
                         "spawnInterval": 3,
                         "start": false,
                         "timer": 5,
-                        "toSpawn": 0
+                        "toSpawn": 11100000
                     },
                     "TypeName": "MS_Spawner"
                 }
@@ -5383,6 +5383,50 @@
     "EntityCount": 47,
     "Hierarchy": [
         {
+            "child": 1,
+            "parent": 0
+        },
+        {
+            "child": 2,
+            "parent": 0
+        },
+        {
+            "child": 3,
+            "parent": 0
+        },
+        {
+            "child": 4,
+            "parent": 0
+        },
+        {
+            "child": 5,
+            "parent": 0
+        },
+        {
+            "child": 6,
+            "parent": 0
+        },
+        {
+            "child": 7,
+            "parent": 0
+        },
+        {
+            "child": 8,
+            "parent": 0
+        },
+        {
+            "child": 9,
+            "parent": 0
+        },
+        {
+            "child": 10,
+            "parent": 0
+        },
+        {
+            "child": 11,
+            "parent": 0
+        },
+        {
             "child": 12,
             "parent": 0
         },
@@ -5461,50 +5505,6 @@
         {
             "child": 44,
             "parent": 26
-        },
-        {
-            "child": 1,
-            "parent": 0
-        },
-        {
-            "child": 2,
-            "parent": 0
-        },
-        {
-            "child": 3,
-            "parent": 0
-        },
-        {
-            "child": 4,
-            "parent": 0
-        },
-        {
-            "child": 5,
-            "parent": 0
-        },
-        {
-            "child": 6,
-            "parent": 0
-        },
-        {
-            "child": 7,
-            "parent": 0
-        },
-        {
-            "child": 8,
-            "parent": 0
-        },
-        {
-            "child": 9,
-            "parent": 0
-        },
-        {
-            "child": 10,
-            "parent": 0
-        },
-        {
-            "child": 11,
-            "parent": 0
         },
         {
             "child": 14,

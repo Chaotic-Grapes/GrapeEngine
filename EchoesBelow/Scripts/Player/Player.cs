@@ -262,7 +262,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
     private void CollisionEntered(Entity self, CollisionEvent evt)
     {
         //do Everything in here
-        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}");
+        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MS_ManagerComponent>())
         {

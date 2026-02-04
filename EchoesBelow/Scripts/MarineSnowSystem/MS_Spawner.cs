@@ -8,6 +8,8 @@ using GrapeEngine.Scripting.Events;
 using System.Collections.Generic;
 
 
+
+
 namespace EchoesBelow.Scripts.MarineSnowSystem;
 
 [Component] public record struct MS_SpawnerComponent(bool start, float spawnInterval, int toSpawn, float timer,float decayTime);
@@ -60,8 +62,18 @@ public class MS_Spawner : SystemBase
                 
                 //Marine Snow selector
                 string msID_raw = gameObject.Component1.toSpawn.ToString();
-                msID_raw.ToCharArray();
-                int msID = GMath.Random(0, 1) + 1;
+                msID_raw = msID_raw.Substring(1);
+                char[] msID_array = msID_raw.ToCharArray();
+                List<int> msID_selected = new List<int>();
+                int id_iterator = 1;
+                foreach(char c in msID_array)
+                {
+                    if(c=='1') msID_selected.Add(id_iterator);
+                    id_iterator++;
+                }
+
+                int msID = msID_selected[(GMath.Random(0, msID_selected.Count-1))];
+
                 //How many to spawn
                 int spawnCount = GMath.Random(1, 2);
                 //Spawner
