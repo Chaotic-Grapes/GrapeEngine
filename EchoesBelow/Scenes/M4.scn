@@ -181,14 +181,14 @@
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
                         "Offset": {
-                            "X": 0.0,
-                            "Y": 0.9230769276618958
+                            "X": 0.23529411852359772,
+                            "Y": 0.0
                         },
-                        "TextureId": 16,
+                        "TextureId": 17,
                         "TexturePath": "",
                         "Tiling": {
-                            "X": 0.0625,
-                            "Y": 0.07692307233810425
+                            "X": 0.011764705181121826,
+                            "Y": 1.0
                         }
                     },
                     "TypeName": "SpriteRenderer2D"
@@ -197,20 +197,20 @@
                     "Data": {
                         "FrameCount": 1,
                         "FrameHeight": 210,
-                        "FrameLength": 20,
-                        "FrameOffset": 0,
+                        "FrameLength": 65,
+                        "FrameOffset": 20,
                         "FrameWidth": 140,
-                        "FramesPerSecond": 24.0,
+                        "FramesPerSecond": 30.0,
                         "Loop": true,
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
                         "Playing": true,
-                        "Row": 12,
-                        "SheetHeight": 2730,
-                        "SheetWidth": 2240,
+                        "Row": 0,
+                        "SheetHeight": 210,
+                        "SheetWidth": 11900,
                         "StartFrame": 16,
-                        "TextureId": 16,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheetV2.png",
+                        "TextureId": 17,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheet_IdleDash_FullHorizontal.png",
                         "UseRow": true
                     },
                     "TypeName": "SpriteSheetAnimation2D"
@@ -460,7 +460,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.7796295881271362,
+                        "AspectRatio": 1.7777777910232544,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
