@@ -40,12 +40,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <scene/SceneManager.h>
-#include "ecs/systems/RendererSystem.h"  
+#include "ecs/systems/RendererSystem.h"
 #include "graphics/RenderGraph.hpp"
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
-#include "ecs/ui/GUIContext.h"
 #include "TilePalettePanel.h"
 
 // -------------------------------------------------------------------------
@@ -432,13 +431,10 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
-            auto& guiCtx = ECS::UI::GUIContext::Get();
-            if (isSceneImageHovered || !guiCtx.UseViewportBounds) {
-                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
-                guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
-                guiCtx.ViewportSize = { size.x * fbScale.x, size.y * fbScale.y };
-                guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
-                guiCtx.UseViewportBounds = true;
+            if (auto* renderer = ECS::RendererSystem::GetInstance()) {
+                // GUI renders into the full LDR target; the scene image is a scaled blit of that target.
+                // Using the ImGui rect as a GUI viewport offsets/clips GUI relative to the image.
+                renderer->ResetGUIViewport();
             }
 
             // Prepare interaction manager with current viewport state

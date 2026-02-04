@@ -120,10 +120,10 @@ namespace {
         int windowCount = 0;
 
         if (anim->UseRow) {
-            const int rowIndex = std::clamp(anim->RowIndex, 0, totalRows - 1);
-            const int startCol = std::clamp(anim->RowStartColumn, 0, totalCols - 1);
+            const int rowIndex = std::clamp(anim->Row, 0, totalRows - 1);
+            const int startCol = std::clamp(anim->FrameOffset, 0, totalCols - 1);
             const int available = totalCols - startCol;
-            int rowCount = anim->RowFrameCount;
+            int rowCount = anim->FrameLength;
             if (rowCount <= 0 || rowCount > available)
                 rowCount = available;
             windowStart = rowIndex * totalCols + startCol;
@@ -567,7 +567,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
@@ -594,7 +594,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;

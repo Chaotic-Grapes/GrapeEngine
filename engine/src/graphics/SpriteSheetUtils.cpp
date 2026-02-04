@@ -63,7 +63,7 @@ namespace SpriteSheetUtils {
         if (totalCols <= 0 || totalRows <= 0)
             return window;
 
-        // Clamp row and column indices to valid ranges
+        // Clamp row/column indices; row index is top-down (0 = top row)
         const int row = std::clamp(rowIndex, 0, totalRows - 1);
         const int startCol = std::clamp(rowStartCol, 0, totalCols - 1);
 

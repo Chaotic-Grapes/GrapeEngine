@@ -58,6 +58,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Services
 // ============================================================================
 #include "services/TimeSystem.h"
+#include "services/ResourceManager.h"
 #include "platform/IPlatformContext.h"
 
 // ============================================================================
@@ -89,6 +90,22 @@ namespace ECS {
     // Implementation of static GetInstance method
     RendererSystem* RendererSystem::GetInstance() {
         return g_rendererSystemInstance;
+    }
+
+    // GUI viewport management
+    void RendererSystem::SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale) {
+        m_guiViewport.Origin = origin;
+        m_guiViewport.Size = size;
+        m_guiViewport.DisplayScale = displayScale;
+        m_guiViewport.Active = true;
+    }
+
+    // Reset GUI viewport to full render target size
+    void RendererSystem::ResetGUIViewport() {
+        m_guiViewport.Origin = { 0.0f, 0.0f };
+        m_guiViewport.Size = m_renderTargetSize;
+        m_guiViewport.DisplayScale = { 1.0f, 1.0f };
+        m_guiViewport.Active = true;
     }
 
     // Helper function to get the effective transform for rendering
@@ -163,6 +180,8 @@ namespace ECS {
         }
         const int width = mainWindow->GetWidth();
         const int height = mainWindow->GetHeight();
+        m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
+        ResetGUIViewport();
 
         // Shaders
         m_shader = std::make_unique<Shader>(
@@ -175,8 +194,7 @@ namespace ECS {
 
         m_sdfCircleShader = std::make_unique<Shader>(
             "assets/shaders/sdf_circle.vert",
-            "assets/shaders/sdf_circle.frag"
-        );
+            "assets/shaders/sdf_circle.frag");
 
         m_bloomExtractShader = std::make_unique<Shader>(
             "assets/shaders/bloom_extract.vert",
@@ -243,6 +261,9 @@ namespace ECS {
 
                 // Resize picking FBO
                 m_pickingFBO.Resize(msg.Width, msg.Height, false, false);
+
+                m_renderTargetSize = { static_cast<float>(msg.Width), static_cast<float>(msg.Height) };
+                ResetGUIViewport();
             });
 
         // Projection matrix
@@ -668,6 +689,9 @@ namespace ECS {
                                 aoStrength = mat.AOStrength;
                                 normalStrength = mat.NormalStrength;
                                 flags = mat.Flags;
+                                if (normalTexId == 0) {
+                                    normalTexId = sr.NormalTextureId;
+                                }
                             }
 
                             m_renderer->submitSprite({
@@ -1219,45 +1243,111 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
-        // GUI Rendering Pass - Render queued GUI elements on top of scene
+        // GUI Pass - Render GUI panels on top of scene
         m_renderGraph->AddPass("GUI", { "LDR" }, { "LDR" },
             [this](ResourceAccessor& res)
             {
+                // Skip if no GUI elements queued
+                if (m_guiPanelQueue.empty() && m_guiTextQueue.empty()) return;
+
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
 
-                // Bind LDR for reading/writing
+                // Setup orthographic projection for screen-space rendering
+                const float width = static_cast<float>(ldr->Width());
+                const float height = static_cast<float>(ldr->Height());
+
                 ldr->Bind();
                 glViewport(0, 0, ldr->Width(), ldr->Height());
 
-                // Enable blending for GUI elements
+                // Enable blending for GUI rendering
                 GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-                // Use batch shader for GUI panels
-                const float width = static_cast<float>(ldr->Width());
-                const float height = static_cast<float>(ldr->Height());
+                // Orthographic projection matrix
                 glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
-                m_guiTextProjection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-                m_guiViewportHeight = height;
-                if (m_shader) {
-                    m_shader->use();
-                    m_shader->setMat4("uViewProj", screenOrtho);
-                    m_shader->setUniform("uLightingEnabled", 0);
+
+                // Setup scissor test based on GUI viewport
+                bool scissorEnabled = false;
+                GUIViewport viewport = m_guiViewport;
+                if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
+                    viewport.Origin = { 0.0f, 0.0f };
+                    viewport.Size = { width, height };
                 }
-                m_guiProjection = screenOrtho;
 
-                m_renderer->beginFrame();
+                // Enable scissor test if viewport size is valid
+                if (viewport.Size.X > 0.0f && viewport.Size.Y > 0.0f) {
+                    glEnable(GL_SCISSOR_TEST);
+                    scissorEnabled = true;
+                    const int scissorX = static_cast<int>(std::round(viewport.Origin.X));
+                    const int scissorY = static_cast<int>(std::round(height - (viewport.Origin.Y + viewport.Size.Y)));
+                    const int scissorW = static_cast<int>(std::round(viewport.Size.X));
+                    const int scissorH = static_cast<int>(std::round(viewport.Size.Y));
+                    glScissor(scissorX, scissorY, scissorW, scissorH);
+                }
 
-                // Process all queued GUI submissions
-                ProcessGUISubmissions();
+                // Render GUI panels
+                if (!m_guiPanelQueue.empty()) {
+                    if (m_shader) {
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", screenOrtho);
+                        m_shader->setUniform("uLightingEnabled", 0);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& panel : m_guiPanelQueue) { // Render each panel
+                        const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
+                                               panel.position.Y + panel.size.Y * 0.5f);
+                        const glm::vec2 size(panel.size.X, panel.size.Y);
+                        const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
+                        GLuint textureId = 0;
+                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                    }
+                    m_renderer->endFrame();
+                }
 
-                m_renderer->endFrame();
+                // Render GUI text
+                if (!m_guiTextQueue.empty()) {
+                    const glm::mat4 textOrtho = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+                    if (m_textShader) {
+                        m_textShader->use();
+                        m_textShader->setMat4("uProjection", textOrtho);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& text : m_guiTextQueue) { // Render each text element
+                        if (text.text.empty()) {
+                            continue;
+                        }
 
-                // Restore blend state
+                        // Load font
+                        const std::string fontPath = text.fontPath.empty()
+                            ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
+                            : text.fontPath;
+                        const int pixelSize = std::max(1, static_cast<int>(std::round(text.pixelSize)));
+                        auto font = RM.GetFont(fontPath, pixelSize);
+                        if (!font) {
+                            continue;
+                        }
+
+                        // Calculate text position (flip Y for GUI space)
+                        const glm::vec2 textPos(text.position.X, height - text.position.Y);
+                        const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                        m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+                    }
+                    m_renderer->endFrame();
+                }
+
+                // Disable scissor test if it was enabled
+                if (scissorEnabled) {
+                    glDisable(GL_SCISSOR_TEST);
+                }
+
+                // Clear GUI queues for next frame
+                m_guiPanelQueue.clear();
+                m_guiTextQueue.clear();
+
                 if (!blendWasEnabled) glDisable(GL_BLEND);
-
                 Framebuffer::Unbind();
             });
 
@@ -1433,6 +1523,32 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
+                                        const Color& color, float cornerRadius) {
+        (void)cornerRadius;
+        if (!m_renderer) return;
+
+        GUIPanelSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.color = color;
+        submission.cornerRadius = cornerRadius;
+        m_guiPanelQueue.push_back(submission);
+    }
+
+    void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
+                                       const std::string& fontPath, float pixelSize, const Color& color) {
+        if (!m_renderer) return;
+
+        GUITextSubmission submission;
+        submission.position = position;
+        submission.text = text;
+        submission.fontPath = fontPath;
+        submission.pixelSize = pixelSize;
+        submission.color = color;
+        m_guiTextQueue.push_back(std::move(submission));
+    }
+
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
                                                   const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
@@ -1518,376 +1634,6 @@ namespace ECS {
             sub.filled = true;
             m_wireframeQueue.push_back(sub);
         }
-    }
-
-    // ========================================================================
-    // GUI Rendering APIs
-    // ========================================================================
-
-    void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                                        const Color& color, float cornerRadius,
-                                        bool clipEnabled, const Vector2D& clipPos,
-                                        const Vector2D& clipSize) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Panel;
-        submission.position = position;
-        submission.size = size;
-        submission.color = color;
-        submission.cornerRadius = cornerRadius;
-        submission.clipEnabled = clipEnabled;
-        submission.clipPos = clipPos;
-        submission.clipSize = clipSize;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUIText(const std::string& fontPath, const std::string& text,
-                                       const Vector2D& position, const Color& color,
-                                       float fontSize, const Color& shadowColor,
-                                       const Vector2D& shadowOffset,
-                                       bool clipEnabled, const Vector2D& clipPos,
-                                       const Vector2D& clipSize) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Text;
-        submission.fontPath = fontPath;
-        submission.text = text;
-        submission.position = position;
-        submission.color = color;
-        submission.fontSize = fontSize;
-        submission.shadowColor = shadowColor;
-        submission.shadowOffset = shadowOffset;
-        submission.clipEnabled = clipEnabled;
-        submission.clipPos = clipPos;
-        submission.clipSize = clipSize;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUISlider(const Vector2D& position, const Vector2D& size,
-                                         float value, const Color& backgroundColor,
-                                         const Color& handleColor, const Color& borderColor,
-                                         float borderRadius,
-                                         bool clipEnabled, const Vector2D& clipPos,
-                                         const Vector2D& clipSize) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Slider;
-        submission.position = position;
-        submission.size = size;
-        submission.value = value;
-        submission.color = backgroundColor;
-        submission.secondaryColor = handleColor;
-        submission.borderColor = borderColor;
-        submission.cornerRadius = borderRadius;
-        submission.clipEnabled = clipEnabled;
-        submission.clipPos = clipPos;
-        submission.clipSize = clipSize;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUICheckbox(const Vector2D& position, const Vector2D& size,
-                                           bool checked, const Color& boxColor,
-                                           const Color& checkColor, const Color& borderColor,
-                                           bool clipEnabled, const Vector2D& clipPos,
-                                           const Vector2D& clipSize) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Checkbox;
-        submission.position = position;
-        submission.size = size;
-        submission.checked = checked;
-        submission.color = boxColor;
-        submission.secondaryColor = checkColor;
-        submission.borderColor = borderColor;
-        submission.clipEnabled = clipEnabled;
-        submission.clipPos = clipPos;
-        submission.clipSize = clipSize;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    void RendererSystem::SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
-                                       const Color& color, float thickness,
-                                       bool clipEnabled, const Vector2D& clipPos,
-                                       const Vector2D& clipSize) {
-        if (!m_renderer) return;
-
-        GUISubmission submission;
-        submission.type = GUISubmission::Type::Line;
-        submission.startPos = startPos;
-        submission.endPos = endPos;
-        submission.color = color;
-        submission.thickness = thickness;
-        submission.clipEnabled = clipEnabled;
-        submission.clipPos = clipPos;
-        submission.clipSize = clipSize;
-
-        m_guiSubmissionQueue.push_back(submission);
-    }
-
-    // ========================================================================
-    // Internal: Process GUI Submissions
-    // ========================================================================
-
-    void RendererSystem::ProcessGUISubmissions() {
-        if (!m_renderer) return;
-
-        bool sawText = false;
-        bool scissorEnabled = false;
-        Vector2D currentClipPos{0.0f, 0.0f};
-        Vector2D currentClipSize{0.0f, 0.0f};
-
-        auto applyScissor = [&](const GUISubmission& submission) {
-            if (!submission.clipEnabled || submission.clipSize.X <= 0.0f || submission.clipSize.Y <= 0.0f) {
-                if (scissorEnabled) {
-                    glDisable(GL_SCISSOR_TEST);
-                    scissorEnabled = false;
-                }
-                return;
-            }
-
-            if (scissorEnabled &&
-                currentClipPos.X == submission.clipPos.X &&
-                currentClipPos.Y == submission.clipPos.Y &&
-                currentClipSize.X == submission.clipSize.X &&
-                currentClipSize.Y == submission.clipSize.Y) {
-                return;
-            }
-
-            currentClipPos = submission.clipPos;
-            currentClipSize = submission.clipSize;
-            glEnable(GL_SCISSOR_TEST);
-            scissorEnabled = true;
-
-            const int scissorX = static_cast<int>(std::round(currentClipPos.X));
-            const int scissorY = static_cast<int>(std::round(m_guiViewportHeight - (currentClipPos.Y + currentClipSize.Y)));
-            const int scissorW = static_cast<int>(std::round(currentClipSize.X));
-            const int scissorH = static_cast<int>(std::round(currentClipSize.Y));
-            glScissor(scissorX, scissorY, scissorW, scissorH);
-        };
-
-        for (const auto& submission : m_guiSubmissionQueue) {
-            if (submission.type == GUISubmission::Type::Text) {
-                sawText = true;
-                continue;
-            }
-
-            if (submission.type == GUISubmission::Type::Panel) {
-                applyScissor(submission);
-                ProcessGUIPanel(submission);
-            } else if (submission.type == GUISubmission::Type::Slider) {
-                applyScissor(submission);
-                ProcessGUISlider(submission);
-            } else if (submission.type == GUISubmission::Type::Checkbox) {
-                applyScissor(submission);
-                ProcessGUICheckbox(submission);
-            } else if (submission.type == GUISubmission::Type::Line) {
-                applyScissor(submission);
-                ProcessGUILine(submission);
-            }
-        }
-
-        if (sawText) {
-            m_renderer->endFrame();
-
-            if (m_textShader) {
-                m_textShader->use();
-                m_textShader->setMat4("uProjection", m_guiTextProjection);
-            }
-            m_renderer->beginFrame();
-
-            for (const auto& submission : m_guiSubmissionQueue) {
-                if (submission.type == GUISubmission::Type::Text) {
-                    applyScissor(submission);
-                    ProcessGUIText(submission);
-                }
-            }
-
-            m_renderer->endFrame();
-
-            if (m_shader) {
-                m_shader->use();
-                m_shader->setMat4("uViewProj", m_guiProjection);
-                m_shader->setUniform("uLightingEnabled", 0);
-            }
-            m_renderer->beginFrame();
-        }
-
-        if (scissorEnabled) {
-            glDisable(GL_SCISSOR_TEST);
-        }
-
-        m_guiSubmissionQueue.clear();
-    }
-
-    void RendererSystem::ProcessGUIPanel(const GUISubmission& submission) {
-        // Convert engine types to GLM
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 glmColor(submission.color.R, submission.color.G,
-                          submission.color.B, submission.color.A);
-
-        // Submit quad representing the panel (no texture)
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0; // no texture (solid color)
-        const glm::vec2 center = glmPos;
-        m_renderer->submitQuad(center, glmSize, textureId, uvRect, glmColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-    }
-
-    void RendererSystem::ProcessGUIText(const GUISubmission& submission) {
-        if (!m_textShader || !m_renderer) return;
-
-        // Font cache (static to persist across frames)
-        static std::unordered_map<std::string, std::shared_ptr<Font>> fontCache;
-
-        // Load/cache font
-        std::string fontPath = submission.fontPath;
-        auto it = fontCache.find(fontPath);
-        if (it == fontCache.end()) {
-            try {
-                auto font = std::make_shared<Font>(fontPath, 96);
-                fontCache[fontPath] = font;
-                it = fontCache.find(fontPath);
-                LOG_DEBUG("Loaded font for GUI: " << fontPath);
-            }
-            catch (const std::exception& e) {
-                LOG_ERROR("Failed to load GUI font " << fontPath << ": " << e.what());
-                return;
-            }
-        }
-
-        // Use text shader for SDF rendering
-        m_textShader->use();
-        m_textShader->setMat4("uProjection", m_guiTextProjection);
-
-        // Convert color from 0-255 to 0.0-1.0
-        glm::vec4 glmColor(
-            submission.color.R,
-            submission.color.G,
-            submission.color.B,
-            submission.color.A
-        );
-
-        const float scale = submission.fontSize / static_cast<float>(it->second->getPixelSize());
-        const float ascent = it->second->getAscent() * scale;
-
-        // Screen-space position (submission position is top-left in GUI space)
-        glm::vec2 screenPos(submission.position.X,
-                            m_guiViewportHeight - (submission.position.Y + ascent));
-
-        // Submit text to renderer for SDF rendering
-        // The renderer's submitText handles font geometry generation and batching
-        m_renderer->submitText(
-            *it->second,
-            submission.text,
-            screenPos,
-            glmColor,
-            submission.fontSize
-        );
-    }
-
-    void RendererSystem::ProcessGUISlider(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Slider consists of: background track + handle
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 bgColor(submission.color.R, submission.color.G,
-                         submission.color.B, submission.color.A);
-        glm::vec4 handleColor(submission.secondaryColor.R,
-                             submission.secondaryColor.G,
-                             submission.secondaryColor.B,
-                             submission.secondaryColor.A);
-
-        // Draw background track (full width, small height)
-        glmPos -= glmSize * 0.5f;
-        float trackHeight = glmSize.y * 0.3f; // Track is 30% of slider height
-        glm::vec2 trackPos = glmPos + glm::vec2(0, (glmSize.y - trackHeight) * 0.5f);
-        glm::vec2 trackSize(glmSize.x, trackHeight);
-
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        const glm::vec2 trackCenter = trackPos + trackSize * 0.5f;
-        m_renderer->submitQuad(trackCenter, trackSize, textureId, uvRect, bgColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-
-        // Draw handle (circle/rounded rect at value position)
-        float handleWidth = glmSize.y * 0.8f; // Handle width = slider height * 0.8
-        float handleX = glmPos.x + (glmSize.x - handleWidth) * submission.value;
-        glm::vec2 handlePos(handleX, glmPos.y);
-        glm::vec2 handleSize(handleWidth, glmSize.y);
-
-        const glm::vec2 handleCenter = handlePos + handleSize * 0.5f;
-        m_renderer->submitQuad(handleCenter, handleSize, textureId, uvRect, handleColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-    }
-
-    void RendererSystem::ProcessGUICheckbox(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Checkbox consists of: box outline + checkmark if checked
-        glm::vec2 glmPos(submission.position.X, submission.position.Y);
-        glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 boxColor(submission.color.R, submission.color.G,
-                          submission.color.B, submission.color.A);
-        glm::vec4 checkColor(submission.secondaryColor.R,
-                            submission.secondaryColor.G,
-                            submission.secondaryColor.B,
-                            submission.secondaryColor.A);
-
-        // Draw checkbox box
-        glmPos -= glmSize * 0.5f;
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        const glm::vec2 boxCenter = glmPos + glmSize * 0.5f;
-        m_renderer->submitQuad(boxCenter, glmSize, textureId, uvRect, boxColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-
-        // Draw checkmark if checked (as a simple X shape with two diagonal lines)
-        if (submission.checked) {
-            // Simplified: submit small quad in center as checkmark indicator
-            float inset = glmSize.x * 0.2f;
-            glm::vec2 checkPos = glmPos + glm::vec2(inset, inset);
-            glm::vec2 checkSize = glmSize - glm::vec2(inset * 2.0f, inset * 2.0f);
-            const glm::vec2 checkCenter = checkPos + checkSize * 0.5f;
-            m_renderer->submitQuad(checkCenter, checkSize, textureId, uvRect, checkColor, 0.0f, 1.0f, 0, 0u, 0.0f);
-        }
-    }
-
-    void RendererSystem::ProcessGUILine(const GUISubmission& submission) {
-        if (!m_renderer) return;
-
-        // Convert engine types to GLM
-        glm::vec2 start(submission.startPos.X, submission.startPos.Y);
-        glm::vec2 end(submission.endPos.X, submission.endPos.Y);
-        glm::vec4 color(submission.color.R, submission.color.G,
-                       submission.color.B, submission.color.A);
-
-        // Calculate line direction and perpendicular
-        glm::vec2 direction = glm::normalize(end - start);
-        glm::vec2 perpendicular(-direction.y, direction.x); // Rotate 90 degrees
-
-        // Create a quad that represents the line (like a thick line)
-        glm::vec2 halfThickness = perpendicular * (submission.thickness * 0.5f);
-
-        // Calculate the four corners of the line quad
-        glm::vec2 p1 = start - halfThickness;
-        glm::vec2 p2 = start + halfThickness;
-        glm::vec2 p3 = end + halfThickness;
-        glm::vec2 p4 = end - halfThickness;
-
-        // Submit as a quad (using average position and approximate size)
-        glm::vec2 center = (start + end) * 0.5f;
-        float lineLength = glm::distance(start, end);
-        glm::vec2 size(lineLength, submission.thickness);
-
-        glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
-        GLuint textureId = 0;
-        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
     }
 
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)
