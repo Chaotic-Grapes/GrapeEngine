@@ -276,11 +276,6 @@ public class Player : SystemBase
 [System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
 public class PlayerCollisionHandler : CollisionSystemBase
 {
-    protected override void OnCreate()
-    {
-        Log("System CollisionTest initialized");
-    }
-
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
         base.OnCollisionEnter(self, evt);
@@ -318,5 +313,19 @@ public class PlayerCollisionHandler : CollisionSystemBase
         //    Log("Hello I Exited");
         //}
     }
-
 }
+
+[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
+public class PlayerTriggerHandler : TriggerSystemBase
+{
+    protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
+    {
+        base.OnTriggerEnter(self, evt);
+        Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        {
+            //Loadscene use dalton's
+        }
+    }
+}
+
