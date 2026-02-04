@@ -176,6 +176,9 @@ public class MS_Manager : SystemBase
     {
         //Set to new transform
         Entity pulledEntity = Entity.FromId(World!, pulledObjId);
+
+        pulledEntity.GetComponent<Active>().Enabled = true;
+
         ref LocalTransform transform = ref pulledEntity.GetComponent<LocalTransform>();
         transform.Position = newPos;
         //Remove from parent
@@ -206,6 +209,8 @@ public class MS_Manager : SystemBase
         if (returningEntity.HasComponent<LinearVelocity2D>()) returningEntity.RemoveComponent<LinearVelocity2D>();
         if (returningEntity.HasComponent<AngularVelocity2D>()) returningEntity.RemoveComponent<AngularVelocity2D>();
         if (returningEntity.HasComponent<MS_DecayComponent>()) returningEntity.RemoveComponent<MS_DecayComponent>();
+
+        returningEntity.GetComponent<Active>().Enabled = false;
         //targetEntity.AttachTo(Entity.FromId(World!,poolContainerId));
     }
     protected override void OnDestroy()

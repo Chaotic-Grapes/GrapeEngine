@@ -3,8 +3,8 @@
         {
             "Data": {
                 "Position": {
-                    "X": 7.700089454650879,
-                    "Y": 3.152716636657715,
+                    "X": 8.018708229064941,
+                    "Y": 2.8230788707733154,
                     "Z": 0.0
                 },
                 "Rotation": {
@@ -14,18 +14,30 @@
                     "Z": 0.0
                 },
                 "Scale": {
-                    "X": 0.20000000298023224,
-                    "Y": 0.20000000298023224,
-                    "Z": 0.20000000298023224
+                    "X": 0.25,
+                    "Y": 0.25,
+                    "Z": 0.25
                 }
             },
             "TypeName": "LocalTransform"
         },
         {
             "Data": {
-                "Value": "MS01_fakeprefab"
+                "Value": "MS02_fakeprefab"
             },
             "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Flags": 0,
+                "LayerMask": 4,
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Radius": 0.5
+            },
+            "TypeName": "CircleCollider2D"
         },
         {
             "Data": {
@@ -37,8 +49,8 @@
             "Data": {
                 "Color": {
                     "A": 1.0,
-                    "B": 0.9998999834060669,
-                    "G": 0.9999926090240479,
+                    "B": 1.0,
+                    "G": 1.0,
                     "R": 1.0
                 },
                 "EmissiveStrength": 5.0,
@@ -50,8 +62,8 @@
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 9,
-                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                "TextureId": 14,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
                 "Tiling": {
                     "X": 1.0,
                     "Y": 1.0
@@ -63,17 +75,17 @@
             "Data": {
                 "Dirty": false,
                 "Matrix": {
-                    "m00": 0.20000000298023224,
+                    "m00": 0.25,
                     "m01": 0.0,
                     "m02": 0.0,
-                    "m03": 7.700089454650879,
+                    "m03": 8.018708229064941,
                     "m10": 0.0,
-                    "m11": 0.20000000298023224,
+                    "m11": 0.25,
                     "m12": 0.0,
-                    "m13": 3.152716636657715,
+                    "m13": 2.8230788707733154,
                     "m20": 0.0,
                     "m21": 0.0,
-                    "m22": 0.20000000298023224,
+                    "m22": 0.25,
                     "m23": 0.0,
                     "m30": 0.0,
                     "m31": 0.0,
@@ -85,23 +97,10 @@
         },
         {
             "Data": {
-                "globalDecayTime": 0,
-                "msID": 1,
+                "msID": 2,
                 "start": false
             },
             "TypeName": "MS_Manager"
-        },
-        {
-            "Data": {
-                "Flags": 0,
-                "LayerMask": 4294967295,
-                "Offset": {
-                    "X": 0.0,
-                    "Y": 0.0
-                },
-                "Radius": 0.5
-            },
-            "TypeName": "ECS::Components::CircleCollider2D"
         },
         {
             "Data": {
