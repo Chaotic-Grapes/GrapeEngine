@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
 #include "ecs/events/EventDispatcher.h"
@@ -26,15 +27,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AudioSystem.h"
-#include "ecs/systems/GUIInputSystem.h"
-#include "ecs/systems/GUILayoutSystem.h"
-#include "ecs/systems/GUIRenderSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
 // Undefine potential Windows macros that conflict with enum names
@@ -113,9 +110,6 @@ namespace Engine {
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
-        // Clear UI event queue
-        ECS::UIEventQueue::Clear();
-        
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
 
@@ -340,10 +334,6 @@ namespace Engine {
         
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
-        
-        // Register GUI systems
-        m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
-        m_systemManager.RegisterSystem<ECS::GUIInputSystem>();
         m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();
 
         // Build dependency graphs (analyzes component access)
