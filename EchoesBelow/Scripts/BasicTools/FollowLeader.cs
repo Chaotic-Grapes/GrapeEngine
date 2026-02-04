@@ -21,19 +21,23 @@ public class FollowLeader : SystemBase
     {
         foreach(var gameObject in World!.Query<FollowLeaderComponent, LocalTransform>())
         {
-            ulong objId=MS_Manager.instance.emptyId; //default objId, just borrowing MS_Manager's empty ID
+            //This is how we find matching signifiers============================================================
+
+            ulong targetObjId =MS_Manager.instance.emptyId; //default objId, just borrowing MS_Manager's empty ID
 
             foreach(var result in World!.Query<MatchSignifierComponent>())
             {
                 if(result.Component1.signifierID == gameObject.Component1.target_signifierID)
                 {
-                    objId = result.Entity.Id;
+                    targetObjId = result.Entity.Id;
                 }
             }
+
+            //===================================================================================================
             Entity entity = Entity.FromId(World!, gameObject.Entity.Id);
             ref LocalTransform transform = ref gameObject.Component2;
 
-            Entity targetEntity = Entity.FromId(World!, objId);
+            Entity targetEntity = Entity.FromId(World!, targetObjId);
             ref LocalTransform targetTransform = ref targetEntity.GetComponent<LocalTransform>();
 
             transform.Position = new Vector3(GMath.Lerp(transform.Position.X, targetTransform.Position.X, 1f),
