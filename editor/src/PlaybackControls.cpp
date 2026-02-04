@@ -476,9 +476,13 @@ void Playback::_restoreWorldState() {
     // This version preserves entity IDs by restoring component values in-place
     // instead of destroying and recreating entities.
     if (!HasValidWorld() || m_savedWorldState.is_null()) {
-        LOG_WARNING("No saved state to restore");
+        if (!m_suppressRestoreWarning) {
+            LOG_WARNING("No saved state to restore");
+        }
+        m_suppressRestoreWarning = false;
         return;
     }
+    m_suppressRestoreWarning = false;
     if (m_savedWorldPtr && m_savedWorldPtr != m_world) {
         LOG_WARNING("Saved state world does not match current world; skipping restore.");
         return;
@@ -663,6 +667,7 @@ void Playback::ClearSavedState() {
     // Explicitly drop snapshot when the world changes during Play.
     m_savedWorldState = nullptr;
     m_savedWorldPtr = nullptr;
+    m_suppressRestoreWarning = true;
 }
 
 // Update the world reference safely when scenes change
