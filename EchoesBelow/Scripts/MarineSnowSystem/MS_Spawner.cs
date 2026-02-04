@@ -45,10 +45,10 @@ public class MS_Spawner : SystemBase
             Entity entity = Entity.FromId(World!, gameObject.Entity.Id);
 
             //If we exceed the spawn interval
-            Log("1");
+          
             if(gameObject.Component1.timer >= gameObject.Component1.spawnInterval)
             {
-                Log("2");
+               
                 //Reset the timer, prime it for the next interval
                 gameObject.Component1.timer = 0;
 
@@ -57,16 +57,16 @@ public class MS_Spawner : SystemBase
                 //Set the x boundary min and max limits
                 float xBoundaryMax = transform.Position.X + boundary.HalfExtents.X;
                 float xBoundaryMin = transform.Position.X - boundary.HalfExtents.X;
-                Log("3");
+                
                 int msID = GMath.Random(0, 1) + 1;
-                Log("4");
+               
                 int spawnCount = GMath.Random(1, 2);
                 for (int i = 0; i < spawnCount; i++)
                 {
                     //Generate new spawn Coordinate
                     float xValue = GMath.Random(xBoundaryMin, xBoundaryMax);
                     Vector3 spawnPos = new Vector3(xValue, transform.Position.Y, 0);
-                    Log("5");
+                    
                     if(MS_Manager.instance.PullFromPool(msID, spawnPos) == MS_Manager.instance.emptyId) continue;
                 }
             }
