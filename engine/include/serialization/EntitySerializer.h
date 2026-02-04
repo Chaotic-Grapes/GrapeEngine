@@ -309,6 +309,35 @@ namespace ECS {
 			anim.UseRow = j.value("UseRow", false);
 		}
 
+		// Custom serialization for TileMapComponent (StringId paths need special handling).
+		inline void to_json(nlohmann::json& j, const TileMapComponent& tilemap) {
+			std::string mapPath = ECS::StringTable::Resolve(tilemap.TileMapPath); // Resolve StringId -> path string.
+			std::string tilesetPath = ECS::StringTable::Resolve(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
+			j = nlohmann::json{
+				{"TileMapPath", mapPath},
+				{"TilesetTexturePath", tilesetPath},
+				{"TileWorldSize", tilemap.TileWorldSize},
+				{"TilePixelSize", tilemap.TilePixelSize},
+				{"DefaultWidth", tilemap.DefaultWidth},
+				{"DefaultHeight", tilemap.DefaultHeight},
+				{"LayerIndex", tilemap.LayerIndex},
+				{"Visible", tilemap.Visible}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, TileMapComponent& tilemap) {
+			std::string mapPath = j.value("TileMapPath", std::string()); // Read map path from JSON.
+			std::string tilesetPath = j.value("TilesetTexturePath", std::string()); // Read tileset path from JSON.
+			tilemap.TileMapPath = mapPath.empty() ? 0 : ECS::StringTable::Intern(mapPath); // Store as StringId.
+			tilemap.TilesetTexturePath = tilesetPath.empty() ? 0 : ECS::StringTable::Intern(tilesetPath); // Store as StringId.
+			tilemap.TileWorldSize = j.value("TileWorldSize", 1.0f); // Default to 1.0 if missing.
+			tilemap.TilePixelSize = j.value("TilePixelSize", 32u); // Default tile pixel size.
+			tilemap.DefaultWidth = j.value("DefaultWidth", 64u); // Default map width.
+			tilemap.DefaultHeight = j.value("DefaultHeight", 64u); // Default map height.
+			tilemap.LayerIndex = j.value("LayerIndex", 0u); // Default layer index.
+			tilemap.Visible = j.value("Visible", true); // Default visibility.
+		}
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationState2D, CurrentFrame, TimeAccumulator, Finished)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
@@ -884,6 +913,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D, "CircleCollider2D")
 	REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D, "SpriteRenderer2D")
 	REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D, "SpriteFlip2D")
+	REGISTER_COMPONENT_SERIALIZER(TileMapComponent, ECS::Components::TileMapComponent, "TileMapComponent")
 	REGISTER_COMPONENT_SERIALIZER(SpriteSheetAnimation2D, ECS::Components::SpriteSheetAnimation2D, "SpriteSheetAnimation2D")
 	REGISTER_COMPONENT_SERIALIZER(AnimationState2D, ECS::Components::AnimationState2D, "AnimationState2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D, "ShapeCircle2D")

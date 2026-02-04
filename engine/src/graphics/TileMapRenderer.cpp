@@ -39,9 +39,10 @@ void TileMapRenderer::Submit(
                 uv.u1, uv.v1
             };
 
+            const float half = tileSize * 0.5f; // Renderer::submitQuad expects center coordinates.
             const glm::vec2 pos{
-                tileMap.TileToWorld(x),
-                tileMap.TileToWorld(y)
+                tileMap.TileToWorld(x) + half,
+                tileMap.TileToWorld(y) + half
             };
 
             const glm::vec2 size{ tileSize, tileSize };

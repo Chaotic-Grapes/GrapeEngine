@@ -123,6 +123,9 @@ public:
     void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders drag/drop validation feedback popups triggered by asset fields
+    void RenderAssetDropFeedbackPopup();
+
 private:
     // -------------------------------------------------------------------------
     // State

@@ -561,6 +561,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                             }
                         }
                         m_selectedAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                     else {
                         // Normal click: single selection
@@ -568,6 +572,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         m_selectedAssets.insert(entryPath);
                         m_selectedAsset = entryPath;
                         m_anchorAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                 }
 
@@ -579,6 +587,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         m_selectedAssets.insert(entryPath);
                         m_selectedAsset = entryPath;
                         m_anchorAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                     ImGui::OpenPopup("ItemContextMenu");
                 }

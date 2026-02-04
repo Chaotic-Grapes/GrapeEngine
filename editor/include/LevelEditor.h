@@ -32,6 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 #include <unordered_set>
 #include "ConsolePanel.h"
@@ -96,6 +98,10 @@ private:
     // Event handlers
     void _onPlaybackStateChanged(EditorState oldState, EditorState newState);
     void _onViewportSelectionChanged(EntityId id);
+    // Asset selection handler for tileset -> tile palette wiring.
+    void _onAssetSelected(const std::string& assetPath);
+    // Sync tile palette/editor state from a selected entity (if it has a tilemap component).
+    void _syncTilePaletteToSelection(EntityId id);
 
     // Core state
     ECS::World* m_world = nullptr;
@@ -116,6 +122,13 @@ private:
     SpriteImportPanel m_spriteImportPanel;
     SystemsPanel m_systemsPanel;
     TilePalettePanel m_tilePalette;
+
+    // Active tilemap editing context (kept alive for renderer + palette).
+    std::shared_ptr<TileMap> m_activeTileMap;
+    std::shared_ptr<Tileset> m_activeTileset;
+    std::string m_activeTileMapPath;
+    std::string m_activeTilesetPath;
+    EntityId m_activeTileMapEntityId = ECS::Entity::NPOS32;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

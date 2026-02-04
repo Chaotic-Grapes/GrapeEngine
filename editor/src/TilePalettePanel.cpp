@@ -8,16 +8,64 @@
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
 #include "../include/core/World/TileTypes.hpp"
+#include <cstring>
 
 // Assuming ImGui::ImageButton takes ImTextureID (void*)
 // Tileset::GetTextureId() returns uint32_t (OpenGL ID).
 // We cast it to ImTextureID.
 
+namespace {
+    // Extract the first path from the ASSET_PATHS payload format.
+    std::string ParseFirstAssetPath(const ImGuiPayload* payload) {
+        if (!payload || !payload->Data || payload->DataSize == 0) {
+            return std::string();
+        }
+
+        const char* data = static_cast<const char*>(payload->Data);
+        const char* end = data + payload->DataSize;
+        if (data >= end) {
+            return std::string();
+        }
+
+        // Payload is a sequence of null-terminated strings; take the first.
+        return std::string(data);
+    }
+}
+
 void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world)
 {
-    m_tileMap = tileMap;
-    m_tileset = tileset;
-    m_world = world;
+    m_world = world; // Store world pointer for physics syncing.
+    // Initialize editing context in one place so state resets stay consistent.
+    SetEditingContext(tileMap, tileset, std::string());
+}
+
+void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
+{
+    if (m_assetDropCallback) {
+        // Forward asset path to the editor-level handler.
+        m_assetDropCallback(assetPath);
+    }
+}
+
+void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, const std::string& tileMapPath)
+{
+    // Remove any cached physics entities tied to the previous map.
+    if (m_world) {
+        for (const auto& [key, entity] : m_physicsEntities) {
+            (void)key; // Suppress unused warning for the map key.
+            if (m_world->IsAlive(entity)) {
+                m_world->Destroy(entity); // Clean up physics entities spawned by the old map.
+            }
+        }
+    }
+
+    m_physicsEntities.clear(); // Reset cached physics entity map.
+    m_tileMap = tileMap; // Assign the new active tilemap.
+    m_tileset = tileset; // Assign the new active tileset.
+    m_tileMapPath = tileMapPath; // Track map path for auto-save on edits.
+    m_selectedTileID = 0; // Reset tile selection when swapping tilesets.
+    m_currentRotation = 0; // Reset rotation to default.
+    m_isEraser = false; // Reset eraser toggle.
 }
 
 void TilePalettePanel::Render()
@@ -29,6 +77,15 @@ void TilePalettePanel::Render()
         if (!m_tileset)
         {
             ImGui::Text("No Tileset Loaded");
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const std::string assetPath = ParseFirstAssetPath(payload);
+                    if (!assetPath.empty()) {
+                        HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
             ImGui::End();
             return;
         }
@@ -59,6 +116,9 @@ void TilePalettePanel::Render()
         for (const auto& [id, def] : tiles)
         {
             ImGui::PushID(id);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Remove tile button background.
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0)); // Keep hover background transparent.
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0)); // Keep active background transparent.
             
             // Calculate UVs for ImageButton
             ImVec2 uv0(def.uv.u0, def.uv.v1); // ImGui uses top-left origin? 
@@ -74,7 +134,8 @@ void TilePalettePanel::Render()
             ImVec2 imUV1(def.uv.u1, def.uv.v0);
 
             // Highlight selected
-            if (m_selectedTileID == id && !m_isEraser)
+            const bool highlightSelected = (m_selectedTileID == id && !m_isEraser); // Cache selection state for this tile.
+            if (highlightSelected)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 0.0f, 0.5f));
             }
@@ -86,9 +147,9 @@ void TilePalettePanel::Render()
                 m_isEraser = false;
             }
 
-            if (m_selectedTileID == id && !m_isEraser)
+            if (highlightSelected)
             {
-                ImGui::PopStyleColor();
+                ImGui::PopStyleColor(); // Pop highlight only if it was pushed above.
             }
 
             float lastButtonX = ImGui::GetItemRectMax().x;
@@ -96,6 +157,7 @@ void TilePalettePanel::Render()
             if (i + 1 < tiles.size() && nextButtonX < windowVisibleX)
                 ImGui::SameLine();
 
+            ImGui::PopStyleColor(3);
             ImGui::PopID();
             i++;
         }
@@ -104,6 +166,25 @@ void TilePalettePanel::Render()
         if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_R))
         {
              m_currentRotation = (m_currentRotation + 1) % 4;
+        }
+
+        // Allow drag-and-drop of assets directly onto the palette window.
+        const ImVec2 windowPos = ImGui::GetWindowPos(); // Cache window position for manual ImVec2 math.
+        const ImVec2 contentMinLocal = ImGui::GetWindowContentRegionMin(); // Content region min (local).
+        const ImVec2 contentMaxLocal = ImGui::GetWindowContentRegionMax(); // Content region max (local).
+        const ImVec2 contentMin(windowPos.x + contentMinLocal.x, windowPos.y + contentMinLocal.y);
+        const ImVec2 contentMax(windowPos.x + contentMaxLocal.x, windowPos.y + contentMaxLocal.y);
+        const ImVec2 contentSize(contentMax.x - contentMin.x, contentMax.y - contentMin.y);
+        ImGui::SetCursorScreenPos(contentMin);
+        ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const std::string assetPath = ParseFirstAssetPath(payload);
+                if (!assetPath.empty()) {
+                    HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+                }
+            }
+            ImGui::EndDragDropTarget();
         }
     }
     ImGui::End();
@@ -117,6 +198,11 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
     if (ImGui::IsKeyPressed(ImGuiKey_R))
     {
         m_currentRotation = (m_currentRotation + 1) % 4;
+    }
+
+    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
+        // TileMap::WorldToTile asserts on negative coordinates; skip out-of-bounds positions.
+        return;
     }
 
     uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
@@ -142,6 +228,11 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
 {
     if (!m_tileMap || !m_tileset) return false;
 
+    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
+        // TileMap::WorldToTile asserts on negative coordinates; ignore clicks outside the map quadrant.
+        return false;
+    }
+
     uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
     uint32_t ty = m_tileMap->WorldToTile(worldPos.y);
     
@@ -163,6 +254,11 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
         TileID packed = PackTile(m_selectedTileID, m_currentRotation);
         m_tileMap->SetTile(0, tx, ty, packed);
         SyncPhysics(tx, ty, packed, false);
+    }
+
+    if (!m_tileMapPath.empty()) {
+        // Persist edits immediately so the tilemap asset stays in sync.
+        m_tileMap->SaveMap(m_tileMapPath);
     }
 
     return true;
