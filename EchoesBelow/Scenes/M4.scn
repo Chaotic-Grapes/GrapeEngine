@@ -117,7 +117,7 @@
                             "X": 0.1599999964237213,
                             "Y": 0.3400000035762787
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": -0.0
@@ -392,7 +392,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.6008316278457642,
+                        "AspectRatio": 1.0811638832092285,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -1419,7 +1419,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -1430,7 +1430,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -1531,7 +1531,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -1542,7 +1542,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -1643,7 +1643,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -1654,7 +1654,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -1755,7 +1755,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.009999999776482582,
                             "Y": 0.0
@@ -1766,7 +1766,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -1867,7 +1867,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -1878,7 +1878,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -1979,7 +1979,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -1990,7 +1990,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2091,7 +2091,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2102,7 +2102,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2209,7 +2209,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2220,7 +2220,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2327,7 +2327,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2338,7 +2338,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2445,7 +2445,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2456,7 +2456,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2563,7 +2563,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2574,7 +2574,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2681,7 +2681,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2692,7 +2692,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2799,7 +2799,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2810,7 +2810,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -2917,7 +2917,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -2928,7 +2928,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -3035,7 +3035,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3046,7 +3046,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -3153,7 +3153,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3164,7 +3164,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -3271,7 +3271,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3282,7 +3282,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -3389,7 +3389,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3400,7 +3400,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 2
                     },
                     "TypeName": "Layer"
                 },
@@ -4005,7 +4005,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Box (Clone)"
+                        "Value": "PlankWall"
                     },
                     "TypeName": "Name"
                 },
@@ -4022,7 +4022,7 @@
                             "X": 11.5,
                             "Y": 0.5
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4193,8 +4193,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -0.010443180799484253,
-                            "Y": -3.7273054122924805,
+                            "X": 0.35206741094589233,
+                            "Y": -4.419371604919434,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -4220,7 +4220,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": -0.05000000074505806,
                             "Y": 0.47999998927116394
@@ -4274,11 +4274,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -0.010443180799484253,
+                            "m03": 0.35206741094589233,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -3.7273054122924805,
+                            "m13": -4.419371604919434,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -4298,8 +4298,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -2.324561834335327,
-                            "Y": -3.6708638668060303,
+                            "X": -2.7365059852600098,
+                            "Y": -4.6265740394592285,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -4325,7 +4325,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": -0.009999999776482582,
                             "Y": 0.47999998927116394
@@ -4379,11 +4379,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -2.324561834335327,
+                            "m03": -2.7365059852600098,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -3.6708638668060303,
+                            "m13": -4.6265740394592285,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -4403,8 +4403,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -3.260298728942871,
-                            "Y": -2.71871018409729,
+                            "X": -3.4745097160339355,
+                            "Y": -3.839198350906372,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -4430,7 +4430,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": -0.009999999776482582,
                             "Y": 0.47999998927116394
@@ -4484,11 +4484,11 @@
                             "m00": 0.6775302290916443,
                             "m01": 0.7354947924613953,
                             "m02": 0.0,
-                            "m03": -3.260298728942871,
+                            "m03": -3.4745097160339355,
                             "m10": -0.7354947924613953,
                             "m11": 0.6775302290916443,
                             "m12": 0.0,
-                            "m13": -2.71871018409729,
+                            "m13": -3.839198350906372,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -4535,7 +4535,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": -0.05000000074505806,
                             "Y": 0.47999998927116394
@@ -4789,7 +4789,7 @@
                             "X": 0.20000000298023224,
                             "Y": 0.5
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4974,7 +4974,7 @@
                 {
                     "Data": {
                         "Flags": 1,
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -5075,7 +5075,7 @@
                             "X": 0.5,
                             "Y": 0.30000001192092896
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": -0.10000000149011612,
                             "Y": 1.600000023841858
@@ -5641,7 +5641,7 @@
                             "X": 0.20000000298023224,
                             "Y": 0.699999988079071
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -6318,7 +6318,7 @@
                             "X": 0.20000000298023224,
                             "Y": 0.699999988079071
                         },
-                        "LayerMask": 4294967295,
+                        "LayerMask": 4294967294,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -6955,25 +6955,307 @@
                     "TypeName": "WorldTransform"
                 }
             ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -12.461140632629395,
+                            "Y": -4.287209987640381,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.5099999904632568,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BigWall"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 11.5,
+                            "Y": 4.5
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 32,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.0
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.5,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 4.389999866485596
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 0,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 9.998999303206801e-05,
+                            "G": 9.998999303206801e-05,
+                            "R": 9.999999747378752e-05
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 11.5,
+                            "Y": 4.5
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.5099999904632568,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -12.461140632629395,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -4.287209987640381,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -0.6671416759490967,
+                            "Y": -8.935839653015137,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.5099999904632568,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "VerticalWall"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 11.5,
+                            "Y": 0.5
+                        },
+                        "LayerMask": 4294967294,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 32,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.0
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.5,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 4.389999866485596
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 0,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 9.998999303206801e-05,
+                            "G": 9.998999303206801e-05,
+                            "R": 9.999999747378752e-05
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 11.5,
+                            "Y": 0.5
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.5099999904632568,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -0.6671416759490967,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -8.935839653015137,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
         }
     ],
-    "EntityCount": 70,
+    "EntityCount": 72,
     "Hierarchy": [
         {
-            "child": 42,
-            "parent": 41
-        },
-        {
-            "child": 43,
-            "parent": 41
-        },
-        {
-            "child": 44,
-            "parent": 41
-        },
-        {
-            "child": 45,
-            "parent": 41
+            "child": 40,
+            "parent": 39
         },
         {
             "child": 14,
@@ -7052,20 +7334,8 @@
             "parent": 63
         },
         {
-            "child": 1,
-            "parent": 0
-        },
-        {
-            "child": 34,
-            "parent": 13
-        },
-        {
-            "child": 35,
-            "parent": 13
-        },
-        {
-            "child": 41,
-            "parent": 39
+            "child": 3,
+            "parent": 2
         },
         {
             "child": 8,
@@ -7076,16 +7346,16 @@
             "parent": 10
         },
         {
-            "child": 46,
-            "parent": 39
+            "child": 1,
+            "parent": 0
         },
         {
-            "child": 40,
-            "parent": 39
+            "child": 34,
+            "parent": 13
         },
         {
-            "child": 3,
-            "parent": 2
+            "child": 35,
+            "parent": 13
         },
         {
             "child": 20,
@@ -7152,6 +7422,26 @@
             "parent": 13
         },
         {
+            "child": 41,
+            "parent": 39
+        },
+        {
+            "child": 42,
+            "parent": 41
+        },
+        {
+            "child": 43,
+            "parent": 41
+        },
+        {
+            "child": 44,
+            "parent": 41
+        },
+        {
+            "child": 45,
+            "parent": 41
+        },
+        {
             "child": 21,
             "parent": 14
         },
@@ -7198,13 +7488,17 @@
         {
             "child": 32,
             "parent": 14
+        },
+        {
+            "child": 46,
+            "parent": 39
         }
     ],
     "Layers": [
         {
             "id": 0,
             "locked": false,
-            "mask": 4294967295,
+            "mask": 4294967294,
             "name": "Background",
             "physicsEnabled": true,
             "renderEnabled": true,
