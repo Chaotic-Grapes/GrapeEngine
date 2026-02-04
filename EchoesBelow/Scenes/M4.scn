@@ -2184,7 +2184,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.9897750616073608,
+                        "AspectRatio": 1.5977011919021606,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -5106,6 +5106,8 @@
                 },
                 {
                     "Data": {
+                        "ms01_signifier": 1234567890,
+                        "ms02_signifier": 1234567891,
                         "start": false
                     },
                     "TypeName": "Inventory Controller"
@@ -5877,20 +5879,32 @@
     "EntityCount": 53,
     "Hierarchy": [
         {
-            "child": 43,
+            "child": 19,
+            "parent": 18
+        },
+        {
+            "child": 22,
+            "parent": 18
+        },
+        {
+            "child": 20,
+            "parent": 18
+        },
+        {
+            "child": 9,
+            "parent": 0
+        },
+        {
+            "child": 10,
+            "parent": 0
+        },
+        {
+            "child": 21,
+            "parent": 18
+        },
+        {
+            "child": 45,
             "parent": 23
-        },
-        {
-            "child": 11,
-            "parent": 0
-        },
-        {
-            "child": 12,
-            "parent": 0
-        },
-        {
-            "child": 1,
-            "parent": 0
         },
         {
             "child": 25,
@@ -5965,6 +5979,14 @@
             "parent": 24
         },
         {
+            "child": 47,
+            "parent": 46
+        },
+        {
+            "child": 49,
+            "parent": 46
+        },
+        {
             "child": 2,
             "parent": 0
         },
@@ -5981,6 +6003,34 @@
             "parent": 0
         },
         {
+            "child": 48,
+            "parent": 47
+        },
+        {
+            "child": 50,
+            "parent": 49
+        },
+        {
+            "child": 12,
+            "parent": 0
+        },
+        {
+            "child": 1,
+            "parent": 0
+        },
+        {
+            "child": 13,
+            "parent": 0
+        },
+        {
+            "child": 43,
+            "parent": 23
+        },
+        {
+            "child": 11,
+            "parent": 0
+        },
+        {
             "child": 6,
             "parent": 0
         },
@@ -5993,60 +6043,12 @@
             "parent": 0
         },
         {
-            "child": 9,
-            "parent": 0
-        },
-        {
-            "child": 10,
-            "parent": 0
-        },
-        {
-            "child": 13,
-            "parent": 0
-        },
-        {
-            "child": 19,
-            "parent": 18
-        },
-        {
-            "child": 20,
-            "parent": 18
-        },
-        {
             "child": 24,
             "parent": 23
         },
         {
             "child": 44,
             "parent": 23
-        },
-        {
-            "child": 45,
-            "parent": 23
-        },
-        {
-            "child": 21,
-            "parent": 18
-        },
-        {
-            "child": 22,
-            "parent": 18
-        },
-        {
-            "child": 47,
-            "parent": 46
-        },
-        {
-            "child": 49,
-            "parent": 46
-        },
-        {
-            "child": 48,
-            "parent": 47
-        },
-        {
-            "child": 50,
-            "parent": 49
         }
     ],
     "Layers": [

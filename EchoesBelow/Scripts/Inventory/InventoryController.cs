@@ -5,10 +5,11 @@ using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using System.Collections.Generic;
+using System.Runtime;
 
 namespace EchoesBelow.Scripts;
 
-[Component] public record struct InventoryControllerComponent(bool start, int ms01_signifier, int mso2_signifier);
+[Component] public record struct InventoryControllerComponent(bool start, int ms01_signifier, int ms02_signifier);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class InventoryController : SystemBase
 {
@@ -22,7 +23,7 @@ public class InventoryController : SystemBase
     protected override void OnCreate()
     {
         instance = this;
-        Log("System CamFollow initialized");
+        Log("System InventoryController initialized");
     }
     private bool OnStart(ref bool startBool)
     {
@@ -55,14 +56,33 @@ public class InventoryController : SystemBase
         {
             case 1:
                 ms01_Count++;
-                //foreach(var ui in World!.Query<MatchSignifierComponent>())
+                foreach(var ui in World!.Query<MatchSignifierComponent>())
+                {
+                    foreach(var inventory in World!.Query<InventoryControllerComponent>())
+                    {
+                        if(ui.Component1.signifierID == inventory.Component1.ms01_signifier) 
+                        {
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"ms01: {ms01_Count}");          
+                        }
+                    }
+                }
                 break;
             case 2:
                 ms02_Count++;
+                foreach (var ui in World!.Query<MatchSignifierComponent>())
+                {
+                    foreach (var inventory in World!.Query<InventoryControllerComponent>())
+                    {
+                        if (ui.Component1.signifierID == inventory.Component1.ms02_signifier)
+                        {
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"ms02: {ms02_Count}");
+                        }
+                    }
+                }
                 break;
         }
-        Log($"ms01 Slot: {ms01_Count}items");
-        Log($"ms02 Slot: {ms02_Count}items");
+        //Log($"ms01 Slot: {ms01_Count}items");
+        //Log($"ms02 Slot: {ms02_Count}items");
 
     }
     public void DecrementInStackSlot(int msID)

@@ -169,7 +169,9 @@ public class MS_Manager : SystemBase
                 return;
             }
             id_Iterator++;
+
         }
+        
     }        
     
     private void InitPoolObj(Vector3 newPos, ulong pulledObjId, float decayTime)
