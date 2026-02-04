@@ -22,6 +22,9 @@ public class Player : SystemBase
 {
     public static Player instance;
 
+    PlayerAnimPreset dashState = new PlayerAnimPreset(0, 0, 20, 24f);
+    PlayerAnimPreset idleState = new PlayerAnimPreset(0, 20, 65, 30f);
+
     public static Compass abs_InputDirection = Compass.N;
     public Vector3 currentPos;
     const float lerpFac = 1;
@@ -50,7 +53,7 @@ public class Player : SystemBase
         dashCoolDownTimer = 0;
         isCoolingDown = false;
 
-
+        PlayerAnimManager.instance.SetAnimState(idleState);
 
 
         //End of Start
@@ -63,15 +66,28 @@ public class Player : SystemBase
         isKeyDown_S = Input.IsKeyDown(KeyCode.S);
         isKeyDown_D = Input.IsKeyDown(KeyCode.D);
 
-        foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
+        foreach (var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
             //A Pseudo Start function, called once per obj at runtime
             //This allows onStart to work
             bool start = gameObject.Component1.start;
             gameObject.Component1.start = OnStart(ref start);
 
-            //Variables
-            ref LocalTransform transform = ref gameObject.Component4;
+            //Anim
+            if (isKeyDown_A || isKeyDown_D || isKeyDown_W || isKeyDown_S)
+            {
+                PlayerAnimManager.instance.SetAnimState(dashState);
+            }
+            else
+            {
+                PlayerAnimManager.instance.SetAnimState(idleState);
+            }
+
+
+
+
+                //Variables
+                ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
             ref AngularVelocity2D av = ref gameObject.Component3;
             Vector2 playerDir;
