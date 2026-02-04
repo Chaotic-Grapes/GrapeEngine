@@ -1,7 +1,9 @@
 [
     "Scenes/ButtonExperiment.scn",
+    "Scenes/ComponentSmasher.scn",
     "Scenes/KairuTest.scn",
     "Scenes/M3_scene.scn",
+    "Scenes/M4.scn",
     "Scenes/MainScene.scn",
     "Scenes/Samples Demo/GuiSample.scn",
     "Scenes/Samples Demo/LayerSystemSample.scn",

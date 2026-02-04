@@ -551,6 +551,7 @@ namespace Scenes {
                     if (!m_crossfadeTriggered) {
                         m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, true);
                         m_crossfadeTriggered = true;
+                        return; // Start fade first, transition next update
                     }
                 }
                 else if (!m_waitingForFadeOut) {

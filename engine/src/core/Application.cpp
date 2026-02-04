@@ -152,11 +152,11 @@ namespace Engine {
             }
         }
 
-        // --- Update Services ---
-        m_audio->Update();
-
         // --- Scene Update ---
         m_sceneManager.Update();
+
+        // --- Update Services ---
+        m_audio->Update();
         auto* currentScene = m_sceneManager.GetActive();
         
         if (currentScene) {
