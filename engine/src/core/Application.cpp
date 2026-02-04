@@ -32,6 +32,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/Scene.h"
 #include "services/Input.h"
 #include "services/MemoryManager.h"
+#include "services/ResourceManager.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
@@ -201,6 +202,17 @@ namespace Engine {
 
         // Stop device change detection
         DeviceManager::StopAudioDeviceChangeDetection();
+
+        // Destroy ECS systems before tearing down rendering/audio backends.
+        ECS::World emptyWorld;
+        if (auto* activeScene = m_sceneManager.GetActive()) {
+            m_systemManager.DestroyAll(activeScene->GetWorld());
+        } else {
+            m_systemManager.DestroyAll(emptyWorld);
+        }
+
+        // Release cached graphics/audio resources while the backend is alive.
+        RM.ClearCache();
 
         // Clean up services
         if (m_scriptManager) {
