@@ -5,6 +5,7 @@ using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
+using EchoesBelow.Scripts.MarineSnowSystem;
 
 namespace EchoesBelow.Scripts;
 
@@ -242,10 +243,41 @@ public class Player : SystemBase
     }
 }
 
-//public class CollisionTestSystem : CollisionSystemBase
-//{
-//    protected void override OnCollisionEnter()
-//    {
+//[Component] public record struct PlayerCollisionHandler();
+[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
+public class PlayerCollisionHandler : CollisionSystemBase
+{
+    protected override void OnCreate()
+    {
+        Log("System CollisionTest initialized");
+    }
 
-//    }
-//}
+    protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
+    {
+        base.OnCollisionEnter(self, evt);
+
+        if (self.HasComponent<PlayerComponent>()) CollisionEntered(self, evt);
+    }
+
+    private void CollisionEntered(Entity self, CollisionEvent evt)
+    {
+        //do Everything in here
+        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}");
+        Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        if (other.HasComponent<MS_ManagerComponent>())
+        {
+            MS_Manager.instance.SendToPool(other.Id);
+            InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
+        }
+    }
+
+    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
+    {
+        base.OnCollisionExit(self, evt);
+        //foreach (var gameObject in World!.Query<CollisionTestComponent>())
+        //{
+        //    Log("Hello I Exited");
+        //}
+    }
+
+}
