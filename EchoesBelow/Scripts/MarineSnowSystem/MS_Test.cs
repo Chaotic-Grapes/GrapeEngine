@@ -25,11 +25,11 @@ public class MS_Test : SystemBase
         {
             if (Input.IsKeyPressed(KeyCode.P))
             {
-                MS_Manager.instance.PullFromPool(result.Component1.pullThis, new Vector3(0, 0, 0));
+                MS_Manager.instance.TakeFromPool(result.Component1.pullThis, new Vector3(0, 0, 0),5);
             }
             if (Input.IsKeyPressed(KeyCode.R))
             {
-                MS_Manager.instance.ReturnToPool((ulong)result.Component1.returnThis);
+                MS_Manager.instance.SendToPool((ulong)result.Component1.returnThis);
             }
 
             if (Input.IsKeyPressed(KeyCode.I))

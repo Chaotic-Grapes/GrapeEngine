@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace EchoesBelow.Scripts.MarineSnowSystem;
 
-[Component] public record struct MS_SpawnerComponent(bool start, float spawnInterval, int toSpawn, float timer);
+[Component] public record struct MS_SpawnerComponent(bool start, float spawnInterval, int toSpawn, float timer,float decayTime);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class MS_Spawner : SystemBase
 {
@@ -58,16 +58,20 @@ public class MS_Spawner : SystemBase
                 float xBoundaryMax = transform.Position.X + boundary.HalfExtents.X;
                 float xBoundaryMin = transform.Position.X - boundary.HalfExtents.X;
                 
+                //Marine Snow selector
+                string msID_raw = gameObject.Component1.toSpawn.ToString();
+                msID_raw.ToCharArray();
                 int msID = GMath.Random(0, 1) + 1;
-               
+                //How many to spawn
                 int spawnCount = GMath.Random(1, 2);
+                //Spawner
                 for (int i = 0; i < spawnCount; i++)
                 {
                     //Generate new spawn Coordinate
                     float xValue = GMath.Random(xBoundaryMin, xBoundaryMax);
                     Vector3 spawnPos = new Vector3(xValue, transform.Position.Y, 0);
                     
-                    if(MS_Manager.instance.PullFromPool(msID, spawnPos) == MS_Manager.instance.emptyId) continue;
+                    if(MS_Manager.instance.TakeFromPool(msID, spawnPos,gameObject.Component1.decayTime) == MS_Manager.instance.emptyId) continue;
                 }
             }
         }

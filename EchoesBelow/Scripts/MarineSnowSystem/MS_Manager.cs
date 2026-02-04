@@ -6,16 +6,14 @@ using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 
 
 namespace EchoesBelow.Scripts.MarineSnowSystem;
 [Component] public record struct MS_ManagerComponent(
 
     int msID,
-    bool start,
-    bool objPoolsCreated
-
+    bool start
+    
 );
 
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
@@ -35,52 +33,24 @@ public class MS_Manager : SystemBase
     public static MS_Manager instance;
     public ulong poolContainerId;
 
-    float timer = 0;
+    public static float globalDecayTime;
 
     public ulong emptyId = 99999999999;
     private Vector3 poolLocation = new Vector3(10000, 10000, 0);
 
     protected override void OnCreate()
     {
-        Log("System MS_Manager initialized");
         //This is only ever called once, so there is only one instance assignment
         //initialize
         instance = this;
-
-
-
+        Log("System MS_Manager initialized");
+        
     }
     private bool OnStart(ref bool startBool, ulong objID, int msID)
     {
         if (startBool == true) return true;
         startBool = true;
         //Todo
-        
-        //if(msID == 0)
-        //{
-        //    //For MS Manager instance
-        //    poolContainerId = objID;
-
-        //    Log("Initialize Pools ! poolContainerId: " + poolContainerId);
-
-        //    ms01_ObjectPool = new List<ulong>();
-        //    ms02_ObjectPool = new List<ulong>();
-        //    ms03_ObjectPool = new List<ulong>();
-        //    ms04_ObjectPool = new List<ulong>();
-        //    ms05_ObjectPool = new List<ulong>();
-        //    ms06_ObjectPool = new List<ulong>();
-        //    ms07_ObjectPool = new List<ulong>();
-
-        //    objPools = new List<ulong>[7];
-        //    objPools[0] = ms01_ObjectPool;
-        //    objPools[1] = ms02_ObjectPool;
-        //    objPools[2] = ms03_ObjectPool;
-        //    objPools[3] = ms04_ObjectPool;
-        //    objPools[4] = ms05_ObjectPool;
-        //    objPools[5] = ms06_ObjectPool;
-        //    objPools[6] = ms07_ObjectPool;
-        //}
-
 
         switch (msID)
         {
@@ -114,7 +84,7 @@ public class MS_Manager : SystemBase
             case 5:
             case 6:
             case 7:
-                ReturnToPool(objID);
+                SendToPool(objID);
                 break;
         }
 
@@ -128,9 +98,10 @@ public class MS_Manager : SystemBase
             ulong objID = gameObject.Entity.Id;
             int msID = gameObject.Component1.msID;
 
+            //This kinda works like an OnAwake( ) function
             bool start = gameObject.Component1.start;
             gameObject.Component1.start = OnStart(ref start, objID, msID);
-            gameObject.Component1.objPoolsCreated = true;
+
         }
 
 
@@ -155,44 +126,9 @@ public class MS_Manager : SystemBase
                     Log($"list 0{++i} count: {objPool.Count}");
                 }
             }
-
-
-            switch (msID)
-            {
-                case 1:
-                    
-
-                    break;
-                case 2:
-
-
-                    break;
-                case 3:
-
-
-                    break;
-                case 4:
-
-
-                    break;
-                case 5:
-
-
-                    break;
-                case 6:
-
-
-                    break;
-                case 7:
-
-
-                    break;
-                default:
-                    break;
-            }
         }
     }
-    public ulong PullFromPool(int msID, Vector3 newPos)
+    public ulong TakeFromPool(int msID, Vector3 newPos, float decayTime)
     {
         int id_Iterator = 1;
         foreach(List<ulong>objPool in objPools)
@@ -202,37 +138,24 @@ public class MS_Manager : SystemBase
             {
                 ulong pulledObjId = objPool[objPool.Count - 1];
                 objPool.Remove(pulledObjId);
-                //Set to new transform
-                Entity pulledEntity = Entity.FromId(World!, pulledObjId);
-                ref LocalTransform transform = ref pulledEntity.GetComponent<LocalTransform>();
-                transform.Position = newPos;
-                //Remove from parent
-                //pulledEntity.Detach();
 
-                //Add gravity and forces
-                ref Rigidbody2D rb = ref pulledEntity.AddComponent<Rigidbody2D>();
-                rb.GravityScale = 0.01f;
-                rb.Mass = 1;
-                rb.LinearDamping = 0.05f;
-                rb.Flags = 2u;
-                ref LinearVelocity2D lv = ref pulledEntity.AddComponent<LinearVelocity2D>();
-                lv.Value.X = GMath.Random(0.1f, 1.8f);
-                pulledEntity.AddComponent<AngularVelocity2D>();
+                InitPoolObj(newPos, pulledObjId, decayTime);
 
-                Log($"Pulled from Pool {id_Iterator}!");
+                Log($"Taken from Pool {id_Iterator}!");
                 return pulledObjId;
             }
             id_Iterator++;
         }
         return emptyId;
     }
-    public void ReturnToPool(ulong returningObjId)
+
+
+
+    public void SendToPool(ulong returningObjId)
     {
         int id_Iterator = 1;
-        //int i = 0;
         foreach (List<ulong> objPool in objPools)
         {
-            //Log("Hello"+i);
             //check if i++ == target msID
             if (Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID == id_Iterator)
             {
@@ -240,17 +163,38 @@ public class MS_Manager : SystemBase
                 objPool.Add(returningObjId);
                 ResetPoolObj(returningObjId);
 
-
                 //returningEntity.GetComponent<Active>().Enabled = false;
 
-                Log($"Returned ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!");
+                Log($"Sent ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!");
                 return;
             }
-            Log("idIterator " + id_Iterator);
             id_Iterator++;
-            
         }
-    }    
+    }        
+    
+    private void InitPoolObj(Vector3 newPos, ulong pulledObjId, float decayTime)
+    {
+        //Set to new transform
+        Entity pulledEntity = Entity.FromId(World!, pulledObjId);
+        ref LocalTransform transform = ref pulledEntity.GetComponent<LocalTransform>();
+        transform.Position = newPos;
+        //Remove from parent
+        //pulledEntity.Detach();
+
+        //Add gravity and forces
+        ref Rigidbody2D rb = ref pulledEntity.AddComponent<Rigidbody2D>();
+        rb.GravityScale = 0.01f;
+        rb.Mass = 1;
+        rb.LinearDamping = 0.05f;
+        rb.Flags = 2u;
+        ref LinearVelocity2D lv = ref pulledEntity.AddComponent<LinearVelocity2D>();
+        lv.Value.X = GMath.Random(0.1f, 1f);
+        pulledEntity.AddComponent<AngularVelocity2D>();
+        //Add Decay Component HARDCODED
+        ref MS_DecayComponent decay = ref pulledEntity.AddComponent<MS_DecayComponent>();
+        decay.decayTime = decayTime;
+
+    }
     private void ResetPoolObj(ulong objID)
     {
         Entity targetEntity = Entity.FromId(World!, objID);
@@ -261,6 +205,7 @@ public class MS_Manager : SystemBase
         if (returningEntity.HasComponent<Rigidbody2D>()) returningEntity.RemoveComponent<Rigidbody2D>();
         if (returningEntity.HasComponent<LinearVelocity2D>()) returningEntity.RemoveComponent<LinearVelocity2D>();
         if (returningEntity.HasComponent<AngularVelocity2D>()) returningEntity.RemoveComponent<AngularVelocity2D>();
+        if (returningEntity.HasComponent<MS_DecayComponent>()) returningEntity.RemoveComponent<MS_DecayComponent>();
         //targetEntity.AttachTo(Entity.FromId(World!,poolContainerId));
     }
     protected override void OnDestroy()
