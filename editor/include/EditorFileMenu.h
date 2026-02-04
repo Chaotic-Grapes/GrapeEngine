@@ -63,6 +63,11 @@ public:
         m_clearPlaybackSnapshot = std::move(callback);
     }
 
+    // Called before scene save to persist external assets (e.g., tilemaps).
+    void SetPreSaveCallback(std::function<void(const std::string&)> callback) {
+        m_preSaveCallback = std::move(callback);
+    }
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -91,6 +96,9 @@ public:
 
     // Saves to current scene path if known; otherwise falls back to Save As
     void SaveScene();
+
+    // Expose the current scene path for editor systems.
+    const std::string& GetCurrentScenePath() const { return m_currentScenePath; }
 
     // Mark the scene as having unsaved changes (only if it was loaded from a file)
     void MarkSceneDirty() {
@@ -131,6 +139,8 @@ private:
     std::function<EditorState()> m_getEditorState = nullptr;
     // Optional callback to clear playback snapshot on in-place reload.
     std::function<void()> m_clearPlaybackSnapshot;
+    // Optional callback to sync external assets before scene serialization.
+    std::function<void(const std::string&)> m_preSaveCallback;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes

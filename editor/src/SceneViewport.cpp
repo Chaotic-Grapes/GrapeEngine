@@ -503,6 +503,56 @@ void SceneViewport::_renderViewport() {
 
                         // Let tile palette panel handle hover and clicks
                         m_tilePalettePanel->OnViewportHover(worldPos);
+
+                        // Draw tilemap bounds/grid when tile palette is active.
+                        if (rendererSystem) {
+                            const auto& map = m_tilePalettePanel->GetTileMap();
+                            const glm::vec2 mapOrigin = m_tilePalettePanel->GetTileMapOrigin(); // Tilemap origin in world space.
+                            if (map && map->LayerCount() > 0) {
+                                const auto& layer = map->GetLayer(0);
+                                const float tileSize = map->TileSize();
+
+                                // Compute camera-aligned extents for an "infinite" grid overlay.
+                                float halfHeight = 10.0f;
+                                float halfWidth = 10.0f;
+                                if (camera->UsePerspective) {
+                                    const float dist = std::max(1.0f, std::abs(camera->Position.z));
+                                    const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
+                                    halfHeight = std::max(1.0f, halfHeightView);
+                                    halfWidth = halfHeight * camera->AspectRatio;
+                                } else {
+                                    halfHeight = std::max(1.0f, camera->OrthoSize);
+                                    halfWidth = halfHeight * camera->AspectRatio;
+                                }
+
+                                const glm::vec2 camPos(camera->Position.x, camera->Position.y);
+                                const glm::vec2 camLocal = camPos - mapOrigin; // Align grid to the tilemap origin.
+                                const float startX = std::floor((camLocal.x - halfWidth) / tileSize) * tileSize + mapOrigin.x;
+                                const float endX = camPos.x + halfWidth;
+                                const float startY = std::floor((camLocal.y - halfHeight) / tileSize) * tileSize + mapOrigin.y;
+                                const float endY = camPos.y + halfHeight;
+
+                                // Draw infinite-ish grid within the camera view.
+                                const glm::vec4 gridColor(0.6f, 0.8f, 0.9f, 0.12f);
+                                const uint32_t maxLines = 256;
+                                uint32_t lineCount = 0;
+                                for (float x = startX; x <= endX && lineCount < maxLines; x += tileSize, ++lineCount) {
+                                    rendererSystem->SubmitWireframeLine(glm::vec2(x, startY), glm::vec2(x, endY), gridColor, 0.02f);
+                                }
+                                lineCount = 0;
+                                for (float y = startY; y <= endY && lineCount < maxLines; y += tileSize, ++lineCount) {
+                                    rendererSystem->SubmitWireframeLine(glm::vec2(startX, y), glm::vec2(endX, y), gridColor, 0.02f);
+                                }
+
+                                // Draw current tilemap bounds as a separate outline.
+                                const glm::vec2 min(mapOrigin.x + map->TileToWorldSigned(map->OriginX()),
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY())); // Bounds min in world space.
+                                const glm::vec2 max(mapOrigin.x + map->TileToWorldSigned(map->OriginX() + static_cast<int32_t>(layer.Width())),
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY() + static_cast<int32_t>(layer.Height()))); // Bounds max in world space.
+                                const glm::vec4 outlineColor(0.2f, 0.9f, 0.9f, 0.45f);
+                                rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
+                            }
+                        }
                         bool left = Input::IsMousePressed(MOUSE_LEFT);
                         bool right = Input::IsMousePressed(MOUSE_RIGHT);
                         if (left || right) {
@@ -534,7 +584,6 @@ void SceneViewport::_renderViewport() {
                     // Draw grid/axes overlays anchored to camera view.
                     if (m_showGrid || m_showAxes) {
                         const glm::vec2 camPos(camera->Position.x, camera->Position.y);
-                        float step = 1.0f;
                         float halfWidth = 10.0f;
                         float halfHeight = 10.0f;
 
@@ -543,12 +592,17 @@ void SceneViewport::_renderViewport() {
                             const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
                             halfHeight = std::max(1.0f, halfHeightView);
                             halfWidth = halfHeight * camera->AspectRatio;
-                            const float scale = std::pow(10.0f, std::floor(std::log10(halfHeight)));
-                            step = std::max(0.5f, scale * 0.25f);
                         } else {
                             halfHeight = std::max(1.0f, camera->OrthoSize);
                             halfWidth = halfHeight * camera->AspectRatio;
-                            step = std::max(0.25f, halfHeight / 10.0f);
+                        }
+
+                        float step = 1.0f;
+                        if (m_tilePalettePanel) {
+                            const auto& map = m_tilePalettePanel->GetTileMap();
+                            if (map && map->LayerCount() > 0) {
+                                step = std::max(0.001f, map->TileSize());
+                            }
                         }
 
                         // Calculate grid start and end positions aligned to step size
@@ -561,25 +615,30 @@ void SceneViewport::_renderViewport() {
                         const glm::vec4 gridColor{ 0.35f, 0.40f, 0.45f, 0.35f };
                         const glm::vec4 axisX{ 0.90f, 0.25f, 0.25f, 0.8f };
                         const glm::vec4 axisY{ 0.25f, 0.85f, 0.35f, 0.8f };
+                        const float gridThickness = 0.02f;
+                        const float axisThickness = 0.02f;
 
                         // Draw grid lines, if enabled
                         if (m_showGrid) {
-                            for (float x = startX; x <= endX; x += step) {
+                            const uint32_t maxLines = 256;
+                            uint32_t lineCount = 0;
+                            for (float x = startX; x <= endX && lineCount < maxLines; x += step, ++lineCount) {
                                 rendererSystem->SubmitWireframeLine(glm::vec2(x, camPos.y - halfHeight),
-                                    glm::vec2(x, camPos.y + halfHeight), gridColor, 0.06f);
+                                    glm::vec2(x, camPos.y + halfHeight), gridColor, gridThickness);
                             }
-                            for (float y = startY; y <= endY; y += step) {
+                            lineCount = 0;
+                            for (float y = startY; y <= endY && lineCount < maxLines; y += step, ++lineCount) {
                                 rendererSystem->SubmitWireframeLine(glm::vec2(camPos.x - halfWidth, y),
-                                    glm::vec2(camPos.x + halfWidth, y), gridColor, 0.06f);
+                                    glm::vec2(camPos.x + halfWidth, y), gridColor, gridThickness);
                             }
                         }
 
                         // Draw axes, if enabled
                         if (m_showAxes) {
                             rendererSystem->SubmitWireframeLine(glm::vec2(camPos.x - halfWidth, 0.0f),
-                                glm::vec2(camPos.x + halfWidth, 0.0f), axisX, 0.10f);
+                                glm::vec2(camPos.x + halfWidth, 0.0f), axisX, axisThickness);
                             rendererSystem->SubmitWireframeLine(glm::vec2(0.0f, camPos.y - halfHeight),
-                                glm::vec2(0.0f, camPos.y + halfHeight), axisY, 0.10f);
+                                glm::vec2(0.0f, camPos.y + halfHeight), axisY, axisThickness);
                         }
                     }
 

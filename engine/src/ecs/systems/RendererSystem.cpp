@@ -583,12 +583,29 @@ namespace ECS {
                     // ===============================
                     if (m_debugTileMap && m_debugTileset)
                     {
+                        // Backward-compatible single debug tilemap path.
                         TileMapRenderer tileRenderer;
+                        const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
                         tileRenderer.Submit(
                             *m_debugTileMap,
-                            *m_debugTileset,
-                            *m_renderer
+                            tilesets,
+                            *m_renderer,
+                            m_debugTileMapOffset
                         );
+                    }
+
+                    if (!m_debugTileMaps.empty())
+                    {
+                        // Render all tilemaps requested by the editor.
+                        TileMapRenderer tileRenderer;
+                        for (const auto& entry : m_debugTileMaps) {
+                            tileRenderer.Submit(
+                                entry.Map.get(),
+                                entry.Tilesets,
+                                *m_renderer,
+                                entry.Offset
+                            );
+                        }
                     }
 
                     for (ECS::Entity entity : list) {
@@ -1095,8 +1112,8 @@ namespace ECS {
         m_renderGraph->AddPass("Wireframe", { "LDR" }, { "LDR" },
             [this, &viewProj](ResourceAccessor& res)
             {
-                // Skip if no wireframes queued
-                if (m_wireframeQueue.empty()) return;
+                // Skip if nothing is queued for overlays or wireframes
+                if (m_wireframeQueue.empty() && m_overlayQuadQueue.empty()) return;
 
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
@@ -1108,6 +1125,30 @@ namespace ECS {
                 GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                // Process all queued overlay quads (textured previews, etc.)
+                if (!m_overlayQuadQueue.empty()) {
+                    if (m_shader) {
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", viewProj);
+                        m_shader->setUniform("uPicking", 0);
+                        m_shader->setUniform("uLightingEnabled", 0);
+                    }
+                    m_renderer->beginFrame();
+                    for (const auto& quad : m_overlayQuadQueue) {
+                        m_renderer->submitQuad(
+                            quad.center,
+                            quad.size,
+                            quad.textureId,
+                            quad.uvRect,
+                            quad.color,
+                            quad.rotation,
+                            1.0f,
+                            0
+                        );
+                    }
+                    m_renderer->endFrame();
+                }
 
                 // Process all queued wireframe submissions
                 for (const auto& sub : m_wireframeQueue) {
@@ -1234,7 +1275,8 @@ namespace ECS {
 
                 m_renderer->endFrame();
 
-                // Clear wireframe queue for next frame
+                // Clear overlay/wireframe queues for next frame
+                m_overlayQuadQueue.clear();
                 m_wireframeQueue.clear();
 
                 // Restore blend state
@@ -1462,6 +1504,25 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    void RendererSystem::SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
+                                          const glm::vec4& color) {
+        if (!m_renderer) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Quad;
+        sub.vertices = {
+            { min.x, min.y },
+            { max.x, min.y },
+            { max.x, max.y },
+            { min.x, max.y }
+        };
+        sub.color = color;
+        sub.thickness = 0.0f;
+        sub.closed = true;
+        sub.filled = true;
+        m_wireframeQueue.push_back(sub);
+    }
+
     void RendererSystem::SubmitWireframeCircle(const glm::vec2& center, float radius,
                                                 const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -1521,6 +1582,24 @@ namespace ECS {
         sub.closed = false;
         sub.filled = false;
         m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitOverlayQuad(const glm::vec2& center,
+                                           const glm::vec2& size,
+                                           GLuint textureId,
+                                           const glm::vec4& uvRect,
+                                           const glm::vec4& color,
+                                           float rotation) {
+        if (!m_renderer) return;
+
+        OverlayQuadSubmission sub;
+        sub.center = center;
+        sub.size = size;
+        sub.textureId = textureId;
+        sub.uvRect = uvRect;
+        sub.color = color;
+        sub.rotation = rotation;
+        m_overlayQuadQueue.push_back(sub);
     }
 
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
@@ -1636,15 +1715,27 @@ namespace ECS {
         }
     }
 
-    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)
+    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset)
     {
         m_debugTileMap = map;
         m_debugTileset = tileset;
+        m_debugTileMapOffset = worldOffset;
+    }
+
+    void RendererSystem::SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps)
+    {
+        m_debugTileMaps = maps; // Store references to editor-owned tilemaps for this frame.
     }
 
     void RendererSystem::ClearDebugTileMap()
     {
         m_debugTileMap.reset();
         m_debugTileset.reset();
+        m_debugTileMapOffset = glm::vec2(0.0f, 0.0f);
+    }
+
+    void RendererSystem::ClearDebugTileMaps()
+    {
+        m_debugTileMaps.clear(); // Clear multi-tilemap debug rendering state.
     }
 }

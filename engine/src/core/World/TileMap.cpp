@@ -4,9 +4,11 @@
 
 
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <cstring>
 
 TileMap::TileMap(float tileSize)
     : m_tileSize(tileSize)
@@ -52,6 +54,125 @@ void TileMap::SetTile(uint32_t layerIndex, uint32_t x, uint32_t y, TileID id)
     m_layers[layerIndex].Set(x, y, id);
 }
 
+void TileMap::ResizeLayer(uint32_t layerIndex, uint32_t newWidth, uint32_t newHeight)
+{
+    if (!IsValidLayer(layerIndex))
+        return;
+
+    if (newWidth == 0 || newHeight == 0)
+        return;
+
+    TileLayer& layer = m_layers[layerIndex];
+    if (layer.Width() == newWidth && layer.Height() == newHeight)
+        return;
+
+    TileLayer resized(newWidth, newHeight);
+    const uint32_t copyWidth = std::min(layer.Width(), newWidth);
+    const uint32_t copyHeight = std::min(layer.Height(), newHeight);
+
+    for (uint32_t y = 0; y < copyHeight; ++y) {
+        for (uint32_t x = 0; x < copyWidth; ++x) {
+            resized.Set(x, y, layer.Get(x, y));
+        }
+    }
+
+    layer = std::move(resized);
+}
+
+int32_t TileMap::OriginX() const
+{
+    return m_originX;
+}
+
+int32_t TileMap::OriginY() const
+{
+    return m_originY;
+}
+
+void TileMap::SetOrigin(int32_t originX, int32_t originY)
+{
+    m_originX = originX;
+    m_originY = originY;
+}
+
+void TileMap::ExpandLayerToFit(uint32_t layerIndex, int32_t tileX, int32_t tileY, uint32_t margin, uint32_t step)
+{
+    if (!IsValidLayer(layerIndex))
+        return;
+
+    TileLayer& layer = m_layers[layerIndex];
+    const int32_t oldOriginX = m_originX;
+    const int32_t oldOriginY = m_originY;
+    const uint32_t oldWidth = layer.Width();
+    const uint32_t oldHeight = layer.Height();
+
+    // Compute the desired signed bounds around the target tile.
+    const int32_t minX = tileX - static_cast<int32_t>(margin);
+    const int32_t minY = tileY - static_cast<int32_t>(margin);
+    const int32_t maxX = tileX + static_cast<int32_t>(margin);
+    const int32_t maxY = tileY + static_cast<int32_t>(margin);
+
+    int32_t newOriginX = oldOriginX;
+    int32_t newOriginY = oldOriginY;
+    uint32_t newWidth = oldWidth;
+    uint32_t newHeight = oldHeight;
+
+    const auto roundUpToStep = [step](uint32_t value) {
+        if (step == 0) return value;
+        const uint32_t rem = value % step;
+        return rem == 0 ? value : value + (step - rem);
+    };
+
+    if (minX < newOriginX) {
+        // Grow to the left by shifting the origin and widening the layer.
+        const uint32_t expandLeft = roundUpToStep(static_cast<uint32_t>(newOriginX - minX));
+        newOriginX -= static_cast<int32_t>(expandLeft);
+        newWidth += expandLeft;
+    }
+
+    const int32_t maxXInclusive = newOriginX + static_cast<int32_t>(newWidth) - 1;
+    if (maxX > maxXInclusive) {
+        // Grow to the right by widening the layer without shifting origin.
+        const uint32_t expandRight = roundUpToStep(static_cast<uint32_t>(maxX - maxXInclusive));
+        newWidth += expandRight;
+    }
+
+    if (minY < newOriginY) {
+        // Grow downward (negative) by shifting the origin and height.
+        const uint32_t expandDown = roundUpToStep(static_cast<uint32_t>(newOriginY - minY));
+        newOriginY -= static_cast<int32_t>(expandDown);
+        newHeight += expandDown;
+    }
+
+    const int32_t maxYInclusive = newOriginY + static_cast<int32_t>(newHeight) - 1;
+    if (maxY > maxYInclusive) {
+        // Grow upward by increasing height without shifting origin.
+        const uint32_t expandUp = roundUpToStep(static_cast<uint32_t>(maxY - maxYInclusive));
+        newHeight += expandUp;
+    }
+
+    if (newOriginX == oldOriginX && newOriginY == oldOriginY &&
+        newWidth == oldWidth && newHeight == oldHeight) {
+        return;
+    }
+
+    TileLayer resized(newWidth, newHeight); // New layer with expanded bounds.
+    const int32_t offsetX = oldOriginX - newOriginX;
+    const int32_t offsetY = oldOriginY - newOriginY;
+
+    for (uint32_t y = 0; y < oldHeight; ++y) {
+        for (uint32_t x = 0; x < oldWidth; ++x) {
+            const uint32_t newX = static_cast<uint32_t>(static_cast<int32_t>(x) + offsetX);
+            const uint32_t newY = static_cast<uint32_t>(static_cast<int32_t>(y) + offsetY);
+            resized.Set(newX, newY, layer.Get(x, y)); // Preserve existing tiles with the new origin offset.
+        }
+    }
+
+    layer = std::move(resized);
+    m_originX = newOriginX;
+    m_originY = newOriginY;
+}
+
 // world -> tile (floor avoids off-by-one at boundaries)
 uint32_t TileMap::WorldToTile(float worldCoord) const
 {
@@ -59,10 +180,108 @@ uint32_t TileMap::WorldToTile(float worldCoord) const
     return static_cast<uint32_t>(std::floor(worldCoord / m_tileSize));
 }
 
+int32_t TileMap::WorldToTileSigned(float worldCoord) const
+{
+    return static_cast<int32_t>(std::floor(worldCoord / m_tileSize));
+}
+
 // tile -> world (tile origin)
 float TileMap::TileToWorld(uint32_t tileCoord) const
 {
-    return tileCoord * m_tileSize;
+    return tileCoord * m_tileSize; // Local-space conversion without origin offset.
+}
+
+float TileMap::TileToWorldSigned(int32_t tileCoord) const
+{
+    return static_cast<float>(tileCoord) * m_tileSize;
+}
+
+bool TileMap::IsTileInBounds(int32_t tileX, int32_t tileY) const
+{
+    if (m_layers.empty()) return false;
+
+    const TileLayer& layer = m_layers[0];
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+
+    return ix >= 0 && iy >= 0 &&
+        ix < static_cast<int32_t>(layer.Width()) &&
+        iy < static_cast<int32_t>(layer.Height());
+}
+
+TileID TileMap::GetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY) const
+{
+    if (!IsValidLayer(layerIndex))
+        return EMPTY_TILE;
+
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+    if (ix < 0 || iy < 0)
+        return EMPTY_TILE;
+
+    const TileLayer& layer = m_layers[layerIndex];
+    if (ix >= static_cast<int32_t>(layer.Width()) || iy >= static_cast<int32_t>(layer.Height()))
+        return EMPTY_TILE;
+
+    return layer.Get(static_cast<uint32_t>(ix), static_cast<uint32_t>(iy));
+}
+
+void TileMap::SetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY, TileID id)
+{
+    if (!IsValidLayer(layerIndex))
+        return;
+
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+    if (ix < 0 || iy < 0)
+        return;
+
+    TileLayer& layer = m_layers[layerIndex];
+    if (ix >= static_cast<int32_t>(layer.Width()) || iy >= static_cast<int32_t>(layer.Height()))
+        return;
+
+    layer.Set(static_cast<uint32_t>(ix), static_cast<uint32_t>(iy), id);
+}
+
+uint8_t TileMap::AddTilesetPath(const std::string& path)
+{
+    if (path.empty()) {
+        return 0;
+    }
+
+    const int32_t existing = FindTilesetPath(path);
+    if (existing >= 0) {
+        return static_cast<uint8_t>(existing);
+    }
+
+    if (m_tilesetPaths.size() >= 255) {
+        // Index is packed into 8 bits, so clamp at 255 entries.
+        return static_cast<uint8_t>(m_tilesetPaths.size() - 1);
+    }
+
+    m_tilesetPaths.push_back(path);
+    return static_cast<uint8_t>(m_tilesetPaths.size() - 1);
+}
+
+int32_t TileMap::FindTilesetPath(const std::string& path) const
+{
+    for (size_t i = 0; i < m_tilesetPaths.size(); ++i) {
+        if (m_tilesetPaths[i] == path) {
+            return static_cast<int32_t>(i);
+        }
+    }
+
+    return -1;
+}
+
+const std::vector<std::string>& TileMap::GetTilesetPaths() const
+{
+    return m_tilesetPaths;
+}
+
+void TileMap::SetTilesetPaths(const std::vector<std::string>& paths)
+{
+    m_tilesetPaths = paths;
 }
 
 bool TileMap::IsValidLayer(uint32_t layerIndex) const
@@ -75,7 +294,13 @@ bool TileMap::SaveMap(const std::string& filepath) const
     std::ofstream out(filepath, std::ios::binary);
     if (!out) return false;
 
-    // Header: 1. Tile Size (float), 2. Layer Count (uint32)
+    // Header: Magic, Version, Tile Size, Layer Count
+    static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
+    static constexpr uint32_t kTileMapVersion = 2; // Version with tileset list + origin.
+
+    out.write(reinterpret_cast<const char*>(&kTileMapMagic), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char*>(&kTileMapVersion), sizeof(uint32_t));
+
     out.write(reinterpret_cast<const char*>(&m_tileSize), sizeof(float));
     
     uint32_t layerCount = static_cast<uint32_t>(m_layers.size());
@@ -95,17 +320,58 @@ bool TileMap::SaveMap(const std::string& filepath) const
             }
         }
     }
+
+    // Append origin after layers.
+    out.write(reinterpret_cast<const char*>(&m_originX), sizeof(int32_t));
+    out.write(reinterpret_cast<const char*>(&m_originY), sizeof(int32_t));
+
+    // Append tileset list (count + length-prefixed strings).
+    const uint32_t tilesetCount = static_cast<uint32_t>(m_tilesetPaths.size());
+    out.write(reinterpret_cast<const char*>(&tilesetCount), sizeof(uint32_t));
+    for (const auto& path : m_tilesetPaths) {
+        const uint32_t len = static_cast<uint32_t>(path.size());
+        out.write(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+        if (len > 0) {
+            out.write(path.data(), len);
+        }
+    }
     
-    return out.good();
+    const bool ok = out.good();
+    if (!ok) {
+        std::cerr << "[TileMap] Failed to write tilemap: " << filepath << "\n";
+    }
+    return ok;
 }
 
 bool TileMap::LoadMap(const std::string& filepath)
 {
     std::ifstream in(filepath, std::ios::binary);
-    if (!in) return false;
+    if (!in) {
+        std::cerr << "[TileMap] Failed to open tilemap: " << filepath << "\n";
+        return false;
+    }
 
-    float fileTileSize;
-    in.read(reinterpret_cast<char*>(&fileTileSize), sizeof(float));
+    static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
+    static constexpr uint32_t kTileMapVersionWithTilesets = 2;
+
+    uint32_t header = 0;
+    in.read(reinterpret_cast<char*>(&header), sizeof(uint32_t));
+    if (!in) {
+        std::cerr << "[TileMap] Failed to read tilemap header: " << filepath << "\n";
+        return false;
+    }
+
+    uint32_t version = 0;
+    float fileTileSize = 0.0f;
+
+    const bool isNewFormat = (header == kTileMapMagic);
+    if (isNewFormat) {
+        in.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
+        in.read(reinterpret_cast<char*>(&fileTileSize), sizeof(float));
+    } else {
+        // Old format: first 4 bytes are the tile size float.
+        std::memcpy(&fileTileSize, &header, sizeof(float));
+    }
     
     // Note: We ignore fileTileSize if it differs from m_tileSize because m_tileSize is const.
     // In a real editor, we might want to recreate the TileMap with the correct size.
@@ -128,12 +394,66 @@ bool TileMap::LoadMap(const std::string& filepath)
         
         for (uint32_t y = 0; y < h; ++y) {
             for (uint32_t x = 0; x < w; ++x) {
-                TileID id;
-                in.read(reinterpret_cast<char*>(&id), sizeof(TileID));
-                layer.Set(x, y, id);
+                if (isNewFormat) {
+                    TileID id;
+                    in.read(reinterpret_cast<char*>(&id), sizeof(TileID));
+                    layer.Set(x, y, id);
+                } else {
+                    uint16_t id16 = 0;
+                    in.read(reinterpret_cast<char*>(&id16), sizeof(uint16_t));
+                    layer.Set(x, y, static_cast<TileID>(id16));
+                }
             }
         }
     }
 
-    return in.good();
+    // Read optional origin data if present (older files won't have it).
+    m_originX = 0;
+    m_originY = 0;
+    if (in.peek() != EOF) {
+        int32_t ox = 0;
+        int32_t oy = 0;
+        in.read(reinterpret_cast<char*>(&ox), sizeof(int32_t));
+        in.read(reinterpret_cast<char*>(&oy), sizeof(int32_t));
+        if (in.good()) {
+            m_originX = ox;
+            m_originY = oy;
+        }
+    }
+
+    // Read optional tileset list if present.
+    m_tilesetPaths.clear();
+    const bool canReadTilesets = (isNewFormat && version >= kTileMapVersionWithTilesets) || !isNewFormat;
+    if (canReadTilesets && in.peek() != EOF) {
+        uint32_t tilesetCount = 0;
+        in.read(reinterpret_cast<char*>(&tilesetCount), sizeof(uint32_t));
+        if (in.good()) {
+            m_tilesetPaths.reserve(tilesetCount);
+            for (uint32_t i = 0; i < tilesetCount; ++i) {
+                uint32_t len = 0;
+                in.read(reinterpret_cast<char*>(&len), sizeof(uint32_t));
+                std::string path;
+                if (len > 0) {
+                    path.resize(len);
+                    in.read(path.data(), len);
+                }
+                if (in.good()) {
+                    m_tilesetPaths.push_back(path);
+                }
+            }
+        }
+    }
+
+    const bool ok = in.good();
+    if (!ok) {
+        std::cerr << "[TileMap] Failed to read tilemap data: " << filepath << "\n";
+        return false;
+    }
+
+    std::cerr << "[TileMap] Loaded " << filepath
+              << " layers=" << m_layers.size()
+              << " tilesets=" << m_tilesetPaths.size()
+              << " origin=(" << m_originX << "," << m_originY << ")"
+              << "\n";
+    return true;
 }

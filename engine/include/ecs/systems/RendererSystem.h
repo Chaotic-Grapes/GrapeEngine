@@ -162,6 +162,9 @@ namespace ECS {
          */
         void SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max, 
                                  const glm::vec4& color, float thickness);
+        // Submit a filled quad (editor overlays like tile previews).
+        void SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
+                              const glm::vec4& color);
 
         /**
          * @brief Submit a wireframe circle outline
@@ -207,6 +210,14 @@ namespace ECS {
                                  const uint32_t* indices, size_t indexCount,
                                  const glm::vec4& color, float thickness);
 
+        // Submit a textured overlay quad in world space (used by editor previews).
+        void SubmitOverlayQuad(const glm::vec2& center,
+                               const glm::vec2& size,
+                               GLuint textureId,
+                               const glm::vec4& uvRect,
+                               const glm::vec4& color,
+                               float rotation);
+
         /**
          * @brief Submit collider debug visualizations for an entity
          * @param world ECS world containing the entity
@@ -223,8 +234,16 @@ namespace ECS {
                            const std::string& fontPath, float pixelSize, const Color& color);
 
         // Call from editor when a tilemap should be rendered
-        void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
+        struct DebugTileMapEntry {
+            std::reference_wrapper<const TileMap> Map;
+            std::vector<const Tileset*> Tilesets;
+            glm::vec2 Offset;
+        };
+
+        void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);
+        void SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps);
         void ClearDebugTileMap();
+        void ClearDebugTileMaps();
 
     private:
         // ====================================================================
@@ -286,6 +305,8 @@ namespace ECS {
 
         std::optional<std::reference_wrapper<const TileMap>> m_debugTileMap;
         std::optional<std::reference_wrapper<const Tileset>> m_debugTileset;
+        glm::vec2 m_debugTileMapOffset = glm::vec2(0.0f, 0.0f); // World-space offset for debug tilemap rendering.
+        std::vector<DebugTileMapEntry> m_debugTileMaps; // Multiple tilemaps to render in the editor.
 
         TileMapRenderer m_tileMapRenderer; // value member, no pointer
 
@@ -306,6 +327,16 @@ namespace ECS {
             bool filled = false;
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
+
+        struct OverlayQuadSubmission {
+            glm::vec2 center;
+            glm::vec2 size;
+            GLuint textureId = 0;
+            glm::vec4 uvRect{0.0f, 0.0f, 1.0f, 1.0f};
+            glm::vec4 color{1.0f};
+            float rotation = 0.0f;
+        };
+        std::vector<OverlayQuadSubmission> m_overlayQuadQueue;
 
         struct GUIPanelSubmission {
             Vector2D position;
