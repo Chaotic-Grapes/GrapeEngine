@@ -165,6 +165,12 @@ public record struct GUIElement
     public bool Visible;
     public GUIAlignment Alignment;
     public short ZOrder;
+    public Vector4 Margin;
+    public Vector4 Padding;
+    public Vector2 ResolvedPosition;
+    public Vector2 ResolvedSize;
+    public Vector2 ContentPosition;
+    public Vector2 ContentSize;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -181,5 +187,102 @@ public record struct GUIText
     public StringId FontPathId;
     public Color Color;
     public float FontSize;
+    public bool Wrap;
+    public GUITextHAlign HAlign;
+    public GUITextVAlign VAlign;
+}
+
+public enum GUITextHAlign : byte
+{
+    Left = 0,
+    Center = 1,
+    Right = 2
+}
+
+public enum GUITextVAlign : byte
+{
+    Top = 0,
+    Middle = 1,
+    Bottom = 2
+}
+
+public enum GUIImageScaleMode : byte
+{
+    Stretch = 0,
+    Fit = 1,
+    Fill = 2
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIImage
+{
+    public uint TextureId;
+    public StringId TexturePathId;
+    public Color Color;
+    public Vector4 UVRect;
+    public GUIImageScaleMode ScaleMode;
+    public bool UseSlicing;
+    public Vector4 SliceBorder;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIInput
+{
+    public bool Hovered;
+    public bool Pressed;
+    public bool Clicked;
+    public bool Released;
+    public bool Dragging;
+    public bool Entered;
+    public bool Exited;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIStateStyle
+{
+    public Color NormalColor;
+    public Color HoverColor;
+    public Color PressedColor;
+    public Color DisabledColor;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIButton
+{
+    public StringId TextId;
+    public StringId FontPathId;
+    public StringId IconPathId;
+    public Color NormalColor;
+    public Color HoverColor;
+    public Color PressedColor;
+    public Color DisabledColor;
+    public Color TextColor;
+    public Color IconColor;
+    public float FontSize;
+    public float CornerRadius;
+    public Vector2 IconSize;
+    public Vector2 IconOffset;
+    public Vector4 Padding;
+    public bool Disabled;
+    public bool Toggle;
+    public bool Toggled;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUISlider
+{
+    public float Value;
+    public float Min;
+    public float Max;
+    public float Step;
+    public Color TrackColor;
+    public Color FillColor;
+    public Color KnobColor;
+    public float CornerRadius;
+    public Vector2 KnobSize;
+    public Vector4 Padding;
+    public bool Horizontal;
+    public bool Disabled;
+    public bool ValueChanged;
 }
 

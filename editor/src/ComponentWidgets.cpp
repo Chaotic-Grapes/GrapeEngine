@@ -364,6 +364,61 @@ namespace EditorUI {
         }
     }
 
+    // Renders a 4D vector as X, Y, Z and W fields on one row
+    void RenderVector4DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey,
+        const std::string& zKey, const std::string& wKey, float dragSpeed)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return; // Skip rows that do not match the current filter
+        }
+        _ensureObject(data);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+
+        float vals[4] = {
+            data.value(xKey, 0.0f),
+            data.value(yKey, 0.0f),
+            data.value(zKey, 0.0f),
+            data.value(wKey, 0.0f)
+        };
+
+        const float fieldWidth = 90.0f;
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+        const char* labels[4] = { "X", "Y", "Z", "W" };
+        const std::string keys[4] = { xKey, yKey, zKey, wKey };
+
+        for (int i = 0; i < 4; i++) {
+            float startX = valueStartOffset + i * (axisLabelWidth + FIELD_LABEL_GAP + fieldWidth + FIELD_GAP);
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX);
+            ImGui::Text("%s", labels[i]);
+
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX + axisLabelWidth + FIELD_LABEL_GAP);
+            ImGui::SetNextItemWidth(fieldWidth);
+            if (ImGui::DragFloat(("##" + label + labels[i]).c_str(), &vals[i], dragSpeed, 0, 0, "%.2f")) {
+                data[keys[i]] = vals[i];
+            }
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(xKey) && defaults->contains(yKey)
+                && defaults->contains(zKey) && defaults->contains(wKey)) {
+                const float defaultX = (*defaults)[xKey].get<float>();
+                const float defaultY = (*defaults)[yKey].get<float>();
+                const float defaultZ = (*defaults)[zKey].get<float>();
+                const float defaultW = (*defaults)[wKey].get<float>();
+                if ((vals[0] != defaultX || vals[1] != defaultY
+                    || vals[2] != defaultZ || vals[3] != defaultW) && _renderResetButton(label)) {
+                    data[xKey] = defaultX;
+                    data[yKey] = defaultY;
+                    data[zKey] = defaultZ;
+                    data[wKey] = defaultW;
+                }
+            }
+        }
+    }
+
     // Renders a quaternion as X, Y, Z and W fields on one row
     // Exact same layout logic as the 3D vector, but with four components
     // The default value for W is 1 since that is the identity rotation

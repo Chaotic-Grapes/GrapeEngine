@@ -81,6 +81,11 @@ namespace EditorUI {
         const std::string& xKey, const std::string& yKey, const std::string& zKey, 
         float dragSpeed);
 
+    // Renders a 4D vector editor with X, Y, Z and W components as separate drag controls
+    void RenderVector4DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey,
+        const std::string& wKey, float dragSpeed);
+
     // Renders a quaternion editor with X, Y, Z and W components
     // Used for rotation values in 3D space
     void RenderQuaternionRow(const std::string& label, nlohmann::json& data, 

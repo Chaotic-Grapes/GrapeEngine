@@ -130,6 +130,11 @@ namespace ECS {
         REGISTER_COMPONENT(GUIElement);
         REGISTER_COMPONENT(GUIPanel);
         REGISTER_COMPONENT(GUIText);
+        REGISTER_COMPONENT(GUIImage);
+        REGISTER_COMPONENT(GUIInput);
+        REGISTER_COMPONENT(GUIStateStyle);
+        REGISTER_COMPONENT(GUIButton);
+        REGISTER_COMPONENT(GUISlider);
 
 
         // Event buffers (physics events)
@@ -190,6 +195,11 @@ namespace ECS {
         LogComponentTypeIds("GUIElement", FNV1a_Hash("GUIElement"));
         LogComponentTypeIds("GUIPanel", FNV1a_Hash("GUIPanel"));
         LogComponentTypeIds("GUIText", FNV1a_Hash("GUIText"));
+        LogComponentTypeIds("GUIImage", FNV1a_Hash("GUIImage"));
+        LogComponentTypeIds("GUIInput", FNV1a_Hash("GUIInput"));
+        LogComponentTypeIds("GUIStateStyle", FNV1a_Hash("GUIStateStyle"));
+        LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));
+        LogComponentTypeIds("GUISlider", FNV1a_Hash("GUISlider"));
 
         LogComponentTypeIds("CollisionEventBuffer", FNV1a_Hash("CollisionEventBuffer"));
         LogComponentTypeIds("TriggerEventBuffer", FNV1a_Hash("TriggerEventBuffer"));
