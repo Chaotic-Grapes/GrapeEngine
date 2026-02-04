@@ -149,11 +149,12 @@ void SceneViewport::_renderViewport() {
     // --- Viewport Header -----------------------------------------------------
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
-    const float headerHeight = ImGui::GetFrameHeight() + 6.0f;
+    const float iconButtonSize = 28.0f;
+    const float headerHeight = iconButtonSize + 10.0f;
     ImGui::BeginChild("##SceneViewportHeader", ImVec2(0.0f, headerHeight), false,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     // Vertically center controls within the header strip.
-    const float centerOffset = std::max(0.0f, (headerHeight - ImGui::GetFrameHeight()) * 0.5f);
+    const float centerOffset = std::max(0.0f, (headerHeight - iconButtonSize) * 0.5f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + centerOffset);
 
     // Clamp helper for per-group tinting.
@@ -187,7 +188,7 @@ void SceneViewport::_renderViewport() {
         // Remove padding inside viewport icon buttons
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
-        const bool clicked = ImGui::Button(icon, ImVec2(28.0f, 0.0f));
+        const bool clicked = ImGui::Button(icon, ImVec2(iconButtonSize, iconButtonSize));
         ImGui::PopStyleVar(2);
         if (useSymbols && m_symbolsFont) ImGui::PopFont();
         if (tooltip && ImGui::IsItemHovered()) {
@@ -505,7 +506,9 @@ void SceneViewport::_renderViewport() {
                         bool left = Input::IsMousePressed(MOUSE_LEFT);
                         bool right = Input::IsMousePressed(MOUSE_RIGHT);
                         if (left || right) {
-                            tilePaletteHandledClick = m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
+                            m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            tilePaletteHandledClick = true;
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {

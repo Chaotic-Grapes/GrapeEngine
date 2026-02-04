@@ -117,15 +117,17 @@ namespace EditorUI {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
 
         if (s_symbolsFont) ImGui::PushFont(s_symbolsFont);
         const bool clicked = ImGui::SmallButton(kResetIcon);
+        if (s_symbolsFont) ImGui::PopFont();
+        
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Reset to default");
         }
-        if (s_symbolsFont) ImGui::PopFont();
 
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
         ImGui::PopID();
         return clicked;

@@ -134,12 +134,6 @@ void TilePalettePanel::Render()
             ImVec2 imUV1(def.uv.u1, def.uv.v0);
 
             // Highlight selected
-            const bool highlightSelected = (m_selectedTileID == id && !m_isEraser); // Cache selection state for this tile.
-            if (highlightSelected)
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 0.0f, 0.5f));
-            }
-
             std::string strId = "Tile_" + std::to_string(id);
             if (ImGui::ImageButton(strId.c_str(),(ImTextureID)(uintptr_t)m_tileset->GetTextureId(), ImVec2(buttonSize, buttonSize), imUV0, imUV1))
             {
@@ -147,9 +141,16 @@ void TilePalettePanel::Render()
                 m_isEraser = false;
             }
 
-            if (highlightSelected)
-            {
-                ImGui::PopStyleColor(); // Pop highlight only if it was pushed above.
+            const bool isHovered = ImGui::IsItemHovered(); // Track hover state for custom border drawing.
+            const bool isSelected = (m_selectedTileID == id && !m_isEraser); // Track selection state for border.
+            if (isHovered || isSelected) {
+                // Draw a colored border instead of changing button background.
+                const ImU32 borderColor = isSelected
+                    ? ImGui::GetColorU32(ImVec4(1.0f, 0.85f, 0.15f, 1.0f))
+                    : ImGui::GetColorU32(ImVec4(0.65f, 0.75f, 0.95f, 0.85f));
+                const ImVec2 min = ImGui::GetItemRectMin();
+                const ImVec2 max = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddRect(min, max, borderColor, 0.0f, 0, 2.0f);
             }
 
             float lastButtonX = ImGui::GetItemRectMax().x;
@@ -169,22 +170,24 @@ void TilePalettePanel::Render()
         }
 
         // Allow drag-and-drop of assets directly onto the palette window.
-        const ImVec2 windowPos = ImGui::GetWindowPos(); // Cache window position for manual ImVec2 math.
         const ImVec2 contentMinLocal = ImGui::GetWindowContentRegionMin(); // Content region min (local).
         const ImVec2 contentMaxLocal = ImGui::GetWindowContentRegionMax(); // Content region max (local).
-        const ImVec2 contentMin(windowPos.x + contentMinLocal.x, windowPos.y + contentMinLocal.y);
-        const ImVec2 contentMax(windowPos.x + contentMaxLocal.x, windowPos.y + contentMaxLocal.y);
-        const ImVec2 contentSize(contentMax.x - contentMin.x, contentMax.y - contentMin.y);
-        ImGui::SetCursorScreenPos(contentMin);
-        ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-                const std::string assetPath = ParseFirstAssetPath(payload);
-                if (!assetPath.empty()) {
-                    HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+        const ImVec2 contentSize(contentMaxLocal.x - contentMinLocal.x, contentMaxLocal.y - contentMinLocal.y);
+        if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
+            const ImVec2 cursorPos = ImGui::GetCursorPos(); // Cache cursor in local coordinates.
+            ImGui::SetCursorPos(contentMinLocal);
+            ImGui::SetNextItemAllowOverlap(); // Keep the invisible target from blocking palette interaction.
+            ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const std::string assetPath = ParseFirstAssetPath(payload);
+                    if (!assetPath.empty()) {
+                        HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+                    }
                 }
+                ImGui::EndDragDropTarget();
             }
-            ImGui::EndDragDropTarget();
+            ImGui::SetCursorPos(cursorPos);
         }
     }
     ImGui::End();
@@ -218,8 +221,24 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
         if (r) {
             glm::vec2 min(tilePos.x, tilePos.y);
             glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
-            glm::vec4 color = m_isEraser ? glm::vec4(1.0f, 0.0f, 0.0f, 0.4f) : glm::vec4(1.0f, 1.0f, 1.0f, 0.4f);
-            DebugDraw2D::RectFill(*r, min, max, color, 0);
+            if (m_isEraser) {
+                glm::vec4 color(1.0f, 0.0f, 0.0f, 0.35f); // Red translucent preview for eraser.
+                DebugDraw2D::RectFill(*r, min, max, color, 0);
+                return;
+            }
+
+            TileUV uv;
+            if (!m_tileset->GetTileUV(m_selectedTileID, uv)) {
+                glm::vec4 color(1.0f, 1.0f, 1.0f, 0.25f); // Fallback to a light fill if UV is missing.
+                DebugDraw2D::RectFill(*r, min, max, color, 0);
+                return;
+            }
+
+            const glm::vec4 uvRect(uv.u0, uv.v0, uv.u1, uv.v1); // Pack UVs for submitQuad.
+            const glm::vec2 center(tilePos.x + size.x * 0.5f, tilePos.y + size.y * 0.5f);
+            const glm::vec4 tint(1.0f, 1.0f, 1.0f, 0.5f); // Translucent tile preview.
+            const float rotation = static_cast<float>(m_currentRotation) * 1.57079632679f;
+            r->submitQuad(center, size, m_tileset->GetTextureId(), uvRect, tint, rotation, 1.0f, 0);
         }
     }
 }
