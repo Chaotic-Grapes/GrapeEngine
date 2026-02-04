@@ -248,7 +248,11 @@ namespace Scenes {
             try {
                 json sceneJson;
                 sceneJson["Version"] = version;
-                sceneJson["SceneName"] = sceneName;
+                std::string derivedSceneName = std::filesystem::path(filename).stem().string();
+                if (derivedSceneName.empty()) {
+                    derivedSceneName = sceneName;
+                }
+                sceneJson["SceneName"] = derivedSceneName;
                 sceneJson["EntityCount"] = 0;
 
                 // Serialize layer manager state (names, masks, visibility, locks, runtime flags)

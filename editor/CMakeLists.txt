@@ -31,6 +31,8 @@ file(GLOB_RECURSE EDITOR_HEADERS CONFIGURE_DEPENDS
 add_executable(GrapeEditor 
     ${EDITOR_SOURCES} 
     ${EDITOR_HEADERS}
+    # Force global new/delete override to be compiled into the Editor EXE
+    ../engine/src/services/GlobalMemoryOverride.cpp
 )
 
 # Set output name
@@ -68,6 +70,16 @@ endif()
 target_include_directories(GrapeEditor PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
+
+# ======================= Precompiled Headers =========================
+set(GRAPEENGINE_PCH_HEADER "${CMAKE_CURRENT_LIST_DIR}/../engine/include/pch.h")
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.16 AND EXISTS "${GRAPEENGINE_PCH_HEADER}")
+    target_precompile_headers(GrapeEditor PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${GRAPEENGINE_PCH_HEADER}>"
+    )
+else()
+    message(STATUS "Editor: Precompiled headers disabled (CMake >= 3.16 required)")
+endif()
 
 # ======================= Compiler Definitions =========================
 # USE_IMGUI enables ImGui code paths (editor-only)

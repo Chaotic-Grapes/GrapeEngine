@@ -2,6 +2,8 @@
 
 #include "../include/core/World/TileMap.hpp"
 #include "../include/core/World/TileSet.hpp"
+#include <glm/vec2.hpp>
+#include <vector>
 
 class Renderer; // forward declare your batch renderer
 
@@ -11,7 +13,8 @@ class TileMapRenderer
 public:
     void Submit(
         const TileMap& tileMap,
-        const Tileset& tileset,
-        Renderer& renderer
+        const std::vector<const Tileset*>& tilesets,
+        Renderer& renderer,
+        const glm::vec2& worldOffset
     ) const;
 };

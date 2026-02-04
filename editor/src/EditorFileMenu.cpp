@@ -588,6 +588,11 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
         entityOrder = &m_hierarchyPanel->GetEntityOrder();
     }
 
+    if (m_preSaveCallback) {
+        // Give the editor a chance to flush external assets (tilemaps, etc.) before scene save.
+        m_preSaveCallback(path);
+    }
+
     // Save scene (symlink automatically keeps source in sync)
     LOG_INFO("Saving scene: " << path);
     if (!m_sceneManager->SaveScene(activeIdx, path, "Scene", "1.0", entityOrder)) {
