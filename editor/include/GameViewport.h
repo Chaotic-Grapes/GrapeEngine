@@ -16,20 +16,27 @@ selection. Separate from the editor camera and scene editing controls.
 #define GAME_VIEWPORT_H
 
 #include "BaseViewport.h"
+#include "graphics/Camera.h"
 
 class GameViewport : public BaseViewport {
 public:
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+        ECS::World* world, Scenes::SceneManager* sceneManager) override;
+    ~GameViewport() override;
     void BeginFrame() override {}
+    void PrepareFrame();
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
     void EndFrame() override {}
 
 private:
     void _renderViewport();
+    bool _syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect);
 
     // Game window aspect ratio settings
     int m_selectedAspectRatio = 0; // Index into aspect ratio list
     bool m_freeAspect = true;      // Whether to use free aspect or fixed ratio
+    Engine::Camera m_gameCamera;
 };
 
 #endif // GAME_VIEWPORT_H

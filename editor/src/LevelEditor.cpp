@@ -369,6 +369,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
+    // Wire up undo system so the Edit menu can call Undo/Redo.
+    m_fileMenu.SetUndoSystem(&m_undoSystem);
 
     // Wire up playback state getter to file menu for edit/play mode checking
     m_fileMenu.SetEditorStateGetter([this]() { return m_playback.GetEditorState(); });
@@ -783,6 +785,7 @@ void LevelEditor::Update() {
     if (Engine::CORE) {
         auto* rendererSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
         if (rendererSystem) {
+            m_gameViewport.PrepareFrame();
             auto* editorCam = m_sceneViewport.GetEditorCamera();
             if (editorCam) {
                 rendererSystem->SetCamera(editorCam->GetCamera());

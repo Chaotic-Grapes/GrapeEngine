@@ -23,6 +23,7 @@ centralized and consistent with the currently active scene.
 
 #include "EditorFileMenu.h"
 #include "HierarchyPanel.h"
+#include "UndoSystem.h"
 #include "EditorStyle.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -191,12 +192,14 @@ void EditorFileMenu::RenderFileMenu() {
 // Draws the "Edit" menu with Undo/Redo and Project Settings
 void EditorFileMenu::RenderEditMenu() {
     if (ImGui::BeginMenu("Edit")) {
-        // TODO: Implement undo/redo functionality
-        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {
-            // Placeholder for undo
+        const bool canUndo = m_undoSystem && m_undoSystem->CanUndo();
+        const bool canRedo = m_undoSystem && m_undoSystem->CanRedo();
+
+        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, canUndo)) {
+            m_undoSystem->Undo();
         }
-        if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {
-            // Placeholder for redo
+        if (ImGui::MenuItem("Redo", "Ctrl+Y", false, canRedo)) {
+            m_undoSystem->Redo();
         }
         ImGui::Separator();
         
