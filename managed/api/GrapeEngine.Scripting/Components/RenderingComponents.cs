@@ -128,3 +128,58 @@ public record struct Light2D
     public bool CastsShadows;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUICanvas
+{
+    public Vector2 ReferenceSize;
+    public Vector2 Offset;
+    public GUIScaleMode ScaleMode;
+}
+
+public enum GUIScaleMode : byte
+{
+    Fit = 0,
+    Fill = 1,
+    MatchWidth = 2,
+    MatchHeight = 3
+}
+
+public enum GUIAlignment : byte
+{
+    TopLeft = 0,
+    Top = 1,
+    TopRight = 2,
+    Left = 3,
+    Center = 4,
+    Right = 5,
+    BottomLeft = 6,
+    Bottom = 7,
+    BottomRight = 8
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIElement
+{
+    public Vector2 Position;
+    public Vector2 Size;
+    public bool Visible;
+    public GUIAlignment Alignment;
+    public short ZOrder;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIPanel
+{
+    public Color Color;
+    public float CornerRadius;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIText
+{
+    public StringId TextId;
+    public StringId FontPathId;
+    public Color Color;
+    public float FontSize;
+}
+
