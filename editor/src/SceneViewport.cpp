@@ -46,6 +46,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "TilePalettePanel.h"
+#include "graphics/Viewport.hpp"
+
+namespace {
+    constexpr const char* kSceneViewportName = "Scene";
+}
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -56,10 +61,13 @@ void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbo
     
     // Set viewport type to Scene
     SetViewportType(ViewportType::Scene);
+    SetViewportName(kSceneViewportName);
+    Graphics::ViewportManager::Create(kSceneViewportName, m_editorCamera ? m_editorCamera->GetCamera() : nullptr, 1, 1);
 }
 
 SceneViewport::~SceneViewport() {
     // Cleanup handled by base class and RAII members
+    Graphics::ViewportManager::Destroy(kSceneViewportName);
 }
 
 void SceneViewport::BeginFrame() {
@@ -394,6 +402,16 @@ void SceneViewport::_renderViewport() {
     m_sceneDrawPos = pos;
     m_sceneDrawSize = size;
 
+    if (size.x > 1.0f && size.y > 1.0f) {
+        Graphics::ViewportManager::Resize(kSceneViewportName, static_cast<int>(size.x), static_cast<int>(size.y));
+        if (m_editorCamera) {
+            m_editorCamera->SetViewportSize(size.x, size.y);
+        }
+    }
+    if (m_editorCamera) {
+        Graphics::ViewportManager::SetCamera(kSceneViewportName, m_editorCamera->GetCamera());
+    }
+
     // Broadcast viewport resize event for camera aspect ratio updates
     Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
@@ -401,26 +419,41 @@ void SceneViewport::_renderViewport() {
         // Configure renderer to use EDITOR camera for Scene viewport
         rendererSystem->SetCamera(m_editorCamera->GetCamera());
 
+        if (!rendererSystem->GetViewport(kSceneViewportName)) {
+            const int vpWidth = std::max(1, static_cast<int>(size.x));
+            const int vpHeight = std::max(1, static_cast<int>(size.y));
+            Graphics::ViewportManager::Create(kSceneViewportName, m_editorCamera ? m_editorCamera->GetCamera() : nullptr, vpWidth, vpHeight);
+        }
+
         // Render camera frustum overlay if enabled
         if (m_world && m_showCameraFrustum) {
             _renderCameraFrustum();
         }
 
-        auto* rg = rendererSystem->GetRenderGraph();
-        if (rg) {
+        uint32_t textureId = 0;
+        if (auto* vp = rendererSystem->GetViewport(kSceneViewportName)) {
+            if (m_debugViewIndex == 1 && vp->HDR) {
+                textureId = vp->HDR->GetColorTexture(0);
+            } else if (m_debugViewIndex == 2 && vp->BloomExtract) {
+                textureId = vp->BloomExtract->GetColorTexture(0);
+            } else if (vp->LDR) {
+                textureId = vp->LDR->GetColorTexture(0);
+            }
+        } else if (auto* rg = rendererSystem->GetRenderGraph()) {
             ResourceAccessor acc(rg);
             // Select debug texture based on the header dropdown.
             const char* debugTextureName = "LDR";
             if (m_debugViewIndex == 1) debugTextureName = "HDR";
             if (m_debugViewIndex == 2) debugTextureName = "BloomExtract";
 
-            uint32_t textureId = acc.GetTexture(debugTextureName);
+            textureId = acc.GetTexture(debugTextureName);
             if (textureId == 0) {
                 textureId = acc.GetTexture("LDR");
             }
-            if (textureId > 0) {
-                ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
-            }
+        }
+
+        if (textureId > 0) {
+            ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
 
             // Check if image is hovered AFTER drawing it
             bool isSceneImageHovered = ImGui::IsItemHovered();
@@ -737,6 +770,12 @@ void SceneViewport::_renderViewport() {
             // Optional FPS overlay.
             if (m_showSceneFpsOverlay) {
                 _drawFpsOverlay(viewportScreenPos, size);
+            }
+        } else {
+            ImGui::TextDisabled("Viewport texture unavailable");
+            m_isViewportHovered = false;
+            if (m_editorCamera) {
+                m_editorCamera->SetViewportFocused(false);
             }
         }
     }

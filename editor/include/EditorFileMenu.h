@@ -28,6 +28,7 @@ active scene.
 
 // Forward declarations
 namespace Scenes { class SceneManager; }
+namespace Editor { class UndoSystem; }
 class HierarchyPanel;
 #include <functional>
 
@@ -51,6 +52,11 @@ public:
     // Set hierarchy panel for entity order management during save/load
     void SetHierarchyPanel(HierarchyPanel* hierarchyPanel) {
         m_hierarchyPanel = hierarchyPanel;
+    }
+
+    // Set undo system for edit menu actions.
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) {
+        m_undoSystem = undoSystem;
     }
 
     // Set a getter to query current editor state (decouples FileMenu from Playback)
@@ -135,6 +141,8 @@ private:
     Scenes::SceneManager* m_sceneManager = nullptr;
     // Hierarchy panel for entity order preservation
     HierarchyPanel* m_hierarchyPanel = nullptr;
+    // Undo system for edit actions
+    Editor::UndoSystem* m_undoSystem = nullptr;
     // Getter used to query current EditorState; optional (defaults to Edit)
     std::function<EditorState()> m_getEditorState = nullptr;
     // Optional callback to clear playback snapshot on in-place reload.

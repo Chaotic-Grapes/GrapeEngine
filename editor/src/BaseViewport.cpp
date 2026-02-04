@@ -214,32 +214,10 @@ void BaseViewport::_renderCameraFrustum() {
     if (!rendererSystem || !m_world || !m_editorCamera) {
         return;
     }
-
-    auto* rg = rendererSystem->GetRenderGraph();
-    if (!rg) {
-        return;
-    }
-
-    // Get HDR framebuffer to draw on
-    ResourceAccessor acc(rg);
-    auto* hdrFbo = acc.GetFramebuffer("HDR");
-    if (!hdrFbo) {
-        return;
-    }
-
-    // Bind HDR framebuffer (don't clear, we're overlaying)
-    hdrFbo->Bind();
-
-    // Get editor camera info for view projection
     auto* cam = m_editorCamera->GetCamera();
     if (!cam) {
-        Framebuffer::Unbind();
         return;
     }
-
-    const glm::mat4 view = cam->GetViewMatrix();
-    const glm::mat4 projection = cam->GetProjectionMatrix();
-    const glm::mat4 viewProj = projection * view;
 
     // Get window dimensions
     auto* context = Engine::CORE->GetPlatformContext();
@@ -247,23 +225,13 @@ void BaseViewport::_renderCameraFrustum() {
     if (!win) return;
     const float windowHeight = static_cast<float>(win->GetHeight());
 
-    // Get renderer and shader from renderer system
-    Renderer* renderer = rendererSystem->GetRenderer();
-    Shader* shader = rendererSystem->GetShader();
-    
-    if (renderer && shader) {
-        Editor::CameraFrustumRenderer::RenderFrustum(
-            *m_world,
-            *renderer,
-            *shader,
-            viewProj,
-            cam->OrthoSize,
-            windowHeight,
-            0  // No entity to exclude (editor camera is not an ECS entity)
-        );
-    }
-
-    Framebuffer::Unbind();
+    Editor::CameraFrustumRenderer::RenderFrustum(
+        *m_world,
+        rendererSystem,
+        cam->OrthoSize,
+        windowHeight,
+        0  // No entity to exclude (editor camera is not an ECS entity)
+    );
 }
 
 void BaseViewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {

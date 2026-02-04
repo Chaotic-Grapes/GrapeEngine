@@ -30,6 +30,25 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "ecs/Components.h"
 #include "EditorECSUtils.h"
+#include "graphics/Viewport.hpp"
+#include "helpers/TransformUtils.h"
+#include <algorithm>
+
+namespace {
+    constexpr const char* kGameViewportName = "Game";
+}
+
+void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+    ECS::World* world, Scenes::SceneManager* sceneManager) {
+    BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
+    SetViewportType(ViewportType::Game);
+    SetViewportName(kGameViewportName);
+    Graphics::ViewportManager::Create(kGameViewportName, nullptr, 1, 1);
+}
+
+GameViewport::~GameViewport() {
+    Graphics::ViewportManager::Destroy(kGameViewportName);
+}
 
 // -------------------------------------------------------------------------
 // Update
@@ -51,20 +70,142 @@ void GameViewport::ShowEditorWindows() {
 // -------------------------------------------------------------------------
 // Private Rendering Implementation
 // -------------------------------------------------------------------------
+void GameViewport::PrepareFrame() {
+    auto* rendererSystem = _getRendererSystem();
+    if (!rendererSystem) {
+        return;
+    }
+
+    ECS::Components::Camera3D* activeCamera = nullptr;
+    ECS::Entity activeCameraEntity = ECS::NULL_ENTITY;
+    const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
+
+    if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
+        m_world->Each([&](ECS::Entity e) {
+            if (!m_world->HasById(e, cameraId)) {
+                return;
+            }
+
+            auto* cam = static_cast<ECS::Components::Camera3D*>(m_world->GetRawComponentPtr(e, cameraId));
+            if (!cam) {
+                return;
+            }
+
+            if (cam->Active && !activeCamera) {
+                activeCamera = cam;
+                activeCameraEntity = e;
+            }
+        });
+    }
+
+    auto* vp = rendererSystem->GetViewport(kGameViewportName);
+    if (!vp) {
+        Graphics::ViewportManager::Create(kGameViewportName, nullptr, 1, 1);
+        vp = rendererSystem->GetViewport(kGameViewportName);
+    }
+    if (!vp) {
+        return;
+    }
+
+    float targetRatio = 1.0f;
+    if (m_freeAspect) {
+        targetRatio = (vp->Size.y > 0) ? static_cast<float>(vp->Size.x) / static_cast<float>(vp->Size.y) : 1.0f;
+    } else {
+        switch (m_selectedAspectRatio) {
+            case 1: targetRatio = 16.0f / 9.0f; break;
+            case 2: targetRatio = 16.0f / 10.0f; break;
+            case 3: targetRatio = 4.0f / 3.0f; break;
+            case 4: targetRatio = 5.0f / 4.0f; break;
+            case 5: targetRatio = 21.0f / 9.0f; break;
+            case 6: targetRatio = 1.0f; break;
+            default: targetRatio = 16.0f / 9.0f; break;
+        }
+    }
+
+    if (activeCamera) {
+        activeCamera->AspectRatio = targetRatio;
+    }
+
+    const bool synced = (activeCamera != nullptr) &&
+        _syncGameCamera(activeCameraEntity, *activeCamera, targetRatio);
+    Graphics::ViewportManager::SetCamera(kGameViewportName, synced ? &m_gameCamera : nullptr);
+}
+
+bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect) {
+    if (!m_world || entity.IsNull()) {
+        return false;
+    }
+
+    m_gameCamera.UsePerspective = camera.UsePerspective;
+    m_gameCamera.FOV = camera.FOV;
+    m_gameCamera.NearPlane = camera.NearPlane;
+    m_gameCamera.FarPlane = camera.FarPlane;
+    m_gameCamera.OrthoSize = camera.OrthoSize;
+    m_gameCamera.AspectRatio = targetAspect;
+
+    ECS::Components::WorldTransform* worldTransform = nullptr;
+    ECS::Components::LocalTransform* localTransform = nullptr;
+    const ECS::ComponentTypeId worldId = Editor::ECSUtils::GetComponentIdFromName("WorldTransform");
+    const ECS::ComponentTypeId localId = Editor::ECSUtils::GetComponentIdFromName("LocalTransform");
+    if (worldId != ECS::NULL_COMPONENT_ID && m_world->HasById(entity, worldId)) {
+        worldTransform = static_cast<ECS::Components::WorldTransform*>(
+            m_world->GetRawComponentPtr(entity, worldId));
+    }
+    if (localId != ECS::NULL_COMPONENT_ID && m_world->HasById(entity, localId)) {
+        localTransform = static_cast<ECS::Components::LocalTransform*>(
+            m_world->GetRawComponentPtr(entity, localId));
+    }
+
+    bool useWorld = (worldTransform != nullptr);
+    if (worldTransform && localTransform) {
+        const float localLenSq = localTransform->Position.X * localTransform->Position.X +
+            localTransform->Position.Y * localTransform->Position.Y +
+            localTransform->Position.Z * localTransform->Position.Z;
+        const bool worldAtOrigin = std::abs(worldTransform->Matrix.m03) < 1e-4f &&
+            std::abs(worldTransform->Matrix.m13) < 1e-4f &&
+            std::abs(worldTransform->Matrix.m23) < 1e-4f;
+        if (worldAtOrigin && localLenSq > 1e-6f) {
+            useWorld = false;
+        }
+    }
+
+    if (useWorld && worldTransform) {
+        Vector3D position;
+        Vector3D scale;
+        Quaternion rotation;
+        TransformUtils::DecomposeTRS(worldTransform->Matrix, position, rotation, scale);
+        m_gameCamera.Position = glm::vec3(position.X, position.Y, position.Z);
+        m_gameCamera.Rotation = glm::quat(rotation.W, rotation.X, rotation.Y, rotation.Z);
+        return true;
+    }
+
+    if (localTransform) {
+        m_gameCamera.Position = glm::vec3(localTransform->Position.X, localTransform->Position.Y, localTransform->Position.Z);
+        m_gameCamera.Rotation = glm::quat(localTransform->Rotation.W, localTransform->Rotation.X, localTransform->Rotation.Y, localTransform->Rotation.Z);
+        return true;
+    }
+
+    return false;
+}
+
 void GameViewport::_renderViewport() {
     // Begin game viewport window
     ImGui::Begin("Game", nullptr);
 
+    bool hasCameraComponent = false;
+    bool hasActiveCamera = false;
+    int cameraCount = 0;
+    ECS::Entity activeCameraEntity = ECS::NULL_ENTITY;
+    ECS::Components::Camera3D* activeCamera = nullptr;
+    uint32_t textureId = 0;
+
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem) {
         ImGui::TextDisabled("No game renderer not initialized");
+        m_isViewportHovered = false;
     }
     else {
         const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
-        // Check if there's an active camera in the scene
-        bool hasCameraComponent = false;
-        bool hasActiveCamera = false;
-        int cameraCount = 0;
 
         if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
             m_world->Each([&](ECS::Entity e) {
@@ -81,6 +222,10 @@ void GameViewport::_renderViewport() {
                 cameraCount++;
                 if (cam->Active) {
                     hasActiveCamera = true;
+                    if (!activeCamera) {
+                        activeCamera = cam;
+                        activeCameraEntity = e;
+                    }
                 }
             });
         }
@@ -88,10 +233,14 @@ void GameViewport::_renderViewport() {
         if (!hasCameraComponent) {
             ImGui::TextDisabled("No camera found");
             ImGui::TextDisabled("Add a Camera3D component to an entity");
+            Graphics::ViewportManager::SetCamera(kGameViewportName, nullptr);
+            m_isViewportHovered = false;
         }
         else if (!hasActiveCamera) {
             ImGui::Text("Found %d camera(s) but none are active", cameraCount);
             ImGui::TextDisabled("Set Camera3D.Active to true in the inspector");
+            Graphics::ViewportManager::SetCamera(kGameViewportName, nullptr);
+            m_isViewportHovered = false;
         }
         else {
             // Aspect ratio selector panel
@@ -152,41 +301,37 @@ void GameViewport::_renderViewport() {
                 const float offsetY = (availableSize.y - displaySize.y) * 0.5f;
                 ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
             }
-            
-            // Update camera aspect ratio to match display size
-            if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
-                m_world->Each([&](ECS::Entity e) {
-                    if (!m_world->HasById(e, cameraId)) {
-                        return;
-                    }
 
-                    auto* cam = static_cast<ECS::Components::Camera3D*>(m_world->GetRawComponentPtr(e, cameraId));
-                    if (cam && cam->Active) {
-                        cam->AspectRatio = targetRatio;
-                    }
-                });
+            // NOTE: The Game viewport displays the output of its dedicated renderer viewport.
+
+            if (auto* vp = rendererSystem->GetViewport(kGameViewportName)) {
+                if (vp->LDR) {
+                    textureId = vp->LDR->GetColorTexture(0);
+                }
+            } else if (auto* rg = rendererSystem->GetRenderGraph()) {
+                ResourceAccessor acc(rg);
+                textureId = acc.GetTexture("LDR");
             }
 
-            // NOTE: The Game viewport displays the rendered scene output.
-            // The renderer is configured by LevelEditor::Update() to use the editor camera.
-            // To view the game camera perspective, the Editor Camera would need to be
-            // positioned at the game camera's location, or we would need separate render passes.
-
-            auto* rg = rendererSystem->GetRenderGraph();
-            if (rg) {
-                ResourceAccessor acc(rg);
-                const uint32_t textureId = acc.GetTexture("LDR");
-                if (textureId > 0) {
-                    ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
-                    const bool isGameImageHovered = ImGui::IsItemHovered();
-                    m_isViewportHovered = isGameImageHovered;
-                }
-                else {
-                    ImGui::TextDisabled("Texture ID is 0 - render graph issue");
-                }
+            if (textureId > 0) {
+                ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+                const bool isGameImageHovered = ImGui::IsItemHovered();
+                m_isViewportHovered = isGameImageHovered;
+                m_sceneDrawPos = ImGui::GetItemRectMin();
+                m_sceneDrawSize = displaySize;
             }
             else {
-                ImGui::TextDisabled("No render graph available");
+                ImGui::TextDisabled("Viewport texture unavailable");
+                m_isViewportHovered = false;
+            }
+
+            if (displaySize.x > 1.0f && displaySize.y > 1.0f) {
+                if (!rendererSystem->GetViewport(kGameViewportName)) {
+                    Graphics::ViewportManager::Create(kGameViewportName, nullptr,
+                        static_cast<int>(displaySize.x), static_cast<int>(displaySize.y));
+                }
+                Graphics::ViewportManager::Resize(kGameViewportName,
+                    static_cast<int>(displaySize.x), static_cast<int>(displaySize.y));
             }
         }
     }

@@ -555,7 +555,7 @@ namespace ECS {
                         TileMapRenderer tileRenderer;
                         const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
                         tileRenderer.Submit(
-                            *m_debugTileMap,
+                            m_debugTileMap->get(),
                             tilesets,
                             *m_renderer,
                             m_debugTileMapOffset
@@ -663,7 +663,7 @@ namespace ECS {
                             float smoothness = 0.5f;
                             float aoStrength = 1.0f;
                             float normalStrength = 1.0f;
-							float flags = 0.0f;
+                            uint32_t flags = 0;
 
                             if (world.Has<Components::Material2D>(entity)) {
                                 const auto& mat = world.Get<Components::Material2D>(entity);
@@ -697,7 +697,7 @@ namespace ECS {
                                 smoothness,         // Material2D: smoothness value
                                 aoStrength,         // Material2D: AO strength
                                 normalStrength,     // Material2D: normal strength
-                                static_cast<uint32_t>(flags)
+                                flags
                                 });
                         }
                     }
@@ -1677,10 +1677,11 @@ namespace ECS {
             m_renderer->beginFrame();
 
             // Tilemap
-            if (m_debugTileMap && m_debugTileset) {
-                TileMapRenderer tileRenderer;
-                tileRenderer.Submit(*m_debugTileMap, *m_debugTileset, *m_renderer);
-            }
+              if (m_debugTileMap && m_debugTileset) {
+                  TileMapRenderer tileRenderer;
+                  const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
+                  tileRenderer.Submit(m_debugTileMap->get(), tilesets, *m_renderer, m_debugTileMapOffset);
+              }
 
             for (Entity entity : list) {
                 if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
@@ -1736,7 +1737,8 @@ namespace ECS {
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
 
                     GLuint normalTexId = 0, mraTexId = 0;
-                    float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f, flags = 0.0f;
+                      float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
+                      uint32_t flags = 0;
 
                     if (world.Has<Components::Material2D>(entity)) {
                         const auto& mat = world.Get<Components::Material2D>(entity);
@@ -1746,7 +1748,7 @@ namespace ECS {
                         smoothness = mat.Smoothness;
                         aoStrength = mat.AOStrength;
                         normalStrength = mat.NormalStrength;
-                        flags = mat.Flags;
+                          flags = mat.Flags;
                         if (normalTexId == 0) normalTexId = sr.NormalTextureId;
                     }
 
@@ -1757,8 +1759,8 @@ namespace ECS {
                         ToGlm(sr.Color), sr.TextureId, angleZ, 1.0f,
                         sr.EmissiveTextureId, sr.EmissiveStrength, sr.Width, sr.Height,
                         normalTexId, mraTexId, metallic, smoothness, aoStrength, normalStrength,
-                        static_cast<uint32_t>(flags)
-                        });
+                          flags
+                          });
                 }
             }
             m_renderer->endFrame();
@@ -1937,9 +1939,11 @@ namespace ECS {
         }
         m_renderer->endFrame();
 
-        // Read pixel
-        int readX = glm::clamp(static_cast<int>(m_currentPickRequest->ScreenX), 0, vp.Size.x - 1);
-        int readY = glm::clamp(static_cast<int>(vp.Size.y - m_currentPickRequest->ScreenY - 1), 0, vp.Size.y - 1);
+        // Read pixel (convert screen coords to local viewport coords)
+        const float localX = m_currentPickRequest->ScreenX - m_currentPickRequest->ViewportPos.x;
+        const float localY = m_currentPickRequest->ScreenY - m_currentPickRequest->ViewportPos.y;
+        int readX = glm::clamp(static_cast<int>(localX), 0, vp.Size.x - 1);
+        int readY = glm::clamp(static_cast<int>(vp.Size.y - localY - 1), 0, vp.Size.y - 1);
 
         m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
         glReadPixels(readX, readY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
