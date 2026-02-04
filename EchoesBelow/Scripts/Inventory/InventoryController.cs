@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace EchoesBelow.Scripts;
 
-[Component] public record struct InventoryControllerComponent(bool start);
+[Component] public record struct InventoryControllerComponent(bool start, int ms01_signifier, int mso2_signifier);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class InventoryController : SystemBase
 {
@@ -55,6 +55,7 @@ public class InventoryController : SystemBase
         {
             case 1:
                 ms01_Count++;
+                //foreach(var ui in World!.Query<MatchSignifierComponent>())
                 break;
             case 2:
                 ms02_Count++;
