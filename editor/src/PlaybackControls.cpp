@@ -24,6 +24,7 @@ Reference:
 #include "PlaybackControls.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
+#include "services/MemoryManager.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "core/Application.h"
@@ -521,7 +522,7 @@ void Playback::_restoreWorldState() {
         }
     });
 
-    for (auto entity : entitiesToDestroy) {
+    for (const auto& entity : entitiesToDestroy) {
         m_world->Destroy(entity);
     }
 

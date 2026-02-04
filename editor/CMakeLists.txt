@@ -31,6 +31,8 @@ file(GLOB_RECURSE EDITOR_HEADERS CONFIGURE_DEPENDS
 add_executable(GrapeEditor 
     ${EDITOR_SOURCES} 
     ${EDITOR_HEADERS}
+    # Force global new/delete override to be compiled into the Editor EXE
+    ../engine/src/services/GlobalMemoryOverride.cpp
 )
 
 # Set output name
