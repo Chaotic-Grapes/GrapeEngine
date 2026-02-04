@@ -18,18 +18,28 @@ public enum BarnacleState : byte
 [Component(Name = "Barnacle Snatcher")]
 public record struct BarnacleSnatcherComponent
 {
-    public int IdleStartFrame;
-    public int IdleFrameCount;
-    public float IdleFps;
-    public int AttackStartFrame;
-    public int AttackFrameCount;
-    public float AttackFps;
-    public bool AttackLoop;
-    public BarnacleState State;
-    public bool IsInRange;
-    public int OverlapCount;
-    public ulong BrainHandle;
-    public float AttackCooldownTimer;
+    public int IdleStartFrame = 21;
+    public int IdleFrameCount = 58;
+    public float IdleFps = 24.0f;
+    public int AnimRow = 26;
+    public int IdleFrameOffset = 19;
+    public int IdleFrameLength = 60;
+    public int AttackStartFrame = 3;
+    public int AttackFrameCount = 18;
+    public float AttackFps = 24.0f;
+    public int AttackFrameOffset = 0;
+    public int AttackFrameLength = 18;
+    public bool AttackLoop = false;
+    public bool Initialized = false;
+    public BarnacleState State = BarnacleState.Idle;
+    public int AnimFrameIndex = 0;
+    public float AnimTimeAccumulator = 0.0f;
+    public bool IsInRange = false;
+    public int OverlapCount = 0;
+    public ulong BrainHandle = 0;
+    public float AttackCooldownTimer = 0.0f;
+
+    public BarnacleSnatcherComponent() { }
 }
 
 public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
@@ -150,6 +160,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             ref var anim = ref result.Component2;
             ref var state = ref result.Component3;
             ref var renderer = ref result.Component4;
+            EnsureDefaults(ref ai);
             Brain brain = GetOrCreateBrain(ref ai);
 
             brain.Update(Time.DeltaTime);
@@ -188,7 +199,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             isAttackState = currentState == attackState;
             if (isAttackState)
             {
-                SetAttack(ref ai, ref anim, ref state);
+                EnsureAttack(ref ai, ref anim, ref state);
                 renderer.Color = AttackColor;
             }
             else
@@ -245,12 +256,13 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     private static void SetAttack(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
     {
         ai.State = BarnacleState.Attack;
-        anim.StartFrame = ai.AttackStartFrame;
-        anim.FrameCount = Math.Max(1, ai.AttackFrameCount);
-        anim.FramesPerSecond = ai.AttackFps > 0.0f ? ai.AttackFps : anim.FramesPerSecond;
+        anim.Row = ai.AnimRow;
+        anim.FrameOffset = Math.Max(0, ai.AttackFrameOffset);
+        anim.FrameLength = Math.Max(1, ai.AttackFrameLength);
         anim.Loop = ai.AttackLoop;
         anim.Playing = true;
-        anim.UseRow = false;
+        anim.UseRow = true;
+        anim.FramesPerSecond = ai.AttackFps > 0.0f ? ai.AttackFps : anim.FramesPerSecond;
 
         state.CurrentFrame = 0;
         state.TimeAccumulator = 0.0f;
@@ -260,12 +272,13 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     private static void SetIdle(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
     {
         ai.State = BarnacleState.Idle;
-        anim.StartFrame = ai.IdleStartFrame;
-        anim.FrameCount = Math.Max(1, ai.IdleFrameCount);
-        anim.FramesPerSecond = ai.IdleFps > 0.0f ? ai.IdleFps : anim.FramesPerSecond;
+        anim.Row = ai.AnimRow;
+        anim.FrameOffset = Math.Max(0, ai.IdleFrameOffset);
+        anim.FrameLength = Math.Max(1, ai.IdleFrameLength);
         anim.Loop = true;
         anim.Playing = true;
-        anim.UseRow = false;
+        anim.UseRow = true;
+        anim.FramesPerSecond = ai.IdleFps > 0.0f ? ai.IdleFps : anim.FramesPerSecond;
 
         state.CurrentFrame = 0;
         state.TimeAccumulator = 0.0f;
@@ -275,11 +288,61 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     private static void EnsureIdle(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
     {
         if (ai.State != BarnacleState.Idle ||
-            anim.StartFrame != ai.IdleStartFrame ||
-            anim.FrameCount != Math.Max(1, ai.IdleFrameCount) ||
-            !anim.Loop)
+            !anim.Loop ||
+            !anim.UseRow ||
+            anim.Row != ai.AnimRow ||
+            anim.FrameOffset != Math.Max(0, ai.IdleFrameOffset) ||
+            anim.FrameLength != Math.Max(1, ai.IdleFrameLength))
         {
             SetIdle(ref ai, ref anim, ref state);
         }
+    }
+
+    private static void EnsureAttack(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
+    {
+        if (ai.State != BarnacleState.Attack ||
+            anim.Loop != ai.AttackLoop ||
+            !anim.UseRow ||
+            anim.Row != ai.AnimRow ||
+            anim.FrameOffset != Math.Max(0, ai.AttackFrameOffset) ||
+            anim.FrameLength != Math.Max(1, ai.AttackFrameLength))
+        {
+            SetAttack(ref ai, ref anim, ref state);
+        }
+    }
+
+    private static void EnsureDefaults(ref BarnacleSnatcherComponent ai)
+    {
+        if (ai.Initialized)
+            return;
+
+        if (ai.IdleFrameCount <= 0 && ai.AttackFrameCount <= 0)
+        {
+            ai.IdleStartFrame = 21;
+            ai.IdleFrameCount = 58;
+            ai.IdleFps = 24.0f;
+            ai.AttackStartFrame = 3;
+            ai.AttackFrameCount = 18;
+            ai.AttackFps = 19.0f;
+            ai.AttackLoop = false;
+            ai.State = BarnacleState.Idle;
+        }
+
+        if (ai.AnimRow < 0)
+            ai.AnimRow = 26;
+
+        if (ai.IdleFrameLength <= 0)
+        {
+            ai.IdleFrameOffset = 19;
+            ai.IdleFrameLength = 60;
+        }
+
+        if (ai.AttackFrameLength <= 0)
+        {
+            ai.AttackFrameOffset = 0;
+            ai.AttackFrameLength = 18;
+        }
+
+        ai.Initialized = true;
     }
 }
