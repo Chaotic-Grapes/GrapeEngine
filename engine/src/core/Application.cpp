@@ -325,6 +325,7 @@ namespace Engine {
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        m_sceneManager.SetAudioSystem(audioSystem);
         
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
