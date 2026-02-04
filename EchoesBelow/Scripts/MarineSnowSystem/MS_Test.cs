@@ -39,17 +39,17 @@ public class MS_Test : SystemBase
 
                 Log("parent . . . ");
                 
-                //child.AttachTo(parent);
+                child.AttachTo(parent);
                 //child.GetParent();
-                //Log("Attempted parenting: " + child.GetParent()!.GetComponent<Name>());
+                Log("Attempted parenting: " + child.GetParent()!.GetComponent<Name>().ToString());
             }
             if (Input.IsKeyPressed(KeyCode.K))
             {
                 Entity child = Entity.FromId(World!, (ulong)result.Component1.child);
                 Entity parent = Entity.FromId(World!, (ulong)result.Component1.parent);
                 Log("child . . . ");
-                //child.Detach();
-                //Log("I wanna live on my own!");
+                child.Detach();
+                Log("I wanna live on my own!");
             }
         }
 

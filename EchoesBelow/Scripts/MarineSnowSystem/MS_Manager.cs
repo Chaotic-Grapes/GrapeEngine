@@ -188,12 +188,14 @@ public class MS_Manager : SystemBase
 
         //Add gravity and forces
         ref Rigidbody2D rb = ref pulledEntity.AddComponent<Rigidbody2D>();
-        rb.GravityScale = 0.01f;
+        rb.GravityScale = 0.1f;
         rb.Mass = 1;
-        rb.LinearDamping = 0.05f;
-        rb.Flags = 2u;
+        rb.LinearDamping = 1.4f;
+        //rb.Flags = 2u;
+        rb.Flags |= Rigidbody2D.FLAG_KINEMATIC | Rigidbody2D.FLAG_USE_GRAVITY;
+
         ref LinearVelocity2D lv = ref pulledEntity.AddComponent<LinearVelocity2D>();
-        lv.Value.X = GMath.Random(0.1f, 1f);
+        lv.Value.X = GMath.Random(0.5f, 2f);
         pulledEntity.AddComponent<AngularVelocity2D>();
         //Add Decay Component HARDCODED
         ref MS_DecayComponent decay = ref pulledEntity.AddComponent<MS_DecayComponent>();
