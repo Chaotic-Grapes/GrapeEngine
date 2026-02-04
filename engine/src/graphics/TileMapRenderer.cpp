@@ -1,6 +1,6 @@
 #include "graphics/renderer.hpp"
 #include "graphics/TileMapRenderer.hpp"
-#include "../src/core/World/TileLayer.hpp"
+#include "../include/core/World/TileLayer.hpp"
 
 void TileMapRenderer::Submit(
     const TileMap& tileMap,
@@ -22,12 +22,15 @@ void TileMapRenderer::Submit(
     {
         for (uint32_t x = 0; x < width; ++x)
         {
-            TileID id = layer.Get(x, y);
-            if (id == EMPTY_TILE)
+            TileID fullID = layer.Get(x, y);
+            if (fullID == EMPTY_TILE)
                 continue;
 
+            TileID baseID = GetTileBaseID(fullID);
+            uint8_t rotIdx = GetTileRotation(fullID);
+
             TileUV uv;
-            if (!tileset.GetTileUV(id, uv))
+            if (!tileset.GetTileUV(baseID, uv))
                 continue;
 
             // Pack TileUV -> glm::vec4 (u0, v0, u1, v1)
@@ -42,6 +45,10 @@ void TileMapRenderer::Submit(
             };
 
             const glm::vec2 size{ tileSize, tileSize };
+            
+            // Rotation: 0=0, 1=90, 2=180, 3=270 (in radians)
+            // 90 degrees = PI/2 = 1.57079632679f
+            float rotation = static_cast<float>(rotIdx) * 1.57079632679f;
 
             renderer.submitQuad(
                 pos,
@@ -49,7 +56,7 @@ void TileMapRenderer::Submit(
                 textureId,
                 uvRect,
                 color,
-                0.0f,   // rotation
+                rotation,   // rotation
                 1.0f,   // scale
                 0       // render layer
             );

@@ -19,10 +19,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "audio/FmodAudioDevice.h"
+#include "audio/AudioEngine.h"
 #include "core/Logger.h"
 
 // External audio device reference
 extern Audio::FmodAudioDevice* gAudioDevice;
+extern Audio::AudioEngine* Audio::gAudioEngine;
 
 // ============================================================================
 // Audio API - Sound Loading and Playback
@@ -39,7 +41,7 @@ extern Audio::FmodAudioDevice* gAudioDevice;
  */
 INTEROP_API bool EngineInterop_Audio_LoadCue(const char* cueId, const char* filePath, bool is3D, bool isLooping, bool isStreaming) {
     (void)isLooping; // Currently unused
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return false;
     }
@@ -48,7 +50,7 @@ INTEROP_API bool EngineInterop_Audio_LoadCue(const char* cueId, const char* file
     params.Is3D = is3D;
     params.Stream = isStreaming;
 
-    return gAudioDevice->LoadCue(cueId, filePath, params);
+    return Audio::gAudioEngine->LoadCue(cueId, filePath, params);
 }
 
 /**
@@ -56,12 +58,12 @@ INTEROP_API bool EngineInterop_Audio_LoadCue(const char* cueId, const char* file
  * @param cueId The identifier for the cue to unload
  */
 INTEROP_API void EngineInterop_Audio_UnloadCue(const char* cueId) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
 
-    gAudioDevice->UnloadCue(cueId);
+    Audio::gAudioEngine->UnloadCue(cueId);
 }
 
 /**
@@ -70,11 +72,11 @@ INTEROP_API void EngineInterop_Audio_UnloadCue(const char* cueId) {
  * @return True if the cue is loaded, false otherwise
  */
 INTEROP_API bool EngineInterop_Audio_HasCue(const char* cueId) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         return false;
     }
 
-    return gAudioDevice->HasCue(cueId);
+    return Audio::gAudioEngine->HasCue(cueId);
 }
 
 /**
@@ -86,7 +88,7 @@ INTEROP_API bool EngineInterop_Audio_HasCue(const char* cueId) {
  * @return A handle ID for the playback instance
  */
 INTEROP_API uint64_t EngineInterop_Audio_Play(const char* cueId, float volume, float pitch, bool paused) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 0;
     }
@@ -94,9 +96,10 @@ INTEROP_API uint64_t EngineInterop_Audio_Play(const char* cueId, float volume, f
     Audio::PlaySettings settings;
     settings.Volume = volume;
     settings.Pitch = pitch;
-    settings.Loop = paused;
+    settings.Loop = false;
+    settings.StartPaused = paused;
 
-    Audio::PlaybackHandle handle = gAudioDevice->Play(cueId, settings);
+    Audio::PlaybackHandle handle = Audio::gAudioEngine->Play(cueId, settings, Audio::Bus::SFX);
     return handle.Id;
 }
 
@@ -109,7 +112,7 @@ INTEROP_API uint64_t EngineInterop_Audio_Play(const char* cueId, float volume, f
  * @return A handle ID for the playback instance
  */
 INTEROP_API uint64_t EngineInterop_Audio_PlaySingle(const char* cueId, float volume, float pitch, int policy) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 0;
     }
@@ -119,7 +122,7 @@ INTEROP_API uint64_t EngineInterop_Audio_PlaySingle(const char* cueId, float vol
     settings.Pitch = pitch;
 
     Audio::PlayPolicy playPolicy = static_cast<Audio::PlayPolicy>(policy);
-    Audio::PlaybackHandle handle = gAudioDevice->PlaySingle(cueId, settings, playPolicy);
+    Audio::PlaybackHandle handle = Audio::gAudioEngine->PlaySingle(cueId, settings, playPolicy, Audio::Bus::SFX);
     return handle.Id;
 }
 
@@ -129,7 +132,7 @@ INTEROP_API uint64_t EngineInterop_Audio_PlaySingle(const char* cueId, float vol
  * @param stopMode The stop mode (0=Immediate, 1=AllowFadeOut)
  */
 INTEROP_API void EngineInterop_Audio_Stop(uint64_t handleId, int stopMode) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
@@ -138,7 +141,7 @@ INTEROP_API void EngineInterop_Audio_Stop(uint64_t handleId, int stopMode) {
     handle.Id = handleId;
     Audio::StopMode mode = static_cast<Audio::StopMode>(stopMode);
 
-    gAudioDevice->Stop(handle, mode);
+    Audio::gAudioEngine->Stop(handle, mode);
 }
 
 /**
@@ -147,13 +150,13 @@ INTEROP_API void EngineInterop_Audio_Stop(uint64_t handleId, int stopMode) {
  * @param stopMode The stop mode (0=Immediate, 1=AllowFadeOut)
  */
 INTEROP_API void EngineInterop_Audio_StopCue(const char* cueId, int stopMode) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
 
     Audio::StopMode mode = static_cast<Audio::StopMode>(stopMode);
-    gAudioDevice->StopCue(cueId, mode);
+    Audio::gAudioEngine->StopCue(cueId, mode);
 }
 
 /**
@@ -162,11 +165,11 @@ INTEROP_API void EngineInterop_Audio_StopCue(const char* cueId, int stopMode) {
  * @return True if the cue is playing, false otherwise
  */
 INTEROP_API bool EngineInterop_Audio_IsCuePlaying(const char* cueId) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         return false;
     }
 
-    return gAudioDevice->IsCuePlaying(cueId);
+    return Audio::gAudioEngine->IsCuePlaying(cueId);
 }
 
 // ============================================================================
@@ -179,14 +182,14 @@ INTEROP_API bool EngineInterop_Audio_IsCuePlaying(const char* cueId) {
  * @param volume The new volume (0.0 to 1.0)
  */
 INTEROP_API void EngineInterop_Audio_SetInstanceVolume(uint64_t handleId, float volume) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
 
     Audio::PlaybackHandle handle;
     handle.Id = handleId;
-    gAudioDevice->SetInstanceVolume(handle, volume);
+    Audio::gAudioEngine->SetInstanceVolume(handle, volume);
 }
 
 /**
@@ -195,14 +198,30 @@ INTEROP_API void EngineInterop_Audio_SetInstanceVolume(uint64_t handleId, float 
  * @param pitch The new pitch (0.5 to 2.0)
  */
 INTEROP_API void EngineInterop_Audio_SetInstancePitch(uint64_t handleId, float pitch) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
 
     Audio::PlaybackHandle handle;
     handle.Id = handleId;
-    gAudioDevice->SetInstancePitch(handle, pitch);
+    Audio::gAudioEngine->SetInstancePitch(handle, pitch);
+}
+
+/**
+ * @brief Set the stereo pan of a playing sound instance (2D only)
+ * @param handleId The handle ID of the playback instance
+ * @param pan The pan value (-1.0 left to 1.0 right)
+ */
+INTEROP_API void EngineInterop_Audio_SetInstancePan(uint64_t handleId, float pan) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    Audio::gAudioEngine->SetInstancePan(handle, pan);
 }
 
 /**
@@ -216,7 +235,7 @@ INTEROP_API void EngineInterop_Audio_SetInstancePitch(uint64_t handleId, float p
  * @param velZ The Z velocity
  */
 INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, float posX, float posY, float posZ, float velX, float velY, float velZ) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
@@ -227,7 +246,7 @@ INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, floa
     Audio::Vec3 position = { posX, posY, posZ };
     Audio::Vec3 velocity = { velX, velY, velZ };
     
-    gAudioDevice->SetInstancePosition(handle, position, velocity);
+    Audio::gAudioEngine->SetInstancePosition(handle, position, velocity);
 }
 
 // ============================================================================
@@ -239,12 +258,12 @@ INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, floa
  * @param volume The new master volume (0.0 to 1.0)
  */
 INTEROP_API void EngineInterop_Audio_SetMasterVolume(float volume) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
     }
 
-    gAudioDevice->SetMasterVolume(volume);
+    Audio::gAudioEngine->SetBusVolume(Audio::Bus::Master, volume);
 }
 
 /**
@@ -252,12 +271,12 @@ INTEROP_API void EngineInterop_Audio_SetMasterVolume(float volume) {
  * @return The current master volume (0.0 to 1.0)
  */
 INTEROP_API float EngineInterop_Audio_GetMasterVolume() {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 1.0f;
     }
 
-    return gAudioDevice->GetMasterVolume();
+    return Audio::gAudioEngine->GetBusVolume(Audio::Bus::Master);
 }
 
 /**
@@ -279,7 +298,7 @@ INTEROP_API void EngineInterop_Audio_SetListener(float posX, float posY, float p
                                              float velX, float velY, float velZ,
                                              float fwdX, float fwdY, float fwdZ,
                                              float upX, float upY, float upZ) {
-    if (!gAudioDevice) {
+    if (!Audio::gAudioEngine) {
           std::cerr << "[ScriptAPI] Audio device not initialized" << '\n';
         return;
     }
@@ -290,5 +309,49 @@ INTEROP_API void EngineInterop_Audio_SetListener(float posX, float posY, float p
     listener.Forward = { fwdX, fwdY, fwdZ };
     listener.Up = { upX, upY, upZ };
 
-    gAudioDevice->SetListener(listener);
+    Audio::gAudioEngine->SetListener(listener);
+}
+
+// ============================================================================
+// Audio API - Bus Controls
+// ============================================================================
+
+/**
+ * @brief Set a mixer bus volume
+ * @param bus Bus index
+ * @param volume New volume (0.0 to 1.0)
+ */
+INTEROP_API void EngineInterop_Audio_SetBusVolume(int bus, float volume) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetBusVolume(static_cast<Audio::Bus>(bus), volume);
+}
+
+/**
+ * @brief Get a mixer bus volume
+ * @param bus Bus index
+ * @return Current volume
+ */
+INTEROP_API float EngineInterop_Audio_GetBusVolume(int bus) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+    return Audio::gAudioEngine->GetBusVolume(static_cast<Audio::Bus>(bus));
+}
+
+/**
+ * @brief Fade a mixer bus to a target volume
+ * @param bus Bus index
+ * @param targetVolume Target volume
+ * @param duration Fade duration in seconds
+ */
+INTEROP_API void EngineInterop_Audio_FadeBusVolume(int bus, float targetVolume, float duration) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->FadeBusVolume(static_cast<Audio::Bus>(bus), targetVolume, duration);
 }

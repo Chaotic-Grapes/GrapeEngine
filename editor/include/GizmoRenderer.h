@@ -104,6 +104,7 @@ namespace Editor {
          * @param projMatrix Camera projection matrix (row-major)
          * @param inputTransform Input entity transform (will be read/modified by ImGuizmo)
          * @param outTransform [OUT] Computed transform from ImGuizmo manipulation
+         * @param snap Optional snap increments (nullptr for no snapping)
          * @param outDeltaTransform [OUT] Delta transform from last frame (optional, set nullptr to skip)
          * @return true if gizmo is currently being manipulated; false otherwise
          */
@@ -112,6 +113,7 @@ namespace Editor {
             const glm::mat4& projMatrix,
             const glm::mat4& inputTransform,
             glm::mat4& outTransform,
+            const float* snap = nullptr,
             glm::mat4* outDeltaTransform = nullptr);
 
         // ====================================================================

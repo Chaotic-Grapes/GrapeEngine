@@ -2,6 +2,7 @@
 #define SERIALIZATION_H
 
 #include <nlohmann/json.hpp>
+#include <vector>
 #include "EntitySerializer.h"
 #include "Serializer.h"
 

@@ -65,6 +65,10 @@ internal partial class AudioAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetInstancePitch(ulong handleId, float pitch);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstancePan")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetInstancePan(ulong handleId, float pan);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstancePosition")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetInstancePosition(ulong handleId, float posX, float posY, float posZ, float velX, float velY, float velZ);
@@ -80,6 +84,18 @@ internal partial class AudioAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetListener")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetListener(float posX, float posY, float posZ, float velX, float velY, float velZ, float fwdX, float fwdY, float fwdZ, float upX, float upY, float upZ);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetBusVolume")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetBusVolume(int bus, float volume);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetBusVolume")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetBusVolume(int bus);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_FadeBusVolume")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void FadeBusVolume(int bus, float targetVolume, float duration);
 }
 
 

@@ -105,7 +105,6 @@ namespace Platform {
 
         // Initialize render device with first window
         if (m_windows.empty() && m_renderDevice) {
-            LOG_INFO("Initializing render device with GLFWwindow*=" << reinterpret_cast<void*>(window->GetGLFWHandle()));
             if (!m_renderDevice->Initialize(window->GetGLFWHandle())) {
                 LOG_ERROR("Render device initialization failed for window: " << info.Title);
             }
@@ -113,7 +112,6 @@ namespace Platform {
 
         // Initialize input system with first window
         if (m_windows.empty() && m_inputSystem) {
-            LOG_INFO("Initializing input system with GLFWwindow*=" << reinterpret_cast<void*>(window->GetGLFWHandle()));
             m_inputSystem->Initialize(window->GetGLFWHandle());
         }
 

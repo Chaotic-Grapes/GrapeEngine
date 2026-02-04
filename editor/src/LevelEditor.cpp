@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "AudioAssetLibrary.h"
+#include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
@@ -28,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
+#include "TilePalettePanel.h"
 #include <cmath>
 
 #ifdef ERROR
@@ -143,26 +145,46 @@ void LevelEditor::_buildDockLayout() {
     );
 
     ImGuiID leftCenterNode, rightNode;
-    // Split main area: carve right strip (25% width) for inspectors
+    // Split main area: carve right strip (28% width) for inspectors and tools
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
+    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.28f, &rightNode, &leftCenterNode);
 
     ImGuiID topSection, assetBrowserNode;
-    // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
-    ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
+    // Split left-center area vertically: top work area (70%), bottom asset browser (30%)
+    ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.70f, &topSection, &assetBrowserNode);
 
     ImGuiID leftTopNode, sceneGameNode;
-    // Split top work area horizontally: left hierarchy (33%), center scene/game (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &sceneGameNode); // Hierarchy strip
+    // Split top work area horizontally: left strip (28%), center scene/game (72%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.28f, &leftTopNode, &sceneGameNode);
 
     // Map panels to target nodes to realize the layout
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
-    ImGui::DockBuilderDockWindow("Game", sceneGameNode);
+    // Layout preset 1: single shared Scene/Game dock.
+    if (m_viewportLayoutPreset == 1) {
+        ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
+        ImGui::DockBuilderDockWindow("Game", sceneGameNode);
+    // Layout preset 2: split Scene/Game side-by-side.
+    } else if (m_viewportLayoutPreset == 2) {
+        ImGuiID sceneNode, gameNode;
+        ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Right, 0.5f, &gameNode, &sceneNode);
+        ImGui::DockBuilderDockWindow("Scene", sceneNode);
+        ImGui::DockBuilderDockWindow("Game", gameNode);
+    // Layout preset 4: quad split for multiple viewports.
+    } else {
+        ImGuiID topNode, bottomNode;
+        ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Down, 0.5f, &bottomNode, &topNode);
+        ImGuiID topLeft, topRight;
+        ImGui::DockBuilderSplitNode(topNode, ImGuiDir_Right, 0.5f, &topRight, &topLeft);
+        ImGuiID bottomLeft, bottomRight;
+        ImGui::DockBuilderSplitNode(bottomNode, ImGuiDir_Right, 0.5f, &bottomRight, &bottomLeft);
+        ImGui::DockBuilderDockWindow("Scene", topLeft);
+        ImGui::DockBuilderDockWindow("Game", topRight);
+    }
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Layers", rightNode);
+    ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
@@ -245,8 +267,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     ImGuiStyle& style = ImGui::GetStyle();
 
     // Initialize audio asset library:
-    // this will scan for folder assets/Audio
-    AudioAssetLibrary::Get().Refresh("assets/Audio");
+    // this will scan for audio anywhere under the project root
+    AudioAssetLibrary::Get().Refresh(Engine::ProjectPaths::GetProjectRoot());
 
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
@@ -262,6 +284,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Wire up playback state getter to file menu for edit/play mode checking
     m_fileMenu.SetEditorStateGetter([this]() { return m_playback.GetEditorState(); });
+    // Ensure play-mode scene reloads don't reuse stale snapshots.
+    m_fileMenu.SetPlaybackSnapshotClearCallback([this]() { m_playback.ClearSavedState(); });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -304,6 +328,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         }
     );
 
+    // Subscribe to viewport layout requests from the scene viewport header
+    m_viewportLayoutSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorViewportLayoutRequested>(
+        [this](const Messaging::EditorViewportLayoutRequested& evt) {
+            // Clamp layout requests and rebuild dock layout next frame.
+            m_viewportLayoutPreset = std::max(1, std::min(4, evt.Layout));
+            m_dockLayoutBuilt = false;
+        }
+    );
+
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);
 
@@ -324,9 +357,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_playback.OnStateChanged([this](const EditorState oldState, const EditorState newState) {
                 _onPlaybackStateChanged(oldState, newState);
                 });
+            // Wire play controls into file menu dirty tracking.
+            m_playback.SetUnsavedChangesProvider([this]() { return m_fileMenu.HasUnsavedChanges(); });
+            m_playback.SetSaveSceneCallback([this]() { m_fileMenu.SaveScene(); });
         },
         [this]() { m_playback.Render(); },
-        [this](ECS::World* w) { m_playback.SetWorld(w); }
+        [this](ECS::World* w) {
+            const bool preservePlayback = m_playback.GetEditorState() != EditorState::Edit;
+            m_playback.SetWorld(w, preservePlayback);
+        }
     );
 
     _registerPanel("Asset Browser",
@@ -368,9 +407,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
                    m_hierarchyWindow.SetViewport(&m_sceneViewport); 
                    m_hierarchyWindow.SetFileMenu(&m_fileMenu);
+                   m_hierarchyWindow.SetUndoSystem(&m_undoSystem); // Enable reorder undo/redo.
         },
         [this]() { m_hierarchyWindow.Render(); },
-        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
+        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); m_hierarchyWindow.SetUndoSystem(&m_undoSystem); } // Keep undo wired after world changes.
     );
 
     _registerPanel("Inspector",
@@ -382,6 +422,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
+    );
+
+    _registerPanel("Tile Palette",
+        [this]() {
+            m_tilePalette.Initialize(nullptr, nullptr, m_world);
+        },
+        [this]() { m_tilePalette.Render(); },
+        [this](ECS::World* w) { m_tilePalette.SetWorld(w); }
     );
 
     _registerPanel("Layers",
@@ -461,6 +509,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Wire up file menu to viewports after panels are initialized
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
+    m_sceneViewport.SetTilePalette(&m_tilePalette);
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
@@ -524,7 +573,7 @@ void LevelEditor::_loadFonts() {
 
 		// Safety check (fallback to default font)
         if (!m_mainFont) {
-            LOG_ERROR("Failed to load Inter Medium font");
+            LOG_ERROR("Failed to load Open Sans Medium font");
             m_mainFont = io.Fonts->AddFontDefault();
         }
     }
@@ -540,7 +589,7 @@ void LevelEditor::_loadFonts() {
 
 		// Safety check (fallback to default font)
         if (!m_boldFont) {
-            LOG_ERROR("Failed to load Inter ExtraBold font");
+            LOG_ERROR("Failed to load Open Sans ExtraBold font");
             m_boldFont = io.Fonts->AddFontDefault();
         }
     }
@@ -627,9 +676,7 @@ void LevelEditor::Update() {
         }
     }
 
-    if (m_playback.IsPlaying()) {
-        Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
-    }
+    // SceneManager::Update is already called in EditorService::Update.
 }
 
 // -------------------------------------------------------------------------
@@ -657,12 +704,8 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
     // Handle state transitions
     if (newState == EditorState::Edit) {
-        // Note: Entity IDs are now preserved during restore, so selection can remain valid
-        // However, we still clear selection as a safe UX pattern when stopping play mode
-        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
-        m_inspector.ClearSelection();
-
-        // Rebuild entity order to reflect restored hierarchy
+        // Entity IDs are preserved during restore, so keep selection intact.
+        // Rebuild entity order to reflect restored hierarchy.
         m_hierarchyWindow.RebuildEntityOrder();
     }
 

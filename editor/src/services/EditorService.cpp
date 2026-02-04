@@ -70,42 +70,34 @@ using namespace Services;
 #ifdef USE_IMGUI
 EditorService::~EditorService() { m_editorInstance = nullptr; }
 
-void EditorService::Initialize() {
-    LOG_INFO("EditorService::Initialize ENTRY - this=" << reinterpret_cast<void*>(this) << ", m_world=" << reinterpret_cast<void*>(m_world));
-    
+void EditorService::Initialize() {    
     // Prevent double initialization
     if (m_initialized || m_backendInitialized) {
-        LOG_WARNING("EditorService::Initialize() - Already initialized, skipping");
+        LOG_WARNING("[EditorService] Initialize() - Already initialized, skipping");
         return;
     }
 
     try {
         if (m_world) {
-            LOG_INFO("EditorService::Initialize - calling UICommon::InitializeDefaultLayouts");
             UICommon::InitializeDefaultLayouts();
         }
 
         if (!Engine::CORE) {
-            LOG_ERROR("EditorService::Initialize() - Engine CORE not available");
+            LOG_ERROR("[EditorService] Initialize() - Engine CORE not available");
             return;
         }
 
         auto* platformContext = Engine::CORE->GetPlatformContext();
         if (!platformContext) {
-            LOG_ERROR("EditorService::Initialize() - Platform context not available");
+            LOG_ERROR("[EditorService] Initialize() - Platform context not available");
             return;
         }
 
         auto* mainWindow = platformContext->GetMainWindow();
         if (!mainWindow) {
-            LOG_WARNING("EditorService::Initialize() - No main window available");
+            LOG_WARNING("[EditorService] No main window available");
             return;
         }
-
-        LOG_INFO("EditorService::Initialize - platformContext=" << reinterpret_cast<void*>(platformContext)
-                 << ", mainWindow=" << reinterpret_cast<void*>(mainWindow)
-                 << ", nativeHandle=" << reinterpret_cast<void*>(mainWindow->GetNativeHandle()));
-
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
@@ -117,13 +109,13 @@ void EditorService::Initialize() {
         io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
         io.FontGlobalScale = EditorStyle::FontScale;
 
-        ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.TabBarBorderSize = 0.0f;
+        // Apply the editor's modern theme overrides.
+        EditorStyle::ApplyModernTheme(style);
 
         GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
         if (!glfwHandle) {
-            LOG_ERROR("EditorService::Initialize() - GLFW native handle is null; cannot initialize ImGui");
+            LOG_ERROR("[EditorService] GLFW native handle is null; cannot initialize ImGui");
             ImGui::DestroyContext();
             return;
         }
@@ -134,7 +126,7 @@ void EditorService::Initialize() {
         // Ensure GL functions are available (GLAD). Window creation normally initializes GLAD,
         // but re-check here to be safe in case of ordering differences during refactor.
         if (!gladLoadGL()) {
-            LOG_ERROR("EditorService::Initialize() - gladLoadGL() failed; OpenGL functions unavailable");
+            LOG_ERROR("[EditorService] gladLoadGL() failed");
             ImGui_ImplOpenGL3_Shutdown();
             ImGui::DestroyContext();
             return;
@@ -156,6 +148,8 @@ void EditorService::Initialize() {
                 }
             );
             m_initialized = true;
+
+            LOG_INFO("Running ImGui version " << IMGUI_VERSION);
         }
     } catch (const std::exception& e) {
         LOG_ERROR("Exception in EditorService::Initialize(): " << e.what());
@@ -214,12 +208,6 @@ void EditorService::BeginFrame() {
 
 void EditorService::Update() {
     if (!m_initialized) return;
-
-    // Ensure the SceneManager processes any pending transitions so the editor
-    // immediately sees newly created scenes (e.g. File->New Scene).
-    // Calling Update here is idempotent and cheap (it only processes pending
-    // transitions) and guarantees the editor's world is set correctly.
-    m_sceneManager.Update();
 
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;

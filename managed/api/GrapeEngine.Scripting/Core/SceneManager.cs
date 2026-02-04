@@ -147,6 +147,19 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Configure the next scene change to trigger audio transitions.
+    /// </summary>
+    /// <param name="fadeDuration">Duration of fade in seconds (0 for immediate stop).</param>
+    /// <param name="allowCrossfade">True to allow overlap between old and new audio.</param>
+    public void SetNextAudioTransition(float fadeDuration, bool allowCrossfade)
+    {
+        unsafe
+        {
+            SceneAPI.SetNextAudioTransition(_sceneManagerPtr, fadeDuration, allowCrossfade);
+        }
+    }
+
+    /// <summary>
     /// Gets the currently active scene.
     /// </summary>
     /// <returns>The active scene, or null if none is active.</returns>
@@ -201,6 +214,7 @@ public class SceneManager
         }
     }
 
+
     /// <summary>
     /// Updates the scene manager and processes any pending scene transitions.
     /// This should be called once per frame by the engine.
@@ -253,6 +267,51 @@ public class SceneManager
             if (result)
             {
                 // Invalidate cache for this scene since it was reloaded
+                _sceneCache.Remove(sceneIndex);
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Creates a new scene slot and loads a scene file into it.
+    /// </summary>
+    /// <param name="filename">Path to the input file.</param>
+    /// <returns>The loaded scene, or null if the load failed.</returns>
+    public Scene? LoadScene(string filename)
+    {
+        if (string.IsNullOrEmpty(filename))
+            throw new ArgumentNullException(nameof(filename));
+
+        ulong sceneIndex = AddScene();
+        if (sceneIndex == ulong.MaxValue)
+            throw new InvalidOperationException("Failed to allocate a new scene slot.");
+
+        if (!LoadScene(sceneIndex, filename))
+        {
+            RemoveScene(sceneIndex);
+            return null;
+        }
+
+        return GetScene(sceneIndex);
+    }
+
+    /// <summary>
+    /// Restarts a scene by reloading it from disk into the same slot.
+    /// </summary>
+    /// <param name="sceneIndex">The index of the scene slot to restart.</param>
+    /// <param name="filename">Path to the input file.</param>
+    /// <returns>True if restart was successful, false otherwise.</returns>
+    public bool RestartScene(ulong sceneIndex, string filename)
+    {
+        if (string.IsNullOrEmpty(filename))
+            throw new ArgumentNullException(nameof(filename));
+
+        unsafe
+        {
+            bool result = SceneAPI.RestartScene(_sceneManagerPtr, sceneIndex, filename);
+            if (result)
+            {
                 _sceneCache.Remove(sceneIndex);
             }
             return result;

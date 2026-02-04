@@ -182,6 +182,8 @@ void GameViewport::_renderViewport() {
                 const uint32_t textureId = acc.GetTexture("LDR");
                 if (textureId > 0) {
                     ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+                    const bool isGameImageHovered = ImGui::IsItemHovered();
+                    m_isViewportHovered = isGameImageHovered;
                 }
                 else {
                     ImGui::TextDisabled("Texture ID is 0 - render graph issue");

@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
 #include "ecs/events/EventDispatcher.h"
@@ -32,8 +33,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/systems/GUISystem.h"
-#include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
 // Undefine potential Windows macros that conflict with enum names
@@ -115,9 +114,6 @@ namespace Engine {
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
-        // Clear UI event queue
-        ECS::UIEventQueue::Clear();
-        
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
 
@@ -158,6 +154,7 @@ namespace Engine {
         m_audio->Update();
 
         // --- Scene Update ---
+        m_sceneManager.Update();
         auto* currentScene = m_sceneManager.GetActive();
         
         if (currentScene) {
@@ -331,7 +328,7 @@ namespace Engine {
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
-        m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
@@ -340,9 +337,7 @@ namespace Engine {
         
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
-        
-        // Register GUI system
-        m_systemManager.RegisterSystem<ECS::GUISystem>();
+        m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();
 
         // Build dependency graphs (analyzes component access)
         m_systemManager.BuildDependencyGraphs();

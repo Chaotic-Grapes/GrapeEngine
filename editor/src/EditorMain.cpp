@@ -44,6 +44,9 @@ int main() {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+    // Log current working directory for debugging
+    LOG_INFO(std::filesystem::current_path());
+
     // Delete temporary compiled script assemblies from previous runs
     {
         std::filesystem::path tempScriptsPath = Engine::ProjectPaths::GetTempScriptsPath();
@@ -114,6 +117,7 @@ int main() {
     EditorState previousState = EditorState::Edit;
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
+
 
     // Editor main loop
     while (engine.IsRunning()) {

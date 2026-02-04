@@ -34,7 +34,7 @@ void CompilePanel::Render() {
     }
 
     const char* statusText = "Idle";
-    if (status == 1) statusText = "Compiling C# Scripts...";
+    if (status == 1 || status == 2) statusText = "Compiling C# Scripts...";
     else if (status == 3) statusText = "Last compile: OK";
     else if (status == 4) statusText = "Last compile: ERROR";
 
@@ -44,26 +44,54 @@ void CompilePanel::Render() {
         s_compileModalOpened = true;
     }
 
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    if (vp) {
+        ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    }
+
     if (ImGui::BeginPopupModal("Compile Status", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 14.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 8.0f));
+
+        const ImVec4 okColor(0.35f, 0.85f, 0.55f, 1.0f);
+        const ImVec4 warnColor(0.95f, 0.75f, 0.25f, 1.0f);
+        const ImVec4 errColor(0.92f, 0.35f, 0.35f, 1.0f);
+        const ImVec4 textMuted(1.0f, 1.0f, 1.0f, 0.75f);
+
         // If compilation finished (success or failure), close the popup immediately
-        if (status != 1 && s_compileModalOpened) {
+        if (status == 3 || status == 4) {
             ImGui::CloseCurrentPopup();
             s_compileModalOpened = false;
+            ImGui::PopStyleVar(3);
             ImGui::EndPopup();
             return;
         }
-        ImGui::TextUnformatted(statusText);
+
+        ImVec4 headerColor = textMuted;
+        if (status == 1 || status == 2) headerColor = warnColor;
+        if (status == 4) headerColor = errColor;
+        if (status == 3) headerColor = okColor;
+
+        ImGui::TextColored(headerColor, "%s", statusText);
+        if (!msg.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, textMuted);
+            ImGui::TextWrapped("%s", msg.c_str());
+            ImGui::PopStyleColor();
+        }
         ImGui::Separator();
 
-        if (status == 1) {
+        if (status == 1 || status == 2) {
+            const float barWidth = std::max(400.0f, ImGui::GetContentRegionAvail().x);
             if (progress >= 0) {
                 float frac = std::clamp(progress / 100.0f, 0.0f, 1.0f);
-                ImGui::ProgressBar(frac, ImVec2(400, 0));
-                ImGui::Text("%d%%", progress);
+                ImGui::ProgressBar(frac, ImVec2(barWidth, 0.0f));
+                // ImGui::PushStyleColor(ImGuiCol_Text, textMuted);
+                // ImGui::Text("%d%%", progress);
+                // ImGui::PopStyleColor();
             }
             else {
-                ImGui::TextUnformatted("Compiling C# Scripts...");
-                ImGui::ProgressBar(0.5f, ImVec2(400, 0));
+                ImGui::ProgressBar(0.5f, ImVec2(barWidth, 0.0f));
             }
         }
         else {
@@ -95,6 +123,7 @@ void CompilePanel::Render() {
             }
         }
 
+        ImGui::PopStyleVar(3);
         ImGui::EndPopup();
     }
 }

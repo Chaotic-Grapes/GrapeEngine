@@ -45,6 +45,42 @@ namespace {
         return id;
     }
 
+    struct ImGuiIdScope {
+        explicit ImGuiIdScope(const char* id) {
+            ImGui::PushID(id);
+        }
+        ~ImGuiIdScope() {
+            ImGui::PopID();
+        }
+    };
+
+    bool RenderClearTrashButton(const char* id, const char* tooltip, ImFont* symbolsFont) {
+        ImGui::SameLine();
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::PushID(id);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+
+        if (symbolsFont) ImGui::PushFont(symbolsFont);
+        const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
+        const bool clicked = ImGui::SmallButton(icon);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+        if (symbolsFont) ImGui::PopFont();
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+        return clicked;
+    }
+
     void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
         if (!world || entity.IsNull() || !world->IsAlive(entity))
             return;
@@ -68,10 +104,10 @@ namespace {
         int windowCount = 0;
 
         if (useRow) {
-            const int rowIndex = std::clamp(animData.value("RowIndex", 0), 0, totalRows - 1);
-            const int startCol = std::clamp(animData.value("RowStartColumn", 0), 0, totalCols - 1);
+            const int rowIndex = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(animData.value("FrameOffset", 0), 0, totalCols - 1);
             const int available = totalCols - startCol;
-            int rowCount = animData.value("RowFrameCount", 0);
+            int rowCount = animData.value("FrameLength", 0);
             if (rowCount <= 0 || rowCount > available)
                 rowCount = available;
             windowStart = rowIndex * totalCols + startCol;
@@ -198,6 +234,7 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 void ComponentUI::RenderName(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Name");
     EditorUI::BeginPropertySection({ "Name" });
 
     // Get current name value
@@ -222,6 +259,7 @@ void ComponentUI::RenderName(nlohmann::json& data, ECS::Entity entity, ECS::Worl
 void ComponentUI::RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Active");
     EditorUI::BeginPropertySection({ "Active" });
     EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled");
     EditorUI::EndPropertySection();
@@ -231,6 +269,7 @@ void ComponentUI::RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::Wo
 void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("TagMask");
     EditorUI::BeginPropertySection({ "Tag Mask" });
 
     static const std::vector<std::string> kTagNames = BuildTagMaskNames();
@@ -243,6 +282,7 @@ void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::W
 void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("LocalTransform");
     // Start a grouped section so all three rows share aligned labels
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
 
@@ -370,6 +410,7 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity,
 void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("SpriteRenderer2D");
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
@@ -462,6 +503,12 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
+    if (!texPath.empty() && RenderClearTrashButton("SpriteClear", "Clear sprite", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["Width"] = 0;
+        data["Height"] = 0;
+    }
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -534,6 +581,10 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    if (!normalPath.empty() && RenderClearTrashButton("NormalMapClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
+    }
     bool droppedNormal = false;
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
@@ -676,6 +727,7 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Rigidbody2D");
     // Group all rigidbody fields so labels line up and scrolling feels consistent
     EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping",
         "Gravity Scale", "Flags" });
@@ -713,6 +765,7 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, EC
 void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("LinearVelocity2D");
     // Single row section for velocity vector
     EditorUI::BeginPropertySection({ "Linear Velocity" });
 
@@ -725,6 +778,7 @@ void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data, ECS::Entity entit
 void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("AngularVelocity2D");
     // Single row section for angular velocity
     EditorUI::BeginPropertySection({ "Angular Velocity" });
 
@@ -737,6 +791,7 @@ void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity enti
 void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("CircleCollider2D");
     // Group rows for trigger, offset, radius and layer mask together
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer Mask" });
 
@@ -768,6 +823,7 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entit
 
 // Renders the BoxCollider2D component
 void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    ImGuiIdScope id("BoxCollider2D");
     // Group rows for trigger, offset, size, rotation and layer mask
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation",
         "Layer Mask" });
@@ -852,6 +908,7 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
 void ComponentUI::RenderShapeCircle2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("ShapeCircle2D");
     // Group radius, offset, color, thickness and filled flag together
     EditorUI::BeginPropertySection({ "Radius", "Offset", "Color", "Thickness", "Filled" });
 
@@ -876,6 +933,7 @@ void ComponentUI::RenderShapeCircle2D(nlohmann::json& data, ECS::Entity entity, 
 void ComponentUI::RenderShapeBox2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("ShapeBox2D");
     // Group size, offset, color, thickness and filled flag together
     EditorUI::BeginPropertySection({ "Half Extents", "Offset", "Color", "Thickness", "Filled" });
 
@@ -900,6 +958,7 @@ void ComponentUI::RenderShapeBox2D(nlohmann::json& data, ECS::Entity entity, ECS
 void ComponentUI::RenderShapeLine2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("ShapeLine2D");
     // Group both endpoints, thickness and color in a single section
     EditorUI::BeginPropertySection({ "Point A", "Point B", "Thickness", "Color" });
 
@@ -921,6 +980,7 @@ void ComponentUI::RenderShapeLine2D(nlohmann::json& data, ECS::Entity entity, EC
 // User can choose between perspective and orthographic modes
 void ComponentUI::RenderCamera3D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity; (void)world;
+    ImGuiIdScope id("Camera3D");
     // Group camera mode and projection related settings together
     EditorUI::BeginPropertySection({ "Mode", "Near Plane", "Far Plane", "Aspect Ratio", "FOV",
         "Ortho Size" });
@@ -957,6 +1017,7 @@ void ComponentUI::RenderCamera3D(nlohmann::json& data, ECS::Entity entity, ECS::
 void ComponentUI::RenderAcceleration2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Acceleration2D");
     EditorUI::BeginPropertySection({ "Acceleration" });
 
     // X and Y components of the acceleration vector
@@ -969,6 +1030,7 @@ void ComponentUI::RenderAcceleration2D(nlohmann::json& data, ECS::Entity entity,
 void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("PhysicsMaterial2D");
     EditorUI::BeginPropertySection({ "Friction", "Restitution", "Position Correct" });
 
     // Friction coefficient (0 = frictionless, 1 = very sticky)
@@ -986,6 +1048,7 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity enti
 // Renders the SpriteSheetAnimation2D component properties
 // Controls animated sprite playback from sprite sheets
 void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    ImGuiIdScope id("SpriteSheetAnimation2D");
     const size_t hashBefore = std::hash<std::string>{}(data.dump());
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
@@ -1046,10 +1109,16 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
     // Group all sprite sheet related rows under one aligned section
     EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
-        "Mode", "Start Frame", "Frame Count", "Row Index", "Row Start Column", "Row Frame Count", "FPS", "Loop", "Playing" });
+        "Mode", "Start Frame", "Frame Count", "Row", "Frame Offset", "Frame Length", "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
+    if (!texPath.empty() && RenderClearTrashButton("SpriteSheetClear", "Clear sprite sheet", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["SheetWidth"] = 0;
+        data["SheetHeight"] = 0;
+    }
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -1116,6 +1185,10 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    if (!normalPath.empty() && RenderClearTrashButton("SpriteSheetNormalClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
+    }
     bool droppedNormal = false;
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
@@ -1192,9 +1265,9 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         // How many frames in the animation sequence
         EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
     } else {
-        EditorUI::RenderIntProperty("Row Index", data, "RowIndex");
-        EditorUI::RenderIntProperty("Row Start Column", data, "RowStartColumn");
-        EditorUI::RenderIntProperty("Row Frame Count", data, "RowFrameCount");
+        EditorUI::RenderIntProperty("Row", data, "Row");
+        EditorUI::RenderIntProperty("Frame Offset", data, "FrameOffset");
+        EditorUI::RenderIntProperty("Frame Length", data, "FrameLength");
     }
 
     // Animation speed in frames per second
@@ -1223,6 +1296,7 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 void ComponentUI::RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("ZIndex2D");
     EditorUI::BeginPropertySection({ "Z-Order" });
 
     // Integer Z-order value (can be negative)
@@ -1234,6 +1308,7 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::
 void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Light2D");
     EditorUI::BeginPropertySection({ "Light Type", "Position", "Direction", "Color", "Intensity", "Range", "Casts Shadows" });
 
     // Light type selection (Directional = 0, Point = 1)
@@ -1278,6 +1353,7 @@ void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Text");
     EditorUI::BeginPropertySection({ "Content", "Font Path", "Pixel Size", "Color", "Anchor" });
 
     // Text content
@@ -1336,6 +1412,7 @@ void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::Worl
 void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("AnimationState2D");
     EditorUI::BeginPropertySection({ "Current Frame", "Time Accumulator", "Finished" });
 
     // Current frame (integer)
@@ -1350,10 +1427,168 @@ void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entit
     EditorUI::EndPropertySection();
 }
 
+void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUICanvas");
+
+    if (!data.contains("ReferenceSize")) data["ReferenceSize"] = { {"X", 1920.0f}, {"Y", 1080.0f} };
+    if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+
+    EditorUI::BeginPropertySection({ "Reference Size", "Offset", "Scale Mode" });
+    EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+
+    const char* scaleModes[] = { "Fit", "Fill", "Match Width", "Match Height" };
+    int scaleMode = data.value("ScaleMode", 0);
+    scaleMode = std::max(0, std::min(scaleMode, 3));
+    ImGui::Text("Scale Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIScaleMode", scaleModes[scaleMode])) {
+        for (int i = 0; i < 4; ++i) {
+            bool selected = (scaleMode == i);
+            if (ImGui::Selectable(scaleModes[i], selected)) {
+                scaleMode = i;
+                data["ScaleMode"] = scaleMode;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIElement");
+
+    if (!data.contains("Position")) data["Position"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Size")) data["Size"] = { {"X", 100.0f}, {"Y", 100.0f} };
+    if (!data.contains("Visible")) data["Visible"] = true;
+    if (!data.contains("Alignment")) data["Alignment"] = 0;
+    if (!data.contains("ZOrder")) data["ZOrder"] = 0;
+
+    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order" });
+    EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
+    EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
+    const char* alignmentOptions[] = {
+        "Top Left", "Top", "Top Right",
+        "Left", "Center", "Right",
+        "Bottom Left", "Bottom", "Bottom Right"
+    };
+    int alignment = data.value("Alignment", 0);
+    alignment = std::max(0, std::min(alignment, 8));
+    ImGui::Text("Alignment");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIAlignment", alignmentOptions[alignment])) {
+        for (int i = 0; i < 9; ++i) {
+            bool selected = (alignment == i);
+            if (ImGui::Selectable(alignmentOptions[i], selected)) {
+                alignment = i;
+                data["Alignment"] = alignment;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIPanel");
+
+    if (!data.contains("Color")) data["Color"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+
+    EditorUI::BeginPropertySection({ "Color", "Corner Radius" });
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIText");
+
+    if (!data.contains("Text")) data["Text"] = "Text";
+    if (!data.contains("FontPath")) data["FontPath"] = "";
+    if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("FontSize")) {
+        if (data.contains("PixelSize")) {
+            data["FontSize"] = data["PixelSize"];
+        } else {
+            data["FontSize"] = 24.0f;
+        }
+    }
+
+    EditorUI::BeginPropertySection({ "Text", "Font", "Color", "Font Size" });
+    EditorUI::RenderTextProperty("Text", data, "Text");
+
+    std::string fontPath = data.value("FontPath", std::string());
+    std::string fontValueText;
+    if (!fontPath.empty()) {
+        fontValueText = std::filesystem::path(fontPath).filename().string();
+    }
+    else {
+        fontValueText = "None (drag font here)";
+    }
+
+    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
+    if (!fontPath.empty() && RenderClearTrashButton("GUITextFontClear", "Clear font", m_symbolsFont)) {
+        data["FontPath"] = "";
+    }
+
+    if (ImGui::BeginDragDropTarget()) {
+        auto acceptPath = [&](const char* droppedPath) {
+            std::filesystem::path path(droppedPath);
+            std::string ext = path.extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".ttf" || ext == ".otf" || ext == ".ttc") {
+                data["FontPath"] = path.string();
+                return true;
+            }
+            return false;
+        };
+
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            acceptPath(droppedPath);
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payload->Data);
+            const char* end = dataBuf + payload->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                if (acceptPath(path.c_str())) {
+                    break;
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::EndPropertySection();
+}
+
 // Generic renderer for C# / unknown components. Uses EditorUI helpers where possible
 // so the look & feel matches other component UIs.
 void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity; (void)world;
+    ImGuiIdScope id("GenericComponent");
 
     if (data.empty()) {
         ImGui::TextDisabled("(C# Component)");
@@ -1414,6 +1649,9 @@ static std::string s_unsupportedPath;
 void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    // Note: Defaults are now handled by EditorComponentRegistry, not here
+    // This prevents JSON modification every frame which would mark component as dirty
+    ImGuiIdScope id("AudioSource");
     // Ensure keys exist with defaults
     if (!data.contains("CueId"))       data["CueId"] = 0;
     if (!data.contains("Volume"))      data["Volume"] = 1.0f;
@@ -1423,55 +1661,18 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
 
     // SINGLE BeginPropertySection call with ALL field names for proper alignment
-    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D" });
+    // Note: Fade duration fields are conditionally shown, so we include all possible fields
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D", "Bus", "Pan",
+                                     "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
     auto& lib = AudioAssetLibrary::Get();
-    const auto& clips = lib.GetAllClips();
 
-    const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
-    for (const auto& clip : clips) {
-        if (clip.id == cueId) {
-            selectedClip = &clip;
-            break;
-        }
-    }
+    const AudioAssetLibrary::ClipInfo* selectedClip = lib.FindById(cueId);
+    std::string currentLabel = selectedClip ? selectedClip->Name : "None (drag audio here)";
 
-    std::string currentLabel;
-    if (!selectedClip)
-        currentLabel = "None (Audio Clip)";
-    else
-        currentLabel = selectedClip->name;
-
-    // Audio Clip combo box - aligned properly
-    ImGui::Text("%s", "Audio Clip");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(90.0f);
-
-    if (ImGui::BeginCombo("##AudioClipCombo", currentLabel.c_str())) {
-        // "None" option
-        bool isNone = (cueId == 0);
-        if (ImGui::Selectable("None (Audio Clip)", isNone)) {
-            data["CueId"] = 0;
-            cueId = 0;
-        }
-        if (isNone)
-            ImGui::SetItemDefaultFocus();
-
-        // One option per known clip
-        for (const auto& clip : clips) {
-            bool isSelected = (clip.id == cueId);
-            if (ImGui::Selectable(clip.name.c_str(), isSelected)) {
-                data["CueId"] = clip.id;
-                cueId = clip.id;
-            }
-            if (isSelected)
-                ImGui::SetItemDefaultFocus();
-        }
-
-        ImGui::EndCombo();
-    }
+    // Audio clip row + drag drop support like SpriteRenderer2D
+    EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
 
     // Drag-drop support
     if (ImGui::BeginDragDropTarget()) {
@@ -1486,7 +1687,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
             if (supported) {
                 const auto& clipInfo = lib.Register(path.string());
-                data["CueId"] = clipInfo.id;
+                data["CueId"] = clipInfo.Id;
             }
             else {
                 s_showUnsupportedPopup = true;
@@ -1506,7 +1707,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
                 bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
                 if (!supported) continue;
                 const auto& clipInfo = lib.Register(p.string());
-                data["CueId"] = clipInfo.id;
+                data["CueId"] = clipInfo.Id;
                 break;
             }
         }
@@ -1521,6 +1722,49 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
     EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
     EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    // Bus selection
+    const char* busOptions[] = { "Master", "Music", "SFX", "UI", "Ambient" };
+    int bus = data.value("Bus", 2);
+    bus = std::clamp(bus, 0, 4);
+    ImGui::Text("Bus");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##AudioBusCombo", busOptions[bus])) {
+        for (int i = 0; i < 5; ++i) {
+            bool selected = (bus == i);
+            if (ImGui::Selectable(busOptions[i], selected)) {
+                bus = i;
+                data["Bus"] = bus;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    // Stereo pan (2D only)
+    bool spatial3D = data.value("Spatial3D", true);
+    if (!spatial3D) {
+        EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f);
+    }
+
+    // Fade settings
+    EditorUI::RenderCheckboxProperty("Enable Fade In", data, "EnableFadeIn");
+
+    // Only show fade duration if fade is enabled
+    bool fadeInEnabled = data.value("EnableFadeIn", false);
+    if (fadeInEnabled) {
+        EditorUI::RenderFloatRow("Fade In Duration", "s", data, "FadeInDuration", 0.1f);
+    }
+
+    EditorUI::RenderCheckboxProperty("Enable Fade Out", data, "EnableFadeOut");
+
+    // Only show fade duration if fade is enabled
+    bool fadeOutEnabled = data.value("EnableFadeOut", false);
+    if (fadeOutEnabled) {
+        EditorUI::RenderFloatRow("Fade Out Duration", "s", data, "FadeOutDuration", 0.1f);
+    }
 
     // SINGLE EndPropertySection call
     EditorUI::EndPropertySection();
@@ -1551,6 +1795,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Layer2D");
     EditorUI::BeginPropertySection({ "Layer" });
     // Try to render as a dropdown of known layers from the active scene
     int currentId = static_cast<int>(data.value("Id", 0));
@@ -1597,6 +1842,7 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    ImGuiIdScope id("Material2D");
 
     EditorUI::BeginPropertySection({ "Normal Map", "MRA Map", "Metallic", "Smoothness", "AO Strength", "Normal Strength", "Alpha Cutoff", "Flags" });
 

@@ -60,6 +60,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
 #include <iostream>
+#include "core/Logger.h"
 #include "audio/FmodAudioDevice.h"
 #include "ecs/events/EventComponents.h"
 #include "ecs/events/EventDispatcher.h"
@@ -452,15 +453,24 @@ namespace ECS {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 
-        //  Choose substep count; make it a tunable or cvar if you like.
+        int collisionEnterCount = 0;
+        int collisionExitCount = 0;
+        int triggerEnterCount = 0;
+        int triggerExitCount = 0;
+        int triggerStayCount = 0;
+
+        // =====================
+        // Simulation Settings
+        // =====================
+        // Choose substep count; make it a tunable or cvar if you like.
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
         // Create event dispatcher for firing collision events
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
-        //to clock currentcollision pairs between A and B entities
-        std::unordered_set<uint64_t> currentCollisions;
+        // Track collisions and trigger overlaps for the whole frame (across substeps).
+        std::unordered_set<uint64_t> frameCollisions;
         std::unordered_set<uint64_t> currentTriggerOverlaps;
 
         // Running frame counter to reset per-frame SFX dedupe
@@ -470,8 +480,11 @@ namespace ECS {
         // Get LayerManager for layer-wide physics gating
         auto* layerManager = world.GetLayerManager();
 
-        //  Collect entity sets once per frame (usually fine).
-        //  AngularVelocity2D, Layer, and Active are now optional.
+        // =====================
+        // Entity Collection
+        // =====================
+        // Collect entity sets once per frame (usually fine).
+        // AngularVelocity2D, Layer, and Active are now optional.
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);
 
@@ -622,7 +635,10 @@ namespace ECS {
                         }
                     });
 
-            // Broad phase for this substep (rebuild grid because poses changed).
+            // =====================
+            // Broad Phase (Uniform Grid)
+            // =====================
+            // Rebuild grid each substep because poses changed.
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
                 const auto* t = world.TryGet<Components::LocalTransform>(e);
@@ -641,6 +657,9 @@ namespace ECS {
             for (Entity e : dynamicEntities) insertEntity(e);
             for (Entity e : staticEntities)  insertEntity(e);
 
+            // =====================
+            // Pair Generation
+            // =====================
             // Candidate pairs deduped per substep.
             std::vector<std::pair<Entity, Entity>> pairs;
             std::unordered_set<uint64_t>           seen;
@@ -665,7 +684,9 @@ namespace ECS {
                 }
             }
 
-            // Narrow phase + resolution for this substep.
+            // =====================
+            // Narrow Phase + Resolution
+            // =====================
             // You can reduce the inner iterative solver because substeps already help stability.
 
             const int solverIters = 4;
@@ -694,7 +715,9 @@ namespace ECS {
                     // If either side has no collider, this pair cannot collide.
                     if ((!circA && !boxA) || (!circB && !boxB)) continue;
 
-                    // --- Layer mask filtering ---
+                    // =====================
+                    // Layer Mask
+                    // =====================
                     // Check if both entities have Layer components
                     const auto* la = world.TryGet<Components::Layer>(A);
                     const auto* lb = world.TryGet<Components::Layer>(B);
@@ -707,9 +730,9 @@ namespace ECS {
                     uint16_t layerAId = la->Id;
                     uint16_t layerBId = lb->Id;
 
-                    // Read collision masks directly from LayerManager (not from collider components)
-                    // This ensures we always use the current, authoritative layer collision settings
-                    // regardless of whether collider masks have been synced yet
+                    // Read collision masks directly from LayerManager (not from collider components).
+                    // This ensures we always use current, authoritative layer collision settings
+                    // regardless of whether collider masks have been synced yet.
                     uint32_t maskA = layerManager->GetLayerMask(layerAId);
                     uint32_t maskB = layerManager->GetLayerMask(layerBId);
 
@@ -739,7 +762,11 @@ namespace ECS {
                     }
                     else if (boxA && boxB) {
                         // Box-box: use new manifold generation
-                        manifold = TestBoxBox(*boxA, *tA, *boxB, *tB);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+
+                        // Test box-box
+                        manifold = TestBoxBox(obbA, obbB);
                         hasCollision = (manifold.pointCount > 0);
                     }
                     else if (circA && boxB) {
@@ -747,7 +774,13 @@ namespace ECS {
                         Vector2D n;
                         float depth;
                         Vector2D contact;
-                        if (TestCircleBox(*circA, *tA, *boxB, *tB, n, depth, contact)) {
+
+                        // Use world-space shapes
+                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, *tA);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+
+                        // Test circle-box
+                        if (TestCircleBox(wcA, obbB, n, depth, contact)) {
                             manifold.normal = n;
                             manifold.penetration = depth;
 
@@ -761,7 +794,13 @@ namespace ECS {
                         Vector2D n;
                         float depth;
                         Vector2D contact;
-                        if (TestCircleBox(*circB, *tB, *boxA, *tA, n, depth, contact)) {
+
+                        // Use world-space shapes
+                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, *tB);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
+
+                        // Test circle-box (flip normal later)
+                        if (TestCircleBox(wcB, obbA, n, depth, contact)) {
                             manifold.normal = -n;  // Flip normal
                             manifold.penetration = depth;
 
@@ -773,6 +812,9 @@ namespace ECS {
 
                     if (!hasCollision) continue;
 
+                    // =====================
+                    // Trigger Handling (no resolution)
+                    // =====================
                     // Check for triggers on either side
                     const bool isTriggerA = (circA && (circA->Flags & 0x1u)) || (boxA && (boxA->Flags & 0x1u));
                     const bool isTriggerB = (circB && (circB->Flags & 0x1u)) || (boxB && (boxB->Flags & 0x1u));
@@ -792,19 +834,20 @@ namespace ECS {
                         continue;
                     }
 
+                    // =====================
+                    // Constraint Resolution
+                    // =====================
                     // Require at least one side to be physically simulated (has rb + velocity).
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                     const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
                     if (!hasPhysA && !hasPhysB) continue;
 
                     uint64_t pairID = MakeCollisionPairID(A, B);
-                    currentCollisions.insert(pairID);
+                    const bool firstSeenThisFrame = frameCollisions.insert(pairID).second;
+                    const bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
 
-                    bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
-
-                    // Fire collision events using EventDispatcher
-                    if (isNewCollision) {
-                        // New collision detected
+                    // Fire collision events once per frame for new pairs.
+                    if (firstSeenThisFrame && isNewCollision) {
                         eventDispatcher.FireCollisionEvent(
                             ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B),
                             Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
@@ -812,6 +855,7 @@ namespace ECS {
                             Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
                             0.0f  // TODO: Compute impact magnitude
                         );
+                        collisionEnterCount++;
                     }
 
                     // Gather physics state (by value) and current velocities; some may be missing.
@@ -842,7 +886,7 @@ namespace ECS {
                         (mA.PositionCorrectPercent + mB.PositionCorrectPercent) * 0.5f
                     };
 
-                    // Resolve
+                    // Resolve velocity + positional correction for this manifold.
                     Engine::Physics::ResolveCollisionManifold(rbA, rbB, vA, vB, *tA, *tB, manifold, mCombined);
 
                     // Write back
@@ -851,7 +895,7 @@ namespace ECS {
 
                     ++resolved;
                     {
-                        // Compute impact magnitude from relative velocity along normal BEFORE the next iteration changes it further.
+                        // Compute impact magnitude from relative velocity along normal before the next iteration changes it further.
                         const Vector2D rel = vB.Value - vA.Value;
                         const float vn = rel.X * manifold.normal.X + rel.Y * manifold.normal.Y;
                         const float    impactSpeed = std::abs(vn);
@@ -891,29 +935,29 @@ namespace ECS {
                 if (resolved == 0) break;
             }
 
-            for (uint64_t pairID : m_previousCollisions) {
-                if (currentCollisions.find(pairID) == currentCollisions.end()) {
-                    // Collision ended
-                    uint32_t idA = (pairID >> 32);
-                    uint32_t idB = (pairID & 0xFFFFFFFF);
-
-                    Entity entityA = world.Resolve(idA);
-                    Entity entityB = world.Resolve(idB);
-
-                    if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
-                        // Fire collision exit events using EventDispatcher
-                        eventDispatcher.FireCollisionExitEvent(
-                            ECS::EntityUtils::Pack(entityA), ECS::EntityUtils::Pack(entityB),
-                            Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
-                        );
-                    }
-                }
-            }
-
-            m_previousCollisions = std::move(currentCollisions);
-
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }
+
+        // Emit collision exits once per frame (after all substeps).
+        for (uint64_t pairID : m_previousCollisions) {
+            if (frameCollisions.find(pairID) == frameCollisions.end()) {
+                uint32_t idA = (pairID >> 32);
+                uint32_t idB = (pairID & 0xFFFFFFFF);
+
+                Entity entityA = world.Resolve(idA);
+                Entity entityB = world.Resolve(idB);
+
+                if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
+                    eventDispatcher.FireCollisionExitEvent(
+                        ECS::EntityUtils::Pack(entityA), ECS::EntityUtils::Pack(entityB),
+                        Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
+                    );
+                    collisionExitCount++;
+                }
+            }
+        }
+
+        m_previousCollisions = std::move(frameCollisions);
 
         // Handle trigger events
         for (uint64_t pairID : currentTriggerOverlaps) {
@@ -930,9 +974,11 @@ namespace ECS {
             if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
                 if (wasOverlapping) {
                     eventDispatcher.FireTriggerStayEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerStayCount++;
                 }
                 else {
                     eventDispatcher.FireTriggerEnterEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerEnterCount++;
                 }
             }
         }
@@ -948,6 +994,7 @@ namespace ECS {
 
                 if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
                     eventDispatcher.FireTriggerExitEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerExitCount++;
                 }
             }
         }

@@ -104,6 +104,9 @@ public:
 
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders SceneButton component for scene transitions
+    void RenderSceneButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
@@ -112,8 +115,13 @@ public:
     // render simple editors for booleans, integers, floats and strings.
     void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-	// Renders material component for assigning materials to renderers
+    // Renders material component for assigning materials to renderers
 	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
 private:
     // -------------------------------------------------------------------------

@@ -52,7 +52,7 @@ namespace EditorUI {
     // Ends a property section
     // Inserts small spacing to ensure blocks of properties don't collapse into each other visually
     void EndPropertySection() {
-        // Dummy creates invisible spacing (width = content width)
+        // Dummy creates invisible spacing (width = available content width)
         ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));
         // Additional vertical spacing between sections
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -292,6 +292,10 @@ namespace EditorUI {
         }
     }
 
+    void RenderColorRow(const std::string& label, nlohmann::json& colorData) {
+        RenderColorProperty(label, colorData);
+    }
+
     // Renders a text field for editing a JSON string key
     // Reads the string, copies it into a local buffer, then writes back if the InputText reports a change
     void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key) {
@@ -490,5 +494,9 @@ namespace EditorUI {
     // -------------------------------------------------------------------------
 
     float GetContentStartX() { return valueStartOffset; }
+
+    float GetContentWidth() {
+        return std::max(0.0f, ImGui::GetContentRegionAvail().x);
+    }
 
 } 

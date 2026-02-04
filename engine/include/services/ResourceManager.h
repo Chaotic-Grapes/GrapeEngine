@@ -35,6 +35,7 @@ Usage:
 
 #include "Export.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -117,6 +118,14 @@ public:
 
     // Create a new empty directory
     bool CreateDirectory(const std::string& path);
+    // Sets the current owner tag for asset tracking (e.g., scene id)
+    void SetOwnerTag(const std::string& ownerTag);
+
+    // Clears the current owner tag
+    void ClearOwnerTag();
+
+    // Unload assets that are only owned by the specified tag
+    void UnloadAssetsByOwner(const std::string& ownerTag);
 
 private:
     // Returns reference to the appropriate cache map for type T
@@ -127,6 +136,22 @@ private:
     template <typename T>
     std::shared_ptr<T> Load(const std::string& filePath);
 
+    // Returns reference to the appropriate owner map for type T
+    template <typename T>
+    std::unordered_map<std::string, std::unordered_set<std::string>>& GetOwnerMap();
+
+    // Tracks ownership of an asset by the current owner tag
+    template <typename T>
+    void TrackOwner(const std::string& name) {
+        if (m_ownerTag.empty()) {
+            return;
+        }
+
+        // Get appropriate owner map and insert owner tag
+        auto& owners = GetOwnerMap<T>();
+        owners[name].insert(m_ownerTag);
+    }
+
     // Asset caches (store loaded assets)
     std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
     std::unordered_map<std::string, std::shared_ptr<AudioData>> m_audioFiles;
@@ -134,6 +159,13 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders;
     std::unordered_map<std::string, std::shared_ptr<PrefabData>> m_prefabs;
     std::unordered_map<std::string, std::shared_ptr<RawData>> m_rawData;
+
+    // Asset owners per type (asset path/cache key -> set of owner tags)
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_textureOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_audioOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_fontOwners;
+
+    std::string m_ownerTag;
 };
 
 // Global ResourceManager instance

@@ -18,6 +18,7 @@ direct ECS manipulation.
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Components.h" 
+#include "ecs/ComponentRegistry.h"
 #include "ecs/StringTable.h"
 #include "EditorECSUtils.h"
 #include "core/Logger.h"
@@ -55,8 +56,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     if (!m_scene) return ECS::Entity::NPOS32;
     ECS::World& world = m_scene->GetWorld();
 
-    // Create empty entity
-    ECS::Entity e = world.Create();
+    // Create entity on default layer so LayerManager stays in sync
+    ECS::Entity e = m_scene->CreateEntityOnLayer(0);
 
     // Name (StringId)
     Editor::ECSUtils::SetEntityName(world, e, name);
@@ -70,14 +71,13 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     wt.Dirty = true;
     Editor::ECSUtils::SetComponent(&world, e, "WorldTransform", wt);
 
-    // Default render layer (0) so the renderer includes the entity
-    // Use Scene::SetLayer instead of writing the component directly so
-    // the Scene's LayerManager is updated (keeps the editor counts in sync).
-    if (m_scene) {
-        m_scene->SetLayer(e, 0);
-    }
-    else {
-        Editor::ECSUtils::SetComponent(&world, e, "Layer", ECS::Components::Layer{ 0 });
+    // Verify Layer component exists
+    const uint32_t layerHash = Editor::ECSUtils::FNV1aHash("Layer");
+    const ECS::ComponentTypeId layerIdFromHash = ECS::ComponentRegistry::GetComponentIdFromHash(layerHash);
+
+    // Log error if Layer component is missing (should not happen)
+    if (layerIdFromHash != ECS::NULL_COMPONENT_ID && !world.HasById(e, layerIdFromHash)) {
+        LOG_ERROR("[EditorEntityActions] New entity missing Layer component (id=" << e.Index << ")");
     }
 
     // Optional parent

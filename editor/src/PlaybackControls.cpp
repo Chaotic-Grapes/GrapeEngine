@@ -33,11 +33,14 @@ Reference:
 #include "scripting/ScriptManager.h"
 #include "helpers/EntityUtils.h"
 #include "EditorECSUtils.h"
+#include "EditorStyle.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 #include <cstring>
+#include <cmath>
+#include <cstdio>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
@@ -68,10 +71,9 @@ void Playback::ProcessInput() {
         !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT))
     {
         if (m_editorState == EditorState::Edit) {
-            // Simulate play button
-            _saveWorldState();
-            _changeState(EditorState::Play);
-            LOG_INFO("Game started (Ctrl+P)");
+            if (_startPlayFromEdit()) {
+                LOG_INFO("Game started (Ctrl+P)");
+            }
         }
         else if (m_editorState == EditorState::Play || m_editorState == EditorState::Paused) {
             // Simulate stop button
@@ -110,115 +112,305 @@ void Playback::ProcessInput() {
 void Playback::Render() {
     // Toolbar window flags: NoTitleBar removes title bar, NoScrollbar prevents scrolling,
     // NoResize prevents manual resizing, NoCollapse prevents collapsing
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | 
-                             ImGuiWindowFlags_NoScrollbar | 
-                             ImGuiWindowFlags_NoResize | 
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
+                             ImGuiWindowFlags_NoScrollbar |
+                             ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_NoCollapse;
-    
+
     // Set fixed height for toolbar from config
     ImGui::SetNextWindowSize(ImVec2(-1, m_toolbarHeight), ImGuiCond_Always);
-    
-    // Use default ImGui tab styling; no local overrides
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2, 2));
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec4 baseBg = EditorStyle::WindowBg;
+    const ImVec4 playTint = ImVec4(0.12f, 0.24f, 0.18f, 1.0f);
+    const ImVec4 pauseTint = ImVec4(0.26f, 0.20f, 0.10f, 1.0f);
+    const ImVec4 stepTint = ImVec4(0.14f, 0.20f, 0.26f, 1.0f);
+
+    // Lightweight color blend for mode tinting.
+    auto blend = [](const ImVec4& a, const ImVec4& b, float t) {
+        return ImVec4(
+            a.x + (b.x - a.x) * t,
+            a.y + (b.y - a.y) * t,
+            a.z + (b.z - a.z) * t,
+            a.w
+        );
+    };
+
+    ImVec4 tintedBg = baseBg;
+    if (m_editorState == EditorState::Play) tintedBg = blend(baseBg, playTint, 0.55f);
+    else if (m_editorState == EditorState::Paused) tintedBg = blend(baseBg, pauseTint, 0.55f);
+    else if (m_editorState == EditorState::Step) tintedBg = blend(baseBg, stepTint, 0.55f);
+
+    // Mode tint keeps the toolbar state-readable at a glance.
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, tintedBg);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
     ImGui::Begin("Game Controls", nullptr, flags);
 
-    // Follow global FontGlobalScale (no local override)
+    const ImVec2 mainBtnSize(42.0f, 26.0f);
+    const ImVec2 smallBtnSize(22.0f, 18.0f);
 
-    // If the buttons have been clicked, they get grayed out
-    auto button = [&](const char* icon, bool shouldBeEnabled, EditorState newState, const char* logMsg,
-        bool isStepButton = false, const char* tooltip = nullptr, ImVec2 size = ImVec2(35, 20))
-        {
-            // Disabled scope: gray-out and block clicks when the control shouldn't be active
-            if (!shouldBeEnabled) ImGui::BeginDisabled();
+    // Compact icon button with optional active palette.
+    auto drawIconButton = [&](const char* icon, bool enabled, const ImVec2& size, const char* tooltip,
+                              bool active, const ImVec4& activeColor, std::function<void()> onClick,
+                              const ImVec4* baseColor = nullptr,
+                              const ImVec4* baseHover = nullptr,
+                              const ImVec4* baseActive = nullptr) {
+        if (!enabled) ImGui::BeginDisabled();
+        if (active) { // Active state color override
+            ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(activeColor, 1.1f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(activeColor, 0.9f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+        }
+        if (!active && baseColor && baseHover && baseActive) { // Custom base colors
+            ImGui::PushStyleColor(ImGuiCol_Button, *baseColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, *baseHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, *baseActive);
+        }
 
-            // ImGui::Button returns true if the user clicks it during this frame.
-            // Style adjustments for padding and font scaling
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(-5, -5));
-            bool clicked = ImGui::Button(icon, size);
-            
-            // Show tooltip on hover
-            if (tooltip && ImGui::IsItemHovered()) {
-                ImGui::PushFont(m_mainFont);
+        bool clicked = false;
+        ImGui::PushFont(m_symbolsFont);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
+        clicked = ImGui::Button(icon, size);
+        ImGui::PopStyleVar(2);
+        ImGui::PopFont();
 
-                ImGui::BeginTooltip();
-                ImGui::Text("%s", tooltip);
-                ImGui::Dummy(ImVec2(0, 20));
+        if (tooltip && ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushFont(m_mainFont);
+            ImGui::Text("%s", tooltip);
+            ImGui::PopFont();
+            ImGui::EndTooltip();
+        }
 
-                // Show current state
-                ImGui::Text("State: %s",
-                            m_editorState == EditorState::Edit ? "EDIT" : m_editorState == EditorState::Paused ? "PAUSED"
-                                                                                                             : m_editorState == EditorState::Play ? "PLAY" : "STEP");
-                ImGui::EndTooltip();
+        if (!active && baseColor && baseHover && baseActive) ImGui::PopStyleColor(3);
+        if (active) ImGui::PopStyleColor(4);
+        if (!enabled) ImGui::EndDisabled();
+        if (clicked && onClick) onClick();
+    };
 
-                ImGui::PopFont();
-            }
+    // Non-interactive state badge.
+    auto drawStatePill = [&](const char* label, const ImVec4& color) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 14.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 4));
+        ImGui::PushStyleColor(ImGuiCol_Button, color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+        ImGui::BeginDisabled();
+        ImGui::Button(label);
+        ImGui::EndDisabled();
+        ImGui::PopStyleColor(4);
+        ImGui::PopStyleVar(2);
+    };
 
-            // Close the disabled block if it was opened
-            if (!shouldBeEnabled) ImGui::EndDisabled();
-
-            // Handle click logic
-            if (clicked) {
-                if (isStepButton) {
-                    // Special case: STEP just sets flag
-                    m_stepRequested = true;
-                }
-                else {
-                    // Normal case: change state
-                    if (newState == EditorState::Play && m_editorState == EditorState::Edit) {
-                        _saveWorldState();
-                    }
-                    if (newState == EditorState::Edit) {
-                        _restoreWorldState();
-                    }
-                    _changeState(newState);
-                }
-                LOG_INFO(logMsg);
-            }
-
-            ImGui::PopStyleVar();
-        };
-
-    // Center buttons horizontally within available content region (Y unchanged)
+    // Top row: centered primary controls, state pill, time scrub on right.
     {
-        float btnWidth = 35.0f;
-        float totalWidth = btnWidth * 3.0f;                    // Total width = 3 buttons + 2 spaces between them
-        float availWidth = ImGui::GetContentRegionAvail().x;   // Get width of available space in current ImGui window/content region
-        float startX = (availWidth - totalWidth) * 0.5f;       // Compute starting X position so buttons are centered
-        startX = std::max(startX, 0.0f);                       // If available width < total width, don't use negative starting pos
+        // Calculate centering offsets
+        const float rowStartX = ImGui::GetCursorPosX();
+        const float contentWidth = ImGui::GetContentRegionAvail().x;
+        const float groupWidth = (mainBtnSize.x * 3.0f) + (style.ItemSpacing.x * 2.0f);
 
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
+        // Background box around controls
+        const ImVec2 controlPadding(8.0f, 4.0f);
+        
+        // Rounded rectangle parameters
+        const float controlRounding = 10.0f;
+        const float boxWidth = groupWidth + (controlPadding.x * 2.0f);
+        const float boxHeight = mainBtnSize.y + (controlPadding.y * 2.0f);
+        const float targetRightWidth = 460.0f;
+        const float reservedRight = std::max(0.0f, std::min(targetRightWidth, contentWidth - boxWidth - 20.0f));
+
+        // Center the box within available content width
+        float startX = (contentWidth - boxWidth) * 0.5f;
+
+        // Ensure box does not overflow left edge
+        startX = std::max(startX, 0.0f);
+        ImVec2 rowStartScreen = ImGui::GetCursorScreenPos();
+        ImVec2 boxMin(rowStartScreen.x + startX, rowStartScreen.y);
+        ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
+
+        // Draw background box
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 1.1f)),
+            controlRounding
+        );
+        ImGui::GetWindowDrawList()->AddRect(
+            boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::Border, 0.8f)),
+            controlRounding
+        );
+
+        // Position cursor for first button
+        ImGui::SetCursorPosX(rowStartX + startX + controlPadding.x);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + controlPadding.y);
+
+        // Play/Pause button
+        const bool canPlay = HasValidWorld();
+        const bool canStep = (m_editorState == EditorState::Paused || m_editorState == EditorState::Step);
+        const bool isPlaying = (m_editorState == EditorState::Play);
+        const bool isPaused = (m_editorState == EditorState::Paused);
+
+        // Determine icon, tooltip, and color based on state
+        const char* playIcon = isPlaying ? "\xEE\x80\xB4" : "\xEE\x80\xB7";
+        const char* playTooltip = isPlaying ? "Pause (Ctrl+Shift+P)" : (m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
+        const ImVec4 playColor = isPlaying ? EditorStyle::WarningButton : EditorStyle::SuccessButton;
+        const bool playActive = isPlaying || isPaused;
+
+        // Draw Play/Pause button
+        ImGui::PushID("PlayPause");
+        drawIconButton(playIcon, canPlay, mainBtnSize, playTooltip,
+            playActive, playColor,
+            [this]() {
+                // Toggle play/pause/resume based on current state
+                if (m_editorState == EditorState::Edit) {
+                    if (_startPlayFromEdit()) {
+                        LOG_INFO("Game started");
+                    }
+                } else if (m_editorState == EditorState::Play) { // Pause
+                    _changeState(EditorState::Paused);
+                    LOG_INFO("Game paused");
+                } else { // Resume from Paused or Step
+                    _changeState(EditorState::Play);
+                    LOG_INFO("Game resumed");
+                }
+            },
+            !playActive ? &EditorStyle::SuccessButton : nullptr, // Custom base colors
+            !playActive ? &EditorStyle::SuccessButtonHover : nullptr, // Hover
+            !playActive ? &EditorStyle::SuccessButtonActive : nullptr); // Active
+        ImGui::PopID();
+
+        // Stop button
+        ImGui::SameLine();
+        ImGui::PushID("Stop");
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        // Draw Stop button
+        drawIconButton("\xEE\x81\x87", m_editorState != EditorState::Edit, mainBtnSize,
+            "Stop (Ctrl+P)", false, EditorStyle::DangerButton,
+            [this]() {
+                _restoreWorldState();
+                _changeState(EditorState::Edit);
+                LOG_INFO("Game stopped");
+            });
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+
+        // Step button
+        ImGui::SameLine();
+        ImGui::PushID("StepPrimary");
+
+        // Draw Step button
+        drawIconButton("\xEE\x81\x84", canStep, mainBtnSize, "Step (Alt+P)",
+            m_editorState == EditorState::Step, EditorStyle::Accent,
+            [this]() {
+                _changeState(EditorState::Step);
+                m_stepRequested = true;
+                LOG_INFO("Stepping 1 physics frame");
+            });
+        ImGui::PopID();
+
+        // State pill: aligned to right side before time scale controls
+        float pillX = rowStartX + contentWidth - reservedRight - 72.0f;
+        if (pillX > ImGui::GetCursorPosX() + style.ItemSpacing.x) { // Enough space to right-align
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(pillX);
+        } else {
+            ImGui::SameLine();
+        }
+
+        // Draw state pill based on current editor state
+        if (m_editorState == EditorState::Play) { // Green for Play
+            drawStatePill("PLAY", EditorStyle::SuccessButton);
+        } else if (m_editorState == EditorState::Paused) { // Yellow for Paused
+            drawStatePill("PAUSED", EditorStyle::WarningButton);
+        } else if (m_editorState == EditorState::Step) { // Accent for Step
+            drawStatePill("STEP", EditorStyle::Accent);
+        }
+
+        // Time scale presets and slider on far right
+        if (reservedRight > 0.0f) {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(rowStartX + contentWidth - reservedRight);
+
+            // Time scale presets
+            ImGui::PushFont(m_mainFont);
+            const float presets[] = { 0.25f, 0.5f, 1.0f, 2.0f };
+            for (float preset : presets) {
+                bool active = std::fabs(m_userTimeScale - preset) < 0.01f;
+                // Highlight active preset for quick feedback.
+                if (active) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Accent);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::AccentHover);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::AccentActive);
+                    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+                }
+
+                // Preset button
+                char label[12];
+                snprintf(label, sizeof(label), "%.2fx", preset);
+                if (ImGui::Button(label, ImVec2(52, 0))) {
+                    m_userTimeScale = preset;
+                    if (m_editorState == EditorState::Play) {
+                        TimeSystem::Instance().SetTimeScale(m_userTimeScale);
+                    }
+                }
+
+                if (active) ImGui::PopStyleColor(4);
+                ImGui::SameLine();
+            }
+
+            // Custom time scale slider, kept compact.
+            ImGui::SetNextItemWidth(110.0f);
+            float sliderScale = m_userTimeScale;
+            if (ImGui::SliderFloat("##TimeScale", &sliderScale, 0.0f, 2.0f, "x%.2f")) {
+                m_userTimeScale = std::max(0.0f, sliderScale);
+                if (m_editorState == EditorState::Play) {
+                    TimeSystem::Instance().SetTimeScale(m_userTimeScale);
+                }
+            }
+
+            ImGui::PopFont();
+        }
     }
 
-    // Single play/pause toggle button
-    // Shows play when in Edit or Paused state
-    if (m_editorState == EditorState::Edit || m_editorState == EditorState::Paused || m_editorState == EditorState::Step) {
-        ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB7", HasValidWorld(), EditorState::Play,
-            m_editorState == EditorState::Edit ? "Game started" : "Game resumed", false,
-            m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
-        ImGui::PopFont();
+    // Deferred popup open to keep ImGui ordering stable.
+    if (m_showUnsavedPlayPopup) {
+        ImGui::OpenPopup("Unsaved Changes##PlayWarning");
+        m_showUnsavedPlayPopup = false;
     }
-    // Shows pause when playing
-    else {
-        ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB4", HasValidWorld(), EditorState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
-        ImGui::PopFont();
+
+    // Unsaved-changes guard before entering play mode.
+    if (ImGui::BeginPopupModal("Unsaved Changes##PlayWarning", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Scene has unsaved changes. Save before entering Play?");
+        ImGui::Separator();
+
+        // Popup buttons
+        if (ImGui::Button("Save & Play", ImVec2(120, 0))) {
+            if (m_saveSceneCallback) m_saveSceneCallback();
+            _saveWorldState();
+            _changeState(EditorState::Play);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Play Anyway", ImVec2(120, 0))) {
+            _saveWorldState();
+            _changeState(EditorState::Play);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(90, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::Checkbox("Warn next time", &m_warnOnUnsavedPlay);
+        ImGui::EndPopup();
     }
-    ImGui::SameLine();
-
-    // STOP: playing/paused > edit
-    ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x87", m_editorState != EditorState::Edit, EditorState::Edit, "Game stopped", false, "Stop (Ctrl+P)");
-    ImGui::PopFont();
-    ImGui::SameLine();
-
-    // Step button (for step-by-step physics)
-    // Enabled when paused or stepping (so you can step multiple frames)
-    ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x84", m_editorState == EditorState::Paused || m_editorState == EditorState::Step, EditorState::Step, "Stepping 1 physics frame", true, "Step (Alt+P)");
-    ImGui::PopFont();
 
     ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
     ImGui::End();
 }
 
@@ -229,6 +421,7 @@ void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
     LOG_INFO("Saving world state.");
+    m_savedWorldPtr = m_world;
 
     nlohmann::json worldJson = nlohmann::json::object();
     nlohmann::json entitiesMap = nlohmann::json::object(); // Changed from array to object
@@ -284,7 +477,15 @@ void Playback::_restoreWorldState() {
     // This version preserves entity IDs by restoring component values in-place
     // instead of destroying and recreating entities.
     if (!HasValidWorld() || m_savedWorldState.is_null()) {
-        LOG_WARNING("No saved state to restore");
+        if (!m_suppressRestoreWarning) {
+            LOG_WARNING("No saved state to restore");
+        }
+        m_suppressRestoreWarning = false;
+        return;
+    }
+    m_suppressRestoreWarning = false;
+    if (m_savedWorldPtr && m_savedWorldPtr != m_world) {
+        LOG_WARNING("Saved state world does not match current world; skipping restore.");
         return;
     }
 
@@ -397,7 +598,7 @@ void Playback::_changeState(EditorState newState) {
         TimeSystem::Instance().SetTimeScale(0.0);
         break;
     case EditorState::Play:
-        TimeSystem::Instance().SetTimeScale(1.0);
+        TimeSystem::Instance().SetTimeScale(m_userTimeScale);
         break;
     case EditorState::Step:
         TimeSystem::Instance().SetTimeScale(0.0);  // Don't advance time, single frame only
@@ -410,9 +611,36 @@ void Playback::_changeState(EditorState newState) {
     }
 }
 
+// Local guard for scene dirtiness checks.
+bool Playback::_hasUnsavedChanges() const {
+    return m_hasUnsavedChangesProvider ? m_hasUnsavedChangesProvider() : false;
+}
+
+// Entry point that defers to the unsaved-changes guard if enabled.
+bool Playback::_startPlayFromEdit() {
+    if (m_warnOnUnsavedPlay && _hasUnsavedChanges()) {
+        m_showUnsavedPlayPopup = true;
+        return false;
+    }
+
+    _saveWorldState();
+    _changeState(EditorState::Play);
+    return true;
+}
+
 // Register callback for state change events
 void Playback::OnStateChanged(std::function<void(EditorState, EditorState)> callback) {
     m_onStateChanged = callback;
+}
+
+// Injected from the editor to share its dirty-state tracking.
+void Playback::SetUnsavedChangesProvider(std::function<bool()> provider) {
+    m_hasUnsavedChangesProvider = std::move(provider);
+}
+
+// Injected save callback so playback can offer save-and-play.
+void Playback::SetSaveSceneCallback(std::function<void()> callback) {
+    m_saveSceneCallback = std::move(callback);
 }
 
 // Query: Is the game currently in the Playing state?
@@ -436,14 +664,39 @@ EditorState Playback::GetEditorState() const {
     return m_editorState;
 }
 
+void Playback::ClearSavedState() {
+    // Explicitly drop snapshot when the world changes during Play.
+    m_savedWorldState = nullptr;
+    m_savedWorldPtr = nullptr;
+    m_suppressRestoreWarning = true;
+}
+
 // Update the world reference safely when scenes change
 // Update the bound world reference used by playback operations.
 // Clears saved snapshot since it no longer matches the world.
-void Playback::SetWorld(ECS::World* world) {
+void Playback::SetWorld(ECS::World* world, bool preserveState) {
     m_world = world;
+    if (!world) {
+        m_editorState = EditorState::Edit;
+        m_stepRequested = false;
+        ClearSavedState();
+        return;
+    }
+
+    // When preserving state (e.g. during scene transitions in Play),
+    // keep playback state but drop any snapshot tied to another world.
+    if (preserveState) {
+        if (m_savedWorldPtr && m_savedWorldPtr != world) {
+            ClearSavedState();
+        }
+        return;
+    }
+
     m_editorState = EditorState::Edit;
     m_stepRequested = false;
-    m_savedWorldState.clear();
+    // Reset time scale on world swap to avoid stale values.
+    m_userTimeScale = 1.0f;
+    ClearSavedState();
 }
 
 // Helper: Restore an entity's state in-place from a JSON snapshot

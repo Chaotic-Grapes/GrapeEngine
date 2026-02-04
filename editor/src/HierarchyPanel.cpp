@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define NO_ERROR
 #include <windows.h>
 #include "HierarchyPanel.h"
+#include "EditorStyle.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include "EditorECSUtils.h"
@@ -43,9 +44,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+#include <cctype>
 #include "BaseViewport.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "UndoSystem.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -100,6 +103,7 @@ namespace {
 
         return false;
     }
+
 }
 
 
@@ -157,6 +161,11 @@ void HierarchyPanel::SetWorld(ECS::World* world) {
     m_anchorEntityId = ECS::Entity::NPOS32;
     // Clear expanded nodes so tree redraws cleanly
     m_expandedNodes.clear();
+    // Reset persistent root order for the new world
+    m_rootOrder.clear();
+    m_childOrder.clear(); // Clear per-parent order cache on scene switch.
+    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state.
+    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state.
 }
 
 // Register a callback for selection change events
@@ -189,6 +198,15 @@ void HierarchyPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids
         if (m_anchorEntityId == ECS::Entity::NPOS32) m_selectionCallback(ECS::Entity::NPOS32);
         else m_selectionCallback(m_anchorEntityId);
     }
+}
+
+void HierarchyPanel::SetEntityOrder(const std::vector<EntityId>& order) {
+    m_entityOrder = order;
+    m_rootOrder.clear();
+    m_childOrder.clear(); // Rebuild per-parent order from serialized order.
+    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state.
+    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state.
+    _seedRootOrderFromEntityOrder();
 }
 
 // -------------------------------------------------------------------------
@@ -244,6 +262,7 @@ void HierarchyPanel::Render() {
                 // Remove ALL deleted entities from selection
                 for (EntityId deletedId : allDeletedIds) {
                     m_selectedEntityIds.erase(deletedId);
+                    _removeEntityFromOrders(deletedId); // Drop deleted entities from order lists.
                 }
 
                 // Update anchor if it was one of the deleted entities
@@ -336,6 +355,15 @@ void HierarchyPanel::_renderHeader() {
             m_selectedEntityIds.clear();
             m_selectedEntityIds.insert(e.Index);
             m_anchorEntityId = e.Index;
+            if (m_world) {
+                ECS::Entity parent = m_world->ParentOf(e);
+                if (parent.IsNull()) {
+                    _appendToOrderList(m_rootOrder, e.Index); // New root goes to bottom.
+                }
+                else {
+                    _appendToOrderList(m_childOrder[parent.Index], e.Index); // New child goes to bottom.
+                }
+            }
 
             if (m_selectionCallback)
                 m_selectionCallback(e.Index);
@@ -349,36 +377,56 @@ void HierarchyPanel::_renderHeader() {
         // Create root entity with specified name
         if (ImGui::Selectable("Create Empty")) {
             if (m_entityActions) {
-                m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                if (newId != ECS::Entity::NPOS32) {
+                    _appendToOrderList(m_rootOrder, newId); // Add new root at end.
+                }
             }
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::BeginMenu("Create UI")) {
-            if (ImGui::MenuItem("Button")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
-                    selectAndMark(e);
-                }
-            }
+        if (ImGui::BeginMenu("Create GUI")) {
             if (ImGui::MenuItem("Panel")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
-                    selectAndMark(e);
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI panel components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    // Add default GUIElement and GUIPanel components
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        
+                        // Add default GUIElement and GUIPanel components
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 300.0f, 200.0f };
+                        m_world->Add<ECS::Components::GUIPanel>(e);
+                        selectAndMark(e);
+                    }
                 }
             }
-            if (ImGui::MenuItem("Label")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
-                    selectAndMark(e);
+
+            if (ImGui::MenuItem("Text")) {
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI text components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    if (newId != ECS::Entity::NPOS32) {
+                        // Add default GUIElement and GUIText components
+                        ECS::Entity e = m_world->Resolve(newId);
+
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 40.0f };
+
+                        auto& text = m_world->Add<ECS::Components::GUIText>(e);
+                        text.SetText("Text");
+                        text.SetFontPath("");
+                        text.FontSize = 24.0f;
+                        selectAndMark(e);
+                    }
                 }
             }
-            if (ImGui::MenuItem("Input Field")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
-                    selectAndMark(e);
-                }
-            }
+
             ImGui::EndMenu();
         }
 
@@ -443,15 +491,23 @@ void HierarchyPanel::_renderEntityTree() {
 
 // Render footer buttons (Clear All)
 void HierarchyPanel::_renderFooterButtons() {
-    // Clear All button: removes all entities from the scene
+    // Clear All button: removes all entities from the scene.
+    // Use danger styling to signal destructive action.
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
     if (ImGui::Button("Clear All")) {
         if (m_entityActions) {
             m_entityActions->ClearAllEntities();
         }
         m_selectedEntityIds.clear();
         m_anchorEntityId = ECS::Entity::NPOS32;
+        m_rootOrder.clear();
+        m_childOrder.clear(); // Clear order caches on delete-all.
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
+    ImGui::PopStyleColor(4);
 }
 
 // -------------------------------------------------------------------------
@@ -857,14 +913,72 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 
     // Drop target: accept entities and prefabs dropped on this node
     if (ImGui::BeginDragDropTarget()) {
+        auto getParentId = [&](EntityId id) -> EntityId {
+            if (!m_world) return ECS::Entity::NPOS32;
+            ECS::Entity ent = m_world->Resolve(id);
+            if (ent.IsNull() || !m_world->IsAlive(ent)) return ECS::Entity::NPOS32;
+            ECS::Entity parent = m_world->ParentOf(ent);
+            return parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+        };
+        auto markDirty = [&]() {
+            if (m_fileMenu) {
+                m_fileMenu->MarkSceneDirty();
+            }
+        };
+        const bool reorderOnly = ImGui::GetIO().KeyAlt; // Alt+drop reorders without changing parents.
+
         // Handle single entity reparenting
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
 
             // Block reparenting if either entity is protected
             if (!IsProtectedEntity(m_world, draggedId) && !IsProtectedEntity(m_world, entityId)) {
-                if (m_entityActions) {
+                EntityId draggedParentId = getParentId(draggedId);
+                EntityId targetParentId = getParentId(entityId);
+
+                // If Alt is held, only reorder within the same parent
+                if (reorderOnly && draggedId != entityId &&
+                    (draggedParentId == targetParentId || draggedParentId == entityId)) {
+                    auto& order = (draggedParentId == ECS::Entity::NPOS32)
+                        ? m_rootOrder
+                        : m_childOrder[draggedParentId];
+                    std::vector<EntityId> before = order; // Snapshot order for undo.
+
+                    // Reorder dragged entity within the same parent
+                    if (draggedParentId == entityId) {
+                        _removeFromOrderList(order, draggedId);
+                        _appendToOrderList(order, draggedId);
+                        markDirty();
+                    }
+                    else {
+                        _moveEntityInOrder(order, draggedId, entityId);
+                        markDirty();
+                    }
+                    _recordOrderChange(draggedParentId, before, order);
+                }
+                // Normal reparenting
+                else if (m_entityActions) {
+                    // Prevent reparenting onto itself
                     m_entityActions->ReparentEntity(draggedId, entityId);
+                    EntityId newParentId = getParentId(draggedId);
+
+                    // Update order lists if parent changed
+                    if (newParentId != draggedParentId) {
+                        if (draggedParentId == ECS::Entity::NPOS32) {
+                            _removeFromOrderList(m_rootOrder, draggedId);
+                        }
+                        else {
+                            _removeFromOrderList(m_childOrder[draggedParentId], draggedId);
+                        }
+
+                        // Add to new parent's order list
+                        if (newParentId == ECS::Entity::NPOS32) {
+                            _appendToOrderList(m_rootOrder, draggedId);
+                        }
+                        else {
+                            _appendToOrderList(m_childOrder[newParentId], draggedId);
+                        }
+                    }
                 }
             }
         }
@@ -874,13 +988,86 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
 
-            // Reparent all dragged entities
+            EntityId targetParentId = getParentId(entityId);
+            EntityId commonParentId = ECS::Entity::NPOS32;
+            bool hasCommonParent = false;
+            bool sameParent = true;
+            std::unordered_set<EntityId> draggedSet;
+
+            draggedSet.reserve(count);
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
-                // Block reparenting if either entity is protected
-                if (!IsProtectedEntity(m_world, draggedId) && !IsProtectedEntity(m_world, entityId)) {
-                    if (m_entityActions) {
-                        m_entityActions->ReparentEntity(draggedId, entityId);
+                if (IsProtectedEntity(m_world, draggedId)) continue;
+                draggedSet.insert(draggedId);
+
+                EntityId parentId = getParentId(draggedId);
+                if (!hasCommonParent) {
+                    commonParentId = parentId;
+                    hasCommonParent = true;
+                }
+                else if (commonParentId != parentId) {
+                    sameParent = false;
+                }
+            }
+
+            if (reorderOnly && sameParent && hasCommonParent &&
+                (commonParentId == targetParentId || commonParentId == entityId) &&
+                draggedSet.find(entityId) == draggedSet.end()) {
+                auto& order = (commonParentId == ECS::Entity::NPOS32)
+                    ? m_rootOrder
+                    : m_childOrder[commonParentId];
+
+                std::vector<EntityId> orderedDragged;
+                orderedDragged.reserve(draggedSet.size());
+                for (EntityId id : order) {
+                    if (draggedSet.find(id) != draggedSet.end()) {
+                        orderedDragged.push_back(id);
+                    }
+                }
+
+                for (EntityId id : orderedDragged) {
+                    _removeFromOrderList(order, id);
+                }
+
+                size_t insertPos = order.size();
+                if (commonParentId != entityId) {
+                    auto it = std::find(order.begin(), order.end(), entityId);
+                    if (it != order.end()) {
+                        insertPos = static_cast<size_t>(std::distance(order.begin(), it)) + 1;
+                    }
+                }
+
+                std::vector<EntityId> before = order; // Snapshot order for undo.
+                order.insert(order.begin() + insertPos, orderedDragged.begin(), orderedDragged.end());
+                markDirty();
+                _recordOrderChange(commonParentId, before, order);
+            }
+            else {
+                // Reparent all dragged entities
+                for (size_t i = 0; i < count; ++i) {
+                    EntityId draggedId = draggedIds[i];
+                    // Block reparenting if either entity is protected
+                    if (!IsProtectedEntity(m_world, draggedId) && !IsProtectedEntity(m_world, entityId)) {
+                        EntityId oldParentId = getParentId(draggedId);
+                        if (m_entityActions) {
+                            m_entityActions->ReparentEntity(draggedId, entityId);
+                        }
+                        EntityId newParentId = getParentId(draggedId);
+                        if (newParentId != oldParentId) {
+                            if (oldParentId == ECS::Entity::NPOS32) {
+                                _removeFromOrderList(m_rootOrder, draggedId);
+                            }
+                            else {
+                                _removeFromOrderList(m_childOrder[oldParentId], draggedId);
+                            }
+
+                            if (newParentId == ECS::Entity::NPOS32) {
+                                _appendToOrderList(m_rootOrder, draggedId);
+                            }
+                            else {
+                                _appendToOrderList(m_childOrder[newParentId], draggedId);
+                            }
+                        }
                     }
                 }
             }
@@ -923,14 +1110,46 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 // Handle drag-drop for the tree background (reparent to root)
 void HierarchyPanel::_handleTreeDragDrop() {
     if (ImGui::BeginDragDropTarget()) {
+        auto markDirty = [&]() {
+            if (m_fileMenu) {
+                m_fileMenu->MarkSceneDirty();
+            }
+        };
         // Reparent single entity to root (make it have no parent)
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
 
             // Block reparenting protected entities
             if (!IsProtectedEntity(m_world, draggedId)) {
-                if (m_entityActions) {
+                EntityId oldParentId = ECS::Entity::NPOS32;
+                if (m_world) {
+                    ECS::Entity ent = m_world->Resolve(draggedId);
+                    if (!ent.IsNull() && m_world->IsAlive(ent)) {
+                        ECS::Entity parent = m_world->ParentOf(ent);
+                        oldParentId = parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+                    }
+                }
+
+                if (oldParentId == ECS::Entity::NPOS32) {
+                    std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo.
+                    _removeFromOrderList(m_rootOrder, draggedId);
+                    _appendToOrderList(m_rootOrder, draggedId);
+                    markDirty();
+                    _recordOrderChange(ECS::Entity::NPOS32, before, m_rootOrder);
+                }
+                else if (m_entityActions) {
                     m_entityActions->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+                    ECS::Entity ent = m_world ? m_world->Resolve(draggedId) : ECS::NULL_ENTITY;
+                    EntityId newParentId = ECS::Entity::NPOS32;
+                    if (m_world && !ent.IsNull() && m_world->IsAlive(ent)) {
+                        ECS::Entity parent = m_world->ParentOf(ent);
+                        newParentId = parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+                    }
+                    if (newParentId != oldParentId) {
+                        _removeFromOrderList(m_childOrder[oldParentId], draggedId);
+                        _appendToOrderList(m_rootOrder, draggedId);
+                        markDirty();
+                    }
                 }
             }
         }
@@ -940,12 +1159,76 @@ void HierarchyPanel::_handleTreeDragDrop() {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
 
-            // Reparent all dragged entities to root
+            bool allRoots = true;
+            std::unordered_set<EntityId> draggedSet;
+            draggedSet.reserve(count);
+
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
-                if (!IsProtectedEntity(m_world, draggedId)) {
-                    if (m_entityActions) {
-                        m_entityActions->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+                if (IsProtectedEntity(m_world, draggedId)) continue;
+                draggedSet.insert(draggedId);
+
+                if (m_world) {
+                    ECS::Entity ent = m_world->Resolve(draggedId);
+                    if (!ent.IsNull() && m_world->IsAlive(ent)) {
+                        ECS::Entity parent = m_world->ParentOf(ent);
+                        if (!parent.IsNull()) {
+                            allRoots = false;
+                        }
+                    }
+                }
+            }
+
+            if (allRoots) {
+                std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo.
+                std::vector<EntityId> orderedDragged;
+                orderedDragged.reserve(draggedSet.size());
+                for (EntityId id : m_rootOrder) {
+                    if (draggedSet.find(id) != draggedSet.end()) {
+                        orderedDragged.push_back(id);
+                    }
+                }
+
+                for (EntityId id : orderedDragged) {
+                    _removeFromOrderList(m_rootOrder, id);
+                }
+                m_rootOrder.insert(m_rootOrder.end(), orderedDragged.begin(), orderedDragged.end());
+                markDirty();
+                _recordOrderChange(ECS::Entity::NPOS32, before, m_rootOrder);
+            }
+            else {
+                // Reparent all dragged entities to root
+                for (size_t i = 0; i < count; ++i) {
+                    EntityId draggedId = draggedIds[i];
+                    if (!IsProtectedEntity(m_world, draggedId)) {
+                        EntityId oldParentId = ECS::Entity::NPOS32;
+                        if (m_world) {
+                            ECS::Entity ent = m_world->Resolve(draggedId);
+                            if (!ent.IsNull() && m_world->IsAlive(ent)) {
+                                ECS::Entity parent = m_world->ParentOf(ent);
+                                oldParentId = parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+                            }
+                        }
+
+                        if (m_entityActions) {
+                            m_entityActions->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+                        }
+
+                        EntityId newParentId = ECS::Entity::NPOS32;
+                        if (m_world) {
+                            ECS::Entity ent = m_world->Resolve(draggedId);
+                            if (!ent.IsNull() && m_world->IsAlive(ent)) {
+                                ECS::Entity parent = m_world->ParentOf(ent);
+                                newParentId = parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+                            }
+                        }
+
+                        if (newParentId != oldParentId) {
+                            if (oldParentId != ECS::Entity::NPOS32) {
+                                _removeFromOrderList(m_childOrder[oldParentId], draggedId);
+                            }
+                            _appendToOrderList(m_rootOrder, draggedId);
+                        }
                     }
                 }
             }
@@ -1084,7 +1367,19 @@ void HierarchyPanel::_cloneEntity(EntityId entityId) {
     if (IsProtectedEntity(m_world, entityId)) return;
 
     if (m_entityActions) {
-        m_entityActions->CloneEntity(entityId);
+        EntityId clonedId = m_entityActions->CloneEntity(entityId);
+        if (clonedId != ECS::Entity::NPOS32 && m_world) {
+            ECS::Entity cloned = m_world->Resolve(clonedId);
+            if (m_world->IsAlive(cloned)) {
+                ECS::Entity parent = m_world->ParentOf(cloned);
+                if (parent.IsNull()) {
+                    _appendToOrderList(m_rootOrder, clonedId); // Append clone at end.
+                }
+                else {
+                    _appendToOrderList(m_childOrder[parent.Index], clonedId); // Append clone at end.
+                }
+            }
+        }
     }
 }
 
@@ -1095,14 +1390,20 @@ void HierarchyPanel::_addChildEntity(EntityId parentId) {
     if (IsProtectedEntity(m_world, parentId)) return;
 
     if (m_entityActions) {
-        m_entityActions->AddEntity("Entity", parentId);
+        EntityId newId = m_entityActions->AddEntity("Entity", parentId);
+        if (newId != ECS::Entity::NPOS32) {
+            _appendToOrderList(m_childOrder[parentId], newId); // Add child at end.
+        }
     }
 }
 
 // Add a new root entity (entity without parent)
 void HierarchyPanel::_addRootEntity() {
     if (m_entityActions) {
-        m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
+        EntityId newId = m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
+        if (newId != ECS::Entity::NPOS32) {
+            _appendToOrderList(m_rootOrder, newId); // Add root at end.
+        }
     }
 }
 
@@ -1207,7 +1508,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
+        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {
@@ -1219,6 +1520,12 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         LOG_INFO("Instantiated prefab: " << prefabName);
 
         // Return the entity ID so caller can select it
+        if (parentId == ECS::Entity::NPOS32) {
+            _appendToOrderList(m_rootOrder, rootEntity.Index); // Track prefab root order.
+        }
+        else {
+            _appendToOrderList(m_childOrder[parentId], rootEntity.Index); // Track prefab child order.
+        }
         return rootEntity.Index;
     }
     catch (const std::exception& e) {
@@ -1234,25 +1541,46 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
 // Get all root entities (entities without parents)
 // Get all root entities (entities without parents)
 // Uses World's ParentOf API to check hierarchy maintained by Attach/Detach
-std::vector<EntityId> HierarchyPanel::_getRootEntities() const {
+std::vector<EntityId> HierarchyPanel::_getRootEntities() {
     std::vector<EntityId> roots;
     if (!m_world) return roots;
 
-    // Iterate all entities and collect those without parents
+    // Collect current roots for membership checks
+    std::vector<EntityId> currentRoots;
     m_world->Each([&](ECS::Entity e) {
         if (ShouldHideFromHierarchy(m_world, e)) return;
-        // Use World's ParentOf to check if entity has no parent
         if (m_world->ParentOf(e).IsNull()) {
-            roots.push_back(e.Index);
+            currentRoots.push_back(e.Index);
         }
         });
 
+    std::unordered_set<EntityId> rootSet(currentRoots.begin(), currentRoots.end());
+    roots.reserve(rootSet.size());
+
+    // Preserve existing order first
+    for (EntityId id : m_rootOrder) {
+        if (rootSet.erase(id) > 0) {
+            roots.push_back(id);
+        }
+    }
+
+    // Append any new roots at the end in detection order
+    if (!rootSet.empty()) {
+        for (EntityId id : currentRoots) {
+            if (rootSet.erase(id) > 0) {
+                roots.push_back(id);
+            }
+        }
+    }
+
+    // Persist the updated order for next frame
+    m_rootOrder = roots;
     return roots;
 }
 
 // Get all children of an entity
 // Uses World's ForChildren API which leverages the HierarchyIndex maintained by Attach/Detach
-std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
+std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) {
     std::vector<EntityId> children;
     if (!m_world) return children;
 
@@ -1260,13 +1588,34 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
     if (parent.IsNull() || !m_world->IsAlive(parent))
         return children;
 
-    // Use World's ForChildren directly which respects sibling order from HierarchyIndex
+    std::vector<EntityId> currentChildren;
     m_world->ForChildren(parent, [&](ECS::Entity child) {
         if (!ShouldHideFromHierarchy(m_world, child)) {
-            children.push_back(child.Index);
+            currentChildren.push_back(child.Index);
         }
         });
 
+    auto& order = m_childOrder[parentId];
+    std::unordered_set<EntityId> childSet(currentChildren.begin(), currentChildren.end());
+    children.reserve(childSet.size());
+
+    // Preserve existing order first
+    for (EntityId id : order) {
+        if (childSet.erase(id) > 0) {
+            children.push_back(id);
+        }
+    }
+
+    // Append any new children at the end in detection order
+    if (!childSet.empty()) {
+        for (EntityId id : currentChildren) {
+            if (childSet.erase(id) > 0) {
+                children.push_back(id);
+            }
+        }
+    }
+
+    order = children;
     return children;
 }
 
@@ -1341,9 +1690,118 @@ void HierarchyPanel::ClearUIState() {
     m_renamingEntityId = ECS::Entity::NPOS32;
     m_contextMenuTarget = ECS::Entity::NPOS32;
     m_searchFilter.clear();
+    m_rootOrder.clear();
+    m_childOrder.clear(); // Clear order caches when UI state resets.
 
     // Notify selection callback that nothing is selected
     if (m_selectionCallback) {
         m_selectionCallback(ECS::Entity::NPOS32);
     }
+}
+
+void HierarchyPanel::_seedRootOrderFromEntityOrder() {
+    if (!m_world) return;
+
+    std::unordered_set<EntityId> seen;
+    m_rootOrder.clear();
+    m_childOrder.clear();
+
+    for (EntityId id : m_entityOrder) {
+        if (seen.insert(id).second == false) continue;
+
+        ECS::Entity entity = m_world->Resolve(id);
+        if (ShouldHideFromHierarchy(m_world, entity)) continue;
+
+        ECS::Entity parent = m_world->ParentOf(entity);
+        if (parent.IsNull()) {
+            m_rootOrder.push_back(id);
+        }
+        else {
+            m_childOrder[parent.Index].push_back(id);
+        }
+    }
+}
+
+void HierarchyPanel::_appendToOrderList(std::vector<EntityId>& order, EntityId entityId) {
+    if (std::find(order.begin(), order.end(), entityId) == order.end()) {
+        order.push_back(entityId);
+    }
+}
+
+void HierarchyPanel::_removeFromOrderList(std::vector<EntityId>& order, EntityId entityId) {
+    auto it = std::remove(order.begin(), order.end(), entityId);
+    if (it != order.end()) {
+        order.erase(it, order.end());
+    }
+}
+
+void HierarchyPanel::_removeEntityFromOrders(EntityId entityId) {
+    _removeFromOrderList(m_rootOrder, entityId);
+    for (auto it = m_childOrder.begin(); it != m_childOrder.end(); ) {
+        _removeFromOrderList(it->second, entityId);
+        if (it->first == entityId || it->second.empty()) {
+            it = m_childOrder.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+void HierarchyPanel::_moveEntityInOrder(std::vector<EntityId>& order, EntityId entityId, EntityId targetId) {
+    if (entityId == targetId) return;
+
+    auto entityIt = std::find(order.begin(), order.end(), entityId);
+    if (entityIt == order.end()) {
+        order.push_back(entityId);
+        return;
+    }
+
+    auto targetIt = std::find(order.begin(), order.end(), targetId);
+    if (targetIt == order.end()) {
+        return;
+    }
+
+    order.erase(entityIt);
+    targetIt = std::find(order.begin(), order.end(), targetId);
+    if (targetIt == order.end()) {
+        order.push_back(entityId);
+        return;
+    }
+
+    order.insert(targetIt + 1, entityId);
+}
+
+void HierarchyPanel::_applyOrder(EntityId parentId, const std::vector<EntityId>& order) {
+    if (parentId == ECS::Entity::NPOS32) {
+        m_rootOrder = order; // Apply new root order.
+    }
+    else {
+        m_childOrder[parentId] = order; // Apply new child order.
+    }
+
+    if (m_fileMenu) {
+        m_fileMenu->MarkSceneDirty(); // Order changes should persist to scene files.
+    }
+}
+
+void HierarchyPanel::_recordOrderChange(EntityId parentId, const std::vector<EntityId>& before, const std::vector<EntityId>& after) {
+    if (!m_undoSystem) return;
+    if (before == after) return;
+
+    float now = static_cast<float>(ImGui::GetTime()); // Timestamp for coalescing.
+    if (parentId == m_lastReorderParentId && (now - m_lastReorderTime) <= REORDER_COALESCE_WINDOW) {
+        if (m_undoSystem->CoalesceReorder(parentId, after)) {
+            m_lastReorderTime = now; // Extend coalesce window.
+            return;
+        }
+    }
+
+    auto apply = [this, parentId](const std::vector<EntityId>& order) {
+        _applyOrder(parentId, order);
+    };
+
+    m_undoSystem->ExecuteCommand(std::make_unique<Editor::ReorderEntitiesCommand>(parentId, apply, before, after)); // Push reorder undo.
+    m_lastReorderParentId = parentId; // Track last reorder parent for coalescing.
+    m_lastReorderTime = now; // Track last reorder time for coalescing.
 }

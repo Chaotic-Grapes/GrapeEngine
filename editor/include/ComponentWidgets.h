@@ -71,6 +71,9 @@ namespace EditorUI {
     // Renders a color picker that edits RGBA values in JSON color data
     void RenderColorProperty(const std::string& label, nlohmann::json& colorData);
 
+    // Renders a color picker aligned as a property row
+    void RenderColorRow(const std::string& label, nlohmann::json& colorData);
+
     // Renders a text input field that edits string values in JSON data
     void RenderTextProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
@@ -103,8 +106,8 @@ namespace EditorUI {
     // Returns X position where property content starts after labels
     float GetContentStartX();
 
-    // Returns fixed content width used for consistent inspector panel layout
-    constexpr float GetContentWidth() { return 730.0f; }
+    // Returns content width for the current inspector panel layout
+    float GetContentWidth();
 
 } 
 

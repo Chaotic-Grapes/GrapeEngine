@@ -14,12 +14,6 @@ using GrapeEngine.Math;
 namespace GrapeEngine.Scripting.Components;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Layer
-{
-    public ushort Id;
-}
-
-[StructLayout(LayoutKind.Sequential)]
 public readonly struct LayerMask
 {
     public readonly uint Mask;

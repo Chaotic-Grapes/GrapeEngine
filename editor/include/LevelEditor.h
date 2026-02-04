@@ -38,11 +38,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "PerformancePanel.h"
 #include "SpriteImportPanel.h"
 #include "SystemsPanel.h"
+#include "TilePalettePanel.h"
 
 struct LevelEditorConfig {
-    float TextFontSize = 23.0f;
-    float IconFontSize = 26.0f;
-    float ToolbarHeight = 26.0f;
+    float TextFontSize = 20.0f;
+    float IconFontSize = 22.0f;
+    float ToolbarHeight = 46.0f;
 };
 
 struct PanelRegistration {
@@ -114,6 +115,7 @@ private:
     PerformancePanel m_performancePanel;
     SpriteImportPanel m_spriteImportPanel;
     SystemsPanel m_systemsPanel;
+    TilePalettePanel m_tilePalette;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;
@@ -128,6 +130,8 @@ private:
     ImGuiID m_dockspaceId = 0;
     bool m_dockLayoutBuilt = false;
     ImVec2 m_lastViewportSize = ImVec2(0, 0);
+    // Tracks the active scene/game viewport layout preset (1/2/4).
+    int m_viewportLayoutPreset = 1;
 
     // Playback state tracking
     EditorState m_lastEditorState = EditorState::Edit;
@@ -139,6 +143,8 @@ private:
     Messaging::SubscriptionHandle m_entityCreatedSubscription;
     Messaging::SubscriptionHandle m_entityDestroyedSubscription;
     Messaging::SubscriptionHandle m_sceneModifiedSubscription;
+    // Listens for viewport layout changes requested by the header controls.
+    Messaging::SubscriptionHandle m_viewportLayoutSubscription;
 };
 
 #endif // LEVEL_EDITOR_H

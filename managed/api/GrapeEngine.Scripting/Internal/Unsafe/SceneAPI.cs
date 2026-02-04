@@ -63,6 +63,10 @@ internal static partial class SceneAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void SetActiveImmediate(void* sceneManagerPtr, ulong sceneIndex);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_SetNextAudioTransition")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void SetNextAudioTransition(void* sceneManagerPtr, float fadeDuration, [MarshalAs(UnmanagedType.I1)] bool allowCrossfade);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_GetActive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void* GetActive(void* sceneManagerPtr);
@@ -96,6 +100,11 @@ internal static partial class SceneAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static unsafe partial bool LoadScene(void* sceneManagerPtr, ulong sceneIndex, string filename);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_RestartScene", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static unsafe partial bool RestartScene(void* sceneManagerPtr, ulong sceneIndex, string filename);
 
     // ============================================================================
     // Scene Properties
@@ -140,18 +149,6 @@ internal static partial class SceneAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_DestroyEntity")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void DestroyEntity(void* scenePtr, ulong entityId);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_CreateOnLayer")]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial ulong CreateOnLayer(void* scenePtr, ushort layerId);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_SetLayer")]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial void SetLayer(void* scenePtr, ulong entityId, ushort layerId);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_RemoveFromLayer")]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial void RemoveFromLayer(void* scenePtr, ulong entityId);
 
     // ============================================================================
     // Prefab Management

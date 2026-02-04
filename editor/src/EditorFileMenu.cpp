@@ -521,13 +521,19 @@ void EditorFileMenu::_openScene(const std::string& path) {
     // If opening the SAME scene, reload into the current slot to avoid world rebinding issues
     if (hasActive && (m_currentScenePath == path)) {
         std::vector<uint32_t> entityOrder;
-        if (m_sceneManager->LoadScene(activeIdx, path, &entityOrder)) {
+        if (m_sceneManager->RestartScene(activeIdx, path, &entityOrder)) {
             m_sceneManager->SetActiveImmediate(activeIdx);
             if (m_hierarchyPanel) {
                 m_hierarchyPanel->ClearUIState();
                 m_hierarchyPanel->SetEntityOrder(entityOrder);
             }
             m_hasUnsavedChanges = false;
+            if (m_getEditorState && m_getEditorState() != EditorState::Edit) {
+                // Reloading while playing should not restore an old snapshot later.
+                if (m_clearPlaybackSnapshot) {
+                    m_clearPlaybackSnapshot();
+                }
+            }
             LOG_INFO("Reloaded active scene: " << path);
         }
         else {
