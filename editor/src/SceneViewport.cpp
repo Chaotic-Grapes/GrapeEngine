@@ -149,11 +149,12 @@ void SceneViewport::_renderViewport() {
     // --- Viewport Header -----------------------------------------------------
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
-    const float headerHeight = ImGui::GetFrameHeight() + 6.0f;
+    const float iconButtonSize = 28.0f;
+    const float headerHeight = iconButtonSize + 10.0f;
     ImGui::BeginChild("##SceneViewportHeader", ImVec2(0.0f, headerHeight), false,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     // Vertically center controls within the header strip.
-    const float centerOffset = std::max(0.0f, (headerHeight - ImGui::GetFrameHeight()) * 0.5f);
+    const float centerOffset = std::max(0.0f, (headerHeight - iconButtonSize) * 0.5f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + centerOffset);
 
     // Clamp helper for per-group tinting.
@@ -184,7 +185,11 @@ void SceneViewport::_renderViewport() {
         const int popCount = pushButtonColors(normal, hover, pressed, text);
         ImGui::PushID(id);
         if (useSymbols && m_symbolsFont) ImGui::PushFont(m_symbolsFont);
-        const bool clicked = ImGui::Button(icon, ImVec2(28.0f, 0.0f));
+        // Remove padding inside viewport icon buttons
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
+        const bool clicked = ImGui::Button(icon, ImVec2(iconButtonSize, iconButtonSize));
+        ImGui::PopStyleVar(2);
         if (useSymbols && m_symbolsFont) ImGui::PopFont();
         if (tooltip && ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
@@ -196,9 +201,9 @@ void SceneViewport::_renderViewport() {
         return clicked;
     };
 
-    // Taken from https://github.com/juliettef/IconFontCppHeaders/tree/main
-    static const char* ICON_CAMERA_3D   = "\xEE\xA1\x8D";   // 3d_rotation
-    static const char* ICON_CAMERA_2D   = "\xEE\x8F\x86";   // crop_square
+    // Taken from Google Material Design Icons
+    static const char* ICON_CAMERA_3D   = "\xEE\xB4\xB8";   // 3d
+    static const char* ICON_CAMERA_2D   = "\xEE\xBC\xB7";   // 2d
     static const char* ICON_MOVE        = "\xEE\xA2\x9F";   // open_with
     static const char* ICON_ROTATE      = "\xEE\x90\x9D";   // rotate_right
     static const char* ICON_SCALE       = "\xEE\x8F\x82";   // crop_free
@@ -228,12 +233,12 @@ void SceneViewport::_renderViewport() {
         isPerspective = m_editorCamera->GetCamera()->UsePerspective;
     }
     ImGui::PushID("CameraMode");
-    if (iconButtonTinted("Persp", ICON_CAMERA_3D, "Perspective", isPerspective, cameraTint, true)) {
-        if (m_editorCamera) m_editorCamera->ResetTo3D();
-    }
-    ImGui::SameLine();
     if (iconButtonTinted("Ortho", ICON_CAMERA_2D, "Orthographic", !isPerspective, cameraTint, true)) {
         if (m_editorCamera) m_editorCamera->ResetTo2D();
+    }
+    ImGui::SameLine();
+    if (iconButtonTinted("Persp", ICON_CAMERA_3D, "Perspective", isPerspective, cameraTint, true)) {
+        if (m_editorCamera) m_editorCamera->ResetTo3D();
     }
     ImGui::PopID();
 
@@ -420,6 +425,20 @@ void SceneViewport::_renderViewport() {
             // Check if image is hovered AFTER drawing it
             bool isSceneImageHovered = ImGui::IsItemHovered();
 
+            // Accept asset drops on the scene viewport to set the active tileset.
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const char* data = static_cast<const char*>(payload->Data);
+                    if (data && payload->DataSize > 0) {
+                        const std::string assetPath(data); // Payload is null-terminated list, first entry is enough.
+                        if (m_tilePalettePanel) {
+                            m_tilePalettePanel->HandleAssetDrop(assetPath);
+                        }
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+
             // Update m_isViewportHovered only when image is hovered
             m_isViewportHovered = isSceneImageHovered;
 
@@ -487,7 +506,9 @@ void SceneViewport::_renderViewport() {
                         bool left = Input::IsMousePressed(MOUSE_LEFT);
                         bool right = Input::IsMousePressed(MOUSE_RIGHT);
                         if (left || right) {
-                            tilePaletteHandledClick = m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
+                            m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            tilePaletteHandledClick = true;
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {

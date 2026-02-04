@@ -101,6 +101,7 @@ namespace ECS {
         REGISTER_COMPONENT(SpriteRenderer2D);
         REGISTER_COMPONENT(SpriteFlip2D);
         REGISTER_COMPONENT(SpriteShader2D);
+        REGISTER_COMPONENT(TileMapComponent); // Register tilemap component for ECS + editor usage.
 
         // Animation
         REGISTER_COMPONENT(SpriteSheetAnimation2D);
@@ -168,6 +169,7 @@ namespace ECS {
         LogComponentTypeIds("SpriteRenderer2D", FNV1a_Hash("SpriteRenderer2D"));
         LogComponentTypeIds("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));
         LogComponentTypeIds("SpriteShader2D", FNV1a_Hash("SpriteShader2D"));
+        LogComponentTypeIds("TileMapComponent", FNV1a_Hash("TileMapComponent"));
 
         LogComponentTypeIds("SpriteSheetAnimation2D", FNV1a_Hash("SpriteSheetAnimation2D"));
         LogComponentTypeIds("AnimationState2D", FNV1a_Hash("AnimationState2D"));

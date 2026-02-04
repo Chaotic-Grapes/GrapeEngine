@@ -340,6 +340,22 @@ namespace ECS {
 
         // TODO: Add Shader components
 
+        // Tile map reference + editor/runtime settings.
+        // This is a lightweight handle to external tilemap data + tileset texture.
+        struct TileMapComponent {
+        public:
+            uint32_t TileMapPath = 0;           // StringId for the .tilemap asset path
+            uint32_t TilesetTexturePath = 0;    // StringId for the tileset texture path
+            float TileWorldSize = 1.0f;         // World-units per tile (used for map scaling)
+            uint32_t TilePixelSize = 32;        // Tile size in pixels for tileset slicing
+            uint32_t DefaultWidth = 64;         // Default width for new maps (tiles)
+            uint32_t DefaultHeight = 64;        // Default height for new maps (tiles)
+            uint32_t LayerIndex = 0;            // Layer index to render/edit (single-layer for now)
+            bool Visible = true;                // Editor/runtime visibility toggle
+            uint8_t _padding[3] = { 0, 0, 0 };   // Padding to keep alignment stable
+        };
+        static_assert(std::is_trivially_copyable_v<TileMapComponent>, "TileMapComponent must be trivially copyable");
+
         // ---------------------------------- Animation ----------------------------------
 
         // Sprite sheet animation configuration (POD)

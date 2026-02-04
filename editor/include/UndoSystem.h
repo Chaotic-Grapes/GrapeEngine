@@ -37,6 +37,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    // Snapshot of a single entity for undo/redo restore operations.
+    struct EntitySnapshot {
+        EntityId Id = ECS::Entity::NPOS32;
+        EntityId ParentId = ECS::Entity::NPOS32;
+        std::vector<ECS::SerializedComponent> Components;
+    };
+
     // ========================================================================
     // Command Interface (Command Pattern)
     // ========================================================================
@@ -101,31 +108,9 @@ namespace Editor {
 
     private:
         ECS::World* m_world;
-        ECS::Entity m_entity;
+        EntityId m_entityId = ECS::Entity::NPOS32;
         std::function<void()> m_onEntityDeleted;
-        bool m_wasExecuted = false;
-
-        // Store entity states for restoration
-        bool m_hasTransform = false;
-        ECS::Components::LocalTransform m_savedTransform;
-
-        bool m_hasLayer = false;
-        ECS::Components::Layer m_savedLayer;
-
-        bool m_hasName = false;
-        ECS::Components::Name m_savedName;
-        
-        bool m_hasActive = false;
-        ECS::Components::Active m_savedActive;
-
-        bool m_hasSprite = false;
-        ECS::Components::SpriteRenderer2D m_savedSprite;
-
-        bool m_hasBox = false;
-        ECS::Components::ShapeBox2D m_savedBox;
-
-        bool m_hasCircle = false;
-        ECS::Components::ShapeCircle2D m_savedCircle;
+        std::vector<EntitySnapshot> m_snapshots;
     };
 
     // ========================================================================
@@ -150,30 +135,32 @@ namespace Editor {
 
     private:
         ECS::World* m_world;
-        ECS::Entity m_entity;
+        EntityId m_entityId = ECS::Entity::NPOS32;
         std::function<void()> m_onEntityRestored;
+        std::vector<EntitySnapshot> m_snapshots;
+    };
 
-        // Store entity state
-        bool m_hasTransform = false;
-        ECS::Components::LocalTransform m_savedTransform;
+    // ========================================================================
+    // Component Snapshot Command (generic component edits/add/remove)
+    // ========================================================================
 
-        bool m_hasLayer = false;
-        ECS::Components::Layer m_savedLayer;
+    class EntityComponentsSnapshotCommand : public ICommand {
+    public:
+        EntityComponentsSnapshotCommand(
+            ECS::World* world,
+            ECS::Entity entity,
+            std::vector<ECS::SerializedComponent> before,
+            std::vector<ECS::SerializedComponent> after
+        );
 
-        bool m_hasName = false;
-        ECS::Components::Name m_savedName;
+        void Execute() override;
+        void Undo() override;
 
-        bool m_hasActive = false;
-        ECS::Components::Active m_savedActive;
-        
-        bool m_hasSprite = false;
-        ECS::Components::SpriteRenderer2D m_savedSprite;
-
-        bool m_hasBox = false;
-        ECS::Components::ShapeBox2D m_savedBox;
-
-        bool m_hasCircle = false;
-        ECS::Components::ShapeCircle2D m_savedCircle;
+    private:
+        ECS::World* m_world;
+        ECS::Entity m_entity;
+        std::vector<ECS::SerializedComponent> m_before;
+        std::vector<ECS::SerializedComponent> m_after;
     };
 
     // ========================================================================

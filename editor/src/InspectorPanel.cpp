@@ -166,6 +166,30 @@ namespace {
         sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
         sprite->Offset = Vector2D{ u0, v0 };
     }
+
+    bool SnapshotsEqual(const std::vector<ECS::SerializedComponent>& a,
+        const std::vector<ECS::SerializedComponent>& b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+
+        auto sortById = [](const ECS::SerializedComponent& lhs, const ECS::SerializedComponent& rhs) {
+            return lhs.Id < rhs.Id;
+        };
+
+        std::vector<ECS::SerializedComponent> left = a;
+        std::vector<ECS::SerializedComponent> right = b;
+        std::sort(left.begin(), left.end(), sortById);
+        std::sort(right.begin(), right.end(), sortById);
+
+        for (size_t i = 0; i < left.size(); ++i) {
+            if (left[i].Id != right[i].Id || left[i].Data != right[i].Data) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
 
 namespace {
@@ -304,6 +328,8 @@ void InspectorPanel::InspectEntity(EntityId id) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
         m_editState.isEditing = false; // Reset edit state
+        m_editState.startComponents.clear();
+        m_editState.hasSnapshot = false;
         return;
     }
 
@@ -315,6 +341,8 @@ void InspectorPanel::InspectEntity(EntityId id) {
     if (previousId != id) {
         m_editState.isEditing = false;
         m_editState.entityId = 0;
+        m_editState.startComponents.clear();
+        m_editState.hasSnapshot = false;
     }
 
     m_entityId = id;
@@ -345,6 +373,11 @@ void InspectorPanel::InspectEntity(EntityId id) {
 
 // Load a prefab file from disk and switch into prefab editing mode
 void InspectorPanel::InspectPrefab(const std::string& path) {
+    m_editState.isEditing = false;
+    m_editState.entityId = 0;
+    m_editState.startComponents.clear();
+    m_editState.hasSnapshot = false;
+
     // Usual checks
     if (path.empty()) {
         m_statusMessage = "Failed: No prefab path";
@@ -426,6 +459,8 @@ void InspectorPanel::ClearSelection() {
     m_entityId = 0;
     m_editState.isEditing = false;
     m_editState.entityId = 0;
+    m_editState.startComponents.clear();
+    m_editState.hasSnapshot = false;
     m_prefabPath.clear();
     m_prefabData = {};
     m_componentsToDelete.clear();
@@ -443,6 +478,18 @@ void InspectorPanel::Render() {
     // Window name changes depending on what we are editing
     const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
+
+    // Keyboard shortcuts for common inspector actions
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput) {
+        const ImGuiIO& io = ImGui::GetIO();
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F, false)) {
+            m_focusComponentFilter = true; // Focus component/property filter
+        }
+        if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false)) {
+            m_openAddComponentPopup = true; // Open Add Component popup
+            m_focusAddComponentSearch = true; // Focus search input inside popup
+        }
+    }
 
     if (m_mode == InspectionMode::None) {
         ImGui::TextDisabled("No selection");
@@ -501,30 +548,26 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     ImGui::TextDisabled("%s (ID: %u)", entityName.c_str(), (unsigned)m_entityId);
 
     // If this entity came from a prefab show the link and an Open Prefab button
-    if (Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
-        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
-        if (!meta) {
-            ImGui::Separator();
-            return;
-        }
+    if (m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
         ImGui::Separator();
         ImGui::Text("Prefab Instance");
 
         // Show the prefab path (looked up from PrefabManager)
         std::string prefabPath;
         if (m_prefabManager) {
-            prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
+            prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
         }
         
         ImGui::SameLine();
         if (!prefabPath.empty()) {
             ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
         } else {
-            ImGui::TextDisabled("0x%08X", meta->PrefabHash);
+            ImGui::TextDisabled("0x%08X", meta.PrefabHash);
         }
 
         // Show modification indicator if modified
-        if (PrefabUtils::IsModified(*meta)) {
+        if (PrefabUtils::IsModified(meta)) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Modified)");
         }
@@ -560,9 +603,15 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                 // Only allow .prefab files to be dropped here
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
                     // Add PrefabInstanceMetadata with registered hash
-                    uint32_t hash = ECS::PrefabManager::ComputeHash(
-                        ECS::PrefabManager::NormalizePath(droppedPath)
-                    );
+                    uint32_t hash = 0;
+                    if (m_prefabManager) {
+                        hash = m_prefabManager->RegisterPrefab(droppedPath);
+                        m_prefabManager->TrackInstance(entity, hash);
+                    } else {
+                        hash = ECS::PrefabManager::ComputeHash(
+                            ECS::PrefabManager::NormalizePath(droppedPath)
+                        );
+                    }
 
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
@@ -587,9 +636,15 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     if (std::filesystem::path(path).extension() != ".prefab") continue;
 
                     // Add PrefabInstanceMetadata with registered hash
-                    uint32_t hash = ECS::PrefabManager::ComputeHash(
-                        ECS::PrefabManager::NormalizePath(path)
-                    );
+                    uint32_t hash = 0;
+                    if (m_prefabManager) {
+                        hash = m_prefabManager->RegisterPrefab(path);
+                        m_prefabManager->TrackInstance(entity, hash);
+                    } else {
+                        hash = ECS::PrefabManager::ComputeHash(
+                            ECS::PrefabManager::NormalizePath(path)
+                        );
+                    }
 
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
@@ -613,6 +668,16 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     // Footer needs 2 lines: one for button row, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
+    // Component/property filter input for the inspector list
+    if (m_focusComponentFilter) {
+        ImGui::SetKeyboardFocusHere();
+        m_focusComponentFilter = false;
+    }
+    ImGui::SetNextItemWidth(240.0f);
+    if (ImGui::InputTextWithHint("##ComponentFilter", "Filter components/fields...", m_componentFilterBuffer, sizeof(m_componentFilterBuffer))) {
+        m_componentFilter = m_componentFilterBuffer;
+    }
+
     // Use smaller padding inside the scrolling region for components
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("EntityComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
@@ -635,24 +700,18 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         // Track which components were actually modified this frame
         std::unordered_set<std::string> modifiedComponents;
 
-        // Capture initial state when starting to edit
-        if (!m_editState.isEditing) {
-            // Check if any ImGui widget is active (isit being edited?)
-            if (ImGui::IsAnyItemActive()) {
-                m_editState.isEditing = true;
-                m_editState.entityId = entity.Index;
+        // Apply property filter so per-field rows can be narrowed
+        if (m_componentFilter.empty()) {
+            EditorUI::ClearPropertyFilter();
+        } else {
+            EditorUI::SetPropertyFilter(m_componentFilter);
+        }
 
-                // Capture initial transform state
-                if (Editor::ECSUtils::HasComponent(m_world, entity, "LocalTransform")) {
-                    const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
-                    if (!lt) {
-                        return;
-                    }
-                    m_editState.startPosition = lt->Position;
-                    m_editState.startRotation = lt->Rotation;
-                    m_editState.startScale = lt->Scale;
-                }
-            }
+        // Precompute the component name/type filter once per frame
+        std::string filterLower;
+        if (!m_componentFilter.empty()) {
+            filterLower = m_componentFilter;
+            std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         }
 
         // First pass: draw every component using registry metadata
@@ -674,10 +733,23 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
                 size_t hashBefore = std::hash<std::string>{}(data.dump());
 
+                // Component name filter to reduce noise in long inspectors
+                if (!filterLower.empty()) {
+                    std::string nameLower = meta->DisplayName;
+                    std::string typeLower = meta->TypeName;
+                    std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (nameLower.find(filterLower) == std::string::npos && typeLower.find(filterLower) == std::string::npos) {
+                        continue;
+                    }
+                }
+
+                const nlohmann::json defaults = meta->GetDefaults(); // Defaults used for reset + per-field reset
+
                 // UI renderer callback: InspectorPanel calls this and forwards to ComponentWidgets
                 // via the ComponentUI helper to draw the actual fields
                 _renderComponentSection(meta->DisplayName, meta->TypeName, data,
-                    [this, meta, entity](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, entity, m_world); }, meta->CanDelete);
+                    [this, meta, entity](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, entity, m_world); }, meta->CanDelete, &defaults);
 
                 size_t hashAfter = std::hash<std::string>{}(data.dump());
 
@@ -693,6 +765,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                 ImGui::Dummy(ImVec2(0, 4));
             }
         }
+
+        // Clear the property filter after rendering component rows
+        EditorUI::ClearPropertyFilter();
 
         // Process deferred deletions after UI loop so we don't mutate while iterating
         // Also remove deleted components from the JSON buffer so they are not re-applied below
@@ -731,6 +806,17 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         m_componentsToDelete.clear();
 
+        if (!m_editState.isEditing && ImGui::IsAnyItemActive()) {
+            m_editState.isEditing = true;
+            m_editState.entityId = entity.Index;
+
+            // Snapshot current component state before edits begin.
+            if (m_undoSystem) {
+                m_editState.startComponents = m_world->CaptureEntityComponents(entity);
+                m_editState.hasSnapshot = true;
+            }
+        }
+
         // Keep sprite preview in sync even when the animation UI is collapsed.
         UpdateSpriteAnimationPreview(m_world, entity);
 
@@ -766,43 +852,20 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         // Record undo when editing finishes
         if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
-            // Editing just finished - record the change
-            if (m_undoSystem && Editor::ECSUtils::HasComponent(m_world, entity, "LocalTransform")) {
-                const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
-                if (!lt) {
-                    return;
-                }
-
-                // Use epsilon comparison for floating point values to avoid spurious undo records
-                constexpr float EPSILON = 0.0001f;
-                auto vec3Changed = [EPSILON](const Vector3D& a, const Vector3D& b) {
-                    return (std::abs(a.X - b.X) > EPSILON || 
-                            std::abs(a.Y - b.Y) > EPSILON || 
-                            std::abs(a.Z - b.Z) > EPSILON);
-                };
-                auto quatChanged = [EPSILON](const Quaternion& a, const Quaternion& b) {
-                    return (std::abs(a.W - b.W) > EPSILON || 
-                            std::abs(a.X - b.X) > EPSILON || 
-                            std::abs(a.Y - b.Y) > EPSILON || 
-                            std::abs(a.Z - b.Z) > EPSILON);
-                };
-
-                // Only record if something actually changed beyond floating point precision
-                bool posChanged = vec3Changed(m_editState.startPosition, lt->Position);
-                bool rotChanged = quatChanged(m_editState.startRotation, lt->Rotation);
-                bool scaleChanged = vec3Changed(m_editState.startScale, lt->Scale);
-
-                if (posChanged || rotChanged || scaleChanged) {
-                    m_undoSystem->RecordTransformChange(
-                        entity.Index,
-                        m_editState.startPosition, m_editState.startRotation, m_editState.startScale,
-                        lt->Position, lt->Rotation, lt->Scale
+            if (m_undoSystem && m_editState.hasSnapshot) {
+                // Capture post-edit state and push a generic snapshot command.
+                auto endSnapshot = m_world->CaptureEntityComponents(entity);
+                if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
+                    auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                        m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)
                     );
-                    LOG_DEBUG("[Inspector] Recorded transform change for undo");
+                    m_undoSystem->ExecuteCommand(std::move(command));
                 }
             }
 
             m_editState.isEditing = false;
+            m_editState.hasSnapshot = false;
+            m_editState.startComponents.clear();
         }
 
         // MARK SCENE AS DIRTY if anything was edited
@@ -818,6 +881,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
     ImGui::EndChild();
     ImGui::PopStyleVar();
+
+    // Render any drag/drop validation feedback triggered by component fields
+    m_componentUI.RenderAssetDropFeedbackPopup();
 }
 
 // Renders the Add Component button row at the bottom of the inspector
@@ -825,6 +891,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
     // Button to open the Add Component popup menu
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
+        m_focusAddComponentSearch = true; // Focus search when the button opens the popup
     }
 
     // Button to save this entity and its components as a prefab
@@ -834,6 +901,10 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
     }
 
     // Popup menu listing all available components from the registry
+    if (m_openAddComponentPopup) {
+        ImGui::OpenPopup("AddComponentMenu");
+        m_openAddComponentPopup = false;
+    }
     if (ImGui::BeginPopup("AddComponentMenu")) {
         ImGui::PushFont(m_boldFont);
         ImGui::Text("Components");
@@ -846,7 +917,11 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             m_addComponentSearchFilter.clear();
         }
 
-        // Search input
+        // Search input (auto-focused when popup opens)
+        if (m_focusAddComponentSearch || ImGui::IsWindowAppearing()) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusAddComponentSearch = false;
+        }
         if (ImGui::InputTextWithHint("##AddCompSearch", "Search...", m_addComponentSearchBuffer, sizeof(m_addComponentSearchBuffer))) {
             m_addComponentSearchFilter = m_addComponentSearchBuffer;
         }
@@ -952,6 +1027,16 @@ void InspectorPanel::_renderPrefabComponents() {
     // Footer needs 2 lines: one for buttons, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
+    // Component/property filter input for prefab inspector list
+    if (m_focusComponentFilter) {
+        ImGui::SetKeyboardFocusHere();
+        m_focusComponentFilter = false;
+    }
+    ImGui::SetNextItemWidth(240.0f);
+    if (ImGui::InputTextWithHint("##ComponentFilterPrefab", "Filter components/fields...", m_componentFilterBuffer, sizeof(m_componentFilterBuffer))) {
+        m_componentFilter = m_componentFilterBuffer;
+    }
+
     // Use smaller padding inside the scrolling region for components
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
@@ -966,6 +1051,13 @@ void InspectorPanel::_renderPrefabComponents() {
 
     ImGui::Dummy(ImVec2(0, 4));
     auto& components = m_prefabData["Components"];
+
+    // Apply property filter so per-field rows can be narrowed
+    if (m_componentFilter.empty()) {
+        EditorUI::ClearPropertyFilter();
+    } else {
+        EditorUI::SetPropertyFilter(m_componentFilter);
+    }
 
     // SORT COMPONENTS: Transform first, then alphabetical by TypeName
     // Create a sorted list of indices so we don't modify the actual JSON array order
@@ -1018,6 +1110,11 @@ void InspectorPanel::_renderPrefabComponents() {
     });
 
     // Draw each component in sorted order using metadata rules
+    std::string filterLower;
+    if (!m_componentFilter.empty()) {
+        filterLower = m_componentFilter;
+        std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    }
     for (size_t idx : sortedIndices) {
         auto& componentEntry = components[idx];
 
@@ -1029,17 +1126,33 @@ void InspectorPanel::_renderPrefabComponents() {
         const auto* meta = ComponentRegistryUI::Find(typeName);
         if (!meta) continue;
 
+        // Component name filter to reduce noise in long inspectors
+        if (!filterLower.empty()) {
+            std::string nameLower = meta->DisplayName;
+            std::string typeLower = meta->TypeName;
+            std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (nameLower.find(filterLower) == std::string::npos && typeLower.find(filterLower) == std::string::npos) {
+                continue;
+            }
+        }
+
         // Render a collapsible UI section for this component
         // After any edit we call _savePrefabData so the file updates immediately
         auto& data = componentEntry["Data"];
+        const nlohmann::json defaults = meta->GetDefaults(); // Defaults used for reset + per-field reset
         _renderComponentSection(meta->DisplayName, meta->TypeName, data,
             // UI renderer callback: InspectorPanel forwards JSON to ComponentWidgets
             // Prefabs do not have live ECS so we save as soon as data changes
             [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, ECS::Entity{}, nullptr); _savePrefabData(); },
-            meta->CanDelete
+            meta->CanDelete,
+            &defaults
         );
         ImGui::Dummy(ImVec2(0, 4));
     }
+
+    // Clear the property filter after rendering component rows
+    EditorUI::ClearPropertyFilter();
 
     // Process deferred deletions
     for (const auto& componentType : m_componentsToDelete) {
@@ -1049,6 +1162,9 @@ void InspectorPanel::_renderPrefabComponents() {
 
     ImGui::EndChild();
     ImGui::PopStyleVar();
+
+    // Render any drag/drop validation feedback triggered by prefab fields
+    m_componentUI.RenderAssetDropFeedbackPopup();
 }
 
 // Renders the action row shown when editing a prefab
@@ -1058,9 +1174,14 @@ void InspectorPanel::_renderPrefabActions() {
     // Button to open the Add Component popup for prefabs
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
+        m_focusAddComponentSearch = true; // Focus search when the button opens the popup
     }
 
     // Popup list of components that can be added to the prefab
+    if (m_openAddComponentPopup) {
+        ImGui::OpenPopup("AddComponentMenu");
+        m_openAddComponentPopup = false;
+    }
     if (ImGui::BeginPopup("AddComponentMenu")) {
         ImGui::PushFont(m_boldFont);
         ImGui::Text("Components");
@@ -1073,7 +1194,11 @@ void InspectorPanel::_renderPrefabActions() {
             m_addComponentSearchFilter.clear();
         }
 
-        // Search input
+        // Search input (auto-focused when popup opens)
+        if (m_focusAddComponentSearch || ImGui::IsWindowAppearing()) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusAddComponentSearch = false;
+        }
         if (ImGui::InputTextWithHint("##AddCompSearchPrefab", "Search...", m_addComponentSearchBuffer, sizeof(m_addComponentSearchBuffer))) {
             m_addComponentSearchFilter = m_addComponentSearchBuffer;
         }
@@ -1185,11 +1310,17 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return false;
 
+    std::vector<ECS::SerializedComponent> beforeSnapshot;
+    if (m_undoSystem) {
+        // Capture full entity state so add/remove can be undone as a single step.
+        beforeSnapshot = m_world->CaptureEntityComponents(entity);
+    }
+
     // Shape components are mutually exclusive
     if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
-        _removeComponentFromEntity("ShapeCircle2D");
-        _removeComponentFromEntity("ShapeBox2D");
-        _removeComponentFromEntity("ShapeLine2D");
+        _removeComponentFromEntity("ShapeCircle2D", false);
+        _removeComponentFromEntity("ShapeBox2D", false);
+        _removeComponentFromEntity("ShapeLine2D", false);
     }
 
     // Look up this component's metadata so we know how to create it
@@ -1222,19 +1353,37 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
 
         // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);
+
+        if (m_undoSystem) {
+            // Record a snapshot diff for undo/redo of the add operation.
+            auto afterSnapshot = m_world->CaptureEntityComponents(entity);
+            if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
+                auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                    m_world, entity, std::move(beforeSnapshot), std::move(afterSnapshot)
+                );
+                m_undoSystem->ExecuteCommand(std::move(command));
+            }
+        }
+
         return true;
     }
     return false;
 }
 
 // Remove a component from the entity unless it is the Transform which must always exist
-void InspectorPanel::_removeComponentFromEntity(const std::string& componentType) {
+void InspectorPanel::_removeComponentFromEntity(const std::string& componentType, bool recordUndo) {
     if (!m_world) return;
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return;
 
     // Transform and Layer cannot be removed
     if (componentType == "LocalTransform" || componentType == "Layer") return;
+
+    std::vector<ECS::SerializedComponent> beforeSnapshot;
+    if (recordUndo && m_undoSystem) {
+        // Capture full entity state so removal can be undone cleanly.
+        beforeSnapshot = m_world->CaptureEntityComponents(entity);
+    }
 
     // // Look up this component's metadata
     const auto* meta = ComponentRegistryUI::Find(componentType);
@@ -1246,6 +1395,17 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
 
         // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);
+
+        if (recordUndo && m_undoSystem) {
+            // Record a snapshot diff for undo/redo of the removal.
+            auto afterSnapshot = m_world->CaptureEntityComponents(entity);
+            if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
+                auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                    m_world, entity, std::move(beforeSnapshot), std::move(afterSnapshot)
+                );
+                m_undoSystem->ExecuteCommand(std::move(command));
+            }
+        }
     }
 }
 

@@ -1221,6 +1221,50 @@ namespace ECS {
         }
 
         /**
+         * @brief Get the first child of a parent entity, or NULL_ENTITY if none.
+         * @param parent The parent entity whose first child will be retrieved
+         * @return ECS::Entity The first child entity, or NULL_ENTITY if no children
+         * @note Assumes the parent entity is alive
+         */
+        Entity FirstChildOf(const Entity parent) const {
+            const auto it = m_hierarchy.FirstChild.find(parent);
+            return it == m_hierarchy.FirstChild.end() ? NULL_ENTITY : it->second;
+        }
+
+        /**
+         * @brief Get the next sibling of a child entity, or NULL_ENTITY if none.
+         * @param child The child entity whose next sibling will be retrieved
+         * @return ECS::Entity The next sibling entity, or NULL_ENTITY if no next sibling
+         * @note Assumes the child entity is alive
+         */
+        Entity NextSiblingOf(const Entity child) const {
+            const auto it = m_hierarchy.NextSibling.find(child);
+            return it == m_hierarchy.NextSibling.end() ? NULL_ENTITY : it->second;
+        }
+
+        /**
+         * @brief Get the number of direct children a parent entity has.
+         * @param parent The parent entity to count children for
+         * @return int Number of direct children
+         * @note Assumes the parent entity is alive
+         */
+        int ChildCountOf(const Entity parent) const {
+            int count = 0;
+            const auto it = m_hierarchy.FirstChild.find(parent);
+            if (it == m_hierarchy.FirstChild.end())
+                return 0;
+
+            Entity c = it->second;
+            while (!c.IsNull()) {
+                ++count;
+                auto itN = m_hierarchy.NextSibling.find(c);
+                c = itN == m_hierarchy.NextSibling.end() ? NULL_ENTITY : itN->second;
+            }
+
+            return count;
+        }
+
+        /**
 		 * @brief Clone an alive entity, copying all its components.
 		 * @param src Source entity to clone
 		 * @param opts Optionally, adjust how certain components are handled during cloning

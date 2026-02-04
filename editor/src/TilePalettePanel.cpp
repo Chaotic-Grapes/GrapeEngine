@@ -8,16 +8,64 @@
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
 #include "../include/core/World/TileTypes.hpp"
+#include <cstring>
 
 // Assuming ImGui::ImageButton takes ImTextureID (void*)
 // Tileset::GetTextureId() returns uint32_t (OpenGL ID).
 // We cast it to ImTextureID.
 
+namespace {
+    // Extract the first path from the ASSET_PATHS payload format.
+    std::string ParseFirstAssetPath(const ImGuiPayload* payload) {
+        if (!payload || !payload->Data || payload->DataSize == 0) {
+            return std::string();
+        }
+
+        const char* data = static_cast<const char*>(payload->Data);
+        const char* end = data + payload->DataSize;
+        if (data >= end) {
+            return std::string();
+        }
+
+        // Payload is a sequence of null-terminated strings; take the first.
+        return std::string(data);
+    }
+}
+
 void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world)
 {
-    m_tileMap = tileMap;
-    m_tileset = tileset;
-    m_world = world;
+    m_world = world; // Store world pointer for physics syncing.
+    // Initialize editing context in one place so state resets stay consistent.
+    SetEditingContext(tileMap, tileset, std::string());
+}
+
+void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
+{
+    if (m_assetDropCallback) {
+        // Forward asset path to the editor-level handler.
+        m_assetDropCallback(assetPath);
+    }
+}
+
+void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, const std::string& tileMapPath)
+{
+    // Remove any cached physics entities tied to the previous map.
+    if (m_world) {
+        for (const auto& [key, entity] : m_physicsEntities) {
+            (void)key; // Suppress unused warning for the map key.
+            if (m_world->IsAlive(entity)) {
+                m_world->Destroy(entity); // Clean up physics entities spawned by the old map.
+            }
+        }
+    }
+
+    m_physicsEntities.clear(); // Reset cached physics entity map.
+    m_tileMap = tileMap; // Assign the new active tilemap.
+    m_tileset = tileset; // Assign the new active tileset.
+    m_tileMapPath = tileMapPath; // Track map path for auto-save on edits.
+    m_selectedTileID = 0; // Reset tile selection when swapping tilesets.
+    m_currentRotation = 0; // Reset rotation to default.
+    m_isEraser = false; // Reset eraser toggle.
 }
 
 void TilePalettePanel::Render()
@@ -29,6 +77,15 @@ void TilePalettePanel::Render()
         if (!m_tileset)
         {
             ImGui::Text("No Tileset Loaded");
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const std::string assetPath = ParseFirstAssetPath(payload);
+                    if (!assetPath.empty()) {
+                        HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
             ImGui::End();
             return;
         }
@@ -59,6 +116,9 @@ void TilePalettePanel::Render()
         for (const auto& [id, def] : tiles)
         {
             ImGui::PushID(id);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Remove tile button background.
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0)); // Keep hover background transparent.
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0)); // Keep active background transparent.
             
             // Calculate UVs for ImageButton
             ImVec2 uv0(def.uv.u0, def.uv.v1); // ImGui uses top-left origin? 
@@ -74,11 +134,6 @@ void TilePalettePanel::Render()
             ImVec2 imUV1(def.uv.u1, def.uv.v0);
 
             // Highlight selected
-            if (m_selectedTileID == id && !m_isEraser)
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 0.0f, 0.5f));
-            }
-
             std::string strId = "Tile_" + std::to_string(id);
             if (ImGui::ImageButton(strId.c_str(),(ImTextureID)(uintptr_t)m_tileset->GetTextureId(), ImVec2(buttonSize, buttonSize), imUV0, imUV1))
             {
@@ -86,9 +141,16 @@ void TilePalettePanel::Render()
                 m_isEraser = false;
             }
 
-            if (m_selectedTileID == id && !m_isEraser)
-            {
-                ImGui::PopStyleColor();
+            const bool isHovered = ImGui::IsItemHovered(); // Track hover state for custom border drawing.
+            const bool isSelected = (m_selectedTileID == id && !m_isEraser); // Track selection state for border.
+            if (isHovered || isSelected) {
+                // Draw a colored border instead of changing button background.
+                const ImU32 borderColor = isSelected
+                    ? ImGui::GetColorU32(ImVec4(1.0f, 0.85f, 0.15f, 1.0f))
+                    : ImGui::GetColorU32(ImVec4(0.65f, 0.75f, 0.95f, 0.85f));
+                const ImVec2 min = ImGui::GetItemRectMin();
+                const ImVec2 max = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddRect(min, max, borderColor, 0.0f, 0, 2.0f);
             }
 
             float lastButtonX = ImGui::GetItemRectMax().x;
@@ -96,6 +158,7 @@ void TilePalettePanel::Render()
             if (i + 1 < tiles.size() && nextButtonX < windowVisibleX)
                 ImGui::SameLine();
 
+            ImGui::PopStyleColor(3);
             ImGui::PopID();
             i++;
         }
@@ -104,6 +167,27 @@ void TilePalettePanel::Render()
         if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_R))
         {
              m_currentRotation = (m_currentRotation + 1) % 4;
+        }
+
+        // Allow drag-and-drop of assets directly onto the palette window.
+        const ImVec2 contentMinLocal = ImGui::GetWindowContentRegionMin(); // Content region min (local).
+        const ImVec2 contentMaxLocal = ImGui::GetWindowContentRegionMax(); // Content region max (local).
+        const ImVec2 contentSize(contentMaxLocal.x - contentMinLocal.x, contentMaxLocal.y - contentMinLocal.y);
+        if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
+            const ImVec2 cursorPos = ImGui::GetCursorPos(); // Cache cursor in local coordinates.
+            ImGui::SetCursorPos(contentMinLocal);
+            ImGui::SetNextItemAllowOverlap(); // Keep the invisible target from blocking palette interaction.
+            ImGui::InvisibleButton("##TilePaletteDropTarget", contentSize);
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const std::string assetPath = ParseFirstAssetPath(payload);
+                    if (!assetPath.empty()) {
+                        HandleAssetDrop(assetPath); // Let the editor resolve the tileset + tilemap.
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+            ImGui::SetCursorPos(cursorPos);
         }
     }
     ImGui::End();
@@ -119,6 +203,11 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
         m_currentRotation = (m_currentRotation + 1) % 4;
     }
 
+    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
+        // TileMap::WorldToTile asserts on negative coordinates; skip out-of-bounds positions.
+        return;
+    }
+
     uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
     uint32_t ty = m_tileMap->WorldToTile(worldPos.y);
 
@@ -132,8 +221,24 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
         if (r) {
             glm::vec2 min(tilePos.x, tilePos.y);
             glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
-            glm::vec4 color = m_isEraser ? glm::vec4(1.0f, 0.0f, 0.0f, 0.4f) : glm::vec4(1.0f, 1.0f, 1.0f, 0.4f);
-            DebugDraw2D::RectFill(*r, min, max, color, 0);
+            if (m_isEraser) {
+                glm::vec4 color(1.0f, 0.0f, 0.0f, 0.35f); // Red translucent preview for eraser.
+                DebugDraw2D::RectFill(*r, min, max, color, 0);
+                return;
+            }
+
+            TileUV uv;
+            if (!m_tileset->GetTileUV(m_selectedTileID, uv)) {
+                glm::vec4 color(1.0f, 1.0f, 1.0f, 0.25f); // Fallback to a light fill if UV is missing.
+                DebugDraw2D::RectFill(*r, min, max, color, 0);
+                return;
+            }
+
+            const glm::vec4 uvRect(uv.u0, uv.v0, uv.u1, uv.v1); // Pack UVs for submitQuad.
+            const glm::vec2 center(tilePos.x + size.x * 0.5f, tilePos.y + size.y * 0.5f);
+            const glm::vec4 tint(1.0f, 1.0f, 1.0f, 0.5f); // Translucent tile preview.
+            const float rotation = static_cast<float>(m_currentRotation) * 1.57079632679f;
+            r->submitQuad(center, size, m_tileset->GetTextureId(), uvRect, tint, rotation, 1.0f, 0);
         }
     }
 }
@@ -141,6 +246,11 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
 bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightClick)
 {
     if (!m_tileMap || !m_tileset) return false;
+
+    if (worldPos.x < 0.0f || worldPos.y < 0.0f) {
+        // TileMap::WorldToTile asserts on negative coordinates; ignore clicks outside the map quadrant.
+        return false;
+    }
 
     uint32_t tx = m_tileMap->WorldToTile(worldPos.x);
     uint32_t ty = m_tileMap->WorldToTile(worldPos.y);
@@ -163,6 +273,11 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
         TileID packed = PackTile(m_selectedTileID, m_currentRotation);
         m_tileMap->SetTile(0, tx, ty, packed);
         SyncPhysics(tx, ty, packed, false);
+    }
+
+    if (!m_tileMapPath.empty()) {
+        // Persist edits immediately so the tilemap asset stays in sync.
+        m_tileMap->SaveMap(m_tileMapPath);
     }
 
     return true;

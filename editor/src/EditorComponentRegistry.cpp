@@ -47,6 +47,7 @@ namespace {
     const uint32_t kHashCamera3D = Editor::ECSUtils::FNV1aHash("Camera3D");
     const uint32_t kHashSpriteRenderer2D = Editor::ECSUtils::FNV1aHash("SpriteRenderer2D");
     const uint32_t kHashSpriteSheetAnimation2D = Editor::ECSUtils::FNV1aHash("SpriteSheetAnimation2D");
+    const uint32_t kHashTileMapComponent = Editor::ECSUtils::FNV1aHash("TileMapComponent");
     const uint32_t kHashZIndex2D = Editor::ECSUtils::FNV1aHash("ZIndex2D");
     const uint32_t kHashRigidbody2D = Editor::ECSUtils::FNV1aHash("Rigidbody2D");
     const uint32_t kHashLinearVelocity2D = Editor::ECSUtils::FNV1aHash("LinearVelocity2D");
@@ -185,6 +186,11 @@ Without these, the macro would end early and break the expansion
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteRenderer2D, "SpriteRenderer2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
+            // Use the generic JSON renderer for now (tilemap UI can be specialized later).
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); };
         }
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"); id != ECS::NULL_COMPONENT_ID) {
@@ -333,6 +339,22 @@ Without these, the macro would end early and break the expansion
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"Width", 0}, {"Height", 0}
             }; 
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
+            // Provide sane defaults for new tilemap components.
+            defaults[id] = []() {
+                return nlohmann::json{
+                    {"TileMapPath", ""},
+                    {"TilesetTexturePath", ""},
+                    {"TileWorldSize", 1.0f},
+                    {"TilePixelSize", 32},
+                    {"DefaultWidth", 64},
+                    {"DefaultHeight", 64},
+                    {"LayerIndex", 0},
+                    {"Visible", true}
+                };
             };
         }
         
@@ -629,6 +651,23 @@ static void _initializeDefaultRegistry() {
                 {"Width", 0}, {"Height", 0}
             }; }),
             COMPONENT_OPS_HASH(SpriteRenderer2D, kHashSpriteRenderer2D)
+        },
+        // Tile Map (stores asset paths + sizing; editing handled by Tile Palette)
+        {
+            "Tile Map", "TileMapComponent", "ECS::Components::TileMapComponent",
+            GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"), kHashTileMapComponent, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                {"TileMapPath", ""},
+                {"TilesetTexturePath", ""},
+                {"TileWorldSize", 1.0f},
+                {"TilePixelSize", 32},
+                {"DefaultWidth", 64},
+                {"DefaultHeight", 64},
+                {"LayerIndex", 0},
+                {"Visible", true}
+            }; }),
+            COMPONENT_OPS_HASH(TileMapComponent, kHashTileMapComponent)
         },
         // Sprite Sheet Animation 2D
         {

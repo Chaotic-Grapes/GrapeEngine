@@ -169,7 +169,8 @@ void Playback::Render() {
 
         bool clicked = false;
         ImGui::PushFont(m_symbolsFont);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 4.0f));
+        // Remove padding inside playback control icon buttons
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
         clicked = ImGui::Button(icon, size);
         ImGui::PopStyleVar(2);
