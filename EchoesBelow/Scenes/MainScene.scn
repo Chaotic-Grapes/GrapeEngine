@@ -219,7 +219,7 @@
                         "EnableFadeIn": true,
                         "EnableFadeOut": true,
                         "FadeInDuration": 4.0,
-                        "FadeOutDuration": 4.0,
+                        "FadeOutDuration": 2.0,
                         "Loop": true,
                         "Pan": 0.0,
                         "Pitch": 1.0,
@@ -9816,22 +9816,6 @@
     "EntityCount": 100,
     "Hierarchy": [
         {
-            "child": 41,
-            "parent": 36
-        },
-        {
-            "child": 42,
-            "parent": 36
-        },
-        {
-            "child": 43,
-            "parent": 36
-        },
-        {
-            "child": 44,
-            "parent": 36
-        },
-        {
             "child": 18,
             "parent": 8
         },
@@ -9906,6 +9890,50 @@
         {
             "child": 35,
             "parent": 8
+        },
+        {
+            "child": 41,
+            "parent": 36
+        },
+        {
+            "child": 42,
+            "parent": 36
+        },
+        {
+            "child": 43,
+            "parent": 36
+        },
+        {
+            "child": 44,
+            "parent": 36
+        },
+        {
+            "child": 79,
+            "parent": 77
+        },
+        {
+            "child": 7,
+            "parent": 6
+        },
+        {
+            "child": 93,
+            "parent": 90
+        },
+        {
+            "child": 97,
+            "parent": 95
+        },
+        {
+            "child": 86,
+            "parent": 84
+        },
+        {
+            "child": 94,
+            "parent": 90
+        },
+        {
+            "child": 87,
+            "parent": 84
         },
         {
             "child": 12,
@@ -10074,34 +10102,6 @@
         {
             "child": 56,
             "parent": 45
-        },
-        {
-            "child": 79,
-            "parent": 77
-        },
-        {
-            "child": 7,
-            "parent": 6
-        },
-        {
-            "child": 93,
-            "parent": 90
-        },
-        {
-            "child": 97,
-            "parent": 95
-        },
-        {
-            "child": 86,
-            "parent": 84
-        },
-        {
-            "child": 94,
-            "parent": 90
-        },
-        {
-            "child": 87,
-            "parent": 84
         },
         {
             "child": 65,

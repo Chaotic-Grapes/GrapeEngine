@@ -2,6 +2,8 @@ using System;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
+using GrapeEngine.Scripting.Gameplay;
+using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 
@@ -26,6 +28,7 @@ public record struct BarnacleSnatcherComponent
     public BarnacleState State;
     public bool IsInRange;
     public int OverlapCount;
+    public ulong BrainHandle;
 }
 
 public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
@@ -70,37 +73,94 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             ref var ai = ref result.Component1;
             ref var anim = ref result.Component2;
             ref var state = ref result.Component3;
+            Brain brain = GetOrCreateBrain(ref ai);
 
-            if (ai.State == BarnacleState.Attack)
+            brain.Update(Time.DeltaTime);
+
+            nint currentState = brain.GetCurrentState();
+            nint attackState = brain.GetAttackState();
+            nint patrolState = brain.GetPatrolState();
+            bool isAttackState = currentState == attackState;
+
+            if (isAttackState)
             {
                 if (state.Finished)
                 {
                     if (ai.IsInRange)
                     {
-                        SetAttack(ref ai, ref anim, ref state);
+                        currentState = TransitionIfDifferent(brain, currentState, attackState);
                     }
                     else
                     {
-                        SetIdle(ref ai, ref anim, ref state);
+                        currentState = TransitionIfDifferent(brain, currentState, patrolState);
                     }
                 }
                 else if (!ai.IsInRange && ai.AttackLoop)
                 {
-                    SetIdle(ref ai, ref anim, ref state);
+                    currentState = TransitionIfDifferent(brain, currentState, patrolState);
                 }
             }
             else
             {
                 if (ai.IsInRange)
                 {
-                    SetAttack(ref ai, ref anim, ref state);
-                }
-                else
-                {
-                    EnsureIdle(ref ai, ref anim, ref state);
+                    currentState = TransitionIfDifferent(brain, currentState, attackState);
                 }
             }
+
+            isAttackState = currentState == attackState;
+            if (isAttackState)
+            {
+                SetAttack(ref ai, ref anim, ref state);
+            }
+            else
+            {
+                EnsureIdle(ref ai, ref anim, ref state);
+            }
         }
+    }
+
+    protected override void OnDestroy()
+    {
+        if (World == null)
+        {
+            return;
+        }
+
+        foreach (var result in World.Query<BarnacleSnatcherComponent>())
+        {
+            ref var ai = ref result.Component1;
+            if (ai.BrainHandle == 0)
+            {
+                continue;
+            }
+
+            Brain.DestroyHandle((nint)ai.BrainHandle);
+            ai.BrainHandle = 0;
+        }
+    }
+
+    private static Brain GetOrCreateBrain(ref BarnacleSnatcherComponent ai)
+    {
+        if (ai.BrainHandle == 0)
+        {
+            Brain created = Brain.Create();
+            ai.BrainHandle = (ulong)created.Handle;
+            return created;
+        }
+
+        return Brain.FromHandle((nint)ai.BrainHandle);
+    }
+
+    private static nint TransitionIfDifferent(Brain brain, nint currentState, nint targetState)
+    {
+        if (currentState == targetState)
+        {
+            return currentState;
+        }
+
+        brain.TransitionTo(targetState);
+        return targetState;
     }
 
     private static void SetAttack(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
