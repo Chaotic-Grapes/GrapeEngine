@@ -302,7 +302,14 @@ public class PlayerCollisionHandler : CollisionSystemBase
 
                 ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
             }
+            else if(other.GetComponent<TagMask>().Mask == 4)
+            {
+                //door detected
+                other.GetComponent<Active>().Enabled = false;
+            }
         }
+
+        
     }
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
