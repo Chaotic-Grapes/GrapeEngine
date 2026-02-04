@@ -567,7 +567,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
@@ -594,7 +594,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;

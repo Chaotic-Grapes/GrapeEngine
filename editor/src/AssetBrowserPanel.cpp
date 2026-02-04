@@ -779,7 +779,7 @@ void AssetBrowserPanel::_loadPrefab() {
                 ECS::Components::PrefabInstanceMetadata meta;
                 meta.PrefabHash = hash;
                 meta.Flags = 0;
-                Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                 // Log info and update status message on successful load
                 LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());

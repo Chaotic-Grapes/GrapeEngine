@@ -1508,7 +1508,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
+        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {
