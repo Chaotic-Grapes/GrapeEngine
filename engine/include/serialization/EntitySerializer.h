@@ -492,7 +492,28 @@ namespace ECS {
 		}
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIElement, Position, Size, Visible, Alignment, ZOrder)
+	inline void to_json(nlohmann::json& j, const GUIElement& element) {
+		j = nlohmann::json{
+			{"Position", element.Position},
+			{"Size", element.Size},
+			{"Visible", element.Visible},
+			{"Alignment", static_cast<uint8_t>(element.Alignment)},
+			{"ZOrder", element.ZOrder},
+			{"Margin", element.Margin},
+			{"Padding", element.Padding}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIElement& element) {
+		if (j.contains("Position")) element.Position = j.at("Position").get<Vector2D>();
+		if (j.contains("Size")) element.Size = j.at("Size").get<Vector2D>();
+		element.Visible = j.value("Visible", true);
+		element.Alignment = static_cast<GUIAlignment>(j.value("Alignment", static_cast<uint8_t>(GUIAlignment::TopLeft)));
+		element.ZOrder = static_cast<int16_t>(j.value("ZOrder", 0));
+		element.Margin = j.contains("Margin") ? j.at("Margin").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+		element.Padding = j.contains("Padding") ? j.at("Padding").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
 	inline void to_json(nlohmann::json& j, const GUIText& text) {
 		const std::string value = ECS::StringTable::Resolve(text.TextId);
@@ -518,6 +539,123 @@ namespace ECS {
 		} else {
 			text.FontSize = j.value("PixelSize", 24.0f);
 		}
+	}
+
+	inline void to_json(nlohmann::json& j, const GUIImage& image) {
+		j = nlohmann::json{
+			{"TexturePath", ResolveStringId(image.TexturePathId)},
+			{"Color", image.Color},
+			{"UVRect", image.UVRect},
+			{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
+			{"UseSlicing", image.UseSlicing},
+			{"SliceBorder", image.SliceBorder}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIImage& image) {
+		image.TexturePathId = ReadStringId(j, "TexturePath", 0);
+		if (j.contains("Color")) {
+			image.Color = j.at("Color").get<::Color>();
+		}
+		if (j.contains("UVRect")) {
+			image.UVRect = j.at("UVRect").get<Vector4D>();
+		}
+		image.ScaleMode = static_cast<GUIImageScaleMode>(j.value("ScaleMode", static_cast<uint8_t>(GUIImageScaleMode::Stretch)));
+		image.UseSlicing = j.value("UseSlicing", false);
+		image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+
+	inline void to_json(nlohmann::json& j, const GUIInput& input) {
+		j = nlohmann::json{
+			{"Hovered", input.Hovered},
+			{"Pressed", input.Pressed},
+			{"Clicked", input.Clicked},
+			{"Released", input.Released},
+			{"Dragging", input.Dragging}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIInput& input) {
+		input.Hovered = j.value("Hovered", false);
+		input.Pressed = j.value("Pressed", false);
+		input.Clicked = j.value("Clicked", false);
+		input.Released = j.value("Released", false);
+		input.Dragging = j.value("Dragging", false);
+	}
+
+	inline void to_json(nlohmann::json& j, const GUIButton& button) {
+		j = nlohmann::json{
+			{"Text", ResolveStringId(button.TextId)},
+			{"FontPath", ResolveStringId(button.FontPathId)},
+			{"IconPath", ResolveStringId(button.IconPathId)},
+			{"NormalColor", button.NormalColor},
+			{"HoverColor", button.HoverColor},
+			{"PressedColor", button.PressedColor},
+			{"DisabledColor", button.DisabledColor},
+			{"TextColor", button.TextColor},
+			{"IconColor", button.IconColor},
+			{"FontSize", button.FontSize},
+			{"CornerRadius", button.CornerRadius},
+			{"IconSize", button.IconSize},
+			{"IconOffset", button.IconOffset},
+			{"Padding", button.Padding},
+			{"Disabled", button.Disabled},
+			{"Toggle", button.Toggle},
+			{"Toggled", button.Toggled}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIButton& button) {
+		button.TextId = ReadStringId(j, "Text", 0);
+		button.FontPathId = ReadStringId(j, "FontPath", 0);
+		button.IconPathId = ReadStringId(j, "IconPath", 0);
+		if (j.contains("NormalColor")) button.NormalColor = j.at("NormalColor").get<::Color>();
+		if (j.contains("HoverColor")) button.HoverColor = j.at("HoverColor").get<::Color>();
+		if (j.contains("PressedColor")) button.PressedColor = j.at("PressedColor").get<::Color>();
+		if (j.contains("DisabledColor")) button.DisabledColor = j.at("DisabledColor").get<::Color>();
+		if (j.contains("TextColor")) button.TextColor = j.at("TextColor").get<::Color>();
+		if (j.contains("IconColor")) button.IconColor = j.at("IconColor").get<::Color>();
+		button.FontSize = j.value("FontSize", 24.0f);
+		button.CornerRadius = j.value("CornerRadius", 0.0f);
+		if (j.contains("IconSize")) button.IconSize = j.at("IconSize").get<Vector2D>();
+		if (j.contains("IconOffset")) button.IconOffset = j.at("IconOffset").get<Vector2D>();
+		if (j.contains("Padding")) button.Padding = j.at("Padding").get<Vector4D>();
+		button.Disabled = j.value("Disabled", false);
+		button.Toggle = j.value("Toggle", false);
+		button.Toggled = j.value("Toggled", false);
+	}
+
+	inline void to_json(nlohmann::json& j, const GUISlider& slider) {
+		j = nlohmann::json{
+			{"Value", slider.Value},
+			{"Min", slider.Min},
+			{"Max", slider.Max},
+			{"Step", slider.Step},
+			{"TrackColor", slider.TrackColor},
+			{"FillColor", slider.FillColor},
+			{"KnobColor", slider.KnobColor},
+			{"CornerRadius", slider.CornerRadius},
+			{"KnobSize", slider.KnobSize},
+			{"Padding", slider.Padding},
+			{"Horizontal", slider.Horizontal},
+			{"Disabled", slider.Disabled}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUISlider& slider) {
+		slider.Value = j.value("Value", 0.0f);
+		slider.Min = j.value("Min", 0.0f);
+		slider.Max = j.value("Max", 1.0f);
+		slider.Step = j.value("Step", 0.0f);
+		if (j.contains("TrackColor")) slider.TrackColor = j.at("TrackColor").get<::Color>();
+		if (j.contains("FillColor")) slider.FillColor = j.at("FillColor").get<::Color>();
+		if (j.contains("KnobColor")) slider.KnobColor = j.at("KnobColor").get<::Color>();
+		slider.CornerRadius = j.value("CornerRadius", 0.0f);
+		if (j.contains("KnobSize")) slider.KnobSize = j.at("KnobSize").get<Vector2D>();
+		if (j.contains("Padding")) slider.Padding = j.at("Padding").get<Vector4D>();
+		slider.Horizontal = j.value("Horizontal", true);
+		slider.Disabled = j.value("Disabled", false);
+		slider.ValueChanged = false;
 	}
 
 	}
@@ -932,6 +1070,10 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
 	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel");
 	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");
+	REGISTER_COMPONENT_SERIALIZER(GUIImage, ECS::Components::GUIImage, "GUIImage");
+	REGISTER_COMPONENT_SERIALIZER(GUIInput, ECS::Components::GUIInput, "GUIInput");
+	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton");
+	REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider");
 }
 
 #endif

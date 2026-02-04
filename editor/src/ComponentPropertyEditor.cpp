@@ -1419,8 +1419,10 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
     if (!data.contains("Visible")) data["Visible"] = true;
     if (!data.contains("Alignment")) data["Alignment"] = 0;
     if (!data.contains("ZOrder")) data["ZOrder"] = 0;
+    if (!data.contains("Margin")) data["Margin"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
 
-    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order" });
+    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order", "Margin", "Padding" });
     EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
     EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
     EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
@@ -1446,6 +1448,8 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
         ImGui::EndCombo();
     }
     EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
+    EditorUI::RenderVector4DRow("Margin", data["Margin"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
     EditorUI::EndPropertySection();
 }
 
@@ -1505,6 +1509,206 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     EditorUI::RenderColorRow("Color", data["Color"]);
     EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIImage");
+
+    if (!data.contains("TexturePath")) data["TexturePath"] = "";
+    if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("UVRect")) data["UVRect"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f} };
+    if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+    if (!data.contains("UseSlicing")) data["UseSlicing"] = false;
+    if (!data.contains("SliceBorder")) data["SliceBorder"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
+
+    EditorUI::BeginPropertySection({ "Texture", "Color", "UV Rect", "Scale Mode", "Use Slicing", "Slice Border" });
+
+    std::string texturePath = data.value("TexturePath", std::string());
+    std::string textureValueText;
+    if (!texturePath.empty()) {
+        textureValueText = std::filesystem::path(texturePath).filename().string();
+    } else {
+        textureValueText = "None (drag texture here)";
+    }
+    EditorUI::RenderStaticValueRow("Texture", textureValueText, texturePath.empty());
+    if (!texturePath.empty() && RenderClearTrashButton("GUIImageTextureClear", "Clear texture", m_symbolsFont)) {
+        data["TexturePath"] = "";
+    }
+    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        data["TexturePath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
+
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderVector4DRow("UV Rect", data["UVRect"], "X", "Y", "Z", "W", 0.01f);
+
+    const char* scaleModes[] = { "Stretch", "Fit", "Fill" };
+    int scaleMode = data.value("ScaleMode", 0);
+    scaleMode = std::max(0, std::min(scaleMode, 2));
+    ImGui::Text("Scale Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIImageScaleMode", scaleModes[scaleMode])) {
+        for (int i = 0; i < 3; ++i) {
+            bool selected = (scaleMode == i);
+            if (ImGui::Selectable(scaleModes[i], selected)) {
+                scaleMode = i;
+                data["ScaleMode"] = scaleMode;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::RenderCheckboxProperty("Use Slicing", data, "UseSlicing");
+    EditorUI::RenderVector4DRow("Slice Border", data["SliceBorder"], "X", "Y", "Z", "W", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIInput");
+
+    if (!data.contains("Hovered")) data["Hovered"] = false;
+    if (!data.contains("Pressed")) data["Pressed"] = false;
+    if (!data.contains("Clicked")) data["Clicked"] = false;
+    if (!data.contains("Released")) data["Released"] = false;
+    if (!data.contains("Dragging")) data["Dragging"] = false;
+
+    EditorUI::BeginPropertySection({ "Hovered", "Pressed", "Clicked", "Released", "Dragging" });
+    ImGui::BeginDisabled();
+    EditorUI::RenderCheckboxProperty("Hovered", data, "Hovered");
+    EditorUI::RenderCheckboxProperty("Pressed", data, "Pressed");
+    EditorUI::RenderCheckboxProperty("Clicked", data, "Clicked");
+    EditorUI::RenderCheckboxProperty("Released", data, "Released");
+    EditorUI::RenderCheckboxProperty("Dragging", data, "Dragging");
+    ImGui::EndDisabled();
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIButton");
+
+    if (!data.contains("Text")) data["Text"] = "Button";
+    if (!data.contains("FontPath")) data["FontPath"] = "";
+    if (!data.contains("IconPath")) data["IconPath"] = "";
+    if (!data.contains("NormalColor")) data["NormalColor"] = { {"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f} };
+    if (!data.contains("HoverColor")) data["HoverColor"] = { {"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f} };
+    if (!data.contains("PressedColor")) data["PressedColor"] = { {"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f} };
+    if (!data.contains("DisabledColor")) data["DisabledColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f} };
+    if (!data.contains("TextColor")) data["TextColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("IconColor")) data["IconColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("FontSize")) data["FontSize"] = 24.0f;
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+    if (!data.contains("IconSize")) data["IconSize"] = { {"X", 24.0f}, {"Y", 24.0f} };
+    if (!data.contains("IconOffset")) data["IconOffset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 8.0f}, {"Y", 6.0f}, {"Z", 8.0f}, {"W", 6.0f} };
+    if (!data.contains("Disabled")) data["Disabled"] = false;
+    if (!data.contains("Toggle")) data["Toggle"] = false;
+    if (!data.contains("Toggled")) data["Toggled"] = false;
+
+    EditorUI::BeginPropertySection({
+        "Text", "Font", "Icon", "Normal Color", "Hover Color", "Pressed Color",
+        "Disabled Color", "Text Color", "Icon Color", "Font Size", "Corner Radius",
+        "Icon Size", "Icon Offset", "Padding", "Disabled", "Toggle", "Toggled"
+    });
+
+    EditorUI::RenderTextProperty("Text", data, "Text");
+
+    std::string fontPath = data.value("FontPath", std::string());
+    std::string fontValueText = fontPath.empty()
+        ? "None (drag font here)"
+        : std::filesystem::path(fontPath).filename().string();
+    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
+    if (!fontPath.empty() && RenderClearTrashButton("GUIButtonFontClear", "Clear font", m_symbolsFont)) {
+        data["FontPath"] = "";
+    }
+    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
+        data["FontPath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kFontExtensions);
+    });
+
+    std::string iconPath = data.value("IconPath", std::string());
+    std::string iconValueText = iconPath.empty()
+        ? "None (drag icon here)"
+        : std::filesystem::path(iconPath).filename().string();
+    EditorUI::RenderStaticValueRow("Icon", iconValueText, iconPath.empty());
+    if (!iconPath.empty() && RenderClearTrashButton("GUIButtonIconClear", "Clear icon", m_symbolsFont)) {
+        data["IconPath"] = "";
+    }
+    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        data["IconPath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
+
+    EditorUI::RenderColorRow("Normal Color", data["NormalColor"]);
+    EditorUI::RenderColorRow("Hover Color", data["HoverColor"]);
+    EditorUI::RenderColorRow("Pressed Color", data["PressedColor"]);
+    EditorUI::RenderColorRow("Disabled Color", data["DisabledColor"]);
+    EditorUI::RenderColorRow("Text Color", data["TextColor"]);
+    EditorUI::RenderColorRow("Icon Color", data["IconColor"]);
+    EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::RenderVector2DRow("Icon Size", data["IconSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Icon Offset", data["IconOffset"], "X", "Y", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderCheckboxProperty("Disabled", data, "Disabled");
+    EditorUI::RenderCheckboxProperty("Toggle", data, "Toggle");
+    EditorUI::RenderCheckboxProperty("Toggled", data, "Toggled");
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUISlider");
+
+    if (!data.contains("Value")) data["Value"] = 0.0f;
+    if (!data.contains("Min")) data["Min"] = 0.0f;
+    if (!data.contains("Max")) data["Max"] = 1.0f;
+    if (!data.contains("Step")) data["Step"] = 0.0f;
+    if (!data.contains("TrackColor")) data["TrackColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
+    if (!data.contains("FillColor")) data["FillColor"] = { {"R", 0.4f}, {"G", 0.4f}, {"B", 0.4f}, {"A", 1.0f} };
+    if (!data.contains("KnobColor")) data["KnobColor"] = { {"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f} };
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+    if (!data.contains("KnobSize")) data["KnobSize"] = { {"X", 16.0f}, {"Y", 16.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f} };
+    if (!data.contains("Horizontal")) data["Horizontal"] = true;
+    if (!data.contains("Disabled")) data["Disabled"] = false;
+    if (!data.contains("ValueChanged")) data["ValueChanged"] = false;
+
+    EditorUI::BeginPropertySection({
+        "Value", "Min", "Max", "Step", "Track Color", "Fill Color", "Knob Color",
+        "Corner Radius", "Knob Size", "Padding", "Horizontal", "Disabled", "Value Changed"
+    });
+
+    EditorUI::RenderFloatRow("Value", "", data, "Value", 0.01f);
+    EditorUI::RenderFloatRow("Min", "", data, "Min", 0.01f);
+    EditorUI::RenderFloatRow("Max", "", data, "Max", 0.01f);
+    EditorUI::RenderFloatRow("Step", "", data, "Step", 0.01f);
+    EditorUI::RenderColorRow("Track Color", data["TrackColor"]);
+    EditorUI::RenderColorRow("Fill Color", data["FillColor"]);
+    EditorUI::RenderColorRow("Knob Color", data["KnobColor"]);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::RenderVector2DRow("Knob Size", data["KnobSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderCheckboxProperty("Horizontal", data, "Horizontal");
+    EditorUI::RenderCheckboxProperty("Disabled", data, "Disabled");
+    ImGui::BeginDisabled();
+    EditorUI::RenderCheckboxProperty("Value Changed", data, "ValueChanged");
+    ImGui::EndDisabled();
     EditorUI::EndPropertySection();
 }
 

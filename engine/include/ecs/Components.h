@@ -585,6 +585,14 @@ namespace ECS {
             bool Visible = true;
             GUIAlignment Alignment = GUIAlignment::TopLeft;
             int16_t ZOrder = 0;
+            Vector4D Margin{ 0.0f, 0.0f, 0.0f, 0.0f };
+            Vector4D Padding{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+            // Runtime layout results (not serialized)
+            Vector2D ResolvedPosition{ 0.0f, 0.0f };
+            Vector2D ResolvedSize{ 0.0f, 0.0f };
+            Vector2D ContentPosition{ 0.0f, 0.0f };
+            Vector2D ContentSize{ 0.0f, 0.0f };
         };
         static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
@@ -617,6 +625,70 @@ namespace ECS {
             }
         };
         static_assert(std::is_trivially_copyable_v<GUIText>, "GUIText must be trivially copyable");
+
+        enum class GUIImageScaleMode : uint8_t {
+            Stretch = 0,
+            Fit = 1,
+            Fill = 2
+        };
+
+        struct GUIImage {
+            uint32_t TextureId = 0;
+            uint32_t TexturePathId = 0;
+            Color Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+            Vector4D UVRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+            GUIImageScaleMode ScaleMode = GUIImageScaleMode::Stretch;
+            bool UseSlicing = false;
+            Vector4D SliceBorder{ 0.0f, 0.0f, 0.0f, 0.0f };
+        };
+        static_assert(std::is_trivially_copyable_v<GUIImage>, "GUIImage must be trivially copyable");
+
+        struct GUIInput {
+            bool Hovered = false;
+            bool Pressed = false;
+            bool Clicked = false;
+            bool Released = false;
+            bool Dragging = false;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIInput>, "GUIInput must be trivially copyable");
+
+        struct GUIButton {
+            uint32_t TextId = 0;
+            uint32_t FontPathId = 0;
+            uint32_t IconPathId = 0;
+            Color NormalColor{ 0.25f, 0.25f, 0.25f, 1.0f };
+            Color HoverColor{ 0.35f, 0.35f, 0.35f, 1.0f };
+            Color PressedColor{ 0.15f, 0.15f, 0.15f, 1.0f };
+            Color DisabledColor{ 0.2f, 0.2f, 0.2f, 0.6f };
+            Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+            Color IconColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+            float FontSize = 24.0f;
+            float CornerRadius = 0.0f;
+            Vector2D IconSize{ 24.0f, 24.0f };
+            Vector2D IconOffset{ 0.0f, 0.0f };
+            Vector4D Padding{ 8.0f, 6.0f, 8.0f, 6.0f };
+            bool Disabled = false;
+            bool Toggle = false;
+            bool Toggled = false;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIButton>, "GUIButton must be trivially copyable");
+
+        struct GUISlider {
+            float Value = 0.0f;
+            float Min = 0.0f;
+            float Max = 1.0f;
+            float Step = 0.0f;
+            Color TrackColor{ 0.2f, 0.2f, 0.2f, 1.0f };
+            Color FillColor{ 0.4f, 0.4f, 0.4f, 1.0f };
+            Color KnobColor{ 0.9f, 0.9f, 0.9f, 1.0f };
+            float CornerRadius = 0.0f;
+            Vector2D KnobSize{ 16.0f, 16.0f };
+            Vector4D Padding{ 6.0f, 6.0f, 6.0f, 6.0f };
+            bool Horizontal = true;
+            bool Disabled = false;
+            bool ValueChanged = false;
+        };
+        static_assert(std::is_trivially_copyable_v<GUISlider>, "GUISlider must be trivially copyable");
 
     }
 }
