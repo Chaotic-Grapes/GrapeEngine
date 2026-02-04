@@ -160,6 +160,8 @@ public class Player : SystemBase
 
             //update Position
             currentPos = transform.Position;
+
+            
         }
     }
     private void SpeedLimit(ref LinearVelocity2D lv,float maxSpeed)
@@ -272,13 +274,23 @@ public class PlayerCollisionHandler : CollisionSystemBase
 
     private void CollisionEntered(Entity self, CollisionEvent evt)
     {
-        //do Everything in here
+        //Collide with MarineSnow
         Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MS_ManagerComponent>())
         {
             MS_Manager.instance.SendToPool(other.Id);
             InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
+        }
+
+        if (other.HasComponent<TagMask>())
+        {
+            Log("TagMask: " + other.GetComponent<TagMask>().Mask);
+            if (other.GetComponent<TagMask>().Mask == 32)
+            {
+
+                ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+            }
         }
     }
 
