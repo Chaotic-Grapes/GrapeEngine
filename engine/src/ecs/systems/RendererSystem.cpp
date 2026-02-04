@@ -1666,7 +1666,21 @@ namespace ECS {
             // Tilemap
             if (m_debugTileMap && m_debugTileset) {
                 TileMapRenderer tileRenderer;
-                tileRenderer.Submit(*m_debugTileMap, *m_debugTileset, *m_renderer);
+           
+                // Wrap the debug tileset into a vector, since Submit expects multiple tilesets
+                const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
+
+				// Submit the debug tilemap for rendering
+                tileRenderer.Submit(*m_debugTileMap, tilesets, *m_renderer, m_debugTileMapOffset);
+            }
+
+			// Render all other tilemaps stored in m_debugTileMaps
+            if (!m_debugTileMaps.empty()) {
+                TileMapRenderer tileRenderer;
+				// Same thing here, but for multiple tilemaps
+                for (const auto& entry : m_debugTileMaps) {
+                    tileRenderer.Submit(entry.Map.get(), entry.Tilesets, *m_renderer, entry.Offset);
+                }
             }
 
             for (Entity entity : list) {
