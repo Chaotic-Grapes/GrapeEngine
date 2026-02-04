@@ -29,6 +29,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "EditorStyle.h"
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include "EditorFileMenu.h"
 
@@ -142,7 +143,7 @@ private:
     // Renders a collapsible component section with consistent styling and delete button
     template <typename T>
     void _renderComponentSection(const std::string& headerName, const std::string& componentType,
-        nlohmann::json& data, T renderContent, bool canDelete = true);
+        nlohmann::json& data, T renderContent, bool canDelete, const nlohmann::json* defaults);
 
     // -------------------------------------------------------------------------
     // Component Menu Management
@@ -175,7 +176,7 @@ private:
     bool _addComponentToEntity(const std::string& componentType);
 
     // Removes a component of specified type from an entity
-    void _removeComponentFromEntity(const std::string& componentType);
+    void _removeComponentFromEntity(const std::string& componentType, bool recordUndo = true);
 
     // Checks if an entity has a specific component type using registry queries
     bool _entityHasComponent(EntityId id, const std::string& componentType);
@@ -234,12 +235,21 @@ private:
     char m_addComponentSearchBuffer[128] = {0};    // Temporary input buffer for search
     std::string m_addComponentSearchFilter;        // Filter string used to match component names
 
+    // Component/property filter state for the inspector list
+    char m_componentFilterBuffer[128] = {0};       // Temporary input buffer for component/property filtering
+    std::string m_componentFilter;                 // Active filter used in component/property list
+    bool m_focusComponentFilter = false;           // Keyboard focus request for the filter input
+    bool m_focusAddComponentSearch = false;        // Keyboard focus request for Add Component search
+    bool m_openAddComponentPopup = false;          // Deferred popup open flag for keyboard shortcuts
+
     // Undo - edit tracking
     struct EditState {
         EntityId entityId = 0;
         Vector3D startPosition;
         Quaternion startRotation;
         Vector3D startScale;
+        std::vector<ECS::SerializedComponent> startComponents;
+        bool hasSnapshot = false;
         bool isEditing = false;
     };
     EditState m_editState;
@@ -253,7 +263,7 @@ private:
 // Template allows any render function to be passed for component-specific UI
 template <typename T>
 void InspectorPanel::_renderComponentSection(const std::string& headerName, const std::string& componentType,
-    nlohmann::json& data, T renderContent, bool canDelete)
+    nlohmann::json& data, T renderContent, bool canDelete, const nlohmann::json* defaults)
 {
     // DefaultOpen: Component starts expanded for immediate editing access
     // Framed: Adds visual border around header for clear section separation
@@ -267,11 +277,56 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
     // Render delete button aligned to the right of the header
     float buttonSize = ImGui::GetFrameHeight();
     float buttonX = ImGui::GetWindowContentRegionMax().x - buttonSize - ImGui::GetStyle().FramePadding.x;
+    float resetX = buttonX - buttonSize - ImGui::GetStyle().ItemSpacing.x;
+
+    // Optional reset button to restore the component to defaults
+    if (defaults) {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorPosX(resetX);
+
+        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+
+        // Reset component data back to its default JSON payload
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+
+        // Style the reset button with secondary colors and symbol font
+        ImGui::PushID((std::string("ResetComponent") + componentType).c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+
+        // Use symbol font for the reset icon
+        if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+        const bool resetClicked = ImGui::SmallButton(resetIcon);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Reset component to defaults");
+        }
+        if (m_symbolsFont) ImGui::PopFont();
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+
+        if (resetClicked) {
+            data = *defaults;
+        }
+    }
 
     // Only show delete button if component is removable
     if (canDelete) {
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(buttonX);
+
+        // Match the reset icon's vertical alignment so header actions line up
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
 
         // Style the remove button with danger colors and symbol font
         bool pushedFont = false;
@@ -328,7 +383,16 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::BeginGroup();
         ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
         ImGui::Indent(boxPaddingX);
+
+        // Register defaults for per-field reset buttons inside this component
+        if (defaults) {
+            EditorUI::RegisterDefaultDataScope(data, *defaults);
+        }
         renderContent(data);
+        if (defaults) {
+            EditorUI::ClearDefaultDataScope();
+        }
+
         ImGui::Unindent(boxPaddingX);
         ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
         ImGui::EndGroup();

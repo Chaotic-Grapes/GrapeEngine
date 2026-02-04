@@ -309,6 +309,35 @@ namespace ECS {
 			anim.UseRow = j.value("UseRow", false);
 		}
 
+		// Custom serialization for TileMapComponent (StringId paths need special handling).
+		inline void to_json(nlohmann::json& j, const TileMapComponent& tilemap) {
+			std::string mapPath = ECS::StringTable::Resolve(tilemap.TileMapPath); // Resolve StringId -> path string.
+			std::string tilesetPath = ECS::StringTable::Resolve(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
+			j = nlohmann::json{
+				{"TileMapPath", mapPath},
+				{"TilesetTexturePath", tilesetPath},
+				{"TileWorldSize", tilemap.TileWorldSize},
+				{"TilePixelSize", tilemap.TilePixelSize},
+				{"DefaultWidth", tilemap.DefaultWidth},
+				{"DefaultHeight", tilemap.DefaultHeight},
+				{"LayerIndex", tilemap.LayerIndex},
+				{"Visible", tilemap.Visible}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, TileMapComponent& tilemap) {
+			std::string mapPath = j.value("TileMapPath", std::string()); // Read map path from JSON.
+			std::string tilesetPath = j.value("TilesetTexturePath", std::string()); // Read tileset path from JSON.
+			tilemap.TileMapPath = mapPath.empty() ? 0 : ECS::StringTable::Intern(mapPath); // Store as StringId.
+			tilemap.TilesetTexturePath = tilesetPath.empty() ? 0 : ECS::StringTable::Intern(tilesetPath); // Store as StringId.
+			tilemap.TileWorldSize = j.value("TileWorldSize", 1.0f); // Default to 1.0 if missing.
+			tilemap.TilePixelSize = j.value("TilePixelSize", 32u); // Default tile pixel size.
+			tilemap.DefaultWidth = j.value("DefaultWidth", 64u); // Default map width.
+			tilemap.DefaultHeight = j.value("DefaultHeight", 64u); // Default map height.
+			tilemap.LayerIndex = j.value("LayerIndex", 0u); // Default layer index.
+			tilemap.Visible = j.value("Visible", true); // Default visibility.
+		}
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationState2D, CurrentFrame, TimeAccumulator, Finished)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
@@ -355,8 +384,39 @@ namespace ECS {
 		}
 
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
+		// Custom serialization for AudioSource to handle backward-compatible defaults
+		inline void to_json(nlohmann::json& j, const AudioSource& src) {
+			j = nlohmann::json{
+				{"CueId", src.CueId},
+				{"Volume", src.Volume},
+				{"Pitch", src.Pitch},
+				{"Loop", src.Loop},
+				{"PlayOnStart", src.PlayOnStart},
+				{"Spatial3D", src.Spatial3D},
+				{"Bus", src.Bus},
+				{"Pan", src.Pan},
+				{"EnableFadeIn", src.EnableFadeIn},
+				{"EnableFadeOut", src.EnableFadeOut},
+				{"FadeInDuration", src.FadeInDuration},
+				{"FadeOutDuration", src.FadeOutDuration}
+			};
+		}
 
+		inline void from_json(const nlohmann::json& j, AudioSource& src) {
+			src.CueId = j.value("CueId", 0u);
+			src.Volume = j.value("Volume", 1.0f);
+			src.Pitch = j.value("Pitch", 1.0f);
+			src.Loop = j.value("Loop", false);
+			src.PlayOnStart = j.value("PlayOnStart", false);
+			src.Spatial3D = j.value("Spatial3D", true);
+			src.Bus = j.value("Bus", static_cast<uint8_t>(Audio::Bus::SFX));
+			src.Pan = j.value("Pan", 0.0f);
+			src.EnableFadeIn = j.value("EnableFadeIn", false);
+			src.EnableFadeOut = j.value("EnableFadeOut", false);
+			src.FadeInDuration = j.value("FadeInDuration", 1.0f);
+			src.FadeOutDuration = j.value("FadeOutDuration", 1.0f);
+		}
+	
 		// Custom serialization for Material2D
 		inline void to_json(nlohmann::json& j, const Material2D& mat) {
 			std::string normalTexturePath = ECS::StringTable::Resolve(mat.NormalTexturePath);
@@ -853,6 +913,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D, "CircleCollider2D")
 	REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D, "SpriteRenderer2D")
 	REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D, "SpriteFlip2D")
+	REGISTER_COMPONENT_SERIALIZER(TileMapComponent, ECS::Components::TileMapComponent, "TileMapComponent")
 	REGISTER_COMPONENT_SERIALIZER(SpriteSheetAnimation2D, ECS::Components::SpriteSheetAnimation2D, "SpriteSheetAnimation2D")
 	REGISTER_COMPONENT_SERIALIZER(AnimationState2D, ECS::Components::AnimationState2D, "AnimationState2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D, "ShapeCircle2D")

@@ -86,7 +86,9 @@ namespace Audio {
         // Per-instance controls
         void SetInstanceVolume(PlaybackHandle handle, float volume);
         void SetInstancePitch(PlaybackHandle handle, float pitch);
+        void SetInstancePan(PlaybackHandle handle, float pan);
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
+        bool IsHandlePlaying(PlaybackHandle handle) const;
 
         // Listener and master
         void SetListener(const ListenerParams& listener);

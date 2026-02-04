@@ -175,9 +175,13 @@ namespace Audio {
         if (!FMOD_OK_OR_LOG(m_system->playSound(snd, nullptr, true, &ch), "playSound") || !ch)
             return {};
 
+        ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
         ch->setVolume(s.Volume);
         ch->setPitch(s.Pitch);
-        ch->setPaused(false);
+        if (!s.Spatial3D) {
+            ch->setPan(s.Pan);
+        }
+        ch->setPaused(s.StartPaused);
 
         PlaybackHandle h{ m_nextId++ };
         m_channels.emplace(h.Id, ch);
@@ -203,12 +207,21 @@ namespace Audio {
                 switch (policy) {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
-                    ch->setPaused(false);
+                    ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    if (!s.Spatial3D) {
+                        ch->setPan(s.Pan);
+                    }
+                    ch->setPaused(s.StartPaused ? true : false);
                     ch->setVolume(s.Volume);
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceResume:
-                    if (!playing) ch->setPaused(false);
+                    if (!playing && !s.StartPaused) ch->setPaused(false);
+                    if (s.StartPaused) ch->setPaused(true);
+                    ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    if (!s.Spatial3D) {
+                        ch->setPan(s.Pan);
+                    }
                     ch->setVolume(s.Volume);
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
@@ -255,12 +268,24 @@ namespace Audio {
         if (auto* ch = _channelFromHandle(handle)) ch->setPitch(pitch);
     }
 
+    void FmodAudioDevice::SetInstancePan(PlaybackHandle handle, float pan) {
+        if (auto* ch = _channelFromHandle(handle)) ch->setPan(pan);
+    }
+
     void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         if (auto* ch = _channelFromHandle(handle)) {
             const FMOD_VECTOR p{ pos.x, pos.y, pos.z };
             const FMOD_VECTOR v{ vel.x, vel.y, vel.z };
             ch->set3DAttributes(&p, &v);
         }
+    }
+
+    bool FmodAudioDevice::IsHandlePlaying(PlaybackHandle handle) const {
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
+            return _is_playing(ch);
+        }
+        return false;
     }
 
     void FmodAudioDevice::SetListener(const ListenerParams& l) {

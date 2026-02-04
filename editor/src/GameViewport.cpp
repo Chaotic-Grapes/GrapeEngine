@@ -37,10 +37,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 void GameViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    if (m_undoSystem) {
-        m_undoSystem->Update();
-    }
-
     // Game viewport doesn't handle entity dragging or editor camera input
     m_isViewportHovered = false;
 }

@@ -132,6 +132,21 @@ INTEROP_API void SceneManagerInterop_SetActiveImmediate(void* sceneManagerPtr, u
 }
 
 /**
+ * @brief Configure the next scene change to trigger audio transitions.
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param fadeDuration Duration of fade in seconds (0 for immediate stop)
+ * @param allowCrossfade True to allow overlap between old and new audio
+ */
+INTEROP_API void SceneManagerInterop_SetNextAudioTransition(void* sceneManagerPtr, float fadeDuration, bool allowCrossfade) {
+    if (!sceneManagerPtr)
+        return;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    manager->SetNextAudioTransition(fadeDuration, allowCrossfade);
+}
+
+/**
  * @brief Get the currently active scene
  *
  * @param sceneManagerPtr Pointer to the SceneManager
@@ -190,6 +205,7 @@ INTEROP_API void SceneManagerInterop_Update(void* sceneManagerPtr) {
     Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
     manager->Update();
 }
+
 
 // ============================================================================
 // Scene Serialization

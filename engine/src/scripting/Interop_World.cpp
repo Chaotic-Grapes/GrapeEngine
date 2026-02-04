@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/events/EventComponents.h"
 #include "core/Logger.h"
 #include <cstring>
+#include <limits>
 #include <combaseapi.h>
 
 #ifdef ERROR
@@ -325,6 +326,130 @@ INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t entityId,
     }
 
     world->RemoveById(entity, componentId);
+}
+
+// ============================================================================
+// Hierarchy Operations
+// ============================================================================
+
+namespace {
+    uint64_t InvalidPackedEntityId() {
+        return (std::numeric_limits<uint64_t>::max)();
+    }
+}
+
+INTEROP_API void WorldInterop_AttachChild(void* worldPtr, uint64_t childId, uint64_t parentId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity child = ECS::EntityUtils::Unpack(childId);
+    ECS::Entity parent = ECS::EntityUtils::Unpack(parentId);
+
+    if (!world->IsAlive(child) || !world->IsAlive(parent)) {
+        LOG_WARNING("[WorldInterop] AttachChild failed: child or parent is not alive");
+        return;
+    }
+
+    world->Attach(child, parent);
+}
+
+INTEROP_API void WorldInterop_DetachChild(void* worldPtr, uint64_t childId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity child = ECS::EntityUtils::Unpack(childId);
+
+    if (!world->IsAlive(child)) {
+        LOG_WARNING("[WorldInterop] DetachChild failed: child is not alive");
+        return;
+    }
+
+    world->Detach(child);
+}
+
+INTEROP_API uint64_t WorldInterop_GetParent(void* worldPtr, uint64_t childId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity child = ECS::EntityUtils::Unpack(childId);
+    if (!world->IsAlive(child)) {
+        LOG_WARNING("[WorldInterop] GetParent failed: child is not alive");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::Entity parent = world->ParentOf(child);
+    if (parent.IsNull() || !world->IsAlive(parent)) {
+        return InvalidPackedEntityId();
+    }
+
+    return ECS::EntityUtils::Pack(parent);
+}
+
+INTEROP_API uint64_t WorldInterop_GetFirstChild(void* worldPtr, uint64_t parentId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity parent = ECS::EntityUtils::Unpack(parentId);
+    if (!world->IsAlive(parent)) {
+        LOG_WARNING("[WorldInterop] GetFirstChild failed: parent is not alive");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::Entity child = world->FirstChildOf(parent);
+    if (child.IsNull() || !world->IsAlive(child)) {
+        return InvalidPackedEntityId();
+    }
+
+    return ECS::EntityUtils::Pack(child);
+}
+
+INTEROP_API uint64_t WorldInterop_GetNextSibling(void* worldPtr, uint64_t childId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity child = ECS::EntityUtils::Unpack(childId);
+    if (!world->IsAlive(child)) {
+        LOG_WARNING("[WorldInterop] GetNextSibling failed: child is not alive");
+        return InvalidPackedEntityId();
+    }
+
+    ECS::Entity sibling = world->NextSiblingOf(child);
+    if (sibling.IsNull() || !world->IsAlive(sibling)) {
+        return InvalidPackedEntityId();
+    }
+
+    return ECS::EntityUtils::Pack(sibling);
+}
+
+INTEROP_API int WorldInterop_GetChildCount(void* worldPtr, uint64_t parentId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return 0;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity parent = ECS::EntityUtils::Unpack(parentId);
+    if (!world->IsAlive(parent)) {
+        LOG_WARNING("[WorldInterop] GetChildCount failed: parent is not alive");
+        return 0;
+    }
+
+    return world->ChildCountOf(parent);
 }
 
 // ============================================================================

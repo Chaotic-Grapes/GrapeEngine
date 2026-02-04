@@ -169,7 +169,8 @@ void Playback::Render() {
 
         bool clicked = false;
         ImGui::PushFont(m_symbolsFont);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 4.0f));
+        // Remove padding inside playback control icon buttons
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
         clicked = ImGui::Button(icon, size);
         ImGui::PopStyleVar(2);
@@ -420,6 +421,7 @@ void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
     LOG_INFO("Saving world state.");
+    m_savedWorldPtr = m_world;
 
     nlohmann::json worldJson = nlohmann::json::object();
     nlohmann::json entitiesMap = nlohmann::json::object(); // Changed from array to object
@@ -475,7 +477,15 @@ void Playback::_restoreWorldState() {
     // This version preserves entity IDs by restoring component values in-place
     // instead of destroying and recreating entities.
     if (!HasValidWorld() || m_savedWorldState.is_null()) {
-        LOG_WARNING("No saved state to restore");
+        if (!m_suppressRestoreWarning) {
+            LOG_WARNING("No saved state to restore");
+        }
+        m_suppressRestoreWarning = false;
+        return;
+    }
+    m_suppressRestoreWarning = false;
+    if (m_savedWorldPtr && m_savedWorldPtr != m_world) {
+        LOG_WARNING("Saved state world does not match current world; skipping restore.");
         return;
     }
 
@@ -654,16 +664,39 @@ EditorState Playback::GetEditorState() const {
     return m_editorState;
 }
 
+void Playback::ClearSavedState() {
+    // Explicitly drop snapshot when the world changes during Play.
+    m_savedWorldState = nullptr;
+    m_savedWorldPtr = nullptr;
+    m_suppressRestoreWarning = true;
+}
+
 // Update the world reference safely when scenes change
 // Update the bound world reference used by playback operations.
 // Clears saved snapshot since it no longer matches the world.
-void Playback::SetWorld(ECS::World* world) {
+void Playback::SetWorld(ECS::World* world, bool preserveState) {
     m_world = world;
+    if (!world) {
+        m_editorState = EditorState::Edit;
+        m_stepRequested = false;
+        ClearSavedState();
+        return;
+    }
+
+    // When preserving state (e.g. during scene transitions in Play),
+    // keep playback state but drop any snapshot tied to another world.
+    if (preserveState) {
+        if (m_savedWorldPtr && m_savedWorldPtr != world) {
+            ClearSavedState();
+        }
+        return;
+    }
+
     m_editorState = EditorState::Edit;
     m_stepRequested = false;
     // Reset time scale on world swap to avoid stale values.
     m_userTimeScale = 1.0f;
-    m_savedWorldState.clear();
+    ClearSavedState();
 }
 
 // Helper: Restore an entity's state in-place from a JSON snapshot

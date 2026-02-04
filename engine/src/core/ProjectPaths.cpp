@@ -50,7 +50,11 @@ namespace Engine {
     std::string ProjectPaths::GetSettingsPath() {
         return GetProjectRoot() + "/ProjectSettings.json";
     }
-    
+
+    std::string ProjectPaths::GetScenesPath() {
+        return GetProjectRoot() + "/Scenes";
+    }
+
     std::string ProjectPaths::GetTempScriptsPath() {
         try {
             // Create a stable temp directory per project

@@ -58,6 +58,11 @@ public:
         m_getEditorState = std::move(getter);
     }
 
+    // Called when the active scene is reloaded during play to clear playback snapshot.
+    void SetPlaybackSnapshotClearCallback(std::function<void()> callback) {
+        m_clearPlaybackSnapshot = std::move(callback);
+    }
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -124,6 +129,8 @@ private:
     HierarchyPanel* m_hierarchyPanel = nullptr;
     // Getter used to query current EditorState; optional (defaults to Edit)
     std::function<EditorState()> m_getEditorState = nullptr;
+    // Optional callback to clear playback snapshot on in-place reload.
+    std::function<void()> m_clearPlaybackSnapshot;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes

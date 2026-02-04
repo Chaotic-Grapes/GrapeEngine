@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Quaternion.h"
 #include "math/Matrix4x4.h"
 #include "ecs/StringTable.h"
+#include "audio/SoundTypes.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
 #include <string>
@@ -339,6 +340,22 @@ namespace ECS {
 
         // TODO: Add Shader components
 
+        // Tile map reference + editor/runtime settings.
+        // This is a lightweight handle to external tilemap data + tileset texture.
+        struct TileMapComponent {
+        public:
+            uint32_t TileMapPath = 0;           // StringId for the .tilemap asset path
+            uint32_t TilesetTexturePath = 0;    // StringId for the tileset texture path
+            float TileWorldSize = 1.0f;         // World-units per tile (used for map scaling)
+            uint32_t TilePixelSize = 32;        // Tile size in pixels for tileset slicing
+            uint32_t DefaultWidth = 64;         // Default width for new maps (tiles)
+            uint32_t DefaultHeight = 64;        // Default height for new maps (tiles)
+            uint32_t LayerIndex = 0;            // Layer index to render/edit (single-layer for now)
+            bool Visible = true;                // Editor/runtime visibility toggle
+            uint8_t _padding[3] = { 0, 0, 0 };   // Padding to keep alignment stable
+        };
+        static_assert(std::is_trivially_copyable_v<TileMapComponent>, "TileMapComponent must be trivially copyable");
+
         // ---------------------------------- Animation ----------------------------------
 
         // Sprite sheet animation configuration (POD)
@@ -471,16 +488,30 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
 
-        // ---------- Audio (kept minimal) ----------
+        // ---------- Audio ----------
 
         struct AudioSource {
         public:
+
+            // Basics
             uint32_t CueId = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
             bool PlayOnStart = false;
+
+            // TODO
             bool Spatial3D = true;
+            uint8_t Bus = static_cast<uint8_t>(Audio::Bus::SFX);
+            float Pan = 0.0f;
+
+            // Fade flags
+			bool EnableFadeIn = false;
+			bool EnableFadeOut = false;
+
+			// Fade durations (seconds)
+			float FadeInDuration = 1.0f;
+			float FadeOutDuration = 1.0f;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
 

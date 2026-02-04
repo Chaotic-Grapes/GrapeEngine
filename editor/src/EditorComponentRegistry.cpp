@@ -47,6 +47,7 @@ namespace {
     const uint32_t kHashCamera3D = Editor::ECSUtils::FNV1aHash("Camera3D");
     const uint32_t kHashSpriteRenderer2D = Editor::ECSUtils::FNV1aHash("SpriteRenderer2D");
     const uint32_t kHashSpriteSheetAnimation2D = Editor::ECSUtils::FNV1aHash("SpriteSheetAnimation2D");
+    const uint32_t kHashTileMapComponent = Editor::ECSUtils::FNV1aHash("TileMapComponent");
     const uint32_t kHashZIndex2D = Editor::ECSUtils::FNV1aHash("ZIndex2D");
     const uint32_t kHashRigidbody2D = Editor::ECSUtils::FNV1aHash("Rigidbody2D");
     const uint32_t kHashLinearVelocity2D = Editor::ECSUtils::FNV1aHash("LinearVelocity2D");
@@ -67,6 +68,7 @@ namespace {
     const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
     const uint32_t kHashGUIPanel = Editor::ECSUtils::FNV1aHash("GUIPanel");
     const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
+    
     template<typename T>
     nlohmann::json MakeDefaultJson() {
         T value{};
@@ -184,6 +186,11 @@ Without these, the macro would end early and break the expansion
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteRenderer2D, "SpriteRenderer2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
+            // Use the generic JSON renderer for now (tilemap UI can be specialized later).
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); };
         }
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"); id != ECS::NULL_COMPONENT_ID) {
@@ -334,6 +341,22 @@ Without these, the macro would end early and break the expansion
             }; 
             };
         }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
+            // Provide sane defaults for new tilemap components.
+            defaults[id] = []() {
+                return nlohmann::json{
+                    {"TileMapPath", ""},
+                    {"TilesetTexturePath", ""},
+                    {"TileWorldSize", 1.0f},
+                    {"TilePixelSize", 32},
+                    {"DefaultWidth", 64},
+                    {"DefaultHeight", 64},
+                    {"LayerIndex", 0},
+                    {"Visible", true}
+                };
+            };
+        }
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"); id != ECS::NULL_COMPONENT_ID) {
             defaults[id] = []() { 
@@ -471,7 +494,11 @@ Without these, the macro would end early and break the expansion
                 {"Pitch", 1.0f },
                 {"Loop", false },
                 {"PlayOnStart", false },
-                {"Spatial3D", false }
+                {"Spatial3D", false },
+                {"EnableFadeIn", false },
+                {"EnableFadeOut", false },
+                {"FadeInDuration", 1.0f },
+                {"FadeOutDuration", 1.0f }
             }; 
             };
         }
@@ -624,6 +651,23 @@ static void _initializeDefaultRegistry() {
                 {"Width", 0}, {"Height", 0}
             }; }),
             COMPONENT_OPS_HASH(SpriteRenderer2D, kHashSpriteRenderer2D)
+        },
+        // Tile Map (stores asset paths + sizing; editing handled by Tile Palette)
+        {
+            "Tile Map", "TileMapComponent", "ECS::Components::TileMapComponent",
+            GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"), kHashTileMapComponent, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                {"TileMapPath", ""},
+                {"TilesetTexturePath", ""},
+                {"TileWorldSize", 1.0f},
+                {"TilePixelSize", 32},
+                {"DefaultWidth", 64},
+                {"DefaultHeight", 64},
+                {"LayerIndex", 0},
+                {"Visible", true}
+            }; }),
+            COMPONENT_OPS_HASH(TileMapComponent, kHashTileMapComponent)
         },
         // Sprite Sheet Animation 2D
         {
@@ -792,7 +836,13 @@ static void _initializeDefaultRegistry() {
                 { "Pitch", 1.0f },
                 { "Loop", false },
                 { "PlayOnStart", false },
-                { "Spatial3D", false }
+                { "Spatial3D", false },
+                { "Bus", 2 },
+                { "Pan", 0.0f },
+                { "EnableFadeIn", false },
+                { "EnableFadeOut", false },
+                { "FadeInDuration", 1.0f },
+                { "FadeOutDuration", 1.0f }
             }; }),
             COMPONENT_OPS_HASH(AudioSource, kHashAudioSource)
         },
@@ -1039,7 +1089,12 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             }
         };
         
-        // Add to registry with generic renderer
+        // Add to registry with generic renderer (or specialized overrides)
+        auto renderFunc = static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>(
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }
+        );
+        auto defaultFunc = static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); });
+
         s_registry.emplace_back(
             displayName,
             typeName,
@@ -1048,8 +1103,8 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             nativeMeta.TypeHash,
             true,  // Managed components can be deleted
             false,  // IsBuiltin - false because this is a dynamically discovered managed component
-            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
-            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); }),
+            renderFunc,
+            defaultFunc,
             static_cast<std::function<bool(ECS::World*, ECS::Entity)>>(hasComponentFunc),
             static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(addComponentFunc),
             static_cast<std::function<void(ECS::World*, ECS::Entity)>>(removeComponentFunc),
