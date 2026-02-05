@@ -591,12 +591,14 @@ void SceneViewport::_renderViewport() {
                                 rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
                             }
                         }
-                        bool left = Input::IsMousePressed(MOUSE_LEFT);
-                        bool right = Input::IsMousePressed(MOUSE_RIGHT);
-                        if (left || right) {
+                        bool left = Input::IsMouseDown(MOUSE_LEFT);
+                        if (left) {
                             // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
-                            m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            m_tilePalettePanel->OnViewportClick(worldPos, false);
                             tilePaletteHandledClick = true;
+                        } 
+                        else {
+                            m_tilePalettePanel->EndViewportPaint();
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {

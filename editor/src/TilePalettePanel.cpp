@@ -327,6 +327,7 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     const glm::vec2 localPos = worldPos - m_worldOrigin; // Convert world space to tilemap-local space.
     const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x); // Signed tile coordinate in map space.
     const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y); // Signed tile coordinate in map space.
+    const int64_t key = PackCoord(tx, ty);
     
     // Check bounds? TileMap expands? TileMap has fixed size layers.
     // Assuming layer 0.
@@ -338,6 +339,9 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     if (!m_tileMap->IsTileInBounds(tx, ty)) return false; // Bail out if still out of bounds.
 
     bool erasing = isRightClick || m_isEraser;
+    if (m_hasLastPaint && key == m_lastPaintKey && erasing == m_lastPaintErase) {
+        return false; // Skip redundant paint when dragging over the same tile.
+    }
     
     if (erasing)
     {
@@ -359,6 +363,9 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
         m_tileMap->SaveMap(m_tileMapPath);
     }
 
+    m_hasLastPaint = true;
+    m_lastPaintKey = key;
+    m_lastPaintErase = erasing;
     return true;
 }
 

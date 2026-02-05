@@ -39,6 +39,7 @@ public:
     // Interaction hooks
     void OnViewportHover(const glm::vec2& worldPos);
     bool OnViewportClick(const glm::vec2& worldPos, bool isRightClick);
+    void EndViewportPaint() { m_hasLastPaint = false; }
 
     void SetActive(bool active) { m_active = active; }
     bool IsActive() const { return m_active; }
@@ -80,9 +81,12 @@ private:
     std::vector<TileMapListEntry> m_tileMapList;
     EntityId m_activeTileMapId = ECS::Entity::NPOS32;
     uint8_t m_activeTilesetIndex = 0;
-    TileID m_selectedTileID = 0; // Base ID selected in palette
+    TileID m_selectedTileID = 0;   // Base ID selected in palette
     uint8_t m_currentRotation = 0; // 0..3
-    bool m_isEraser = false;
+	bool m_isEraser = false;       // Eraser mode toggle
+	bool m_hasLastPaint = false;   // Track last painted tile to avoid redundant paints
+	bool m_lastPaintErase = false; // Whether the last paint was an erase
+	int64_t m_lastPaintKey = 0;    // Packed coordinate of last painted tile
 
     // Physics Sync State
     // Key: (x << 16) | y. Value: Entity handle.
