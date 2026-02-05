@@ -714,19 +714,20 @@ namespace Serialization {
 		template<typename T>
 		static void RegisterComponent(const char* name) {
 			const uint32_t typeHash = Serialization::FNV1aHash(name);
+			// Capture the concrete component id so serialization does not depend on hash registration order.
+			const ECS::ComponentTypeId componentId = ECS::ComponentRegistry::Type<T>();
 			Registry()[typeHash] = ComponentInfo{
 				name,
 				typeHash,
 				// Serialize
-				[typeHash](const ECS::World& world, ECS::Entity e, json& j) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
-					if (id == ECS::NULL_COMPONENT_ID) {
+				[componentId](const ECS::World& world, ECS::Entity e, json& j) {
+					if (componentId == ECS::NULL_COMPONENT_ID) {
 						j = nullptr;
 						return;
 					}
 
-					if (world.HasById(e, id)) {
-						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, id);
+					if (world.HasById(e, componentId)) {
+						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, componentId);
 						if (ptr) {
 							const T& component = *static_cast<const T*>(ptr);
 							Serialization::to_json_adl<T>(j, component);
@@ -737,36 +738,33 @@ namespace Serialization {
 					j = nullptr;
 				},
 				// Deserialize
-				[typeHash](ECS::World& world, ECS::Entity e, const json& j) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
-					if (id == ECS::NULL_COMPONENT_ID) {
+				[componentId](ECS::World& world, ECS::Entity e, const json& j) {
+					if (componentId == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
 
 					T value = Serialization::from_json_adl<T>(j);
-					void* ptr = world.GetRawComponentPtr(e, id);
+					void* ptr = world.GetRawComponentPtr(e, componentId);
 					if (ptr) {
 						*static_cast<T*>(ptr) = value;
 					}
 					else {
-						world.AddComponentById(e, id, &value, sizeof(T));
+						world.AddComponentById(e, componentId, &value, sizeof(T));
 					}
 				},
 				// Has
-				[typeHash](const ECS::World& world, ECS::Entity e) -> bool {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
-					if (id == ECS::NULL_COMPONENT_ID) {
+				[componentId](const ECS::World& world, ECS::Entity e) -> bool {
+					if (componentId == ECS::NULL_COMPONENT_ID) {
 						return false;
 					}
-					return world.HasById(e, id);
+					return world.HasById(e, componentId);
 				},
 				// Remove
-				[typeHash](ECS::World& world, ECS::Entity e) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
-					if (id == ECS::NULL_COMPONENT_ID) {
+				[componentId](ECS::World& world, ECS::Entity e) {
+					if (componentId == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
-					world.RemoveById(e, id);
+					world.RemoveById(e, componentId);
 				}
 			};
 		}
