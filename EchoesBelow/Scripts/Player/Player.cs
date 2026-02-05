@@ -6,6 +6,7 @@ using GrapeEngine.Scripting.Systems.Attributes;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
 using EchoesBelow.Scripts.MarineSnowSystem;
+using System;
 
 namespace EchoesBelow.Scripts;
 
@@ -278,6 +279,8 @@ public class PlayerCollisionHandler : CollisionSystemBase
 {
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
+        Log("COLLIDED");
+        Console.WriteLine("COLLIDED");
         base.OnCollisionEnter(self, evt);
 
         if (self.HasComponent<PlayerComponent>()) CollisionEntered(self, evt);
@@ -285,31 +288,32 @@ public class PlayerCollisionHandler : CollisionSystemBase
 
     private void CollisionEntered(Entity self, CollisionEvent evt)
     {
+        //Log("COLLIDED");
         //Collide with MarineSnow
-        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
-        Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        if (other.HasComponent<MS_ManagerComponent>())
-        {
-            MS_Manager.instance.SendToPool(other.Id);
-            InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
-        }
+        //Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
+        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        //if (other.HasComponent<MS_ManagerComponent>())
+        //{
+        //    MS_Manager.instance.SendToPool(other.Id);
+        //    InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
+        //}
 
-        if (other.HasComponent<TagMask>())
-        {
-            Log("TagMask: " + other.GetComponent<TagMask>().Mask);
-            if (other.GetComponent<TagMask>().Mask == 32)
-            {
+        //if (other.HasComponent<TagMask>())
+        //{
+        //    Log("TagMask: " + other.GetComponent<TagMask>().Mask);
+        //    if (other.GetComponent<TagMask>().Mask == 32)
+        //    {
 
-                ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
-            }
-            else if(other.GetComponent<TagMask>().Mask == 4)
-            {
-                //door detected
-                other.GetComponent<Active>().Enabled = false;
-            }
-        }
+        //        ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+        //    }
+        //    else if(other.GetComponent<TagMask>().Mask == 4)
+        //    {
+        //        //door detected
+        //        other.GetComponent<Active>().Enabled = false;
+        //    }
+        //}
 
-        
+
     }
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
@@ -327,12 +331,41 @@ public class PlayerTriggerHandler : TriggerSystemBase
 {
     protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
     {
+        Log("TRIGGERED");
+        Console.WriteLine("TRIGGERED");
         base.OnTriggerEnter(self, evt);
+        
+        //Collide with MarineSnow
+        //Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        if (other.HasComponent<MS_ManagerComponent>())
         {
-            //Loadscene use dalton's
+            MS_Manager.instance.SendToPool(other.Id);
+            InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
         }
+
+        if (other.HasComponent<TagMask>())
+        {
+            Log("TagMask: " + other.GetComponent<TagMask>().Mask);
+            if (other.GetComponent<TagMask>().Mask == 32)
+            {
+
+                ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+            }
+            else if (other.GetComponent<TagMask>().Mask == 4)
+            {
+                //door detected
+                other.GetComponent<Active>().Enabled = false;
+            }
+        }
+
+
+
+        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        //if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        //{
+        //    //Loadscene use dalton's
+        //}
     }
 }
 

@@ -47,7 +47,7 @@ public class InventoryController : SystemBase
     protected override void OnUpdate()
     {
         //check for input
-        isDown_Q = Input.IsKeyDown(KeyCode.Q);
+        isDown_Q = Input.IsKeyPressed(KeyCode.Q);
 
         foreach(var gameObject in World!.Query<InventoryControllerComponent>())
         {
@@ -65,7 +65,7 @@ public class InventoryController : SystemBase
                 if(gameObject.Entity.GetComponent<MatchSignifierComponent>().signifierID == 1234 ||
                    gameObject.Entity.GetComponent<MatchSignifierComponent>().signifierID == 2345)
                 {
-                gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible = !gameObject.Entity.GetFirstChild()!.GetComponent<GUIElement>().Visible;
+                gameObject.Entity.GetComponent<GUIElement>().Visible = !gameObject.Entity.GetComponent<GUIElement>().Visible;
                 }
                 
             }
