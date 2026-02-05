@@ -1,3 +1,13 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    StateMachine.h
+ * 
+ * @brief   contain's defintiions of structs and function declarations used
+ * in StateMachine.cpp
+ */
+
+
 #pragma once
 #include "core/Application.h"
 #include "time.h"
