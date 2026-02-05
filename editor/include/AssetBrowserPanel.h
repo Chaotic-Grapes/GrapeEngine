@@ -27,6 +27,7 @@ Provides:
 #include <imgui.h>
 #include <string>
 #include <unordered_set>
+#include <functional>
 #include <vector>
 
 // Forward declarations
@@ -35,6 +36,8 @@ class InspectorPanel;
 // Asset browser panel for file navigation and asset management
 class AssetBrowserPanel {
 public:
+    // Callback for asset selection changes (used by other editor systems).
+    using AssetSelectionCallback = std::function<void(const std::string&)>;
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
@@ -47,6 +50,8 @@ public:
 
     // Connect inspector so double-click can open prefabs
     void SetInspector(InspectorPanel* inspector);
+    // Register a callback for asset selection changes.
+    void SetSelectionChangedCallback(AssetSelectionCallback callback) { m_selectionCallback = std::move(callback); }
 
     // Callback for loading tilesets
     using OnLoadTilesetCallback = std::function<void(const std::string&)>;
@@ -185,6 +190,7 @@ private:
     std::string m_selectedAsset;
     std::unordered_set<std::string> m_selectedAssets; // Multi-selection support
     std::string m_anchorAsset;                        // For shift-selection
+    AssetSelectionCallback m_selectionCallback;       // Selection change callback
 
     // Clipboard state
     std::vector<std::string> m_clipboardAssets;

@@ -19,6 +19,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/GUILayoutSystem.h"
+#include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
 #include "ecs/events/EventDispatcher.h"
@@ -26,15 +29,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AudioSystem.h"
-#include "ecs/systems/GUIInputSystem.h"
-#include "ecs/systems/GUILayoutSystem.h"
-#include "ecs/systems/GUIRenderSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
+#include "services/MemoryManager.h"
+#include "services/ResourceManager.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
 // Undefine potential Windows macros that conflict with enum names
@@ -57,6 +58,9 @@ namespace Engine {
 
         // Set global pointer to this application instance
         CORE = this;
+
+        // Force memory manager pool creation at load time
+        (void)MemoryManager::GetInstance();
 
         // Initialize crash dumping system
         CrashDumping::Initialize();
@@ -113,9 +117,6 @@ namespace Engine {
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
-        // Clear UI event queue
-        ECS::UIEventQueue::Clear();
-        
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
 
@@ -156,6 +157,7 @@ namespace Engine {
         m_audio->Update();
 
         // --- Scene Update ---
+        m_sceneManager.Update();
         auto* currentScene = m_sceneManager.GetActive();
         
         if (currentScene) {
@@ -200,6 +202,17 @@ namespace Engine {
 
         // Stop device change detection
         DeviceManager::StopAudioDeviceChangeDetection();
+
+        // Destroy ECS systems before tearing down rendering/audio backends.
+        ECS::World emptyWorld;
+        if (auto* activeScene = m_sceneManager.GetActive()) {
+            m_systemManager.DestroyAll(activeScene->GetWorld());
+        } else {
+            m_systemManager.DestroyAll(emptyWorld);
+        }
+
+        // Release cached graphics/audio resources while the backend is alive.
+        RM.ClearCache();
 
         // Clean up services
         if (m_scriptManager) {
@@ -329,7 +342,7 @@ namespace Engine {
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
-        m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
@@ -338,8 +351,6 @@ namespace Engine {
         
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
-        
-        // Register GUI systems
         m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
         m_systemManager.RegisterSystem<ECS::GUIInputSystem>();
         m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();

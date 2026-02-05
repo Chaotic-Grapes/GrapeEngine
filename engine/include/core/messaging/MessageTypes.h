@@ -140,6 +140,12 @@ namespace Messaging {
         std::string NewScene; // New scene name
     };
 
+    // Sent when the active scene is about to change (before transition).
+    struct SceneChanging {
+        std::string OldScene; // Previous scene name
+        std::string NewScene; // New scene name
+    };
+
     // Sent when the game is paused/unpaused.
     struct GamePaused {
         bool IsPaused; // True if the game is paused

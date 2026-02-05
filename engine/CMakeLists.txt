@@ -22,6 +22,8 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/src/*.c
 )
 
+# GlobalMemoryOverride.cpp is already picked up by GLOB_RECURSE above
+
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS 
     ${CMAKE_CURRENT_LIST_DIR}/include/*.h
     ${CMAKE_CURRENT_LIST_DIR}/include/*.hpp
@@ -80,6 +82,16 @@ target_include_directories(GrapeEngineLib PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
     ${CMAKE_CURRENT_LIST_DIR}/../externals/include
 )
+
+# ======================= Precompiled Headers =========================
+set(GRAPEENGINE_PCH_HEADER "${CMAKE_CURRENT_LIST_DIR}/include/pch.h")
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.16 AND EXISTS "${GRAPEENGINE_PCH_HEADER}")
+    target_precompile_headers(GrapeEngineLib PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${GRAPEENGINE_PCH_HEADER}>"
+    )
+else()
+    message(STATUS "Engine: Precompiled headers disabled (CMake >= 3.16 required)")
+endif()
 
 # ======================= Link Dependencies =========================
 # CoreCLR / .NET Hosting

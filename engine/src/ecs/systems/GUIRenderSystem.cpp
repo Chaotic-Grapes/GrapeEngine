@@ -1,941 +1,512 @@
-/* Start Header *****************************************************************/
-/*!
-\file   GUIRenderSystem.cpp
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\brief
-Implementation of GUI rendering system.
-*/
-/* End Header *******************************************************************/
-
 #include "ecs/systems/GUIRenderSystem.h"
-#include "ecs/systems/RendererSystem.h"
-#include "ecs/ui/GUIContext.h"
-#include "ecs/ui/GUIStyleRegistry.h"
-#include "ecs/ui/GUIUtilities.h"
-#include "ecs/ui/GUIHelpers.h"
-#include "ecs/StringTable.h"
-#include "math/Vector2D.h"
-#include "Color.h"
-#include "core/Logger.h"
+
 #include <algorithm>
-#include <unordered_set>
-
-namespace {
-    using ECS::Entity;
-    using ECS::World;
-    using ECS::Components::GUIButton;
-    using ECS::Components::GUIContainer;
-    using ECS::Components::GUIElement;
-    using ECS::Components::GUIPanel;
-    using ECS::Components::GUISeparator;
-    using ECS::Components::GUISlider;
-    using ECS::Components::GUICheckbox;
-    using ECS::Components::GUIDropdown;
-    using ECS::Components::GUIInputField;
-    using ECS::Components::GUIText;
-    using ECS::Components::GUIStyleRef;
-
-    const ECS::UI::GUIStyle* ResolveStyle(World& world, Entity entity) {
-        if (!world.Has<GUIStyleRef>(entity)) {
-            return nullptr;
-        }
-
-        const auto& styleRef = world.Get<GUIStyleRef>(entity);
-        if (styleRef.StyleId == 0) {
-            return nullptr;
-        }
-
-        return ECS::UI::GUIStyleRegistry::GetStyle(styleRef.StyleId);
-    }
-
-    Vector2D CenteredPosition(Vector2D topLeft, Vector2D size) {
-        return { topLeft.X + size.X * 0.5f, topLeft.Y + size.Y * 0.5f };
-    }
-
-    Vector2D ComputeAlignedTextPosition(const GUIElement& element, const GUIText& text,
-                                        const std::string& content,
-                                        const std::string& fontPath) {
-        const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(content, fontPath, text.FontSize);
-
-        const float contentWidth = std::max(0.0f, element.Size.X - element.PaddingLeft - element.PaddingRight);
-        const float contentHeight = std::max(0.0f, element.Size.Y - element.PaddingTop - element.PaddingBottom);
-
-        float x = element.WorldPosition.X + element.PaddingLeft;
-        switch (text.Alignment) {
-            case ECS::Components::GUIText::TextAlignment::Center:
-                x += (contentWidth - measured.X) * 0.5f;
-                break;
-            case ECS::Components::GUIText::TextAlignment::Right:
-                x += contentWidth - measured.X;
-                break;
-            case ECS::Components::GUIText::TextAlignment::Justified:
-            case ECS::Components::GUIText::TextAlignment::Left:
-            default:
-                break;
-        }
-
-        float y = element.WorldPosition.Y + element.PaddingTop;
-        switch (element.VAlign) {
-            case ECS::Components::VerticalAlignment::Middle:
-                y += (contentHeight - measured.Y) * 0.5f;
-                break;
-            case ECS::Components::VerticalAlignment::Bottom:
-                y += contentHeight - measured.Y;
-                break;
-            case ECS::Components::VerticalAlignment::Stretch:
-            case ECS::Components::VerticalAlignment::Top:
-            default:
-                break;
-        }
-
-        return { x, y };
-    }
-
-    Vector2D ComputeAlignedTextPosition(const GUIElement& element,
-                                        ECS::Components::GUIText::TextAlignment alignment,
-                                        const Vector2D& measured) {
-        const float contentWidth = std::max(0.0f, element.Size.X - element.PaddingLeft - element.PaddingRight);
-        const float contentHeight = std::max(0.0f, element.Size.Y - element.PaddingTop - element.PaddingBottom);
-
-        float x = element.WorldPosition.X + element.PaddingLeft;
-        switch (alignment) {
-            case ECS::Components::GUIText::TextAlignment::Center:
-                x += (contentWidth - measured.X) * 0.5f;
-                break;
-            case ECS::Components::GUIText::TextAlignment::Right:
-                x += contentWidth - measured.X;
-                break;
-            case ECS::Components::GUIText::TextAlignment::Justified:
-            case ECS::Components::GUIText::TextAlignment::Left:
-            default:
-                break;
-        }
-
-        float y = element.WorldPosition.Y + element.PaddingTop + (contentHeight - measured.Y) * 0.5f;
-        return { x, y };
-    }
-
-    std::vector<std::string> SplitOptions(const std::string& optionsText, uint32_t maxOptions) {
-        std::vector<std::string> options;
-        std::string current;
-        for (char c : optionsText) {
-            if (c == '\n') {
-                options.push_back(current);
-                current.clear();
-                if (options.size() >= maxOptions) {
-                    return options;
-                }
-            } else {
-                current.push_back(c);
-            }
-        }
-        if (!current.empty() && options.size() < maxOptions) {
-            options.push_back(current);
-        }
-        return options;
-    }
-
-    bool ResolveClipRect(World& world, Entity entity, Vector2D& outPos, Vector2D& outSize) {
-        auto* parent = world.TryGet<ECS::Components::Parent>(entity);
-        while (parent && !parent->ParentEntity.IsNull()) {
-            Entity parentEntity = parent->ParentEntity;
-            if (world.Has<ECS::Components::GUIScrollView>(parentEntity) &&
-                world.Has<ECS::Components::GUIElement>(parentEntity)) {
-                const auto& scroll = world.Get<ECS::Components::GUIScrollView>(parentEntity);
-                if (scroll.ClipContent) {
-                    const auto& parentElement = world.Get<ECS::Components::GUIElement>(parentEntity);
-                    outPos = {
-                        parentElement.WorldPosition.X + parentElement.PaddingLeft,
-                        parentElement.WorldPosition.Y + parentElement.PaddingTop
-                    };
-                    outSize = {
-                        std::max(0.0f, parentElement.Size.X - parentElement.PaddingLeft - parentElement.PaddingRight),
-                        std::max(0.0f, parentElement.Size.Y - parentElement.PaddingTop - parentElement.PaddingBottom)
-                    };
-                    return true;
-                }
-            }
-
-            parent = world.TryGet<ECS::Components::Parent>(parentEntity);
-        }
-
-        return false;
-    }
-
-    void LogMissingGUIElement(World& world) {
-        static std::unordered_set<uint32_t> loggedEntities;
-
-        auto logIfMissing = [&](Entity entity, const char* componentName) {
-            if (world.Has<GUIElement>(entity)) {
-                return;
-            }
-            if (!loggedEntities.insert(entity.Index).second) {
-                return;
-            }
-            LOG_WARNING("GUIRenderSystem: entity " << entity.Index
-                        << " has " << componentName << " without GUIElement");
-        };
-
-        world.Each<GUIPanel>([&](Entity entity, const GUIPanel&) {
-            logIfMissing(entity, "GUIPanel");
-        });
-        world.Each<GUIButton>([&](Entity entity, const GUIButton&) {
-            logIfMissing(entity, "GUIButton");
-        });
-        world.Each<GUIInputField>([&](Entity entity, const GUIInputField&) {
-            logIfMissing(entity, "GUIInputField");
-        });
-        world.Each<GUIText>([&](Entity entity, const GUIText&) {
-            logIfMissing(entity, "GUIText");
-        });
-        world.Each<GUISlider>([&](Entity entity, const GUISlider&) {
-            logIfMissing(entity, "GUISlider");
-        });
-        world.Each<GUICheckbox>([&](Entity entity, const GUICheckbox&) {
-            logIfMissing(entity, "GUICheckbox");
-        });
-        world.Each<GUIDropdown>([&](Entity entity, const GUIDropdown&) {
-            logIfMissing(entity, "GUIDropdown");
-        });
-        world.Each<GUISeparator>([&](Entity entity, const GUISeparator&) {
-            logIfMissing(entity, "GUISeparator");
-        });
-    }
-
-    void RenderPanel(World& world, Entity entity, const GUIElement& element, const GUIPanel& panel,
-                     bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color color = panel.BackgroundColor;
-        if (style && style->HasPanelColor) {
-            color = style->PanelColor;
-        }
-
-        ctx.RenderCommands.SubmitPanel(CenteredPosition(element.WorldPosition, element.Size),
-                                       element.Size, color, panel.BorderRadius,
-                                       clipEnabled, clipPos, clipSize);
-    }
-
-    void RenderButton(World& world, Entity entity, const GUIElement& element, const GUIButton& button,
-                      bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color colorNormal = button.ColorNormal;
-        Color colorHovered = button.ColorHovered;
-        Color colorPressed = button.ColorPressed;
-        Color colorDisabled = button.ColorDisabled;
-
-        if (style && style->HasButtonColors) {
-            colorNormal = style->ButtonNormal;
-            colorHovered = style->ButtonHovered;
-            colorPressed = style->ButtonPressed;
-            colorDisabled = style->ButtonDisabled;
-        }
-
-        Color bgColor;
-        switch (button.State) {
-            case ECS::Components::ButtonState::Hovered:
-                bgColor = colorHovered;
-                break;
-            case ECS::Components::ButtonState::Pressed:
-                bgColor = colorPressed;
-                break;
-            case ECS::Components::ButtonState::Disabled:
-                bgColor = colorDisabled;
-                break;
-            case ECS::Components::ButtonState::Normal:
-            default:
-                bgColor = colorNormal;
-                break;
-        }
-
-        ctx.RenderCommands.SubmitPanel(CenteredPosition(element.WorldPosition, element.Size),
-                                       element.Size, bgColor, 0.0f,
-                                       clipEnabled, clipPos, clipSize);
-
-        if (button.Label != 0) {
-            Color textColor{1.0f, 1.0f, 1.0f, 1.0f};
-            uint32_t fontPath = 0;
-            Color shadowColor{0.0f, 0.0f, 0.0f, 0.0f};
-            Vector2D shadowOffset{0.0f, 0.0f};
-            ECS::Components::GUIText::TextAlignment alignment = ECS::Components::GUIText::TextAlignment::Center;
-            float fontSize = 16.0f;
-
-            if (button.UseLabelTextSettings) {
-                textColor = button.LabelTextSettings.TextColor;
-                fontPath = button.LabelTextSettings.FontPath;
-                shadowColor = button.LabelTextSettings.ShadowColor;
-                shadowOffset = button.LabelTextSettings.ShadowOffset;
-                alignment = button.LabelTextSettings.Alignment;
-                fontSize = button.LabelTextSettings.FontSize;
-            }
-
-            if (style) {
-                if (style->HasTextColor) {
-                    textColor = style->TextColor;
-                }
-                if (style->HasFontPath) {
-                    if (fontPath == 0) {
-                        fontPath = style->FontPath;
-                    }
-                }
-                if (style->HasTextShadow) {
-                    shadowColor = style->TextShadowColor;
-                    shadowOffset = style->TextShadowOffset;
-                }
-                if (style->HasTextFontSize && !button.UseLabelTextSettings) {
-                    fontSize = style->TextFontSize;
-                }
-            }
-
-            const std::string& content = ctx.StringCache.Resolve(button.Label);
-            const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-            const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(content, fontPathStr, fontSize);
-            Vector2D textPos = ComputeAlignedTextPosition(element, alignment, measured);
-
-            ctx.RenderCommands.SubmitText(fontPath, button.Label, textPos, textColor, fontSize,
-                                          shadowColor, shadowOffset,
-                                          clipEnabled, clipPos, clipSize);
-        }
-    }
-
-    void RenderText(World& world, Entity entity, const GUIElement& element, const GUIText& text,
-                    bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color fontColor = text.FontColor;
-        uint32_t fontPath = text.FontPath;
-        float fontSize = text.FontSize;
-        Color shadowColor = text.ShadowColor;
-        Vector2D shadowOffset = text.ShadowOffset;
-
-        if (style) {
-            if (style->HasTextColor) {
-                fontColor = style->TextColor;
-            }
-            if (style->HasFontPath) {
-                fontPath = style->FontPath;
-            }
-            if (style->HasTextFontSize) {
-                fontSize = style->TextFontSize;
-            }
-            if (style->HasTextShadow) {
-                shadowColor = style->TextShadowColor;
-                shadowOffset = style->TextShadowOffset;
-            }
-        }
-
-        const std::string& content = ctx.StringCache.Resolve(text.Content);
-        const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-        GUIText measureText = text;
-        measureText.FontSize = fontSize;
-        const Vector2D textPos = ComputeAlignedTextPosition(element, measureText, content, fontPathStr);
-
-        ctx.RenderCommands.SubmitText(fontPath, text.Content, textPos,
-                                      fontColor, fontSize,
-                                      shadowColor, shadowOffset,
-                                      clipEnabled, clipPos, clipSize);
-    }
-
-    void RenderSlider(World& world, Entity entity, const GUIElement& element, const GUISlider& slider,
-                      bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color background = slider.BackgroundColor;
-        Color handle = slider.HandleColor;
-
-        if (style && style->HasSliderColors) {
-            background = style->SliderBackground;
-            handle = style->SliderHandle;
-        }
-
-        float normalizedValue = (slider.CurrentValue - slider.MinValue) /
-                                (slider.MaxValue - slider.MinValue);
-        normalizedValue = std::max(0.0f, std::min(1.0f, normalizedValue));
-
-        ctx.RenderCommands.SubmitSlider(CenteredPosition(element.WorldPosition, element.Size),
-                                        element.Size,
-                                        normalizedValue, background, handle,
-                                        clipEnabled, clipPos, clipSize);
-    }
-
-    void RenderCheckbox(World& world, Entity entity, const GUIElement& element, const GUICheckbox& checkbox,
-                        bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color checked = checkbox.CheckedColor;
-        Color unchecked = checkbox.UncheckedColor;
-        Color border = checkbox.BorderColor;
-        Color textColor{1.0f, 1.0f, 1.0f, 1.0f};
-        uint32_t fontPath = 0;
-        Color shadowColor{0.0f, 0.0f, 0.0f, 0.0f};
-        Vector2D shadowOffset{0.0f, 0.0f};
-        ECS::Components::GUIText::TextAlignment labelAlignment = ECS::Components::GUIText::TextAlignment::Left;
-        float labelFontSize = checkbox.LabelFontSize;
-
-        if (style && style->HasCheckboxColors) {
-            checked = style->CheckboxChecked;
-            unchecked = style->CheckboxUnchecked;
-            border = style->CheckboxBorder;
-        }
-        if (checkbox.UseLabelTextSettings) {
-            textColor = checkbox.LabelTextSettings.TextColor;
-            fontPath = checkbox.LabelTextSettings.FontPath;
-            shadowColor = checkbox.LabelTextSettings.ShadowColor;
-            shadowOffset = checkbox.LabelTextSettings.ShadowOffset;
-            labelAlignment = checkbox.LabelTextSettings.Alignment;
-            labelFontSize = checkbox.LabelTextSettings.FontSize;
-        } else {
-            switch (checkbox.LabelAlignment) {
-                case ECS::Components::HorizontalAlignment::Center:
-                    labelAlignment = ECS::Components::GUIText::TextAlignment::Center;
-                    break;
-                case ECS::Components::HorizontalAlignment::Right:
-                    labelAlignment = ECS::Components::GUIText::TextAlignment::Right;
-                    break;
-                case ECS::Components::HorizontalAlignment::Stretch:
-                case ECS::Components::HorizontalAlignment::Left:
-                default:
-                    break;
-            }
-        }
-
-        if (style) {
-            if (style->HasTextColor) {
-                textColor = style->TextColor;
-            }
-            if (style->HasFontPath) {
-                fontPath = style->FontPath;
-            }
-            if (style->HasTextShadow) {
-                shadowColor = style->TextShadowColor;
-                shadowOffset = style->TextShadowOffset;
-            }
-            if (style->HasTextFontSize && !checkbox.UseLabelTextSettings) {
-                labelFontSize = style->TextFontSize;
-            }
-        }
-
-        if (!checkbox.Interactable) {
-            checked.A *= 0.6f;
-            unchecked.A *= 0.6f;
-            textColor.A *= 0.6f;
-        }
-
-        Color boxColor = checkbox.IsChecked ? checked : unchecked;
-        const float contentWidth = std::max(0.0f, element.Size.X - element.PaddingLeft - element.PaddingRight);
-        const float contentHeight = std::max(0.0f, element.Size.Y - element.PaddingTop - element.PaddingBottom);
-        float checkSize = checkbox.CheckSize > 0.0f ? checkbox.CheckSize : contentHeight;
-        if (contentHeight > 0.0f) {
-            checkSize = std::min(checkSize, contentHeight);
-        }
-
-        const Vector2D boxCenter{
-            element.WorldPosition.X + element.PaddingLeft + checkSize * 0.5f,
-            element.WorldPosition.Y + element.PaddingTop + contentHeight * 0.5f
-        };
-
-        ctx.RenderCommands.SubmitCheckbox(boxCenter,
-                                          { checkSize, checkSize },
-                                          checkbox.IsChecked, boxColor, checked, border,
-                                          clipEnabled, clipPos, clipSize);
-
-        if (checkbox.Label != 0) {
-            constexpr float kLabelSpacing = 6.0f;
-            const std::string& content = ctx.StringCache.Resolve(checkbox.Label);
-            const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-            const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(content, fontPathStr, labelFontSize);
-
-            const float labelStartX = element.WorldPosition.X + element.PaddingLeft + checkSize + kLabelSpacing;
-            float labelWidth = element.WorldPosition.X + element.PaddingLeft + contentWidth - labelStartX;
-            if (labelWidth < 0.0f) {
-                labelWidth = 0.0f;
-            }
-
-            float textX = labelStartX;
-            switch (labelAlignment) {
-                case ECS::Components::GUIText::TextAlignment::Center:
-                    textX = labelStartX + (labelWidth - measured.X) * 0.5f;
-                    break;
-                case ECS::Components::GUIText::TextAlignment::Right:
-                    textX = labelStartX + (labelWidth - measured.X);
-                    break;
-                case ECS::Components::GUIText::TextAlignment::Justified:
-                case ECS::Components::GUIText::TextAlignment::Left:
-                default:
-                    break;
-            }
-
-            Vector2D textPos{
-                textX,
-                element.WorldPosition.Y + element.PaddingTop + (contentHeight - measured.Y) * 0.5f
-            };
-
-            ctx.RenderCommands.SubmitText(fontPath, checkbox.Label, textPos,
-                                          textColor, labelFontSize,
-                                          shadowColor, shadowOffset,
-                                          clipEnabled, clipPos, clipSize);
-        }
-    }
-
-    void RenderDropdown(World& world, Entity entity, const GUIElement& element, const GUIDropdown& dropdown,
-                        bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-
-        Color background = dropdown.BackgroundColor;
-        Color highlight = dropdown.HighlightColor;
-        Color textColor{1.0f, 1.0f, 1.0f, 1.0f};
-        uint32_t fontPath = 0;
-        float fontSize = 16.0f;
-        Color shadowColor{0.0f, 0.0f, 0.0f, 0.0f};
-        Vector2D shadowOffset{0.0f, 0.0f};
-        ECS::Components::GUIText::TextAlignment alignment = ECS::Components::GUIText::TextAlignment::Left;
-
-        if (style && style->HasDropdownColors) {
-            background = style->DropdownBackground;
-            highlight = style->DropdownHighlight;
-        }
-        if (dropdown.UseOptionTextSettings) {
-            textColor = dropdown.OptionTextSettings.TextColor;
-            fontPath = dropdown.OptionTextSettings.FontPath;
-            fontSize = dropdown.OptionTextSettings.FontSize;
-            shadowColor = dropdown.OptionTextSettings.ShadowColor;
-            shadowOffset = dropdown.OptionTextSettings.ShadowOffset;
-            alignment = dropdown.OptionTextSettings.Alignment;
-        }
-        if (style) {
-            if (style->HasTextColor) {
-                textColor = style->TextColor;
-            }
-            if (style->HasFontPath && fontPath == 0) {
-                fontPath = style->FontPath;
-            }
-            if (style->HasTextFontSize && !dropdown.UseOptionTextSettings) {
-                fontSize = style->TextFontSize;
-            }
-            if (style->HasTextShadow) {
-                shadowColor = style->TextShadowColor;
-                shadowOffset = style->TextShadowOffset;
-            }
-        }
-
-        ctx.RenderCommands.SubmitPanel(CenteredPosition(element.WorldPosition, element.Size),
-                                       element.Size, background, 0.0f,
-                                       clipEnabled, clipPos, clipSize);
-
-            const std::string& optionTextRaw = ctx.StringCache.Resolve(dropdown.Options);
-            const auto options = SplitOptions(optionTextRaw, dropdown.OptionCount);
-            if (!options.empty() && dropdown.SelectedIndex < options.size()) {
-                const std::string& selected = options[dropdown.SelectedIndex];
-                const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-                const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(selected, fontPathStr, fontSize);
-                Vector2D textPos = ComputeAlignedTextPosition(element, alignment, measured);
-                ctx.RenderCommands.SubmitText(fontPath, ECS::StringTable::Intern(selected), textPos,
-                                              textColor, fontSize, shadowColor, shadowOffset,
-                                              clipEnabled, clipPos, clipSize);
-            }
-
-        if (dropdown.IsOpen && dropdown.OptionCount > 0) {
-            for (uint32_t i = 0; i < dropdown.OptionCount && i < ECS::Components::GUIDropdown::MaxOptions; ++i) {
-                Vector2D optionPos = element.WorldPosition;
-                optionPos.Y += element.Size.Y * (i + 1);
-
-                Color optionColor = (i == dropdown.SelectedIndex) ? highlight : background;
-                ctx.RenderCommands.SubmitPanel(CenteredPosition(optionPos, element.Size),
-                                               element.Size, optionColor, 0.0f,
-                                               clipEnabled, clipPos, clipSize);
-
-                if (i < options.size()) {
-                    GUIElement optionElement = element;
-                    optionElement.WorldPosition = optionPos;
-                    const std::string& optionText = options[i];
-                    const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-                    const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(optionText, fontPathStr, fontSize);
-                    Vector2D textPos = ComputeAlignedTextPosition(optionElement, alignment, measured);
-                    ctx.RenderCommands.SubmitText(fontPath, ECS::StringTable::Intern(optionText), textPos,
-                                                  textColor, fontSize, shadowColor, shadowOffset,
-                                                  clipEnabled, clipPos, clipSize);
-                }
-            }
-        }
-    }
-
-    void RenderInputField(World& world, Entity entity, const GUIElement& element, const GUIInputField& input,
-                          bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const ECS::UI::GUIStyle* style = ResolveStyle(world, entity);
-        Color background = input.BackgroundColor;
-        Color textColor = input.TextColor;
-        uint32_t fontPath = input.FontPath;
-        float fontSize = input.FontSize;
-        Color shadowColor{0.0f, 0.0f, 0.0f, 0.0f};
-        Vector2D shadowOffset{0.0f, 0.0f};
-        ECS::Components::GUIText::TextAlignment alignment = ECS::Components::GUIText::TextAlignment::Left;
-
-        if (input.UseTextSettings) {
-            textColor = input.TextSettings.TextColor;
-            fontPath = input.TextSettings.FontPath;
-            fontSize = input.TextSettings.FontSize;
-            shadowColor = input.TextSettings.ShadowColor;
-            shadowOffset = input.TextSettings.ShadowOffset;
-            alignment = input.TextSettings.Alignment;
-        }
-
-        if (style) {
-            if (style->HasInputColors) {
-                background = style->InputBackground;
-                textColor = style->InputText;
-            }
-            if (style->HasTextColor) {
-                textColor = style->TextColor;
-            }
-            if (style->HasFontPath && fontPath == 0) {
-                fontPath = style->FontPath;
-            }
-            if (style->HasTextFontSize && !input.UseTextSettings) {
-                fontSize = style->TextFontSize;
-            }
-            if (style->HasTextShadow) {
-                shadowColor = style->TextShadowColor;
-                shadowOffset = style->TextShadowOffset;
-            }
-        }
-
-        ctx.RenderCommands.SubmitPanel(CenteredPosition(element.WorldPosition, element.Size),
-                                       element.Size, background, 0.0f,
-                                       clipEnabled, clipPos, clipSize);
-
-        uint32_t textId = input.Content != 0 ? input.Content : input.Placeholder;
-        if (textId != 0) {
-            if (input.Content == 0) {
-                if (input.UsePlaceholderSettings) {
-                    textColor = input.PlaceholderSettings.TextColor;
-                    fontPath = input.PlaceholderSettings.FontPath;
-                    fontSize = input.PlaceholderSettings.FontSize;
-                    shadowColor = input.PlaceholderSettings.ShadowColor;
-                    shadowOffset = input.PlaceholderSettings.ShadowOffset;
-                    alignment = input.PlaceholderSettings.Alignment;
-                } else {
-                    textColor.A *= 0.6f;
-                    if (style && style->HasInputColors) {
-                        textColor = style->InputPlaceholder;
-                    }
-                }
-            }
-
-            const std::string& content = ctx.StringCache.Resolve(textId);
-            const std::string& fontPathStr = ctx.StringCache.Resolve(fontPath);
-            const Vector2D measured = ECS::UI::GUITextUtils::MeasureText(content, fontPathStr, fontSize);
-            Vector2D textPos = ComputeAlignedTextPosition(element, alignment, measured);
-            ctx.RenderCommands.SubmitText(fontPath, textId, textPos,
-                                          textColor, fontSize,
-                                          shadowColor, shadowOffset,
-                                          clipEnabled, clipPos, clipSize);
-        }
-    }
-
-    void RenderSeparator(World& world, Entity entity, const GUIElement& element, const GUISeparator& separator,
-                         bool clipEnabled, Vector2D clipPos, Vector2D clipSize) {
-        (void)world;
-        (void)entity;
-        auto& ctx = ECS::UI::GUIContext::Get();
-
-        Vector2D startPos, endPos;
-        if (separator.Orient == ECS::Components::GUISeparator::Orientation::Horizontal) {
-            float centerY = element.WorldPosition.Y + element.Size.Y * 0.5f;
-            startPos = { element.WorldPosition.X, centerY };
-            endPos = { element.WorldPosition.X + element.Size.X, centerY };
-        } else {
-            float centerX = element.WorldPosition.X + element.Size.X * 0.5f;
-            startPos = { centerX, element.WorldPosition.Y };
-            endPos = { centerX, element.WorldPosition.Y + element.Size.Y };
-        }
-
-        ctx.RenderCommands.SubmitLine(startPos, endPos, separator.Color, separator.Thickness,
-                                      clipEnabled, clipPos, clipSize);
-    }
-
-    void RenderElement(World& world, Entity entity) {
-        if (!world.Has<GUIElement>(entity)) {
-            return;
-        }
-
-        const auto& element = world.Get<GUIElement>(entity);
-        if (!element.Active || !element.Visible) {
-            return;
-        }
-
-        auto& ctx = ECS::UI::GUIContext::Get();
-        auto visualElement = element;
-        const auto visualIt = ctx.VisualStates.find(entity.Index);
-        if (visualIt != ctx.VisualStates.end()) {
-            const float scale = std::max(0.01f, visualIt->second.CurrentScale);
-            const Vector2D scaledSize{ element.Size.X * scale, element.Size.Y * scale };
-            const Vector2D offset{
-                (element.Size.X - scaledSize.X) * 0.5f,
-                (element.Size.Y - scaledSize.Y) * 0.5f
-            };
-            visualElement.Size = scaledSize;
-            visualElement.WorldPosition = { element.WorldPosition.X + offset.X, element.WorldPosition.Y + offset.Y };
-        }
-
-        Vector2D clipPos{};
-        Vector2D clipSize{};
-        const bool clipEnabled = ResolveClipRect(world, entity, clipPos, clipSize);
-
-        if (world.Has<GUIPanel>(entity)) {
-            RenderPanel(world, entity, visualElement, world.Get<GUIPanel>(entity),
-                        clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUIButton>(entity)) {
-            RenderButton(world, entity, visualElement, world.Get<GUIButton>(entity),
-                         clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUIInputField>(entity)) {
-            RenderInputField(world, entity, visualElement, world.Get<GUIInputField>(entity),
-                             clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUIText>(entity)) {
-            RenderText(world, entity, visualElement, world.Get<GUIText>(entity),
-                       clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUISlider>(entity)) {
-            RenderSlider(world, entity, visualElement, world.Get<GUISlider>(entity),
-                         clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUICheckbox>(entity)) {
-            RenderCheckbox(world, entity, visualElement, world.Get<GUICheckbox>(entity),
-                           clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUIDropdown>(entity)) {
-            RenderDropdown(world, entity, visualElement, world.Get<GUIDropdown>(entity),
-                           clipEnabled, clipPos, clipSize);
-        }
-        if (world.Has<GUISeparator>(entity)) {
-            RenderSeparator(world, entity, visualElement, world.Get<GUISeparator>(entity),
-                            clipEnabled, clipPos, clipSize);
-        }
-
-        if (visualIt != ctx.VisualStates.end() && visualIt->second.HasOverlay) {
-            const auto& overlay = visualIt->second.OverlayColor;
-            ctx.RenderCommands.SubmitPanel(
-                CenteredPosition(visualElement.WorldPosition, visualElement.Size),
-                visualElement.Size,
-                overlay,
-                0.0f,
-                clipEnabled, clipPos, clipSize);
-        }
-    }
-
-    void FlushRenderCommands(ECS::RendererSystem* rendererSystem) {
-        if (!rendererSystem) {
-            return;
-        }
-
-        auto& ctx = ECS::UI::GUIContext::Get();
-        static const std::string kDefaultFont = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf";
-        const float scale = (ctx.CanvasScale > 0.0f) ? ctx.CanvasScale : 1.0f;
-        const Vector2D offset = ctx.CanvasOffset;
-
-        for (const auto& cmd : ctx.RenderCommands.Commands()) {
-            const bool clipEnabled = cmd.ClipEnabled;
-            const Vector2D clipPos{
-                cmd.ClipPosition.X * scale + offset.X,
-                cmd.ClipPosition.Y * scale + offset.Y
-            };
-            const Vector2D clipSize{
-                cmd.ClipSize.X * scale,
-                cmd.ClipSize.Y * scale
-            };
-
-            switch (cmd.Type) {
-                case ECS::UI::GUIRenderCommandType::Panel:
-                    rendererSystem->SubmitGUIPanel(
-                        { cmd.Position.X * scale + offset.X, cmd.Position.Y * scale + offset.Y },
-                        { cmd.Size.X * scale, cmd.Size.Y * scale },
-                        cmd.PrimaryColor,
-                        cmd.ScalarA * scale,
-                        clipEnabled, clipPos, clipSize);
-                    break;
-                case ECS::UI::GUIRenderCommandType::Text: {
-                    const std::string& resolvedFont = ctx.StringCache.Resolve(cmd.FontId);
-                    const std::string& fontPath = resolvedFont.empty() ? kDefaultFont : resolvedFont;
-                    const std::string& content = ctx.StringCache.Resolve(cmd.TextId);
-                    rendererSystem->SubmitGUIText(
-                        fontPath,
-                        content,
-                        { cmd.Position.X * scale + offset.X, cmd.Position.Y * scale + offset.Y },
-                        cmd.PrimaryColor,
-                        cmd.ScalarA * scale,
-                        cmd.SecondaryColor,
-                        { cmd.Offset.X * scale, cmd.Offset.Y * scale },
-                        clipEnabled, clipPos, clipSize);
-                    break;
-                }
-                case ECS::UI::GUIRenderCommandType::Slider:
-                    rendererSystem->SubmitGUISlider(
-                        { cmd.Position.X * scale + offset.X, cmd.Position.Y * scale + offset.Y },
-                        { cmd.Size.X * scale, cmd.Size.Y * scale },
-                        cmd.ScalarA,
-                        cmd.PrimaryColor,
-                        cmd.SecondaryColor,
-                        Color(200U, 200U, 200U, 255U),
-                        4.0f,
-                        clipEnabled, clipPos, clipSize);
-                    break;
-                case ECS::UI::GUIRenderCommandType::Checkbox:
-                    rendererSystem->SubmitGUICheckbox(
-                        { cmd.Position.X * scale + offset.X, cmd.Position.Y * scale + offset.Y },
-                        { cmd.Size.X * scale, cmd.Size.Y * scale },
-                        cmd.Flag,
-                        cmd.PrimaryColor,
-                        cmd.SecondaryColor,
-                        cmd.TertiaryColor,
-                        clipEnabled, clipPos, clipSize);
-                    break;
-                case ECS::UI::GUIRenderCommandType::Line:
-                    rendererSystem->SubmitGUILine(
-                        { cmd.Position.X * scale + offset.X, cmd.Position.Y * scale + offset.Y },
-                        { cmd.End.X * scale + offset.X, cmd.End.Y * scale + offset.Y },
-                        cmd.PrimaryColor,
-                        cmd.ScalarA * scale,
-                        clipEnabled, clipPos, clipSize);
-                    break;
-            }
-        }
-    }
-
-    void SubmitRectOutline(ECS::UI::GUIRenderCommandBuffer& buffer, Vector2D pos, Vector2D size,
-                           const Color& color, float thickness) {
-        Vector2D topLeft = pos;
-        Vector2D topRight{ pos.X + size.X, pos.Y };
-        Vector2D bottomLeft{ pos.X, pos.Y + size.Y };
-        Vector2D bottomRight{ pos.X + size.X, pos.Y + size.Y };
-
-        buffer.SubmitLine(topLeft, topRight, color, thickness);
-        buffer.SubmitLine(topRight, bottomRight, color, thickness);
-        buffer.SubmitLine(bottomRight, bottomLeft, color, thickness);
-        buffer.SubmitLine(bottomLeft, topLeft, color, thickness);
-    }
-
-    void RenderDebugOverlay(World& world, const ECS::Components::GUICanvas& canvasSettings) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        const Color boundsColor = canvasSettings.DebugBoundsColor;
-        const Color paddingColor = canvasSettings.DebugPaddingColor;
-        const Color anchorColor = canvasSettings.DebugAnchorColor;
-        constexpr float kLineThickness = 1.0f;
-        constexpr float kAnchorSize = 6.0f;
-
-        world.Each<GUIElement>([&](Entity entity, const GUIElement& element) {
-            if (!element.Active || !element.Visible) {
-                return;
-            }
-
-            SubmitRectOutline(ctx.RenderCommands, element.WorldPosition, element.Size,
-                              boundsColor, kLineThickness);
-
-            Vector2D innerPos{
-                element.WorldPosition.X + element.PaddingLeft,
-                element.WorldPosition.Y + element.PaddingTop
-            };
-            Vector2D innerSize{
-                std::max(0.0f, element.Size.X - element.PaddingLeft - element.PaddingRight),
-                std::max(0.0f, element.Size.Y - element.PaddingTop - element.PaddingBottom)
-            };
-            if (innerSize.X > 0.0f && innerSize.Y > 0.0f) {
-                SubmitRectOutline(ctx.RenderCommands, innerPos, innerSize,
-                                  paddingColor, kLineThickness);
-            }
-
-            if (const auto* parent = world.TryGet<ECS::Components::Parent>(entity)) {
-                if (!parent->ParentEntity.IsNull() && world.Has<GUIElement>(parent->ParentEntity)) {
-                    const auto& parentElement = world.Get<GUIElement>(parent->ParentEntity);
-                    Vector2D anchorPos{
-                        parentElement.WorldPosition.X + element.AnchorMin.X * parentElement.Size.X,
-                        parentElement.WorldPosition.Y + element.AnchorMin.Y * parentElement.Size.Y
-                    };
-                    Vector2D left{ anchorPos.X - kAnchorSize, anchorPos.Y };
-                    Vector2D right{ anchorPos.X + kAnchorSize, anchorPos.Y };
-                    Vector2D top{ anchorPos.X, anchorPos.Y - kAnchorSize };
-                    Vector2D bottom{ anchorPos.X, anchorPos.Y + kAnchorSize };
-                    ctx.RenderCommands.SubmitLine(left, right, anchorColor, kLineThickness);
-                    ctx.RenderCommands.SubmitLine(top, bottom, anchorColor, kLineThickness);
-                }
-            }
-        });
-    }
-}
+#include <cctype>
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+#include "ecs/Components.h"
+#include "ecs/systems/RendererSystem.h"
+#include "graphics/font.hpp"
+#include "graphics/texture.hpp"
+#include "services/ResourceManager.h"
 
 namespace ECS {
+    namespace {
+        enum class GUIState {
+            Normal,
+            Hovered,
+            Pressed,
+            Disabled
+        };
+
+        // Resolve interaction state from input + disabled flag.
+        GUIState ResolveState(const Components::GUIInput* input, bool disabled) {
+            if (disabled) {
+                return GUIState::Disabled;
+            }
+            if (input && input->Pressed) {
+                return GUIState::Pressed;
+            }
+            if (input && input->Hovered) {
+                return GUIState::Hovered;
+            }
+            return GUIState::Normal;
+        }
+
+        // Pick a style color for the given GUI state (or fallback if no style component).
+        Color ResolveStyleColor(const Components::GUIStateStyle* style, const Color& fallback, GUIState state) {
+            if (!style) {
+                return fallback;
+            }
+
+            switch (state) {
+            case GUIState::Hovered:
+                return style->HoverColor;
+            case GUIState::Pressed:
+                return style->PressedColor;
+            case GUIState::Disabled:
+                return style->DisabledColor;
+            case GUIState::Normal:
+            default:
+                return style->NormalColor;
+            }
+        }
+
+        // Approximate line width using glyph advances and tracking.
+        float MeasureLineWidth(const Font& font, std::string_view line, float pixelSize) {
+            const float scale = pixelSize / static_cast<float>(font.getPixelSize());
+            const float tracking = 1.05f;
+            float width = 0.0f;
+            for (char c : line) {
+                const Glyph& g = font.getGlyph(c);
+                width += g.advance * scale * tracking;
+            }
+            return width;
+        }
+
+        // Split text into lines, optionally wrapping to maxWidth.
+        std::vector<std::string> WrapText(const Font& font, const std::string& text, float pixelSize, float maxWidth, bool wrap) {
+            std::vector<std::string> lines;
+            if (text.empty()) {
+                return lines;
+            }
+
+            const float scale = pixelSize / static_cast<float>(font.getPixelSize());
+            const float tracking = 1.05f;
+
+            // Measure a token (word or whitespace chunk).
+            auto tokenWidth = [&](std::string_view token) {
+                float width = 0.0f;
+                for (char c : token) {
+                    const Glyph& g = font.getGlyph(c);
+                    width += g.advance * scale * tracking;
+                }
+                return width;
+            };
+
+            std::string line;
+            float lineWidth = 0.0f;
+            std::string token;
+
+            // Append pending token to the line and handle wrapping.
+            auto flushToken = [&](bool forceNewLine) {
+                if (token.empty()) {
+                    return;
+                }
+
+                const float tokenW = tokenWidth(token);
+                const bool canWrap = wrap && maxWidth > 0.0f;
+                if (canWrap && !line.empty() && (lineWidth + tokenW) > maxWidth && !forceNewLine) {
+                    lines.push_back(line);
+                    line.clear();
+                    lineWidth = 0.0f;
+                }
+
+                line += token;
+                lineWidth += tokenW;
+                token.clear();
+            };
+
+            // Walk characters and build tokens (whitespace is handled separately).
+            for (size_t i = 0; i < text.size(); ++i) {
+                const char c = text[i];
+                if (c == '\n') {
+                    flushToken(true);
+                    lines.push_back(line);
+                    line.clear();
+                    lineWidth = 0.0f;
+                    continue;
+                }
+
+                if (std::isspace(static_cast<unsigned char>(c))) {
+                    flushToken(false);
+                    const std::string space(1, c);
+                    const float spaceW = tokenWidth(space);
+                    const bool canWrap = wrap && maxWidth > 0.0f;
+                    if (canWrap && !line.empty() && (lineWidth + spaceW) > maxWidth) {
+                        lines.push_back(line);
+                        line.clear();
+                        lineWidth = 0.0f;
+                    }
+                    if (!line.empty() || c != ' ') {
+                        line += space;
+                        lineWidth += spaceW;
+                    }
+                    continue;
+                }
+
+                token.push_back(c);
+            }
+
+            // Flush the final token and ensure we emit at least one line.
+            flushToken(false);
+            if (!line.empty() || lines.empty()) {
+                lines.push_back(line);
+            }
+
+            return lines;
+        }
+    }
 
     void GUIRenderSystem::OnCreate(World& world) {
         (void)world;
-        LOG_INFO("GUIRenderSystem initialized");
     }
 
     void GUIRenderSystem::OnUpdate(World& world) {
-        RendererSystem* rendererSystem = RendererSystem::GetInstance();
-        if (!rendererSystem) {
-            LOG_WARNING("GUIRenderSystem::OnUpdate: RendererSystem not available");
+        auto* renderer = RendererSystem::GetInstance();
+        if (!renderer) {
             return;
         }
 
-        LogMissingGUIElement(world);
+        // Flatten GUI components into a sortable list for stable draw order.
+        struct RenderItem {
+            int16_t zOrder;
+            Entity entity;
+            enum class Type { Panel, Text, Image, Button, Slider } type;
+        };
 
-        auto elements = UI::GetSortedGUIElements(world);
-        for (Entity entity : elements) {
-            if (world.IsAlive(entity)) {
-                RenderElement(world, entity);
+        std::vector<RenderItem> items;
+        auto pushItem = [&](Entity entity, const Components::GUIElement& element, RenderItem::Type type) {
+            if (!element.Visible) {
+                return;
+            }
+            items.push_back(RenderItem{ element.ZOrder, entity, type });
+        };
+
+        world.Each<Components::GUIElement, Components::GUIPanel>(
+            [&](Entity entity, const Components::GUIElement& element, const Components::GUIPanel&) {
+                pushItem(entity, element, RenderItem::Type::Panel);
+            });
+
+        world.Each<Components::GUIElement, Components::GUIText>(
+            [&](Entity entity, const Components::GUIElement& element, const Components::GUIText&) {
+                pushItem(entity, element, RenderItem::Type::Text);
+            });
+
+        world.Each<Components::GUIElement, Components::GUIImage>(
+            [&](Entity entity, const Components::GUIElement& element, const Components::GUIImage&) {
+                pushItem(entity, element, RenderItem::Type::Image);
+            });
+
+        world.Each<Components::GUIElement, Components::GUIButton>(
+            [&](Entity entity, const Components::GUIElement& element, const Components::GUIButton&) {
+                pushItem(entity, element, RenderItem::Type::Button);
+            });
+
+        world.Each<Components::GUIElement, Components::GUISlider>(
+            [&](Entity entity, const Components::GUIElement& element, const Components::GUISlider&) {
+                pushItem(entity, element, RenderItem::Type::Slider);
+            });
+
+        // Sort all GUI elements by Z order before submitting to the renderer.
+        std::sort(items.begin(), items.end(),
+            [](const RenderItem& a, const RenderItem& b) { return a.zOrder < b.zOrder; });
+
+        for (const auto& item : items) {
+            const auto& element = world.Get<Components::GUIElement>(item.entity);
+            if (element.ResolvedSize.X <= 0.0f || element.ResolvedSize.Y <= 0.0f) {
+                continue;
+            }
+
+            // Use resolved size to compute per-element scale for padding, icons, and fonts.
+            const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+            const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+
+            // Cache common optional components for styling decisions.
+            const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
+                ? &world.Get<Components::GUIInput>(item.entity)
+                : nullptr;
+            const Components::GUIStateStyle* style = world.Has<Components::GUIStateStyle>(item.entity)
+                ? &world.Get<Components::GUIStateStyle>(item.entity)
+                : nullptr;
+
+            // Detect disabled state from component type (used for styling).
+            bool disabled = false;
+            if (world.Has<Components::GUIButton>(item.entity)) {
+                disabled = world.Get<Components::GUIButton>(item.entity).Disabled;
+            } else if (world.Has<Components::GUISlider>(item.entity)) {
+                disabled = world.Get<Components::GUISlider>(item.entity).Disabled;
+            }
+            const GUIState state = ResolveState(input, disabled);
+
+            switch (item.type) {
+            case RenderItem::Type::Panel: {
+                const auto& panel = world.Get<Components::GUIPanel>(item.entity);
+                const Color panelColor = ResolveStyleColor(style, panel.Color, state);
+                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                break;
+            }
+            case RenderItem::Type::Text: {
+                const auto& text = world.Get<Components::GUIText>(item.entity);
+                const std::string textValue = text.GetText();
+                if (textValue.empty()) {
+                    break;
+                }
+
+                // Load the font to measure text for wrapping/alignment.
+                const std::string fontPath = text.GetFontPath();
+                const float pixelSize = text.FontSize * scaleX;
+                const int fontSize = std::max(1, static_cast<int>(std::round(pixelSize)));
+                auto font = RM.GetFont(fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : fontPath, fontSize);
+                if (!font) {
+                    break;
+                }
+
+                // Build wrapped lines and compute total height for vertical alignment.
+                const float maxWidth = text.Wrap ? element.ContentSize.X : 0.0f;
+                const auto lines = WrapText(*font, textValue, pixelSize, maxWidth, text.Wrap);
+                const float lineHeight = pixelSize * 1.2f;
+                const float totalHeight = lineHeight * static_cast<float>(lines.size());
+
+                // Adjust start Y based on vertical alignment inside the content rect.
+                float startY = element.ContentPosition.Y;
+                if (text.VAlign == Components::GUIText::VerticalAlign::Middle) {
+                    startY += (element.ContentSize.Y - totalHeight) * 0.5f;
+                } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
+                    startY += (element.ContentSize.Y - totalHeight);
+                }
+
+                const Color textColor = ResolveStyleColor(style, text.Color, state);
+                for (size_t i = 0; i < lines.size(); ++i) {
+                    const std::string& line = lines[i];
+                    const float lineWidth = MeasureLineWidth(*font, line, pixelSize);
+                    // Adjust start X based on horizontal alignment.
+                    float startX = element.ContentPosition.X;
+                    if (text.HAlign == Components::GUIText::HorizontalAlign::Center) {
+                        startX += (element.ContentSize.X - lineWidth) * 0.5f;
+                    } else if (text.HAlign == Components::GUIText::HorizontalAlign::Right) {
+                        startX += (element.ContentSize.X - lineWidth);
+                    }
+
+                    // Submit each line as its own text draw.
+                    const Vector2D linePos = { startX, startY + static_cast<float>(i) * lineHeight };
+                    renderer->SubmitGUIText(linePos, line, fontPath, pixelSize, textColor);
+                }
+                break;
+            }
+            case RenderItem::Type::Image: {
+                const auto& image = world.Get<Components::GUIImage>(item.entity);
+                const std::string path = ECS::StringTable::Resolve(image.TexturePathId);
+                uint32_t textureId = image.TextureId;
+                std::shared_ptr<Texture> texture;
+                if (!path.empty()) {
+                    texture = RM.Get<Texture>(path);
+                    if (texture) {
+                        textureId = texture->ID();
+                    }
+                }
+                if (textureId == 0 && !texture) {
+                    break;
+                }
+
+                // Start from content rect, then adjust for scale mode.
+                Vector2D pos = element.ContentPosition;
+                Vector2D size = element.ContentSize;
+                Vector4D uv = image.UVRect;
+
+                if (texture && (image.ScaleMode != Components::GUIImageScaleMode::Stretch)) {
+                    const float texW = static_cast<float>(texture->Width());
+                    const float texH = static_cast<float>(texture->Height());
+                    if (texW > 0.0f && texH > 0.0f) {
+                        const float scale = (image.ScaleMode == Components::GUIImageScaleMode::Fit)
+                            ? std::min(size.X / texW, size.Y / texH)
+                            : std::max(size.X / texW, size.Y / texH);
+                        const Vector2D newSize = { texW * scale, texH * scale };
+                        pos.X += (size.X - newSize.X) * 0.5f;
+                        pos.Y += (size.Y - newSize.Y) * 0.5f;
+                        size = newSize;
+                    }
+                }
+
+                // Apply state style color if present (tinting).
+                const Color imageColor = ResolveStyleColor(style, image.Color, state);
+                if (image.UseSlicing && texture) {
+                    const float texW = static_cast<float>(texture->Width());
+                    const float texH = static_cast<float>(texture->Height());
+                    Vector4D border = image.SliceBorder;
+                    Vector4D borderScaled = {
+                        border.X * scaleX,
+                        border.Y * scaleY,
+                        border.Z * scaleX,
+                        border.W * scaleY
+                    };
+                    const float left = std::min(borderScaled.X, size.X * 0.5f);
+                    const float right = std::min(borderScaled.Z, size.X * 0.5f);
+                    const float top = std::min(borderScaled.Y, size.Y * 0.5f);
+                    const float bottom = std::min(borderScaled.W, size.Y * 0.5f);
+
+                    const float u0 = uv.X;
+                    const float v0 = uv.Y;
+                    const float u1 = uv.Z;
+                    const float v1 = uv.W;
+                    const float uLeft = texW > 0.0f ? (u0 + (border.X / texW) * (u1 - u0)) : u0;
+                    const float uRight = texW > 0.0f ? (u1 - (border.Z / texW) * (u1 - u0)) : u1;
+                    const float vTop = texH > 0.0f ? (v0 + (border.Y / texH) * (v1 - v0)) : v0;
+                    const float vBottom = texH > 0.0f ? (v1 - (border.W / texH) * (v1 - v0)) : v1;
+
+                    const float x0 = pos.X;
+                    const float x1 = pos.X + left;
+                    const float x2 = pos.X + size.X - right;
+                    const float x3 = pos.X + size.X;
+                    const float y0 = pos.Y;
+                    const float y1 = pos.Y + top;
+                    const float y2 = pos.Y + size.Y - bottom;
+                    const float y3 = pos.Y + size.Y;
+
+                    // Build 3x3 slice grid for 9-slice rendering.
+                    const struct Slice {
+                        Vector2D pos;
+                        Vector2D size;
+                        Vector4D uv;
+                    } slices[] = {
+                        { {x0, y0}, {x1 - x0, y1 - y0}, {u0, v0, uLeft, vTop} },
+                        { {x1, y0}, {x2 - x1, y1 - y0}, {uLeft, v0, uRight, vTop} },
+                        { {x2, y0}, {x3 - x2, y1 - y0}, {uRight, v0, u1, vTop} },
+                        { {x0, y1}, {x1 - x0, y2 - y1}, {u0, vTop, uLeft, vBottom} },
+                        { {x1, y1}, {x2 - x1, y2 - y1}, {uLeft, vTop, uRight, vBottom} },
+                        { {x2, y1}, {x3 - x2, y2 - y1}, {uRight, vTop, u1, vBottom} },
+                        { {x0, y2}, {x1 - x0, y3 - y2}, {u0, vBottom, uLeft, v1} },
+                        { {x1, y2}, {x2 - x1, y3 - y2}, {uLeft, vBottom, uRight, v1} },
+                        { {x2, y2}, {x3 - x2, y3 - y2}, {uRight, vBottom, u1, v1} }
+                    };
+
+                    for (const auto& slice : slices) {
+                        if (slice.size.X <= 0.0f || slice.size.Y <= 0.0f) {
+                            continue;
+                        }
+                        renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor);
+                    }
+                } else {
+                    // Non-sliced image uses a single quad.
+                    renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor);
+                }
+                break;
+            }
+            case RenderItem::Type::Button: {
+                const auto& button = world.Get<Components::GUIButton>(item.entity);
+                // Pick background color based on state (or override with GUIStateStyle if present).
+                Color bgColor = ResolveStyleColor(style, button.NormalColor, state);
+                if (!style) {
+                    if (button.Disabled) {
+                        bgColor = button.DisabledColor;
+                    } else if (button.Toggle && button.Toggled) {
+                        bgColor = button.PressedColor;
+                    } else if (input && input->Pressed) {
+                        bgColor = button.PressedColor;
+                    } else if (input && input->Hovered) {
+                        bgColor = button.HoverColor;
+                    }
+                }
+
+                // Background panel (button body).
+                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+
+                // Offset content by button padding to keep labels/icons aligned.
+                const Vector2D innerPos = {
+                    element.ContentPosition.X + button.Padding.X * scaleX,
+                    element.ContentPosition.Y + button.Padding.Y * scaleY
+                };
+                const Vector2D innerSize = {
+                    std::max(0.0f, element.ContentSize.X - (button.Padding.X + button.Padding.Z) * scaleX),
+                    std::max(0.0f, element.ContentSize.Y - (button.Padding.Y + button.Padding.W) * scaleY)
+                };
+
+                const std::string label = button.TextId ? ECS::StringTable::Resolve(button.TextId) : std::string();
+                if (!label.empty()) {
+                    // Label text is anchored at the inner content origin.
+                    renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
+                        button.FontSize * scaleX, button.TextColor);
+                }
+
+                if (button.IconPathId != 0) {
+                    const std::string iconPath = ECS::StringTable::Resolve(button.IconPathId);
+                    if (!iconPath.empty()) {
+                        auto iconTex = RM.Get<Texture>(iconPath);
+                        if (iconTex) {
+                            const Vector2D iconSize = { button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
+                            const Vector2D iconPos = {
+                                innerPos.X + button.IconOffset.X * scaleX,
+                                innerPos.Y + button.IconOffset.Y * scaleY
+                            };
+                            // Icons are drawn as a tinted image over the button.
+                            renderer->SubmitGUIImage(iconPos, iconSize, iconTex->ID(),
+                                Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                        }
+                    }
+                }
+                break;
+            }
+            case RenderItem::Type::Slider: {
+                auto& slider = world.Get<Components::GUISlider>(item.entity);
+                // Use padding to keep the track away from element edges.
+                const Vector2D padding = {
+                    slider.Padding.X * scaleX,
+                    slider.Padding.Y * scaleY
+                };
+                const Vector2D paddingOpposite = {
+                    slider.Padding.Z * scaleX,
+                    slider.Padding.W * scaleY
+                };
+                Vector2D trackPos = {
+                    element.ContentPosition.X + padding.X,
+                    element.ContentPosition.Y + padding.Y
+                };
+                Vector2D trackSize = {
+                    std::max(0.0f, element.ContentSize.X - padding.X - paddingOpposite.X),
+                    std::max(0.0f, element.ContentSize.Y - padding.Y - paddingOpposite.Y)
+                };
+
+                const Color trackColor = ResolveStyleColor(style, slider.TrackColor, state);
+                renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+
+                // Fill length is derived from the normalized slider value.
+                const float range = std::max(0.0001f, slider.Max - slider.Min);
+                const float t = std::max(0.0f, std::min(1.0f, (slider.Value - slider.Min) / range));
+                Vector2D fillPos = trackPos;
+                Vector2D fillSize = trackSize;
+                if (slider.Horizontal) {
+                    fillSize.X = trackSize.X * t;
+                } else {
+                    fillSize.Y = trackSize.Y * t;
+                }
+                renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+
+                // Knob is centered at the end of the fill for consistent dragging.
+                Vector2D knobSize = { slider.KnobSize.X * scaleX, slider.KnobSize.Y * scaleY };
+                Vector2D knobPos = trackPos;
+                if (slider.Horizontal) {
+                    knobPos.X = trackPos.X + trackSize.X * t - knobSize.X * 0.5f;
+                    knobPos.Y = trackPos.Y + (trackSize.Y - knobSize.Y) * 0.5f;
+                } else {
+                    knobPos.X = trackPos.X + (trackSize.X - knobSize.X) * 0.5f;
+                    knobPos.Y = trackPos.Y + trackSize.Y * t - knobSize.Y * 0.5f;
+                }
+                renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                break;
+            }
             }
         }
-
-        auto& ctx = UI::GUIContext::Get();
-        for (Entity modal : ctx.Modals) {
-            if (world.IsAlive(modal)) {
-                RenderElement(world, modal);
-            }
-        }
-
-        if (ctx.Tooltip.Visible) {
-            // TODO: render tooltip via renderer
-        }
-
-        bool debugDraw = false;
-        ECS::Components::GUICanvas canvasSettings{};
-        world.Each<ECS::Components::GUICanvas>([&](Entity, const ECS::Components::GUICanvas& canvas) {
-            if (!debugDraw && canvas.DebugDraw) {
-                canvasSettings = canvas;
-                debugDraw = true;
-            }
-        });
-
-        if (debugDraw) {
-            RenderDebugOverlay(world, canvasSettings);
-        }
-
-        FlushRenderCommands(rendererSystem);
     }
 
     void GUIRenderSystem::OnDestroy(World& world) {
         (void)world;
-        LOG_INFO("GUIRenderSystem destroyed");
     }
 
     SystemMetadata GUIRenderSystem::GetMetadata() const {
-        return ComponentAccessBuilder("GUIRenderSystem")
+        ComponentAccessBuilder builder("GUIRenderSystem");
+        builder.SetExecutionOrder(-10);
+        return builder
+            .ReadComponent<Components::GUICanvas>()
             .ReadComponent<Components::GUIElement>()
-            .SetExecutionOrder(2)
-            .SetGroup(SystemGroup::PreRender)
-            .SetRunMode(SystemRunMode::Always)
-            .SetEnabled(true)
+            .ReadComponent<Components::GUIPanel>()
+            .ReadComponent<Components::GUIText>()
+            .ReadComponent<Components::GUIImage>()
+            .ReadComponent<Components::GUIButton>()
+            .ReadComponent<Components::GUISlider>()
+            .ReadComponent<Components::GUIInput>()
+            .ReadComponent<Components::GUIStateStyle>()
             .Build();
     }
-
-} // namespace ECS
+}

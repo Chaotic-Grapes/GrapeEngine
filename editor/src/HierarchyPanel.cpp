@@ -385,29 +385,91 @@ void HierarchyPanel::_renderHeader() {
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::BeginMenu("Create UI")) {
-            if (ImGui::MenuItem("Button")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
-                    selectAndMark(e);
-                }
-            }
+        if (ImGui::BeginMenu("Create GUI")) {
             if (ImGui::MenuItem("Panel")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
-                    selectAndMark(e);
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI panel components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    // Add default GUIElement and GUIPanel components
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        
+                        // Add default GUIElement and GUIPanel components
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 300.0f, 200.0f };
+                        m_world->Add<ECS::Components::GUIPanel>(e);
+                        selectAndMark(e);
+                    }
                 }
             }
-            if (ImGui::MenuItem("Label")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
-                    selectAndMark(e);
+
+            if (ImGui::MenuItem("Text")) {
+                if (m_entityActions && m_world) {
+                    // Create new entity and add GUI text components
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+                    if (newId != ECS::Entity::NPOS32) {
+                        // Add default GUIElement and GUIText components
+                        ECS::Entity e = m_world->Resolve(newId);
+
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 40.0f };
+
+                        auto& text = m_world->Add<ECS::Components::GUIText>(e);
+                        text.SetText("Text");
+                        text.SetFontPath("");
+                        text.FontSize = 24.0f;
+                        selectAndMark(e);
+                    }
                 }
             }
-            if (ImGui::MenuItem("Input Field")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
-                    selectAndMark(e);
+
+            if (ImGui::MenuItem("Image")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 128.0f, 128.0f };
+                        m_world->Add<ECS::Components::GUIImage>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Button")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 160.0f, 40.0f };
+                        auto& button = m_world->Add<ECS::Components::GUIButton>(e);
+                        button.TextId = ECS::StringTable::Intern("Button");
+                        button.FontPathId = 0;
+                        m_world->Add<ECS::Components::GUIInput>(e);
+                        selectAndMark(e);
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Slider")) {
+                if (m_entityActions && m_world) {
+                    EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+                    if (newId != ECS::Entity::NPOS32) {
+                        ECS::Entity e = m_world->Resolve(newId);
+                        auto& element = m_world->Add<ECS::Components::GUIElement>(e);
+                        element.Position = { 10.0f, 10.0f };
+                        element.Size = { 200.0f, 24.0f };
+                        m_world->Add<ECS::Components::GUISlider>(e);
+                        m_world->Add<ECS::Components::GUIInput>(e);
+                        selectAndMark(e);
+                    }
                 }
             }
 
@@ -513,13 +575,13 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     bool hasChildren = !children.empty();
 
     // Check if this is a prefab instance FIRST (needed for color, both parent and child)
-    bool isPrefabInstance = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
+    bool isPrefabInstance = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
     if (!isPrefabInstance) {
         // Check if any parent has prefab component
         ECS::Entity parent = m_world->ParentOf(entity);
         while (!parent.IsNull()) {
-            if (Editor::ECSUtils::HasComponent(m_world, parent, "PrefabInstanceMetadata")) {
+            if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(parent)) {
                 isPrefabInstance = true;
                 break;
             }
@@ -543,32 +605,29 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (isPrefabInstance && Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
-        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
-        if (!meta) {
-            return;
-        }
+    if (isPrefabInstance && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
         oss << " [Prefab";
         
         // Try to show prefab name if manager is available, otherwise show hash
         if (m_prefabManager) {
-            std::string prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
+            std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
             if (!prefabPath.empty()) {
                 std::string prefabName = std::filesystem::path(prefabPath).stem().string();
                 oss << ":" << prefabName;
             }
             else {
-                oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
+                oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
             }
         }
         else {
-            oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
+            oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
         }
         
         oss << "]";
 
         // Show modification indicator
-        if (PrefabUtils::IsModified(*meta)) {
+        if (PrefabUtils::IsModified(meta)) {
             oss << " *";
         }
     }
@@ -1290,11 +1349,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
             // Detach Prefab: removes prefab metadata from entity
             if (selectionCount == 1) {
-                bool hasMeta = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
+            bool hasMeta = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
-                        Editor::ECSUtils::RemoveComponent(m_world, entity, "PrefabInstanceMetadata");
+                        m_world->Remove<ECS::Components::PrefabInstanceMetadata>(entity);
                         if (m_prefabManager) {
                             m_prefabManager->RemoveInstance(entity);
                         }
@@ -1484,15 +1543,21 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         std::string normalizedPath = p.lexically_normal().string();
 
         // Register prefab and compute hash
-        uint32_t hash = ECS::PrefabManager::ComputeHash(
-            ECS::PrefabManager::NormalizePath(normalizedPath)
-        );
+        uint32_t hash = 0;
+        if (m_prefabManager) {
+            hash = m_prefabManager->RegisterPrefab(normalizedPath);
+            m_prefabManager->TrackInstance(rootEntity, hash);
+        } else {
+            hash = ECS::PrefabManager::ComputeHash(
+                ECS::PrefabManager::NormalizePath(normalizedPath)
+            );
+        }
 
         // Create and add metadata component
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
+        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {

@@ -29,6 +29,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "EditorStyle.h"
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include "EditorFileMenu.h"
 
@@ -142,7 +143,7 @@ private:
     // Renders a collapsible component section with consistent styling and delete button
     template <typename T>
     void _renderComponentSection(const std::string& headerName, const std::string& componentType,
-        nlohmann::json& data, T renderContent, bool canDelete = true);
+        nlohmann::json& data, T renderContent, bool canDelete, const nlohmann::json* defaults);
 
     // -------------------------------------------------------------------------
     // Component Menu Management
@@ -175,7 +176,7 @@ private:
     bool _addComponentToEntity(const std::string& componentType);
 
     // Removes a component of specified type from an entity
-    void _removeComponentFromEntity(const std::string& componentType);
+    void _removeComponentFromEntity(const std::string& componentType, bool recordUndo = true);
 
     // Checks if an entity has a specific component type using registry queries
     bool _entityHasComponent(EntityId id, const std::string& componentType);
@@ -234,12 +235,21 @@ private:
     char m_addComponentSearchBuffer[128] = {0};    // Temporary input buffer for search
     std::string m_addComponentSearchFilter;        // Filter string used to match component names
 
+    // Component/property filter state for the inspector list
+    char m_componentFilterBuffer[128] = {0};       // Temporary input buffer for component/property filtering
+    std::string m_componentFilter;                 // Active filter used in component/property list
+    bool m_focusComponentFilter = false;           // Keyboard focus request for the filter input
+    bool m_focusAddComponentSearch = false;        // Keyboard focus request for Add Component search
+    bool m_openAddComponentPopup = false;          // Deferred popup open flag for keyboard shortcuts
+
     // Undo - edit tracking
     struct EditState {
         EntityId entityId = 0;
         Vector3D startPosition;
         Quaternion startRotation;
         Vector3D startScale;
+        std::vector<ECS::SerializedComponent> startComponents;
+        bool hasSnapshot = false;
         bool isEditing = false;
     };
     EditState m_editState;
@@ -253,38 +263,167 @@ private:
 // Template allows any render function to be passed for component-specific UI
 template <typename T>
 void InspectorPanel::_renderComponentSection(const std::string& headerName, const std::string& componentType,
-    nlohmann::json& data, T renderContent, bool canDelete)
+    nlohmann::json& data, T renderContent, bool canDelete, const nlohmann::json* defaults)
 {
     // DefaultOpen: Component starts expanded for immediate editing access
     // Framed: Adds visual border around header for clear section separation
     // SpanFullWidth: Header uses entire available width regardless of content
+    ImGui::SetNextItemAllowOverlap();
+    if (m_boldFont) ImGui::PushFont(m_boldFont);
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(),
         ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanFullWidth);
+    if (m_boldFont) ImGui::PopFont();
 
-    if (ImGui::BeginPopupContextItem(("ComponentHeaderContext##" + componentType).c_str())) {
-        if (!canDelete) ImGui::BeginDisabled();
-        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
-        if (ImGui::MenuItem("Remove Component")) {
-            if (canDelete) {
-                m_componentsToDelete.push_back(componentType);
-            }
+    // Render delete button aligned to the right of the header
+    float buttonSize = ImGui::GetFrameHeight();
+    float buttonX = ImGui::GetWindowContentRegionMax().x - buttonSize - ImGui::GetStyle().FramePadding.x;
+    float resetX = buttonX - buttonSize - ImGui::GetStyle().ItemSpacing.x;
+
+    // Optional reset button to restore the component to defaults
+    if (defaults) {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorPosX(resetX);
+
+        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+
+        // Reset component data back to its default JSON payload
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+
+        // Style the reset button with secondary colors and symbol font
+        ImGui::PushID((std::string("ResetComponent") + componentType).c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+
+        // Use symbol font for the reset icon
+        if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+        const bool resetClicked = ImGui::Button(resetIcon, ImVec2(buttonSize, buttonSize));
+        if (m_symbolsFont) ImGui::PopFont();
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Reset component to defaults");
         }
-        ImGui::PopStyleColor(3);
-        if (!canDelete) {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("Transform cannot be removed");
-            }
-            ImGui::EndDisabled();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+
+        if (resetClicked) {
+            data = *defaults;
         }
-        ImGui::EndPopup();
+    }
+
+    // Only show delete button if component is removable
+    if (canDelete) {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorPosX(buttonX);
+
+        // Match the reset icon's vertical alignment so header actions line up
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+
+        // Style the remove button with danger colors and symbol font
+        bool pushedFont = false;
+        if (m_symbolsFont) {
+            ImGui::PushFont(m_symbolsFont);
+            pushedFont = true;
+        }
+
+        // Use a unicode cross symbol for the button label
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+
+        // Remove component if button is clicked
+        if (ImGui::Button((std::string("\xEE\xA1\xB2##RemoveComponent") + componentType).c_str(), ImVec2(buttonSize, buttonSize))) {
+            m_componentsToDelete.push_back(componentType);
+        }
+
+        // Pop styles and font after button rendering
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar(2);
+        if (pushedFont) {
+            ImGui::PopFont();
+        }
     }
 
     // Create collapsing header with specific behavior flags
     if (nodeOpen) {
         // After header, display component-specific UI
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const float boxPaddingX = 10.0f;
+        const float boxPaddingY = 6.0f;
+        const float boxRounding = 6.0f;
+
+        // Calculate box positions for background rendering
+        const ImVec2 windowPos = ImGui::GetWindowPos();
+
+        // Get available width for the content box
+        const float boxWidth = ImGui::GetContentRegionAvail().x;
+        const float gap = ImGui::GetStyle().ItemSpacing.y;
+
+        // Adjust cursor position to account for spacing
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - gap);
+        ImVec2 boxMinScreen = ImGui::GetCursorScreenPos();
+
+        // Split draw list into layers for background and content
+        drawList->ChannelsSplit(2);
+        drawList->ChannelsSetCurrent(1);
+
+        // Render content within padded box area
+        ImGui::BeginGroup();
+        ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+        ImGui::Indent(boxPaddingX);
+
+        // Register defaults for per-field reset buttons inside this component
+        if (defaults) {
+            EditorUI::RegisterDefaultDataScope(data, *defaults);
+        }
         renderContent(data);
+        if (defaults) {
+            EditorUI::ClearDefaultDataScope();
+        }
+
+        ImGui::Unindent(boxPaddingX);
+        ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+        ImGui::EndGroup();
+
+        // Calculate box max position based on content size
+        ImVec2 boxMaxScreen = ImGui::GetItemRectMax();
+        boxMaxScreen.x = boxMinScreen.x + boxWidth;
+
+        // Render background box with rounded corners
+        drawList->ChannelsSetCurrent(0);
+        drawList->AddRectFilled(
+            boxMinScreen,
+            boxMaxScreen,
+            ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 0.85f)),
+            boxRounding,
+            ImDrawFlags_RoundCornersBottom
+        );
+        drawList->AddRect(
+            boxMinScreen,
+            boxMaxScreen,
+            ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::Border, 0.85f)),
+            boxRounding,
+            ImDrawFlags_RoundCornersBottom
+        );
+
+        // Merge draw channels back together
+        drawList->ChannelsMerge();
+        ImGui::SetCursorScreenPos(ImVec2(boxMinScreen.x, boxMaxScreen.y));
 
         ImGui::Spacing();
         ImGui::Spacing();

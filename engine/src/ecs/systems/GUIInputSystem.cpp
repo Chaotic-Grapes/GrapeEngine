@@ -1,478 +1,193 @@
-/* Start Header *****************************************************************/
-/*!
-\file   GUIInputSystem.cpp
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\brief
-Implementation of GUI input handling and interaction updates.
-*/
-/* End Header *******************************************************************/
-
-#include "ecs/systems/GUIInputSystem.h"
-#include "ecs/ui/GUIContext.h"
-#include "ecs/ui/GUIUtilities.h"
-#include "ecs/ui/GUILayout.h"
-#include "core/Logger.h"
-#include "helpers/MathUtils.h"
-#include "services/Input.h"
-#include "services/TimeSystem.h"
 #include <algorithm>
-#include <glm/vec2.hpp>
-
-namespace {
-    using ECS::Entity;
-    using ECS::World;
-    using ECS::Components::GUIButton;
-    using ECS::Components::GUIElement;
-    using ECS::Components::GUIInputField;
-    using ECS::Components::GUIScrollView;
-    using ECS::Components::GUISlider;
-
-    void BuildSpatialGrid(World& world) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        for (uint32_t y = 0; y < ECS::UI::GUIContext::GridHeight; ++y) {
-            for (uint32_t x = 0; x < ECS::UI::GUIContext::GridWidth; ++x) {
-                ctx.SpatialGrid[x][y].Elements.clear();
-            }
-        }
-
-        auto elements = ECS::UI::GetSortedGUIElements(world);
-
-        for (Entity entity : elements) {
-            if (!world.Has<GUIElement>(entity)) {
-                continue;
-            }
-
-            const auto& element = world.Get<GUIElement>(entity);
-            if (!element.Active || !element.Visible) {
-                continue;
-            }
-
-            Vector2D minPos = element.WorldPosition;
-            Vector2D maxPos = element.WorldPosition + element.Size;
-
-            float minGridX = minPos.X / ctx.LayoutCanvasSize.X;
-            float minGridY = minPos.Y / ctx.LayoutCanvasSize.Y;
-            float maxGridX = maxPos.X / ctx.LayoutCanvasSize.X;
-            float maxGridY = maxPos.Y / ctx.LayoutCanvasSize.Y;
-
-            minGridX = std::max(0.0f, std::min(1.0f, minGridX));
-            minGridY = std::max(0.0f, std::min(1.0f, minGridY));
-            maxGridX = std::max(0.0f, std::min(1.0f, maxGridX));
-            maxGridY = std::max(0.0f, std::min(1.0f, maxGridY));
-
-            uint32_t minCellX = static_cast<uint32_t>(minGridX * (ECS::UI::GUIContext::GridWidth - 1));
-            uint32_t minCellY = static_cast<uint32_t>(minGridY * (ECS::UI::GUIContext::GridHeight - 1));
-            uint32_t maxCellX = static_cast<uint32_t>(maxGridX * (ECS::UI::GUIContext::GridWidth - 1));
-            uint32_t maxCellY = static_cast<uint32_t>(maxGridY * (ECS::UI::GUIContext::GridHeight - 1));
-
-            for (uint32_t y = minCellY; y <= maxCellY; ++y) {
-                for (uint32_t x = minCellX; x <= maxCellX; ++x) {
-                    ctx.SpatialGrid[x][y].Elements.push_back(entity);
-                }
-            }
-        }
-    }
-
-    Entity RaycastGUI(World& world, Vector2D point, Entity skipEntity = ECS::NULL_ENTITY) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-
-        float gridX = point.X / ctx.LayoutCanvasSize.X;
-        float gridY = point.Y / ctx.LayoutCanvasSize.Y;
-        gridX = std::max(0.0f, std::min(1.0f, gridX));
-        gridY = std::max(0.0f, std::min(1.0f, gridY));
-
-        uint32_t cellX = static_cast<uint32_t>(gridX * (ECS::UI::GUIContext::GridWidth - 1));
-        uint32_t cellY = static_cast<uint32_t>(gridY * (ECS::UI::GUIContext::GridHeight - 1));
-        cellX = std::min(cellX, ECS::UI::GUIContext::GridWidth - 1);
-        cellY = std::min(cellY, ECS::UI::GUIContext::GridHeight - 1);
-
-        const auto& cellElements = ctx.SpatialGrid[cellX][cellY].Elements;
-
-        for (auto it = cellElements.rbegin(); it != cellElements.rend(); ++it) {
-            Entity entity = *it;
-            if (entity == skipEntity) {
-                continue;
-            }
-
-            if (!world.IsAlive(entity) || !world.Has<GUIElement>(entity)) {
-                continue;
-            }
-
-            const auto& element = world.Get<GUIElement>(entity);
-            if (!element.Active || !element.Visible) {
-                continue;
-            }
-
-            if (ECS::UI::IsPointInElement(point, element)) {
-                return entity;
-            }
-        }
-
-        return ECS::NULL_ENTITY;
-    }
-
-    void UpdateButtonState(World& world, Entity entity, GUIButton& button,
-                           bool mouseOver, bool mousePressed) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        auto& runtimeState = ctx.RuntimeStates[entity.Index];
-        runtimeState.Hovered = mouseOver;
-
-        if (!button.Interactable) {
-            button.State = ECS::Components::ButtonState::Disabled;
-            runtimeState.Pressed = false;
-            button.Pressed = false;
-            button.Released = false;
-            button.Hovered = false;
-            return;
-        }
-
-        if (mousePressed) {
-            button.State = ECS::Components::ButtonState::Pressed;
-            runtimeState.Pressed = true;
-        } else if (mouseOver) {
-            button.State = ECS::Components::ButtonState::Hovered;
-            runtimeState.Pressed = false;
-        } else {
-            button.State = ECS::Components::ButtonState::Normal;
-            runtimeState.Pressed = false;
-        }
-
-        button.Hovered = mouseOver;
-        button.Pressed = runtimeState.Pressed;
-
-        if (ctx.MouseReleased && mouseOver && ctx.PressedElement == entity) {
-            if (button.ActionID != 0) {
-                auto it = ctx.ActionRegistry.find(button.ActionID);
-                if (it != ctx.ActionRegistry.end()) {
-                    it->second(world, entity);
-                }
-            }
-            runtimeState.Released = true;
-        } else {
-            runtimeState.Released = false;
-        }
-
-        button.Released = runtimeState.Released;
-    }
-
-    void UpdateSliderInteraction(World& world, Entity entity, GUISlider& slider,
-                                 const GUIElement& element,
-                                 bool mouseOver, Vector2D mousePos) {
-        (void)world;
-        auto& ctx = ECS::UI::GUIContext::Get();
-        if (!slider.Interactable) {
-            return;
-        }
-
-        auto& runtimeState = ctx.RuntimeStates[entity.Index];
-
-        if (ctx.MousePressed && mouseOver && ctx.DraggedElement == entity) {
-            runtimeState.Dragging = true;
-            runtimeState.DragOffset = mousePos.X - element.WorldPosition.X;
-        }
-
-        if (runtimeState.Dragging && ctx.MouseDown) {
-            float sliderX = mousePos.X - element.WorldPosition.X;
-            float sliderWidth = element.Size.X;
-            float ratio = std::max(0.0f, std::min(1.0f, sliderX / sliderWidth));
-            slider.CurrentValue = slider.MinValue + (slider.MaxValue - slider.MinValue) * ratio;
-
-            if (slider.ActionID != 0) {
-                auto it = ctx.ActionRegistry.find(slider.ActionID);
-                if (it != ctx.ActionRegistry.end()) {
-                    it->second(world, entity);
-                }
-            }
-        }
-
-        if (ctx.MouseReleased) {
-            runtimeState.Dragging = false;
-        }
-
-        slider.Dragging = runtimeState.Dragging;
-        slider.DragOffset = runtimeState.DragOffset;
-    }
-
-    void UpdateInputField(Entity entity, GUIInputField& input,
-                          bool focused, char inputChar) {
-        (void)entity;
-        (void)inputChar;
-        input.Focused = focused;
-        if (!focused || !input.Interactable) {
-            return;
-        }
-    }
-
-    void UpdateScrollView(Entity entity, GUIScrollView& scroll,
-                          const GUIElement& element,
-                          World& world) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-        if (!scroll.VerticalScroll && !scroll.HorizontalScroll) {
-            return;
-        }
-
-        if (ctx.HoveredElement != entity) {
-            return;
-        }
-
-        const float scrollX = static_cast<float>(Input::GetScrollX());
-        const float scrollY = static_cast<float>(Input::GetScrollY());
-        if (scrollX == 0.0f && scrollY == 0.0f) {
-            return;
-        }
-
-        const float maxScrollX = std::max(0.0f, scroll.ContentSize.X - element.Size.X);
-        const float maxScrollY = std::max(0.0f, scroll.ContentSize.Y - element.Size.Y);
-
-        if (scroll.HorizontalScroll) {
-            scroll.ScrollPosition.X = std::max(0.0f, std::min(maxScrollX,
-                scroll.ScrollPosition.X - scrollX * scroll.ScrollSensitivity));
-        }
-        if (scroll.VerticalScroll) {
-            scroll.ScrollPosition.Y = std::max(0.0f, std::min(maxScrollY,
-                scroll.ScrollPosition.Y - scrollY * scroll.ScrollSensitivity));
-        }
-
-        ECS::UI::GUILayout::InvalidateLayoutRecursive(world, entity);
-        ctx.SpatialGridDirty = true;
-    }
-
-    void UpdateInteraction(World& world, float deltaTime) {
-        (void)deltaTime;
-        auto& ctx = ECS::UI::GUIContext::Get();
-
-        world.Each<GUIButton>([&](Entity entity, GUIButton& button) {
-            bool isHovered = entity == ctx.HoveredElement;
-            bool isPressed = isHovered && ctx.MousePressed;
-            UpdateButtonState(world, entity, button, isHovered, isPressed);
-        });
-
-        world.Each<GUISlider>([&](Entity entity, GUISlider& slider) {
-            bool isHovered = entity == ctx.HoveredElement;
-            if (world.Has<GUIElement>(entity)) {
-                const auto& element = world.Get<GUIElement>(entity);
-                UpdateSliderInteraction(world, entity, slider, element, isHovered, ctx.MousePosition);
-            }
-        });
-
-        if (!ctx.FocusedElement.IsNull() && world.Has<GUIInputField>(ctx.FocusedElement)) {
-            auto& input = world.Get<GUIInputField>(ctx.FocusedElement);
-            UpdateInputField(ctx.FocusedElement, input, true, 0);
-        }
-
-        world.Each<GUIScrollView>([&](Entity entity, GUIScrollView& scroll) {
-            if (world.Has<GUIElement>(entity)) {
-                const auto& element = world.Get<GUIElement>(entity);
-                UpdateScrollView(entity, scroll, element, world);
-            }
-        });
-    }
-
-    void ApplyVisualFeedback(World& world) {
-        auto& ctx = ECS::UI::GUIContext::Get();
-
-        world.Each<GUIElement>([&](Entity entity, GUIElement& element) {
-            if (!element.Active || !element.Visible) {
-                return;
-            }
-
-            uint32_t entityId = entity.Index;
-            auto& visualState = ctx.VisualStates[entityId];
-
-            bool isHovered = entity == ctx.HoveredElement;
-            bool isPressed = entity == ctx.PressedElement;
-            bool isFocused = entity == ctx.FocusedElement;
-            bool isDisabled = false;
-
-            if (world.Has<GUIButton>(entity)) {
-                isDisabled = !world.Get<GUIButton>(entity).Interactable;
-            }
-
-            float targetScale = 1.0f;
-            if (isDisabled) {
-                targetScale = 1.0f;
-            } else if (isPressed) {
-                targetScale = ctx.VisualConfig.ActiveScale;
-            } else if (isHovered) {
-                targetScale = ctx.VisualConfig.HoverScale;
-            }
-
-            if (ctx.VisualConfig.EnableSmoothTransitions) {
-                visualState.CurrentScale = MathUtils::Lerp(
-                    visualState.CurrentScale,
-                    targetScale,
-                    ctx.VisualConfig.TransitionSpeed * static_cast<float>(TimeSystem::Instance().GetFixedTimeStep())
-                );
-            } else {
-                visualState.CurrentScale = targetScale;
-            }
-
-            visualState.HasOverlay = false;
-            if (isDisabled) {
-                visualState.OverlayColor = ctx.VisualConfig.HoverOverlay;
-                visualState.OverlayColor.A = static_cast<uint8_t>(255.0f * ctx.VisualConfig.DisabledAlpha);
-                visualState.HasOverlay = true;
-            } else if (isFocused) {
-                visualState.OverlayColor = ctx.VisualConfig.FocusOverlay;
-                visualState.HasOverlay = true;
-            } else if (isPressed) {
-                visualState.OverlayColor = ctx.VisualConfig.ActiveOverlay;
-                visualState.HasOverlay = true;
-            } else if (isHovered) {
-                visualState.OverlayColor = ctx.VisualConfig.HoverOverlay;
-                visualState.HasOverlay = true;
-            }
-        });
-    }
-}
+#include <cmath>
+#include "ecs/Components.h"
+#include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/RendererSystem.h"
+#include "services/Input.h"
 
 namespace ECS {
+    namespace {
+        Entity s_captureEntity = NULL_ENTITY; // Tracks the element that owns pointer capture.
+    }
 
     void GUIInputSystem::OnCreate(World& world) {
         (void)world;
-        LOG_INFO("GUIInputSystem initialized");
+    }
+
+    // Simple AABB hit test in GUI space.
+    static bool PointInRect(const Vector2D& p, const Vector2D& pos, const Vector2D& size) {
+        return p.X >= pos.X && p.Y >= pos.Y && p.X <= (pos.X + size.X) && p.Y <= (pos.Y + size.Y);
     }
 
     void GUIInputSystem::OnUpdate(World& world) {
-        auto& ctx = UI::GUIContext::Get();
-        ctx.ResetFrame();
-
-        if (ctx.SpatialGridDirty) {
-            BuildSpatialGrid(world);
-            ctx.SpatialGridDirty = false;
+        auto* renderer = RendererSystem::GetInstance();
+        if (!renderer) {
+            return;
         }
 
-        const float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        // Release capture if the captured entity no longer exists.
+        if (!s_captureEntity.IsNull() && !world.IsAlive(s_captureEntity)) {
+            s_captureEntity = NULL_ENTITY;
+        }
 
-        glm::dvec2 mousePosDouble;
-        Input::GetMousePosition(mousePosDouble.x, mousePosDouble.y);
-        Vector2D screenPos{ static_cast<float>(mousePosDouble.x), static_cast<float>(mousePosDouble.y) };
-        bool mouseInViewport = true;
-        if (ctx.UseViewportBounds && ctx.ViewportSize.X > 0.0f && ctx.ViewportSize.Y > 0.0f) {
-            screenPos.X *= ctx.ViewportDisplayScale.X;
-            screenPos.Y *= ctx.ViewportDisplayScale.Y;
-            screenPos.X -= ctx.ViewportOrigin.X;
-            screenPos.Y -= ctx.ViewportOrigin.Y;
-            mouseInViewport = (screenPos.X >= 0.0f && screenPos.Y >= 0.0f &&
-                screenPos.X <= ctx.ViewportSize.X && screenPos.Y <= ctx.ViewportSize.Y);
-            if (mouseInViewport) {
-                const float scaleX = (ctx.CanvasSize.X > 0.0f) ? (ctx.CanvasSize.X / ctx.ViewportSize.X) : 1.0f;
-                const float scaleY = (ctx.CanvasSize.Y > 0.0f) ? (ctx.CanvasSize.Y / ctx.ViewportSize.Y) : 1.0f;
-                screenPos.X *= scaleX;
-                screenPos.Y *= scaleY;
-            } else {
-                screenPos = { -1.0f, -1.0f };
+        // Use the current GUI viewport (editor may override viewport per panel).
+        RendererSystem::GUIViewport viewport = renderer->GetGUIViewport();
+        if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
+            const Vector2D renderSize = renderer->GetRenderTargetSize();
+            viewport.Origin = { 0.0f, 0.0f };
+            viewport.Size = renderSize;
+        }
+
+        // Convert raw cursor position into GUI viewport space.
+        double mouseX = 0.0;
+        double mouseY = 0.0;
+        Input::GetMousePosition(mouseX, mouseY);
+
+        const Vector2D mouse = {
+            static_cast<float>(mouseX / std::max(0.0001f, viewport.DisplayScale.X)),
+            static_cast<float>(mouseY / std::max(0.0001f, viewport.DisplayScale.Y))
+        };
+
+        // Snapshot mouse button state for this frame.
+        const bool mouseDown = Input::IsMouseDown(MOUSE_LEFT);
+        const bool mousePressed = Input::IsMousePressed(MOUSE_LEFT);
+        const bool mouseReleased = Input::IsMouseUp(MOUSE_LEFT);
+
+        world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput& input) {
+            // Clear one-frame flags before recomputing state.
+            input.Clicked = false;
+            input.Released = false;
+            input.Entered = false;
+            input.Exited = false;
+
+            if (!element.Visible) {
+                input.Hovered = false;
+                input.Pressed = false;
+                input.Dragging = false;
+                return;
             }
-        }
-        if (ctx.CanvasScale > 0.0f) {
-            screenPos.X = (screenPos.X - ctx.CanvasOffset.X) / ctx.CanvasScale;
-            screenPos.Y = (screenPos.Y - ctx.CanvasOffset.Y) / ctx.CanvasScale;
-        }
-        ctx.MousePosition = screenPos;
 
-        ctx.MousePressed = Input::IsMousePressed(MOUSE_LEFT);
-        ctx.MouseReleased = Input::IsMouseUp(MOUSE_LEFT);
-        ctx.MouseDown = Input::IsMouseDown(MOUSE_LEFT);
+            // Use resolved layout rects for hit testing.
+            const Vector2D pos = element.ResolvedPosition;
+            const Vector2D size = element.ResolvedSize;
+            const bool hovered = PointInRect(mouse, pos, size);
+            const bool wasHovered = input.Hovered;
+            input.Hovered = hovered;
+            input.Entered = (!wasHovered && hovered);
+            input.Exited = (wasHovered && !hovered);
 
-        Entity previousHovered = ctx.HoveredElement;
-        ctx.HoveredElement = mouseInViewport ? RaycastGUI(world, ctx.MousePosition) : ECS::NULL_ENTITY;
-        if (previousHovered != ctx.HoveredElement) {
-            if (!previousHovered.IsNull()) {
-                ctx.EventQueue.Push(UI::GUIEventType::HoverExited, previousHovered, ctx.MousePosition);
+            // Capture pointer on press inside this element.
+            if (mousePressed && hovered) {
+                s_captureEntity = entity;
             }
-            if (!ctx.HoveredElement.IsNull()) {
-                ctx.EventQueue.Push(UI::GUIEventType::HoverEntered, ctx.HoveredElement, ctx.MousePosition);
+
+            const bool captured = (s_captureEntity == entity);
+            input.Pressed = captured && mouseDown;
+            input.Dragging = captured && mouseDown;
+
+            // Release capture when the button is released.
+            if (captured && mouseReleased) {
+                input.Pressed = false;
+                input.Dragging = false;
+                input.Released = true;
+                if (hovered) {
+                    input.Clicked = true;
+                }
+                s_captureEntity = NULL_ENTITY;
             }
-        }
 
-        if (!ctx.HoveredElement.IsNull()) {
-            ctx.RuntimeStates[ctx.HoveredElement.Index].Hovered = true;
-        }
+            // Clear capture if input was lost without a release event.
+            if (captured && !mouseDown && !mousePressed) {
+                input.Dragging = false;
+                s_captureEntity = NULL_ENTITY;
+            }
 
-        if (ctx.MousePressed && !ctx.HoveredElement.IsNull()) {
-            ctx.PressedElement = ctx.HoveredElement;
-            ctx.RuntimeStates[ctx.PressedElement.Index].Pressed = true;
-            ctx.EventQueue.Push(UI::GUIEventType::Pressed, ctx.PressedElement, ctx.MousePosition);
-        }
-
-        if (ctx.MouseReleased) {
-            if (!ctx.PressedElement.IsNull()) {
-                ctx.RuntimeStates[ctx.PressedElement.Index].Released = true;
-                ctx.EventQueue.Push(UI::GUIEventType::Released, ctx.PressedElement, ctx.MousePosition);
-                if (ctx.PressedElement == ctx.HoveredElement) {
-                    ctx.EventQueue.Push(UI::GUIEventType::Clicked, ctx.PressedElement, ctx.MousePosition);
+            if (world.Has<Components::GUIButton>(entity)) {
+                auto& button = world.Get<Components::GUIButton>(entity);
+                // Disabled buttons cannot be interacted with.
+                if (button.Disabled) {
+                    input.Hovered = false;
+                    input.Pressed = false;
+                    input.Dragging = false;
+                    input.Clicked = false;
+                    input.Released = false;
+                } else if (input.Clicked && button.Toggle) {
+                    // Toggle buttons flip state on click.
+                    button.Toggled = !button.Toggled;
                 }
             }
-            ctx.PressedElement = ECS::NULL_ENTITY;
-        }
 
-        if (ctx.Tooltip.Visible) {
-            ctx.Tooltip.Timer -= deltaTime;
-            if (ctx.Tooltip.Timer <= 0.0f) {
-                ctx.Tooltip.Visible = false;
-            }
-        }
-
-        if (ctx.MousePressed) {
-            ctx.MouseDragStart = ctx.MousePosition;
-
-            const double currentTime = TimeSystem::Instance().GetRealTimeSinceStart();
-            const float doubleClickTime = static_cast<float>(currentTime - ctx.LastInteractionTime);
-            if (doubleClickTime < ctx.DoubleClickThreshold && ctx.LastClickedElement == ctx.HoveredElement) {
-                // Double-click detected
-            }
-
-            ctx.LastInteractionTime = static_cast<float>(currentTime);
-            ctx.LastClickedElement = ctx.HoveredElement;
-
-            if (!ctx.HoveredElement.IsNull()) {
-                ctx.DraggedElement = ctx.HoveredElement;
-            }
-
-            Entity previousFocused = ctx.FocusedElement;
-            if (!ctx.HoveredElement.IsNull() && world.Has<GUIInputField>(ctx.HoveredElement)) {
-                ctx.FocusedElement = ctx.HoveredElement;
-            } else {
-                ctx.FocusedElement = ECS::NULL_ENTITY;
-            }
-
-            if (previousFocused != ctx.FocusedElement) {
-                if (!previousFocused.IsNull()) {
-                    ctx.EventQueue.Push(UI::GUIEventType::Unfocused, previousFocused, ctx.MousePosition);
-                    ctx.RuntimeStates[previousFocused.Index].Focused = false;
+            if (world.Has<Components::GUISlider>(entity)) {
+                auto& slider = world.Get<Components::GUISlider>(entity);
+                // Disabled sliders ignore pointer input.
+                if (slider.Disabled) {
+                    slider.ValueChanged = false;
+                    return;
                 }
-                if (!ctx.FocusedElement.IsNull()) {
-                    ctx.EventQueue.Push(UI::GUIEventType::Focused, ctx.FocusedElement, ctx.MousePosition);
-                    ctx.RuntimeStates[ctx.FocusedElement.Index].Focused = true;
+
+                slider.ValueChanged = false;
+
+                // Scale padding based on resolved size so layout and input stay in sync.
+                const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+                const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+                const Vector4D padding = {
+                    slider.Padding.X * scaleX,
+                    slider.Padding.Y * scaleY,
+                    slider.Padding.Z * scaleX,
+                    slider.Padding.W * scaleY
+                };
+                // Track rect is the interactive area of the slider.
+                Vector2D trackPos = {
+                    element.ContentPosition.X + padding.X,
+                    element.ContentPosition.Y + padding.Y
+                };
+                Vector2D trackSize = {
+                    std::max(0.0f, element.ContentSize.X - padding.X - padding.Z),
+                    std::max(0.0f, element.ContentSize.Y - padding.Y - padding.W)
+                };
+
+                // Update slider while dragging or on initial press.
+                const bool active = captured || (hovered && mousePressed);
+                if (active) {
+                    float t = 0.0f;
+                    if (slider.Horizontal) {
+                        const float denom = std::max(0.0001f, trackSize.X);
+                        t = (mouse.X - trackPos.X) / denom;
+                    } else {
+                        const float denom = std::max(0.0001f, trackSize.Y);
+                        t = (mouse.Y - trackPos.Y) / denom;
+                    }
+                    t = std::max(0.0f, std::min(1.0f, t));
+
+                    // Convert normalized position into value range.
+                    float value = slider.Min + t * (slider.Max - slider.Min);
+                    if (slider.Step > 0.0f) {
+                        value = std::round(value / slider.Step) * slider.Step;
+                    }
+                    value = std::max(slider.Min, std::min(slider.Max, value));
+
+                    // Mark when the slider value changes.
+                    if (std::abs(value - slider.Value) > 0.0001f) {
+                        slider.Value = value;
+                        slider.ValueChanged = true;
+                    }
                 }
             }
-        }
-
-        if (ctx.MouseReleased) {
-            ctx.DraggedElement = ECS::NULL_ENTITY;
-        }
-
-        UpdateInteraction(world, deltaTime);
-        ApplyVisualFeedback(world);
+        });
     }
 
     void GUIInputSystem::OnDestroy(World& world) {
         (void)world;
-        LOG_INFO("GUIInputSystem destroyed");
     }
 
     SystemMetadata GUIInputSystem::GetMetadata() const {
-        return ComponentAccessBuilder("GUIInputSystem")
-            .WriteComponent<Components::GUIElement>()
+        ComponentAccessBuilder builder("GUIInputSystem");
+        builder.SetExecutionOrder(-15);
+        return builder
+            .ReadComponent<Components::GUIElement>()
+            .WriteComponent<Components::GUIInput>()
             .WriteComponent<Components::GUIButton>()
             .WriteComponent<Components::GUISlider>()
-            .WriteComponent<Components::GUIInputField>()
-            .SetExecutionOrder(1)
-            .SetGroup(SystemGroup::PreRender)
-            .SetRunMode(SystemRunMode::Always)
-            .SetEnabled(true)
             .Build();
     }
-
-} // namespace ECS
+}

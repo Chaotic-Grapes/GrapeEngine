@@ -104,6 +104,9 @@ public:
 
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders SceneButton component for scene transitions
+    void RenderSceneButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
@@ -115,14 +118,18 @@ public:
     // Renders material component for assigning materials to renderers
 	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders GUI element layout and alignment data
-    void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-
-    // Renders GUI container layout configuration
-    void RenderGUIContainer(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-
-    // Renders GUI canvas scaling configuration
     void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIStateStyle(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders drag/drop validation feedback popups triggered by asset fields
+    void RenderAssetDropFeedbackPopup();
 
 private:
     // -------------------------------------------------------------------------

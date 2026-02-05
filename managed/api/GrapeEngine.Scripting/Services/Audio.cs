@@ -28,6 +28,7 @@ public struct AudioHandle(ulong id)
 
     public void SetVolume(float volume) => Audio.SetInstanceVolume(this, volume);
     public void SetPitch(float pitch) => Audio.SetInstancePitch(this, pitch);
+    public void SetPan(float pan) => Audio.SetInstancePan(this, pan);
     public void SetPosition(Vector3 position, Vector3 velocity) => Audio.SetInstancePosition(this, position, velocity);
     public void Stop(StopMode mode = StopMode.Immediate) => Audio.Stop(this, mode);
 }
@@ -37,9 +38,22 @@ public struct AudioHandle(ulong id)
 /// </summary>
 public enum PlayPolicy
 {
-    KeepOldest = 0,
-    KeepNewest = 1,
-    RestartSingle = 2
+    NewInstance = 0,
+    SingleInstanceRestart = 1,
+    SingleInstanceResume = 2,
+    SingleInstanceIgnore = 3
+}
+
+/// <summary>
+/// Audio mixer bus.
+/// </summary>
+public enum AudioBus : byte
+{
+    Master = 0,
+    Music = 1,
+    SFX = 2,
+    UI = 3,
+    Ambient = 4
 }
 
 /// <summary>
@@ -107,7 +121,7 @@ public static class Audio
     /// <param name="volume">Volume (0.0 to 1.0).</param>
     /// <param name="pitch">Pitch multiplier (default 1.0).</param>
     /// <returns>Audio handle for controlling playback.</returns>
-    public static AudioHandle PlaySingle(string cueId, PlayPolicy policy = PlayPolicy.KeepOldest, float volume = 1.0f, float pitch = 1.0f)
+    public static AudioHandle PlaySingle(string cueId, PlayPolicy policy = PlayPolicy.SingleInstanceIgnore, float volume = 1.0f, float pitch = 1.0f)
     {
         return new(AudioAPI.PlaySingle(cueId, volume, pitch, (int)policy));
     }
@@ -157,6 +171,14 @@ public static class Audio
     }
 
     /// <summary>
+    /// Set the stereo pan of a playing sound instance (2D only).
+    /// </summary>
+    public static void SetInstancePan(AudioHandle handle, float pan)
+    {
+        AudioAPI.SetInstancePan(handle.Id, pan);
+    }
+
+    /// <summary>
     /// Set the 3D position and velocity of a playing sound instance.
     /// </summary>
     public static void SetInstancePosition(AudioHandle handle, Vector3 position, Vector3 velocity)
@@ -175,6 +197,30 @@ public static class Audio
     {
         get => AudioAPI.GetMasterVolume();
         set => AudioAPI.SetMasterVolume(value);
+    }
+
+    /// <summary>
+    /// Set the volume for a specific mixer bus.
+    /// </summary>
+    public static void SetBusVolume(AudioBus bus, float volume)
+    {
+        AudioAPI.SetBusVolume((int)bus, volume);
+    }
+
+    /// <summary>
+    /// Get the volume for a specific mixer bus.
+    /// </summary>
+    public static float GetBusVolume(AudioBus bus)
+    {
+        return AudioAPI.GetBusVolume((int)bus);
+    }
+
+    /// <summary>
+    /// Fade a mixer bus to a target volume over time.
+    /// </summary>
+    public static void FadeBusVolume(AudioBus bus, float targetVolume, float duration)
+    {
+        AudioAPI.FadeBusVolume((int)bus, targetVolume, duration);
     }
 
     /// <summary>

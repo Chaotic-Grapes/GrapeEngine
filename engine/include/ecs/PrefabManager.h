@@ -158,6 +158,11 @@ namespace ECS {
         World* GetWorld() const { return m_world; }
 
         /**
+         * @brief Clear only the instance tracking maps (keeps prefab registry).
+         */
+        void ClearInstanceTracking();
+
+        /**
          * @brief Clear all prefab registrations and instance tracking.
          */
         void Clear();

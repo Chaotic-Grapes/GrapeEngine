@@ -101,6 +101,7 @@ namespace ECS {
         REGISTER_COMPONENT(SpriteRenderer2D);
         REGISTER_COMPONENT(SpriteFlip2D);
         REGISTER_COMPONENT(SpriteShader2D);
+        REGISTER_COMPONENT(TileMapComponent); // Register tilemap component for ECS + editor usage.
 
         // Animation
         REGISTER_COMPONENT(SpriteSheetAnimation2D);
@@ -124,24 +125,17 @@ namespace ECS {
         REGISTER_COMPONENT(AudioSource);
 
         // Material2D
-		REGISTER_COMPONENT(Material2D);
-
-        // GUI
+        REGISTER_COMPONENT(Material2D);
         REGISTER_COMPONENT(GUICanvas);
         REGISTER_COMPONENT(GUIElement);
-        REGISTER_COMPONENT(GUIStyleRef);
-        REGISTER_COMPONENT(GUIContainer);
         REGISTER_COMPONENT(GUIPanel);
-        REGISTER_COMPONENT(GUIButton);
-        REGISTER_COMPONENT(GUIInputField);
-        REGISTER_COMPONENT(GUISlider);
-        REGISTER_COMPONENT(GUICheckbox);
-        REGISTER_COMPONENT(GUIDropdown);
-        REGISTER_COMPONENT(GUIScrollView);
-        REGISTER_COMPONENT(GUISeparator);
         REGISTER_COMPONENT(GUIText);
-        REGISTER_COMPONENT(GUILayoutGroup);
-        REGISTER_COMPONENT(GUITooltip);
+        REGISTER_COMPONENT(GUIImage);
+        REGISTER_COMPONENT(GUIInput);
+        REGISTER_COMPONENT(GUIStateStyle);
+        REGISTER_COMPONENT(GUIButton);
+        REGISTER_COMPONENT(GUISlider);
+
 
         // Event buffers (physics events)
         REGISTER_EVENT_COMPONENT(CollisionEventBuffer);
@@ -180,6 +174,7 @@ namespace ECS {
         LogComponentTypeIds("SpriteRenderer2D", FNV1a_Hash("SpriteRenderer2D"));
         LogComponentTypeIds("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));
         LogComponentTypeIds("SpriteShader2D", FNV1a_Hash("SpriteShader2D"));
+        LogComponentTypeIds("TileMapComponent", FNV1a_Hash("TileMapComponent"));
 
         LogComponentTypeIds("SpriteSheetAnimation2D", FNV1a_Hash("SpriteSheetAnimation2D"));
         LogComponentTypeIds("AnimationState2D", FNV1a_Hash("AnimationState2D"));
@@ -198,19 +193,13 @@ namespace ECS {
         LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
         LogComponentTypeIds("GUICanvas", FNV1a_Hash("GUICanvas"));
         LogComponentTypeIds("GUIElement", FNV1a_Hash("GUIElement"));
-        LogComponentTypeIds("GUIStyleRef", FNV1a_Hash("GUIStyleRef"));
-        LogComponentTypeIds("GUIContainer", FNV1a_Hash("GUIContainer"));
         LogComponentTypeIds("GUIPanel", FNV1a_Hash("GUIPanel"));
-        LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));
-        LogComponentTypeIds("GUIInputField", FNV1a_Hash("GUIInputField"));
-        LogComponentTypeIds("GUISlider", FNV1a_Hash("GUISlider"));
-        LogComponentTypeIds("GUICheckbox", FNV1a_Hash("GUICheckbox"));
-        LogComponentTypeIds("GUIDropdown", FNV1a_Hash("GUIDropdown"));
-        LogComponentTypeIds("GUIScrollView", FNV1a_Hash("GUIScrollView"));
-        LogComponentTypeIds("GUISeparator", FNV1a_Hash("GUISeparator"));
         LogComponentTypeIds("GUIText", FNV1a_Hash("GUIText"));
-        LogComponentTypeIds("GUILayoutGroup", FNV1a_Hash("GUILayoutGroup"));
-        LogComponentTypeIds("GUITooltip", FNV1a_Hash("GUITooltip"));
+        LogComponentTypeIds("GUIImage", FNV1a_Hash("GUIImage"));
+        LogComponentTypeIds("GUIInput", FNV1a_Hash("GUIInput"));
+        LogComponentTypeIds("GUIStateStyle", FNV1a_Hash("GUIStateStyle"));
+        LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));
+        LogComponentTypeIds("GUISlider", FNV1a_Hash("GUISlider"));
 
         LogComponentTypeIds("CollisionEventBuffer", FNV1a_Hash("CollisionEventBuffer"));
         LogComponentTypeIds("TriggerEventBuffer", FNV1a_Hash("TriggerEventBuffer"));

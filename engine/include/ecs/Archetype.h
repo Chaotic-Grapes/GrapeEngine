@@ -110,6 +110,12 @@ namespace ECS {
         uint32_t GetChunkCount() const noexcept { return static_cast<uint32_t>(m_chunks.size()); }
 
         /**
+         * @brief Gets the byte size of a single chunk buffer in this archetype.
+         * @return The total bytes per chunk (component storage only).
+         */
+        size_t GetChunkByteSize() const noexcept { return m_totalBytes; }
+
+        /**
          * @brief Inserts a new entity into the archetype and returns its location.
          * @return A pair containing the chunk index and slot index of the newly inserted entity.
          */

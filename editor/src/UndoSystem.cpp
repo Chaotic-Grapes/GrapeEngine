@@ -20,8 +20,168 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 #include "core/Logger.h"
 #include "EditorECSUtils.h"
+#include <algorithm>
+#include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace Editor {
+    namespace {
+        void CollectEntitySnapshots(ECS::World* world, ECS::Entity entity, std::vector<EntitySnapshot>& out) {
+            if (!world || entity.IsNull() || !world->IsAlive(entity)) {
+                return;
+            }
+
+            EntitySnapshot snapshot;
+            snapshot.Id = entity.Index;
+
+            ECS::Entity parent = world->ParentOf(entity);
+            snapshot.ParentId = parent.IsNull() ? ECS::Entity::NPOS32 : parent.Index;
+
+            snapshot.Components = world->CaptureEntityComponents(entity);
+
+            const ECS::ComponentTypeId parentTypeId = ECS::TypeIdOf<ECS::Components::Parent>();
+            snapshot.Components.erase(
+                std::remove_if(snapshot.Components.begin(), snapshot.Components.end(),
+                    [parentTypeId](const ECS::SerializedComponent& sc) { return sc.Id == parentTypeId; }),
+                snapshot.Components.end()
+            );
+
+            out.push_back(std::move(snapshot));
+
+            world->ForChildren(entity, [&](ECS::Entity child) {
+                CollectEntitySnapshots(world, child, out);
+            });
+        }
+
+        void CollectEntityHierarchyIds(ECS::World* world, ECS::Entity entity, std::vector<EntityId>& out) {
+            if (!world || entity.IsNull() || !world->IsAlive(entity)) {
+                return;
+            }
+
+            out.push_back(entity.Index);
+
+            world->ForChildren(entity, [&](ECS::Entity child) {
+                CollectEntityHierarchyIds(world, child, out);
+            });
+        }
+
+        void DestroyEntityHierarchy(ECS::World* world, EntityId entityId) {
+            if (!world || entityId == ECS::Entity::NPOS32) {
+                return;
+            }
+
+            ECS::Entity entity = world->Resolve(entityId);
+            if (!world->IsAlive(entity)) {
+                return;
+            }
+
+            std::vector<EntityId> entities;
+            CollectEntityHierarchyIds(world, entity, entities);
+
+            for (auto it = entities.rbegin(); it != entities.rend(); ++it) {
+                ECS::Entity current = world->Resolve(*it);
+                if (world->IsAlive(current)) {
+                    world->Destroy(current);
+                }
+            }
+        }
+
+        void RestoreEntityHierarchy(ECS::World* world, const std::vector<EntitySnapshot>& snapshots) {
+            if (!world || snapshots.empty()) {
+                return;
+            }
+
+            std::unordered_map<EntityId, ECS::Entity> entityMap;
+            entityMap.reserve(snapshots.size());
+
+            for (const auto& snapshot : snapshots) {
+                ECS::Entity created = world->CreateWithId(snapshot.Id);
+                entityMap.emplace(snapshot.Id, created);
+            }
+
+            auto applySnapshotComponents = [world](ECS::Entity entity,
+                const std::vector<ECS::SerializedComponent>& comps,
+                bool allowIfNotAlive) {
+                if (!world) {
+                    return;
+                }
+
+                if (!world->IsAlive(entity)) {
+                    if (!allowIfNotAlive) {
+                        return;
+                    }
+
+                    for (const auto& sc : comps) {
+                        world->AddComponentById(entity, sc.Id,
+                            const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
+                    }
+                    return;
+                }
+
+                std::unordered_set<ECS::ComponentTypeId> restoreIds;
+                restoreIds.reserve(comps.size());
+                for (const auto& sc : comps) {
+                    restoreIds.insert(sc.Id);
+                }
+
+                auto existing = world->GetEntityComponents(entity);
+                for (auto id : existing) {
+                    if (restoreIds.find(id) == restoreIds.end()) {
+                        world->RemoveById(entity, id);
+                    }
+                }
+
+                for (const auto& sc : comps) {
+                    void* ptr = world->GetRawComponentPtr(entity, sc.Id);
+                    if (ptr) {
+                        const auto& meta = ECS::ComponentRegistry::Meta(sc.Id);
+                        const size_t copySize = meta.Size > 0
+                            ? std::min(sc.Data.size(), meta.Size)
+                            : sc.Data.size();
+                        if (copySize > 0) {
+                            std::memcpy(ptr, sc.Data.data(), copySize);
+                        }
+                    } else {
+                        world->AddComponentById(entity, sc.Id,
+                            const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
+                    }
+                }
+            };
+
+            for (const auto& snapshot : snapshots) {
+                auto it = entityMap.find(snapshot.Id);
+                if (it == entityMap.end()) {
+                    continue;
+                }
+                // Newly created entities are not "alive" until they get components.
+                applySnapshotComponents(it->second, snapshot.Components, true);
+            }
+
+            for (const auto& snapshot : snapshots) {
+                if (snapshot.ParentId == ECS::Entity::NPOS32) {
+                    continue;
+                }
+
+                ECS::Entity child = world->Resolve(snapshot.Id);
+                if (!world->IsAlive(child)) {
+                    continue;
+                }
+
+                ECS::Entity parent = ECS::NULL_ENTITY;
+                auto parentIt = entityMap.find(snapshot.ParentId);
+                if (parentIt != entityMap.end()) {
+                    parent = parentIt->second;
+                } else {
+                    parent = world->Resolve(snapshot.ParentId);
+                }
+
+                if (world->IsAlive(parent)) {
+                    world->Attach(child, parent);
+                }
+            }
+        }
+    }
 
     // ========================================================================
     // TransformChangeCommand Implementation
@@ -98,127 +258,40 @@ namespace Editor {
         std::function<void()> onEntityDeleted
     )
         : m_world(world)
-        , m_entity(entity)
+        , m_entityId(entity.Index)
         , m_onEntityDeleted(onEntityDeleted)
     {
-        // Snapshot entity state at creation time
+        // Snapshot the full entity hierarchy at creation time for redo.
         if (m_world && m_world->IsAlive(entity)) {
-            auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
-                m_world, entity, "LocalTransform");
-            if (transform) {
-                m_hasTransform = true;
-                m_savedTransform = *transform;
-            }
-
-            auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(
-                m_world, entity, "Layer");
-            if (layer) {
-                m_hasLayer = true;
-                m_savedLayer = *layer;
-            }
-
-            auto* name = Editor::ECSUtils::GetComponentPtr<ECS::Components::Name>(
-                m_world, entity, "Name");
-            if (name) {
-                m_hasName = true;
-                m_savedName = *name;
-            }
-
-            auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(
-                m_world, entity, "Active");
-            if (active) {
-                m_hasActive = true;
-                m_savedActive = *active;
-            }
-
-            auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(
-                m_world, entity, "SpriteRenderer2D");
-            if (sprite) {
-                m_hasSprite = true;
-                m_savedSprite = *sprite;
-            }
-
-            auto* box = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeBox2D>(
-                m_world, entity, "ShapeBox2D");
-            if (box) {
-                m_hasBox = true;
-                m_savedBox = *box;
-            }
-
-            auto* circle = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeCircle2D>(
-                m_world, entity, "ShapeCircle2D");
-            if (circle) {
-                m_hasCircle = true;
-                m_savedCircle = *circle;
-            }
+            CollectEntitySnapshots(m_world, entity, m_snapshots);
         }
     }
 
     void CreateEntityCommand::Execute() {
         // Execute = Restore the entity mainly for Redo
-        if (!m_world || !m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot execute entity creation - entity invalid");
+        if (!m_world || m_snapshots.empty()) {
+            LOG_WARNING("[UndoSystem] Cannot execute entity creation - missing snapshots");
             return;
         }
 
-        // Restore all components from snapshot
-        if (m_hasTransform) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "LocalTransform", m_savedTransform);
-        }
-
-        if (m_hasLayer) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Layer", m_savedLayer);
-        }
-
-        if (m_hasName) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Name", m_savedName);
-        }
-
-        if (m_hasActive) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", m_savedActive);
-        }
-
-        if (m_hasSprite) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "SpriteRenderer2D", m_savedSprite);
-        }
-
-        if (m_hasBox) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeBox2D", m_savedBox);
-        }
-
-        if (m_hasCircle) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeCircle2D", m_savedCircle);
-        }
-
-        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " restored (redo creation)");
+        RestoreEntityHierarchy(m_world, m_snapshots);
+        LOG_DEBUG("[UndoSystem] Entity " << m_entityId << " restored (redo creation)");
     }
 
     void CreateEntityCommand::Undo() {
-        // Undo creation = soft delete (deactivate)
-        if (!m_world) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity creation - world is null");
+        // Undo creation = delete the current entity hierarchy.
+        if (!m_world || m_entityId == ECS::Entity::NPOS32) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity creation - entity invalid");
             return;
         }
 
-        if (!m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity creation - entity already deleted");
-            return;
-        }
-
-        if (m_world->Has<ECS::Components::Active>(m_entity)) {
-            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
-        }
-        else {
-            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
-        }
-
-        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deactivated (undo creation)");
+        DestroyEntityHierarchy(m_world, m_entityId);
 
         if (m_onEntityDeleted) {
             m_onEntityDeleted();
         }
 
-        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deleted (undo creation)");
+        LOG_DEBUG("[UndoSystem] Entity " << m_entityId << " deleted (undo creation)");
     }
 
     // ========================================================================
@@ -231,129 +304,127 @@ namespace Editor {
         std::function<void()> onEntityRestored
     )
         : m_world(world)
-        , m_entity(entity)
+        , m_entityId(entity.Index)
         , m_onEntityRestored(onEntityRestored)
     {
-        // Snapshot entity state before deletion
+        // Snapshot the full entity hierarchy before deletion for undo.
         if (m_world && m_world->IsAlive(entity)) {
-            auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
-                m_world, entity, "LocalTransform");
-            if (transform) {
-                m_hasTransform = true;
-                m_savedTransform = *transform;
-            }
-
-            auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(
-                m_world, entity, "Layer");
-            if (layer) {
-                m_hasLayer = true;
-                m_savedLayer = *layer;
-            }
-
-            auto* name = Editor::ECSUtils::GetComponentPtr<ECS::Components::Name>(
-                m_world, entity, "Name");
-            if (name) {
-                m_hasName = true;
-                m_savedName = *name;
-            }
-
-            auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(
-                m_world, entity, "Active");
-            if (active) {
-                m_hasActive = true;
-                m_savedActive = *active;
-            }
-
-            auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(
-                m_world, entity, "SpriteRenderer2D");
-            if (sprite) {
-                m_hasSprite = true;
-                m_savedSprite = *sprite;
-            }
-
-            auto* box = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeBox2D>(
-                m_world, entity, "ShapeBox2D");
-            if (box) {
-                m_hasBox = true;
-                m_savedBox = *box;
-            }
-
-            auto* circle = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeCircle2D>(
-                m_world, entity, "ShapeCircle2D");
-            if (circle) {
-                m_hasCircle = true;
-                m_savedCircle = *circle;
-            }
+            CollectEntitySnapshots(m_world, entity, m_snapshots);
         }
     }
 
     void DeleteEntityCommand::Execute() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+        if (!m_world || m_entityId == ECS::Entity::NPOS32) {
             LOG_WARNING("[UndoSystem] Cannot execute entity deletion - entity invalid");
             return;
         }
 
-        // Deactivate entity
-        if (m_world->Has<ECS::Components::Active>(m_entity)) {
-            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
-        }
-        else {
-            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
-        }
-
-        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deleted");
+        DestroyEntityHierarchy(m_world, m_entityId);
+        LOG_DEBUG("[UndoSystem] Entity " << m_entityId << " deleted");
     }
 
     void DeleteEntityCommand::Undo() {
-        if (!m_world) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - world is null");
+        if (!m_world || m_snapshots.empty()) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - missing snapshots");
             return;
         }
 
-        // For soft delete system: entity should still be alive, just deactivated
-        if (!m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity no longer exists in ECS");
-            return;
-        }
-
-        // Restore entity state
-        if (m_hasTransform) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "LocalTransform", m_savedTransform);
-        }
-
-        if (m_hasLayer) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Layer", m_savedLayer);
-        }
-
-        if (m_hasName) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Name", m_savedName);
-        }
-
-        if (m_hasSprite) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "SpriteRenderer2D", m_savedSprite);
-        }
-
-        if (m_hasBox) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeBox2D", m_savedBox);
-        }
-
-        if (m_hasCircle) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeCircle2D", m_savedCircle);
-        }
-
-        // Restore Active component last (this will re-enable the entity)
-        if (m_hasActive) {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", m_savedActive);
-        }
-        else {
-            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", ECS::Components::Active{ true });
-        }
+        RestoreEntityHierarchy(m_world, m_snapshots);
 
         if (m_onEntityRestored) {
             m_onEntityRestored();
         }
 
-        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " restored (undo deletion)");
+        LOG_DEBUG("[UndoSystem] Entity " << m_entityId << " restored (undo deletion)");
+    }
+
+    // ========================================================================
+    // EntityComponentsSnapshotCommand Implementation
+    // ========================================================================
+
+    EntityComponentsSnapshotCommand::EntityComponentsSnapshotCommand(
+        ECS::World* world,
+        ECS::Entity entity,
+        std::vector<ECS::SerializedComponent> before,
+        std::vector<ECS::SerializedComponent> after
+    )
+        : m_world(world)
+        , m_entity(entity)
+        , m_before(std::move(before))
+        , m_after(std::move(after))
+    {
+    }
+
+    void EntityComponentsSnapshotCommand::Execute() {
+        if (!m_world || !m_world->IsAlive(m_entity)) {
+            LOG_WARNING("[UndoSystem] Cannot execute component snapshot - entity invalid");
+            return;
+        }
+
+        std::unordered_set<ECS::ComponentTypeId> restoreIds;
+        restoreIds.reserve(m_after.size());
+        for (const auto& sc : m_after) {
+            restoreIds.insert(sc.Id);
+        }
+
+        auto existing = m_world->GetEntityComponents(m_entity);
+        for (auto id : existing) {
+            if (restoreIds.find(id) == restoreIds.end()) {
+                m_world->RemoveById(m_entity, id);
+            }
+        }
+
+        for (const auto& sc : m_after) {
+            void* ptr = m_world->GetRawComponentPtr(m_entity, sc.Id);
+            if (ptr) {
+                const auto& meta = ECS::ComponentRegistry::Meta(sc.Id);
+                const size_t copySize = meta.Size > 0
+                    ? std::min(sc.Data.size(), meta.Size)
+                    : sc.Data.size();
+                if (copySize > 0) {
+                    std::memcpy(ptr, sc.Data.data(), copySize);
+                }
+            } else {
+                m_world->AddComponentById(m_entity, sc.Id,
+                    const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
+            }
+        }
+    }
+
+    void EntityComponentsSnapshotCommand::Undo() {
+        if (!m_world || !m_world->IsAlive(m_entity)) {
+            LOG_WARNING("[UndoSystem] Cannot undo component snapshot - entity invalid");
+            return;
+        }
+
+        std::unordered_set<ECS::ComponentTypeId> restoreIds;
+        restoreIds.reserve(m_before.size());
+        for (const auto& sc : m_before) {
+            restoreIds.insert(sc.Id);
+        }
+
+        auto existing = m_world->GetEntityComponents(m_entity);
+        for (auto id : existing) {
+            if (restoreIds.find(id) == restoreIds.end()) {
+                m_world->RemoveById(m_entity, id);
+            }
+        }
+
+        for (const auto& sc : m_before) {
+            void* ptr = m_world->GetRawComponentPtr(m_entity, sc.Id);
+            if (ptr) {
+                const auto& meta = ECS::ComponentRegistry::Meta(sc.Id);
+                const size_t copySize = meta.Size > 0
+                    ? std::min(sc.Data.size(), meta.Size)
+                    : sc.Data.size();
+                if (copySize > 0) {
+                    std::memcpy(ptr, sc.Data.data(), copySize);
+                }
+            } else {
+                m_world->AddComponentById(m_entity, sc.Id,
+                    const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
+            }
+        }
     }
 
     // ========================================================================

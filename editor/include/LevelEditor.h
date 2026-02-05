@@ -32,8 +32,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include "ConsolePanel.h"
 #include "PerformancePanel.h"
 #include "SpriteImportPanel.h"
@@ -96,6 +99,20 @@ private:
     // Event handlers
     void _onPlaybackStateChanged(EditorState oldState, EditorState newState);
     void _onViewportSelectionChanged(EntityId id);
+    // Asset selection handler for tileset -> tile palette wiring.
+    void _onAssetSelected(const std::string& assetPath);
+    // Sync tile palette/editor state from a selected entity (if it has a tilemap component).
+    void _syncTilePaletteToSelection(EntityId id);
+    // Save all cached tilemap assets to disk before scene serialization.
+    void _saveActiveTileMapAsset(const std::string& scenePath);
+    // Refresh cached tilemaps and push all visible tilemaps to the renderer.
+    void _refreshTileMapCache();
+    // Render a modal to create a tilemap when a tileset is selected without an active tilemap.
+    void _renderTilemapCreateModal();
+    // Apply a tileset asset path to an existing tilemap entity.
+    void _applyTilesetToTilemap(ECS::Entity entity, const std::string& assetPath);
+    // Activate the tilemap for palette editing without changing hierarchy selection.
+    void _setActiveTileMap(EntityId id);
 
     // Core state
     ECS::World* m_world = nullptr;
@@ -116,6 +133,33 @@ private:
     SpriteImportPanel m_spriteImportPanel;
     SystemsPanel m_systemsPanel;
     TilePalettePanel m_tilePalette;
+
+    struct TileMapCacheEntry {
+        std::shared_ptr<TileMap> Map;
+        std::vector<std::shared_ptr<Tileset>> Tilesets;
+        std::string MapPath;
+        std::vector<std::string> TilesetPaths;
+        float TileWorldSize = 1.0f;
+        uint32_t TilePixelSize = 32;
+        uint32_t DefaultWidth = 64;
+        uint32_t DefaultHeight = 64;
+        glm::vec2 Origin{0.0f, 0.0f};
+        bool Visible = true;
+        std::string DisplayName;
+        uint8_t ActiveTilesetIndex = 0;
+        uint32_t Generation = 0; // Track entity generation to detect scene reloads.
+    };
+
+    // Active tilemap editing context (kept alive for renderer + palette).
+    std::shared_ptr<TileMap> m_activeTileMap;
+    std::shared_ptr<Tileset> m_activeTileset;
+    std::string m_activeTileMapPath;
+    std::string m_activeTilesetPath;
+    EntityId m_activeTileMapEntityId = ECS::Entity::NPOS32;
+    std::unordered_map<EntityId, TileMapCacheEntry> m_tileMapCache;
+    std::vector<TilePalettePanel::TileMapListEntry> m_tileMapList;
+    std::string m_pendingTilesetPath;
+    bool m_showTilemapCreateModal = false;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

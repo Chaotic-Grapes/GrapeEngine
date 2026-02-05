@@ -26,10 +26,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_set>
 #include <sstream>
 #include <cstdint>
+#include <filesystem>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "core/Logger.h"
-#include "services/TimeSystem.h"
+#include "core/ProjectPaths.h"
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
@@ -144,8 +146,37 @@ namespace Scenes {
         void SetActiveImmediate(const size_t index) {
             if (index >= m_scenes.size())
                 return;
-            
+
+            _notifySceneChanging(index);
             _performTransition(index);
+        }
+
+        /**
+         * @brief Configure the next scene change to trigger audio transitions.
+         * @param fadeDuration Duration of fade in seconds (0 for immediate stop).
+         * @param allowCrossfade True to allow overlap between old and new audio.
+         */
+        void SetNextAudioTransition(float fadeDuration, bool allowCrossfade) {
+            m_pendingAudioTransitionFade = fadeDuration;
+            m_pendingAudioTransitionCrossfade = allowCrossfade;
+            m_hasPendingAudioTransition = true;
+        }
+
+        /**
+         * @brief Consume the pending audio transition, if any.
+         * @param outFadeDuration Output fade duration in seconds.
+         * @param outAllowCrossfade Output crossfade flag.
+         * @return true if a pending transition was consumed.
+         */
+        bool ConsumeNextAudioTransition(float& outFadeDuration, bool& outAllowCrossfade) {
+            if (!m_hasPendingAudioTransition) {
+                return false;
+            }
+
+            outFadeDuration = m_pendingAudioTransitionFade;
+            outAllowCrossfade = m_pendingAudioTransitionCrossfade;
+            m_hasPendingAudioTransition = false;
+            return true;
         }
 
         /**
@@ -217,7 +248,11 @@ namespace Scenes {
             try {
                 json sceneJson;
                 sceneJson["Version"] = version;
-                sceneJson["SceneName"] = sceneName;
+                std::string derivedSceneName = std::filesystem::path(filename).stem().string();
+                if (derivedSceneName.empty()) {
+                    derivedSceneName = sceneName;
+                }
+                sceneJson["SceneName"] = derivedSceneName;
                 sceneJson["EntityCount"] = 0;
 
                 // Serialize layer manager state (names, masks, visibility, locks, runtime flags)
@@ -410,6 +445,11 @@ namespace Scenes {
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
 					<< "\tEntities loaded: " << loadedCount);
 
+                scene.SetPath(filename);
+                if (sceneJson.contains("SceneName")) {
+                    scene.SetName(sceneJson["SceneName"].get<std::string>());
+                }
+
                 // Rebuild LayerManager membership lists so editor UI (LayersPanel)
                 // sees the correct entities per layer. Deserialization writes the
                 // Layer component directly to the world, which does not update the
@@ -464,8 +504,10 @@ namespace Scenes {
             if (m_pendingActive == NPOS)
                 return;
 
+            _notifySceneChanging(m_pendingActive);
             _performTransition(m_pendingActive);
             m_pendingActive = NPOS;
+            m_hasPendingAudioTransition = false;
         }
 
         void _performTransition(const size_t toIndex) {
@@ -498,6 +540,23 @@ namespace Scenes {
             }
         }
 
+        void _notifySceneChanging(const size_t toIndex) {
+            // Notify listeners of scene changing
+            std::string oldName;
+            std::string newName;
+
+            // Get old scene name
+            if (m_active != NPOS && m_active < m_scenes.size() && m_scenes[m_active]) {
+                oldName = m_scenes[m_active]->GetName();
+            }
+            // Get new scene name
+            if (toIndex < m_scenes.size() && m_scenes[toIndex]) {
+                newName = m_scenes[toIndex]->GetName();
+            }
+
+            Messaging::MessageSystem::Notify(Messaging::SceneChanging{std::move(oldName), std::move(newName)});
+        }
+
         // Generate a unique owner tag for a scene based on its pointer
         static std::string _makeOwnerTag(const Scene* scene) {
             if (!scene) {
@@ -510,6 +569,46 @@ namespace Scenes {
             std::ostringstream oss;
             oss << "Scene@" << std::hex << reinterpret_cast<uintptr_t>(scene);
             return oss.str();
+        }
+
+        static std::string _resolveScenePath(const std::string& path) {
+            if (path.empty()) {
+                return {};
+            }
+
+            std::filesystem::path pathFs(path);
+            return pathFs.is_absolute()
+                ? pathFs.string()
+                : Engine::ProjectPaths::ToAbsolutePath(path);
+        }
+
+        static std::string _normalizePath(const std::string& path) {
+            std::filesystem::path normalized = std::filesystem::path(path).lexically_normal();
+            std::string normalizedStr = normalized.string();
+            std::replace(normalizedStr.begin(), normalizedStr.end(), '\\', '/');
+            return normalizedStr;
+        }
+
+        size_t _findSceneIndexByPath(const std::string& normalizedAbsolutePath) const {
+            const size_t count = m_scenes.size();
+            for (size_t i = 0; i < count; ++i) {
+                const Scene* scene = m_scenes[i].get();
+                if (!scene) {
+                    continue;
+                }
+
+                const std::string& scenePath = scene->GetPath();
+                if (scenePath.empty()) {
+                    continue;
+                }
+
+                const std::string sceneAbsolute = _resolveScenePath(scenePath);
+                if (_normalizePath(sceneAbsolute) == normalizedAbsolutePath) {
+                    return i;
+                }
+            }
+
+            return NPOS;
         }
 
         // Initialize runtime prefab metadata post-load
@@ -564,6 +663,10 @@ namespace Scenes {
         static constexpr size_t NPOS = static_cast<size_t>(-1);
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;
+
+        bool m_hasPendingAudioTransition = false; // Whether there is a pending audio transition
+        float m_pendingAudioTransitionFade = 0.0f; // Fade duration in seconds
+        bool m_pendingAudioTransitionCrossfade = false; // Whether to allow crossfade
     };
 }
 

@@ -66,8 +66,8 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "TextureId": 16,
+                        "TexturePath": "",
                         "Tiling": {
                             "X": 0.0625,
                             "Y": 0.10000000149011612
@@ -79,19 +79,19 @@
                     "Data": {
                         "FrameCount": 16,
                         "FrameHeight": 16,
+                        "FrameLength": 16,
+                        "FrameOffset": 0,
                         "FrameWidth": 32,
                         "FramesPerSecond": 6.0,
                         "Loop": true,
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
                         "Playing": true,
-                        "RowFrameCount": 16,
-                        "RowIndex": 0,
-                        "RowStartColumn": 0,
+                        "Row": 0,
                         "SheetHeight": 160,
                         "SheetWidth": 512,
                         "StartFrame": 0,
-                        "TextureId": 6,
+                        "TextureId": 16,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
                         "UseRow": true
                     },
@@ -130,7 +130,7 @@
                         "Position": {
                             "X": 0.0,
                             "Y": 0.0,
-                            "Z": -10.0
+                            "Z": 0.0
                         },
                         "Rotation": {
                             "W": 1.0,
@@ -154,15 +154,27 @@
                 },
                 {
                     "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
                         "Active": true,
-                        "AspectRatio": 2.0617432594299316,
+                        "AspectRatio": 1.3412127494812012,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
                         "OrthoSize": 10.0,
-                        "UsePerspective": false
+                        "UsePerspective": true
                     },
                     "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
                 },
                 {
                     "Data": {
@@ -179,7 +191,7 @@
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
-                            "m23": -10.0,
+                            "m23": 0.0,
                             "m30": 0.0,
                             "m31": 0.0,
                             "m32": 0.0,
@@ -255,6 +267,6 @@
             "visible": true
         }
     ],
-    "SceneName": "Scene",
+    "SceneName": "SpriteAnimationSample",
     "Version": "1.0"
 }

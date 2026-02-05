@@ -40,13 +40,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <scene/SceneManager.h>
-#include "ecs/systems/RendererSystem.h"  
+#include "ecs/systems/RendererSystem.h"
 #include "graphics/RenderGraph.hpp"
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
-#include "ecs/ui/GUIContext.h"
 #include "TilePalettePanel.h"
+#include "graphics/Viewport.hpp"
+
+namespace {
+    constexpr const char* kSceneViewportName = "Scene";
+}
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -57,10 +61,13 @@ void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbo
     
     // Set viewport type to Scene
     SetViewportType(ViewportType::Scene);
+    SetViewportName(kSceneViewportName);
+    Graphics::ViewportManager::Create(kSceneViewportName, m_editorCamera ? m_editorCamera->GetCamera() : nullptr, 1, 1);
 }
 
 SceneViewport::~SceneViewport() {
     // Cleanup handled by base class and RAII members
+    Graphics::ViewportManager::Destroy(kSceneViewportName);
 }
 
 void SceneViewport::BeginFrame() {
@@ -150,11 +157,12 @@ void SceneViewport::_renderViewport() {
     // --- Viewport Header -----------------------------------------------------
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
-    const float headerHeight = ImGui::GetFrameHeight() + 6.0f;
+    const float iconButtonSize = 28.0f;
+    const float headerHeight = iconButtonSize + 10.0f;
     ImGui::BeginChild("##SceneViewportHeader", ImVec2(0.0f, headerHeight), false,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     // Vertically center controls within the header strip.
-    const float centerOffset = std::max(0.0f, (headerHeight - ImGui::GetFrameHeight()) * 0.5f);
+    const float centerOffset = std::max(0.0f, (headerHeight - iconButtonSize) * 0.5f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + centerOffset);
 
     // Clamp helper for per-group tinting.
@@ -185,7 +193,11 @@ void SceneViewport::_renderViewport() {
         const int popCount = pushButtonColors(normal, hover, pressed, text);
         ImGui::PushID(id);
         if (useSymbols && m_symbolsFont) ImGui::PushFont(m_symbolsFont);
-        const bool clicked = ImGui::Button(icon, ImVec2(28.0f, 0.0f));
+        // Remove padding inside viewport icon buttons
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
+        const bool clicked = ImGui::Button(icon, ImVec2(iconButtonSize, iconButtonSize));
+        ImGui::PopStyleVar(2);
         if (useSymbols && m_symbolsFont) ImGui::PopFont();
         if (tooltip && ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
@@ -197,9 +209,9 @@ void SceneViewport::_renderViewport() {
         return clicked;
     };
 
-    // Taken from https://github.com/juliettef/IconFontCppHeaders/tree/main
-    static const char* ICON_CAMERA_3D   = "\xEE\xA1\x8D";   // 3d_rotation
-    static const char* ICON_CAMERA_2D   = "\xEE\x8F\x86";   // crop_square
+    // Taken from Google Material Design Icons
+    static const char* ICON_CAMERA_3D   = "\xEE\xB4\xB8";   // 3d
+    static const char* ICON_CAMERA_2D   = "\xEE\xBC\xB7";   // 2d
     static const char* ICON_MOVE        = "\xEE\xA2\x9F";   // open_with
     static const char* ICON_ROTATE      = "\xEE\x90\x9D";   // rotate_right
     static const char* ICON_SCALE       = "\xEE\x8F\x82";   // crop_free
@@ -229,12 +241,12 @@ void SceneViewport::_renderViewport() {
         isPerspective = m_editorCamera->GetCamera()->UsePerspective;
     }
     ImGui::PushID("CameraMode");
-    if (iconButtonTinted("Persp", ICON_CAMERA_3D, "Perspective", isPerspective, cameraTint, true)) {
-        if (m_editorCamera) m_editorCamera->ResetTo3D();
-    }
-    ImGui::SameLine();
     if (iconButtonTinted("Ortho", ICON_CAMERA_2D, "Orthographic", !isPerspective, cameraTint, true)) {
         if (m_editorCamera) m_editorCamera->ResetTo2D();
+    }
+    ImGui::SameLine();
+    if (iconButtonTinted("Persp", ICON_CAMERA_3D, "Perspective", isPerspective, cameraTint, true)) {
+        if (m_editorCamera) m_editorCamera->ResetTo3D();
     }
     ImGui::PopID();
 
@@ -390,6 +402,16 @@ void SceneViewport::_renderViewport() {
     m_sceneDrawPos = pos;
     m_sceneDrawSize = size;
 
+    if (size.x > 1.0f && size.y > 1.0f) {
+        Graphics::ViewportManager::Resize(kSceneViewportName, static_cast<int>(size.x), static_cast<int>(size.y));
+        if (m_editorCamera) {
+            m_editorCamera->SetViewportSize(size.x, size.y);
+        }
+    }
+    if (m_editorCamera) {
+        Graphics::ViewportManager::SetCamera(kSceneViewportName, m_editorCamera->GetCamera());
+    }
+
     // Broadcast viewport resize event for camera aspect ratio updates
     Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
@@ -397,29 +419,58 @@ void SceneViewport::_renderViewport() {
         // Configure renderer to use EDITOR camera for Scene viewport
         rendererSystem->SetCamera(m_editorCamera->GetCamera());
 
+        if (!rendererSystem->GetViewport(kSceneViewportName)) {
+            const int vpWidth = std::max(1, static_cast<int>(size.x));
+            const int vpHeight = std::max(1, static_cast<int>(size.y));
+            Graphics::ViewportManager::Create(kSceneViewportName, m_editorCamera ? m_editorCamera->GetCamera() : nullptr, vpWidth, vpHeight);
+        }
+
         // Render camera frustum overlay if enabled
         if (m_world && m_showCameraFrustum) {
             _renderCameraFrustum();
         }
 
-        auto* rg = rendererSystem->GetRenderGraph();
-        if (rg) {
+        uint32_t textureId = 0;
+        if (auto* vp = rendererSystem->GetViewport(kSceneViewportName)) {
+            if (m_debugViewIndex == 1 && vp->HDR) {
+                textureId = vp->HDR->GetColorTexture(0);
+            } else if (m_debugViewIndex == 2 && vp->BloomExtract) {
+                textureId = vp->BloomExtract->GetColorTexture(0);
+            } else if (vp->LDR) {
+                textureId = vp->LDR->GetColorTexture(0);
+            }
+        } else if (auto* rg = rendererSystem->GetRenderGraph()) {
             ResourceAccessor acc(rg);
             // Select debug texture based on the header dropdown.
             const char* debugTextureName = "LDR";
             if (m_debugViewIndex == 1) debugTextureName = "HDR";
             if (m_debugViewIndex == 2) debugTextureName = "BloomExtract";
 
-            uint32_t textureId = acc.GetTexture(debugTextureName);
+            textureId = acc.GetTexture(debugTextureName);
             if (textureId == 0) {
                 textureId = acc.GetTexture("LDR");
             }
-            if (textureId > 0) {
-                ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
-            }
+        }
+
+        if (textureId > 0) {
+            ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
 
             // Check if image is hovered AFTER drawing it
             bool isSceneImageHovered = ImGui::IsItemHovered();
+
+            // Accept asset drops on the scene viewport to set the active tileset.
+            if (ImGui::BeginDragDropTarget()) {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                    const char* data = static_cast<const char*>(payload->Data);
+                    if (data && payload->DataSize > 0) {
+                        const std::string assetPath(data); // Payload is null-terminated list, first entry is enough.
+                        if (m_tilePalettePanel) {
+                            m_tilePalettePanel->HandleAssetDrop(assetPath);
+                        }
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
 
             // Update m_isViewportHovered only when image is hovered
             m_isViewportHovered = isSceneImageHovered;
@@ -432,13 +483,10 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
-            auto& guiCtx = ECS::UI::GUIContext::Get();
-            if (isSceneImageHovered || !guiCtx.UseViewportBounds) {
-                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
-                guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
-                guiCtx.ViewportSize = { size.x * fbScale.x, size.y * fbScale.y };
-                guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
-                guiCtx.UseViewportBounds = true;
+            if (auto* renderer = ECS::RendererSystem::GetInstance()) {
+                // GUI renders into the full LDR target; the scene image is a scaled blit of that target.
+                // Using the ImGui rect as a GUI viewport offsets/clips GUI relative to the image.
+                renderer->ResetGUIViewport();
             }
 
             // Prepare interaction manager with current viewport state
@@ -488,10 +536,62 @@ void SceneViewport::_renderViewport() {
 
                         // Let tile palette panel handle hover and clicks
                         m_tilePalettePanel->OnViewportHover(worldPos);
+
+                        // Draw tilemap bounds/grid when tile palette is active.
+                        if (rendererSystem) {
+                            const auto& map = m_tilePalettePanel->GetTileMap();
+                            const glm::vec2 mapOrigin = m_tilePalettePanel->GetTileMapOrigin(); // Tilemap origin in world space.
+                            if (map && map->LayerCount() > 0) {
+                                const auto& layer = map->GetLayer(0);
+                                const float tileSize = map->TileSize();
+
+                                // Compute camera-aligned extents for an "infinite" grid overlay.
+                                float halfHeight = 10.0f;
+                                float halfWidth = 10.0f;
+                                if (camera->UsePerspective) {
+                                    const float dist = std::max(1.0f, std::abs(camera->Position.z));
+                                    const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
+                                    halfHeight = std::max(1.0f, halfHeightView);
+                                    halfWidth = halfHeight * camera->AspectRatio;
+                                } else {
+                                    halfHeight = std::max(1.0f, camera->OrthoSize);
+                                    halfWidth = halfHeight * camera->AspectRatio;
+                                }
+
+                                const glm::vec2 camPos(camera->Position.x, camera->Position.y);
+                                const glm::vec2 camLocal = camPos - mapOrigin; // Align grid to the tilemap origin.
+                                const float startX = std::floor((camLocal.x - halfWidth) / tileSize) * tileSize + mapOrigin.x;
+                                const float endX = camPos.x + halfWidth;
+                                const float startY = std::floor((camLocal.y - halfHeight) / tileSize) * tileSize + mapOrigin.y;
+                                const float endY = camPos.y + halfHeight;
+
+                                // Draw infinite-ish grid within the camera view.
+                                const glm::vec4 gridColor(0.6f, 0.8f, 0.9f, 0.12f);
+                                const uint32_t maxLines = 256;
+                                uint32_t lineCount = 0;
+                                for (float x = startX; x <= endX && lineCount < maxLines; x += tileSize, ++lineCount) {
+                                    rendererSystem->SubmitWireframeLine(glm::vec2(x, startY), glm::vec2(x, endY), gridColor, 0.02f);
+                                }
+                                lineCount = 0;
+                                for (float y = startY; y <= endY && lineCount < maxLines; y += tileSize, ++lineCount) {
+                                    rendererSystem->SubmitWireframeLine(glm::vec2(startX, y), glm::vec2(endX, y), gridColor, 0.02f);
+                                }
+
+                                // Draw current tilemap bounds as a separate outline.
+                                const glm::vec2 min(mapOrigin.x + map->TileToWorldSigned(map->OriginX()),
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY())); // Bounds min in world space.
+                                const glm::vec2 max(mapOrigin.x + map->TileToWorldSigned(map->OriginX() + static_cast<int32_t>(layer.Width())),
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY() + static_cast<int32_t>(layer.Height()))); // Bounds max in world space.
+                                const glm::vec4 outlineColor(0.2f, 0.9f, 0.9f, 0.45f);
+                                rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
+                            }
+                        }
                         bool left = Input::IsMousePressed(MOUSE_LEFT);
                         bool right = Input::IsMousePressed(MOUSE_RIGHT);
                         if (left || right) {
-                            tilePaletteHandledClick = m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
+                            m_tilePalettePanel->OnViewportClick(worldPos, right);
+                            tilePaletteHandledClick = true;
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {
@@ -517,7 +617,6 @@ void SceneViewport::_renderViewport() {
                     // Draw grid/axes overlays anchored to camera view.
                     if (m_showGrid || m_showAxes) {
                         const glm::vec2 camPos(camera->Position.x, camera->Position.y);
-                        float step = 1.0f;
                         float halfWidth = 10.0f;
                         float halfHeight = 10.0f;
 
@@ -526,12 +625,17 @@ void SceneViewport::_renderViewport() {
                             const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
                             halfHeight = std::max(1.0f, halfHeightView);
                             halfWidth = halfHeight * camera->AspectRatio;
-                            const float scale = std::pow(10.0f, std::floor(std::log10(halfHeight)));
-                            step = std::max(0.5f, scale * 0.25f);
                         } else {
                             halfHeight = std::max(1.0f, camera->OrthoSize);
                             halfWidth = halfHeight * camera->AspectRatio;
-                            step = std::max(0.25f, halfHeight / 10.0f);
+                        }
+
+                        float step = 1.0f;
+                        if (m_tilePalettePanel) {
+                            const auto& map = m_tilePalettePanel->GetTileMap();
+                            if (map && map->LayerCount() > 0) {
+                                step = std::max(0.001f, map->TileSize());
+                            }
                         }
 
                         // Calculate grid start and end positions aligned to step size
@@ -544,25 +648,30 @@ void SceneViewport::_renderViewport() {
                         const glm::vec4 gridColor{ 0.35f, 0.40f, 0.45f, 0.35f };
                         const glm::vec4 axisX{ 0.90f, 0.25f, 0.25f, 0.8f };
                         const glm::vec4 axisY{ 0.25f, 0.85f, 0.35f, 0.8f };
+                        const float gridThickness = 0.02f;
+                        const float axisThickness = 0.02f;
 
                         // Draw grid lines, if enabled
                         if (m_showGrid) {
-                            for (float x = startX; x <= endX; x += step) {
+                            const uint32_t maxLines = 256;
+                            uint32_t lineCount = 0;
+                            for (float x = startX; x <= endX && lineCount < maxLines; x += step, ++lineCount) {
                                 rendererSystem->SubmitWireframeLine(glm::vec2(x, camPos.y - halfHeight),
-                                    glm::vec2(x, camPos.y + halfHeight), gridColor, 0.06f);
+                                    glm::vec2(x, camPos.y + halfHeight), gridColor, gridThickness);
                             }
-                            for (float y = startY; y <= endY; y += step) {
+                            lineCount = 0;
+                            for (float y = startY; y <= endY && lineCount < maxLines; y += step, ++lineCount) {
                                 rendererSystem->SubmitWireframeLine(glm::vec2(camPos.x - halfWidth, y),
-                                    glm::vec2(camPos.x + halfWidth, y), gridColor, 0.06f);
+                                    glm::vec2(camPos.x + halfWidth, y), gridColor, gridThickness);
                             }
                         }
 
                         // Draw axes, if enabled
                         if (m_showAxes) {
                             rendererSystem->SubmitWireframeLine(glm::vec2(camPos.x - halfWidth, 0.0f),
-                                glm::vec2(camPos.x + halfWidth, 0.0f), axisX, 0.10f);
+                                glm::vec2(camPos.x + halfWidth, 0.0f), axisX, axisThickness);
                             rendererSystem->SubmitWireframeLine(glm::vec2(0.0f, camPos.y - halfHeight),
-                                glm::vec2(0.0f, camPos.y + halfHeight), axisY, 0.10f);
+                                glm::vec2(0.0f, camPos.y + halfHeight), axisY, axisThickness);
                         }
                     }
 
@@ -661,6 +770,12 @@ void SceneViewport::_renderViewport() {
             // Optional FPS overlay.
             if (m_showSceneFpsOverlay) {
                 _drawFpsOverlay(viewportScreenPos, size);
+            }
+        } else {
+            ImGui::TextDisabled("Viewport texture unavailable");
+            m_isViewportHovered = false;
+            if (m_editorCamera) {
+                m_editorCamera->SetViewportFocused(false);
             }
         }
     }

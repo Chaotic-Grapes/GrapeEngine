@@ -1,232 +1,241 @@
-/* Start Header *****************************************************************/
-/*!
-\file   GUILayoutSystem.cpp
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\brief
-Implementation of the GUI layout system.
-*/
-/* End Header *******************************************************************/
-
-#include "ecs/systems/GUILayoutSystem.h"
-#include "ecs/ui/GUIContext.h"
-#include "ecs/ui/GUILayout.h"
-#include "core/Application.h"
-#include "core/Logger.h"
-#include "ecs/Components.h"
-#include "platform/IPlatformContext.h"
 #include <algorithm>
-#include <cstdint>
-#include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include "ecs/Components.h"
+#include "ecs/systems/GUILayoutSystem.h"
+#include "ecs/systems/RendererSystem.h"
 
 namespace ECS {
-    namespace {
-        Vector2D GetCanvasSizeFromPlatform() {
-            if (!Engine::CORE) {
-                return { 0.0f, 0.0f };
-            }
-
-            auto* platform = Engine::CORE->GetPlatformContext();
-            if (!platform) {
-                return { 0.0f, 0.0f };
-            }
-
-            int width = 0;
-            int height = 0;
-            if (auto* renderDevice = platform->GetRenderDevice()) {
-                width = renderDevice->GetViewportWidth();
-                height = renderDevice->GetViewportHeight();
-            }
-
-            if ((width <= 0 || height <= 0) && platform->GetMainWindow()) {
-                auto* window = platform->GetMainWindow();
-                width = window->GetWidth();
-                height = window->GetHeight();
-            }
-
-            if (width <= 0 || height <= 0) {
-                return { 0.0f, 0.0f };
-            }
-
-            return { static_cast<float>(width), static_cast<float>(height) };
-        }
-
-        void UpdateCanvasMetrics(World& world) {
-            auto& ctx = UI::GUIContext::Get();
-
-            const Vector2D actualSize = GetCanvasSizeFromPlatform();
-            if (actualSize.X > 0.0f && actualSize.Y > 0.0f) {
-                if (ctx.CanvasSize.X != actualSize.X || ctx.CanvasSize.Y != actualSize.Y) {
-                    ctx.CanvasSize = actualSize;
-                    ctx.SpatialGridDirty = true;
-                }
-            }
-
-            Components::GUICanvas canvasSettings{};
-            bool found = false;
-            uint32_t lowestIndex = UINT32_MAX;
-            world.Each<Components::GUICanvas>([&](Entity entity, const Components::GUICanvas& canvas) {
-                if (!found || entity.Index < lowestIndex) {
-                    canvasSettings = canvas;
-                    lowestIndex = entity.Index;
-                    found = true;
-                }
-            });
-
-            Vector2D referenceSize = ctx.CanvasSize;
-            float scaleFactor = 1.0f;
-            if (found) {
-                referenceSize = canvasSettings.ReferenceSize;
-                scaleFactor = canvasSettings.ScaleFactor;
-            }
-
-            if (referenceSize.X <= 0.0f || referenceSize.Y <= 0.0f) {
-                referenceSize = ctx.CanvasSize;
-            }
-
-            float scaleX = ctx.CanvasSize.X / referenceSize.X;
-            float scaleY = ctx.CanvasSize.Y / referenceSize.Y;
-            float scale = 1.0f;
-            switch (canvasSettings.ScaleMode) {
-                case Components::GUICanvasScaleMode::Fill:
-                    scale = std::max(scaleX, scaleY);
-                    break;
-                case Components::GUICanvasScaleMode::MatchWidth:
-                    scale = scaleX;
-                    break;
-                case Components::GUICanvasScaleMode::MatchHeight:
-                    scale = scaleY;
-                    break;
-                case Components::GUICanvasScaleMode::Fit:
-                default:
-                    scale = std::min(scaleX, scaleY);
-                    break;
-            }
-            scale *= scaleFactor;
-            if (scale <= 0.0f) {
-                scale = 1.0f;
-            }
-
-            const float extraX = ctx.CanvasSize.X - referenceSize.X * scale;
-            const float extraY = ctx.CanvasSize.Y - referenceSize.Y * scale;
-            Vector2D baseOffset{ 0.0f, 0.0f };
-            switch (canvasSettings.Alignment) {
-                case Components::GUICanvasAlignment::TopLeft:
-                    baseOffset = { 0.0f, 0.0f };
-                    break;
-                case Components::GUICanvasAlignment::Top:
-                    baseOffset = { extraX * 0.5f, 0.0f };
-                    break;
-                case Components::GUICanvasAlignment::TopRight:
-                    baseOffset = { extraX, 0.0f };
-                    break;
-                case Components::GUICanvasAlignment::Left:
-                    baseOffset = { 0.0f, extraY * 0.5f };
-                    break;
-                case Components::GUICanvasAlignment::Right:
-                    baseOffset = { extraX, extraY * 0.5f };
-                    break;
-                case Components::GUICanvasAlignment::BottomLeft:
-                    baseOffset = { 0.0f, extraY };
-                    break;
-                case Components::GUICanvasAlignment::Bottom:
-                    baseOffset = { extraX * 0.5f, extraY };
-                    break;
-                case Components::GUICanvasAlignment::BottomRight:
-                    baseOffset = { extraX, extraY };
-                    break;
-                case Components::GUICanvasAlignment::Center:
-                default:
-                    baseOffset = { extraX * 0.5f, extraY * 0.5f };
-                    break;
-            }
-
-            const Vector2D newOffset{
-                baseOffset.X + canvasSettings.Offset.X,
-                baseOffset.Y + canvasSettings.Offset.Y
-            };
-            if (ctx.LayoutCanvasSize.X != referenceSize.X || ctx.LayoutCanvasSize.Y != referenceSize.Y ||
-                ctx.CanvasScale != scale ||
-                ctx.CanvasOffset.X != newOffset.X || ctx.CanvasOffset.Y != newOffset.Y) {
-                ctx.SpatialGridDirty = true;
-            }
-
-            ctx.LayoutCanvasSize = referenceSize;
-            ctx.CanvasScale = scale;
-            ctx.CanvasOffset = newOffset;
-        }
-
-        size_t HashFloat(float value) {
-            return std::hash<float>{}(value);
-        }
-
-        size_t HashVector2D(const Vector2D& value) {
-            size_t hash = HashFloat(value.X);
-            hash ^= HashFloat(value.Y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            return hash;
-        }
-
-        size_t HashGUIElement(const ECS::Components::GUIElement& element, ECS::Entity parentEntity) {
-            size_t hash = HashVector2D(element.Position);
-            hash ^= HashVector2D(element.Size) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashVector2D(element.AnchorMin) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashVector2D(element.AnchorMax) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashVector2D(element.Offset) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashFloat(element.PaddingLeft) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashFloat(element.PaddingRight) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashFloat(element.PaddingTop) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= HashFloat(element.PaddingBottom) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<int>{}(static_cast<int>(element.HAlign)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<int>{}(static_cast<int>(element.VAlign)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<int>{}(static_cast<int>(element.ElementType)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<int>{}(static_cast<int>(element.ZOrder)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<uint32_t>{}(parentEntity.Index) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            return hash;
-        }
-
-        void RefreshLayoutInvalidation(World& world) {
-            auto& ctx = UI::GUIContext::Get();
-
-            world.Each<Components::GUIElement>([&](Entity entity, Components::GUIElement& element) {
-                const auto* parent = world.TryGet<Components::Parent>(entity);
-                ECS::Entity parentEntity = parent ? parent->ParentEntity : ECS::NULL_ENTITY;
-
-                size_t hash = HashGUIElement(element, parentEntity);
-                auto it = ctx.LayoutHashes.find(entity.Index);
-                if (it == ctx.LayoutHashes.end() || it->second != hash) {
-                    element.DirtyLayout = true;
-                    ctx.LayoutHashes[entity.Index] = hash;
-                }
-            });
-        }
-    }
-
     void GUILayoutSystem::OnCreate(World& world) {
         (void)world;
-        LOG_INFO("GUILayoutSystem initialized");
+    }
+
+    // Compute canvas scale based on reference size and scale mode.
+    static Vector2D ComputeScale(const Components::GUICanvas& canvas, const Vector2D& viewportSize) {
+        Vector2D scale{ 1.0f, 1.0f };
+        if (canvas.ReferenceSize.X <= 0.0f || canvas.ReferenceSize.Y <= 0.0f) {
+            return scale;
+        }
+
+        const float scaleX = viewportSize.X / canvas.ReferenceSize.X;
+        const float scaleY = viewportSize.Y / canvas.ReferenceSize.Y;
+        float uniform = 1.0f;
+        switch (canvas.ScaleMode) {
+        case Components::GUIScaleMode::Fit:
+            uniform = std::min(scaleX, scaleY);
+            scale = { uniform, uniform };
+            break;
+        case Components::GUIScaleMode::Fill:
+            uniform = std::max(scaleX, scaleY);
+            scale = { uniform, uniform };
+            break;
+        case Components::GUIScaleMode::MatchWidth:
+            scale = { scaleX, scaleX };
+            break;
+        case Components::GUIScaleMode::MatchHeight:
+            scale = { scaleY, scaleY };
+            break;
+        }
+
+        return scale;
+    }
+
+    // Resolve anchor position based on alignment within a given rect.
+    static Vector2D AlignAnchor(const Vector2D& origin, const Vector2D& size, Components::GUIAlignment alignment) {
+        switch (alignment) {
+        case Components::GUIAlignment::Top:
+            return { origin.X + size.X * 0.5f, origin.Y };
+        case Components::GUIAlignment::TopRight:
+            return { origin.X + size.X, origin.Y };
+        case Components::GUIAlignment::Left:
+            return { origin.X, origin.Y + size.Y * 0.5f };
+        case Components::GUIAlignment::Center:
+            return { origin.X + size.X * 0.5f, origin.Y + size.Y * 0.5f };
+        case Components::GUIAlignment::Right:
+            return { origin.X + size.X, origin.Y + size.Y * 0.5f };
+        case Components::GUIAlignment::BottomLeft:
+            return { origin.X, origin.Y + size.Y };
+        case Components::GUIAlignment::Bottom:
+            return { origin.X + size.X * 0.5f, origin.Y + size.Y };
+        case Components::GUIAlignment::BottomRight:
+            return { origin.X + size.X, origin.Y + size.Y };
+        case Components::GUIAlignment::TopLeft:
+        default:
+            return origin;
+        }
     }
 
     void GUILayoutSystem::OnUpdate(World& world) {
-        UI::GUIContext& context = UI::GUIContext::Get();
-        UpdateCanvasMetrics(world);
-        RefreshLayoutInvalidation(world);
-        UI::GUILayout::CalculateLayout(world, context.LayoutCanvasSize);
+        auto* renderer = RendererSystem::GetInstance();
+        if (!renderer) {
+            return;
+        }
+
+        // Query the active GUI viewport (editor may override it).
+        RendererSystem::GUIViewport viewport = renderer->GetGUIViewport();
+        if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
+            const Vector2D renderSize = renderer->GetRenderTargetSize();
+            viewport.Origin = { 0.0f, 0.0f };
+            viewport.Size = renderSize;
+        }
+
+        // Use the first canvas found; if none exists, fall back to viewport size.
+        Components::GUICanvas canvas{};
+        bool foundCanvas = false;
+        world.Each<Components::GUICanvas>([&](Entity, const Components::GUICanvas& c) {
+            canvas = c;
+            foundCanvas = true;
+        });
+        if (!foundCanvas) {
+            canvas.ReferenceSize = viewport.Size;
+            canvas.Offset = { 0.0f, 0.0f };
+            canvas.ScaleMode = Components::GUIScaleMode::Fit;
+        }
+
+        // Compute scale from reference size and scale mode.
+        const Vector2D scale = ComputeScale(canvas, viewport.Size);
+        const Vector2D contentSize = {
+            canvas.ReferenceSize.X * scale.X,
+            canvas.ReferenceSize.Y * scale.Y
+        };
+        const Vector2D contentOrigin = {
+            viewport.Origin.X + (viewport.Size.X - contentSize.X) * 0.5f,
+            viewport.Origin.Y + (viewport.Size.Y - contentSize.Y) * 0.5f
+        };
+
+        // Collect GUI elements for recursive layout.
+        std::vector<Entity> elements;
+        world.Each<Components::GUIElement>([&](Entity entity, Components::GUIElement&) {
+            elements.push_back(entity);
+        });
+
+        std::unordered_map<Entity, bool, EntityHash> resolved;   // cache layout completion per element
+        std::unordered_set<Entity, EntityHash> resolving;        // cycle guard for parent chains
+
+        auto resolveElement = [&](auto&& self, Entity entity) -> void {
+            // Skip elements already computed this frame.
+            if (resolved[entity]) {
+                return;
+            }
+            // Guard against recursive parent loops.
+            if (resolving.count(entity) > 0) {
+                return;
+            }
+
+            resolving.insert(entity);
+
+            auto& element = world.Get<Components::GUIElement>(entity);
+            // Default anchor origin and size come from canvas space.
+            Vector2D anchorOrigin = { contentOrigin.X + canvas.Offset.X, contentOrigin.Y + canvas.Offset.Y };
+            Vector2D anchorSize = contentSize;
+
+            if (world.Has<Components::Parent>(entity)) {
+                const auto& parent = world.Get<Components::Parent>(entity);
+                const Entity parentEntity = parent.ParentEntity;
+                if (!parentEntity.IsNull() && world.IsAlive(parentEntity) &&
+                    world.Has<Components::GUIElement>(parentEntity)) {
+                    // Ensure parent is laid out before applying child offsets.
+                    self(self, parentEntity);
+                    const auto& parentElement = world.Get<Components::GUIElement>(parentEntity);
+                    anchorOrigin = parentElement.ContentPosition;
+                    anchorSize = parentElement.ContentSize;
+                }
+            }
+
+            // Apply scale to size and margin/padding so layout matches rendering.
+            Vector2D size = { element.Size.X * scale.X, element.Size.Y * scale.Y };
+            Vector4D margin = {
+                element.Margin.X * scale.X,
+                element.Margin.Y * scale.Y,
+                element.Margin.Z * scale.X,
+                element.Margin.W * scale.Y
+            };
+            Vector4D padding = {
+                element.Padding.X * scale.X,
+                element.Padding.Y * scale.Y,
+                element.Padding.Z * scale.X,
+                element.Padding.W * scale.Y
+            };
+
+            // Margins reduce the final size and offset the anchor position.
+            size.X = std::max(0.0f, size.X - margin.X - margin.Z);
+            size.Y = std::max(0.0f, size.Y - margin.Y - margin.W);
+
+            // Resolve the anchor point based on alignment within the anchor rect.
+            Vector2D anchor = AlignAnchor(anchorOrigin, anchorSize, element.Alignment);
+            Vector2D position = {
+                anchor.X + element.Position.X * scale.X + margin.X,
+                anchor.Y + element.Position.Y * scale.Y + margin.Y
+            };
+
+            // Offset position by element size for alignments that are not top-left.
+            switch (element.Alignment) {
+            case Components::GUIAlignment::Top:
+                position.X -= size.X * 0.5f;
+                break;
+            case Components::GUIAlignment::TopRight:
+                position.X -= size.X;
+                break;
+            case Components::GUIAlignment::Left:
+                position.Y -= size.Y * 0.5f;
+                break;
+            case Components::GUIAlignment::Center:
+                position.X -= size.X * 0.5f;
+                position.Y -= size.Y * 0.5f;
+                break;
+            case Components::GUIAlignment::Right:
+                position.X -= size.X;
+                position.Y -= size.Y * 0.5f;
+                break;
+            case Components::GUIAlignment::BottomLeft:
+                position.Y -= size.Y;
+                break;
+            case Components::GUIAlignment::Bottom:
+                position.X -= size.X * 0.5f;
+                position.Y -= size.Y;
+                break;
+            case Components::GUIAlignment::BottomRight:
+                position.X -= size.X;
+                position.Y -= size.Y;
+                break;
+            case Components::GUIAlignment::TopLeft:
+            default:
+                break;
+            }
+
+            // Cache resolved rect for rendering and input.
+            element.ResolvedPosition = position;
+            element.ResolvedSize = size;
+
+            // Content rect excludes padding for child alignment and text layout.
+            Vector2D contentPos = { position.X + padding.X, position.Y + padding.Y };
+            Vector2D contentSizeFinal = {
+                std::max(0.0f, size.X - padding.X - padding.Z),
+                std::max(0.0f, size.Y - padding.Y - padding.W)
+            };
+            element.ContentPosition = contentPos;
+            element.ContentSize = contentSizeFinal;
+
+            resolved[entity] = true;
+            resolving.erase(entity);
+        };
+
+        for (const auto& entity : elements) {
+            resolveElement(resolveElement, entity);
+        }
     }
 
     void GUILayoutSystem::OnDestroy(World& world) {
         (void)world;
-        LOG_INFO("GUILayoutSystem destroyed");
     }
 
     SystemMetadata GUILayoutSystem::GetMetadata() const {
-        return ComponentAccessBuilder("GUILayoutSystem")
-            .WriteComponent<Components::GUIElement>()
+        ComponentAccessBuilder builder("GUILayoutSystem");
+        builder.SetExecutionOrder(-20);
+        return builder
             .ReadComponent<Components::GUICanvas>()
-            .SetExecutionOrder(0)
-            .SetGroup(SystemGroup::PreRender)
-            .SetRunMode(SystemRunMode::Always)
-            .SetEnabled(true)
+            .ReadComponent<Components::Parent>()
+            .WriteComponent<Components::GUIElement>()
             .Build();
     }
-
-} // namespace ECS
+}

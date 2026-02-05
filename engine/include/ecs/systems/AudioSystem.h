@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef AUDIOSYSTEM_H
 #define AUDIOSYSTEM_H
 
+#include "Export.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
 #include "ecs/World.h"
@@ -34,7 +35,7 @@ namespace ECS {
      * @brief System for managing audio playback
      * Executes in PostUpdate phase with executionOrder=50
      */
-    class AudioSystem : public ISystem {
+    class GRAPEENGINE_API AudioSystem : public ISystem {
     public:
         /**
          * @brief Construct audio system
@@ -64,18 +65,61 @@ namespace ECS {
          */
         void OnSceneStop();
 
+        /**
+         * @brief Called when scene is about to unload (before transition)
+         * Initiates fade-out for all active audio if fade is enabled
+         * @param fadeDuration Duration of fade-out in seconds (0 for immediate stop)
+         */
+        void OnSceneWillUnload(float fadeDuration = 0.0f, bool allowCrossfade = false);
+
+        /**
+         * @brief Fade out all currently playing audio
+         * @param duration Duration of fade-out in seconds
+         */
+        void FadeOutAllAudio(float duration);
+
+        /**
+         * @brief Check if any audio is currently fading out
+         * @return true if at least one sound is fading out
+         */
+        bool HasActiveFadeOuts() const;
+
+        /**
+         * @brief Get the maximum remaining fade-out time
+         * @return Maximum remaining fade time in seconds (0 if no fade-outs active)
+         */
+        float GetMaxFadeOutRemaining() const;
+
+        /**
+         * @brief Check if a specific entity's audio is currently fading
+         * @param entity Entity to check
+         * @return true if entity is currently fading
+         */
+        bool IsEntityFading(Entity entity) const;
+
     private:
         Services::AudioService& m_audioService;
 
-        /// Map entity -> playing audio handle
+        // Map entity -> playing audio handle
         std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
 
-        /// Track if scene has started (for PlayOnStart logic)
+        // Cached world pointer for fade-outs during scene transitions
+        World* m_world = nullptr;
+
+        // Track if scene has started (for PlayOnStart logic)
         bool m_hasStarted = false;
 
+        // Guard against restarting audio while a scene unload transition is pending
+        bool m_sceneUnloadInProgress = false;
+        bool m_allowCrossfadeOnUnload = false;
+
         // Helper methods
-        void _stopSound(Entity entity);
+        void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
+
+        // Fade helper methods (delegated to AudioEngine)
+        void _fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume);
+        void _fadeOutHandle(Audio::PlaybackHandle handle, float duration);
     };
 }
 

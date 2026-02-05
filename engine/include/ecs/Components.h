@@ -29,8 +29,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Quaternion.h"
 #include "math/Matrix4x4.h"
 #include "ecs/StringTable.h"
+#include "audio/SoundTypes.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
+#include <string>
 #include <type_traits>
 
 /*
@@ -340,10 +342,21 @@ namespace ECS {
 
         // TODO: Add Shader components
 
-        // TileMap component (holds shared pointer to the actual map data)
+        // Tile map reference + editor/runtime settings.
+        // This is a lightweight handle to external tilemap data + tileset texture.
         struct TileMapComponent {
-            std::shared_ptr<TileMap> Map;
+        public:
+            uint32_t TileMapPath = 0;           // StringId for the .tilemap asset path
+            uint32_t TilesetTexturePath = 0;    // StringId for the tileset texture path
+            float TileWorldSize = 1.0f;         // World-units per tile (used for map scaling)
+            uint32_t TilePixelSize = 32;        // Tile size in pixels for tileset slicing
+            uint32_t DefaultWidth = 64;         // Default width for new maps (tiles)
+            uint32_t DefaultHeight = 64;        // Default height for new maps (tiles)
+            uint32_t LayerIndex = 0;            // Layer index to render/edit (single-layer for now)
+            bool Visible = true;                // Editor/runtime visibility toggle
+            uint8_t _padding[3] = { 0, 0, 0 };   // Padding to keep alignment stable
         };
+        static_assert(std::is_trivially_copyable_v<TileMapComponent>, "TileMapComponent must be trivially copyable");
 
         // ---------------------------------- Animation ----------------------------------
 
@@ -358,9 +371,9 @@ namespace ECS {
             int SheetHeight = 0;              // Total height of the sprite sheet
             int StartFrame = 0;               // First frame index in the animation
             int FrameCount = 0;               // Number of frames in the animation
-            int RowIndex = 0;                 // Row index when using row mode
-            int RowStartColumn = 0;           // Start column within the row
-            int RowFrameCount = 0;            // Frames to use in row (0 = rest of row)
+            int Row = 0;                     // Row index when using row mode (0 = top)
+            int FrameOffset = 0;             // Column offset in the row (0 = leftmost)
+            int FrameLength = 0;             // Frames to use in row (0 = rest of row)
             float FramesPerSecond = 10.0f;    // Animation speed (FPS)
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
@@ -477,16 +490,30 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
 
-        // ---------- Audio (kept minimal) ----------
+        // ---------- Audio ----------
 
         struct AudioSource {
         public:
+
+            // Basics
             uint32_t CueId = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
             bool PlayOnStart = false;
+
+            // TODO
             bool Spatial3D = true;
+            uint8_t Bus = static_cast<uint8_t>(Audio::Bus::SFX);
+            float Pan = 0.0f;
+
+            // Fade flags
+			bool EnableFadeIn = false;
+			bool EnableFadeOut = false;
+
+			// Fade durations (seconds)
+			float FadeInDuration = 1.0f;
+			float FadeOutDuration = 1.0f;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
 
@@ -528,498 +555,169 @@ namespace ECS {
 
         // ---------- GUI ----------
 
-        // ============================================================================
-        // Enums for GUI configuration
-        // ============================================================================
-
-        enum class HorizontalAlignment : uint8_t {
-            Left = 0,
-            Center = 1,
-            Right = 2,
-            Stretch = 3
-        };
-
-        enum class VerticalAlignment : uint8_t {
-            Top = 0,
-            Middle = 1,
-            Bottom = 2,
-            Stretch = 3
-        };
-
-        enum class GUICanvasAlignment : uint8_t {
-            Center = 0,
-            TopLeft = 1,
-            Top = 2,
-            TopRight = 3,
-            Left = 4,
-            Right = 5,
-            BottomLeft = 6,
-            Bottom = 7,
-            BottomRight = 8
-        };
-
-        enum class GUICanvasScaleMode : uint8_t {
+        enum class GUIScaleMode : uint8_t {
             Fit = 0,
             Fill = 1,
             MatchWidth = 2,
             MatchHeight = 3
         };
 
-        enum class LayoutType : uint8_t {
-            Absolute = 0,       // Fixed position and size
-            HorizontalBox = 1,  // Children arranged horizontally
-            VerticalBox = 2,    // Children arranged vertically
-            Grid = 3,           // Grid layout
-            Docking = 4         // Docking layout (future)
-        };
-
-        enum class ButtonState : uint8_t {
-            Normal = 0,
-            Hovered = 1,
-            Pressed = 2,
-            Disabled = 3
-        };
-
-        enum class GUIElementType : uint8_t {
-            Custom = 0,
-            Container = 1,
-            Button = 2,
-            Panel = 3,
-            Text = 4,
-            Image = 5,
-            InputField = 6,
-            Slider = 7,
-            Checkbox = 8,
-            Dropdown = 9,
-            ScrollView = 10,
-            Separator = 11
-        };
-
-
-        // ============================================================================
-        // Core GUI Components
-        // ============================================================================
-
-        /**
-         * @brief Global GUI canvas settings for reference scaling.
-         * Use a single instance to define the design resolution and scale factor.
-         */
         struct GUICanvas {
-            Vector2D ReferenceSize{ 1920.0f, 1080.0f };
-            float ScaleFactor = 1.0f;
-            GUICanvasAlignment Alignment = GUICanvasAlignment::Center;
-            Vector2D Offset{ 0.0f, 0.0f };
-            GUICanvasScaleMode ScaleMode = GUICanvasScaleMode::Fit;
-            bool DebugDraw = false;
-            Color DebugBoundsColor{ 0.2f, 0.8f, 1.0f, 0.6f };
-            Color DebugPaddingColor{ 1.0f, 0.8f, 0.2f, 0.6f };
-            Color DebugAnchorColor{ 1.0f, 0.2f, 0.2f, 0.8f };
+            Vector2D ReferenceSize{ 1920.0f, 1080.0f }; // logical design size used for scaling
+            Vector2D Offset{ 0.0f, 0.0f };              // pixel offset applied after scaling
+            GUIScaleMode ScaleMode = GUIScaleMode::Fit; // how ReferenceSize maps to viewport
         };
         static_assert(std::is_trivially_copyable_v<GUICanvas>, "GUICanvas must be trivially copyable");
 
-        /**
-         * @brief Base component for all GUI elements
-         * Provides positioning, sizing, visibility, and anchoring
-         */
-                struct GUIElement {
-            // Layout and positioning
-            Vector2D Position{ 0.0f, 0.0f };      // Local position (relative to parent)
-            Vector2D Size{ 100.0f, 100.0f };      // Width and height in pixels
-            Vector2D AnchorMin{ 0.0f, 0.0f };     // Anchor point (0,0)=TopLeft, (1,1)=BottomRight
-            Vector2D AnchorMax{ 0.0f, 0.0f };     // Anchor max for stretching
-            Vector2D Offset{ 0.0f, 0.0f };        // Offset from anchor point
-
-            // Visibility and interaction
-            bool Active = true;                   // Whether element is rendered and interactive
-            bool Visible = true;                  // Whether element is visible (but may still receive input)
-            bool Raycast = true;                  // Whether element blocks raycasts from other elements
-
-            // Layout information
-            HorizontalAlignment HAlign = HorizontalAlignment::Left;
-            VerticalAlignment VAlign = VerticalAlignment::Top;
-            GUIElementType ElementType = GUIElementType::Custom;
-
-            // Padding and margins
-            float PaddingLeft = 0.0f;
-            float PaddingRight = 0.0f;
-            float PaddingTop = 0.0f;
-            float PaddingBottom = 0.0f;
-
-            // Z-order for depth sorting
-            int16_t ZOrder = 0;
-
-            // Cached world position (computed by layout system)
-                    Vector2D WorldPosition{ 0.0f, 0.0f };
-                    bool DirtyLayout = true;              // Marks that layout needs recomputation
-                };
-                static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
-
-                /**
-                 * @brief Style reference for GUI elements (StringTable ID)
-                 */
-        struct GUIStyleRef {
-            uint32_t StyleId = 0;
+        enum class GUIAlignment : uint8_t {
+            TopLeft = 0,
+            Top = 1,
+            TopRight = 2,
+            Left = 3,
+            Center = 4,
+            Right = 5,
+            BottomLeft = 6,
+            Bottom = 7,
+            BottomRight = 8
         };
-        static_assert(std::is_trivially_copyable_v<GUIStyleRef>, "GUIStyleRef must be trivially copyable");
 
-                /**
-                 * @brief Container component for managing child elements
-                 * Supports various layout types (Box, Grid, etc.)
-                 */
-                struct GUIContainer {
-            LayoutType Layout = LayoutType::VerticalBox;
+        struct GUIElement {
+            Vector2D Position{ 0.0f, 0.0f };           // local offset from the anchor
+            Vector2D Size{ 100.0f, 100.0f };           // logical size before scaling
+            bool Visible = true;                       // visibility toggle (render + input)
+            GUIAlignment Alignment = GUIAlignment::TopLeft; // anchor within parent/viewport
+            int16_t ZOrder = 0;                        // draw order within GUI pass
+            Vector4D Margin{ 0.0f, 0.0f, 0.0f, 0.0f };  // left, top, right, bottom
+            Vector4D Padding{ 0.0f, 0.0f, 0.0f, 0.0f }; // left, top, right, bottom
 
-            // Box layout properties
-            float Spacing = 5.0f;                 // Space between children
-            bool ChildForceExpandWidth = false;   // Make children expand to fill width
-            bool ChildForceExpandHeight = false;  // Make children expand to fill height
-
-            // Grid layout properties
-            uint32_t GridColumns = 1;
-            float GridCellPaddingX = 0.0f;
-            float GridCellPaddingY = 0.0f;
-
-            // Layout size calculation preferences
-            bool PreferredWidthDynamic = false;   // Calculate width from content
-            bool PreferredHeightDynamic = false;  // Calculate height from content
-            float MinWidth = 0.0f;
-            float MinHeight = 0.0f;
+            // Runtime layout results (not serialized)
+            Vector2D ResolvedPosition{ 0.0f, 0.0f }; // top-left in viewport space
+            Vector2D ResolvedSize{ 0.0f, 0.0f };     // size after scale/margins
+            Vector2D ContentPosition{ 0.0f, 0.0f };  // top-left after padding
+            Vector2D ContentSize{ 0.0f, 0.0f };      // size after padding
         };
-        static_assert(std::is_trivially_copyable_v<GUIContainer>, "GUIContainer must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
-        /**
-         * @brief GUI child list component for hierarchy management
-         * Stores child entities using stable ECS handles.
-         */
-        struct GUIChildList {
-            static constexpr size_t MaxChildren = 256;
-
-            Entity Children[MaxChildren]{};
-            uint16_t ChildCount = 0;
-        };
-        static_assert(std::is_trivially_copyable_v<GUIChildList>, "GUIChildList must be trivially copyable");
-
-        /**
-         * @brief Panel component for styled containers
-         * Provides background color, borders, and shadow effects
-         */
         struct GUIPanel {
-            Color BackgroundColor{ 0.2f, 0.2f, 0.2f, 1.0f };
-            Color BorderColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-
-            float BorderThickness = 0.0f;         // 0 = no border
-            float BorderRadius = 0.0f;            // Rounded corners (0 = sharp)
-
-            // Shadow
-            bool CastShadow = false;
-            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.3f };
-            Vector2D ShadowOffset{ 2.0f, -2.0f };
-            float ShadowBlur = 4.0f;
-
-            // Clipping
-            bool ClipContent = false;             // Clip children to panel bounds
+            Color Color{ 0.2f, 0.2f, 0.2f, 1.0f };
+            float CornerRadius = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<GUIPanel>, "GUIPanel must be trivially copyable");
 
-        /**
-         * @brief GUI Text component (separate from general Text component)
-         * Optimized for GUI rendering with anchoring and alignment
-         */
         struct GUIText {
-                    static constexpr size_t MaxTextLength = 512;
+            uint32_t TextId = 0;     // StringTable id for text content
+            uint32_t FontPathId = 0; // StringTable id for font asset path
+            Color Color{ 1.0f, 1.0f, 1.0f, 1.0f }; // base text color
+            float FontSize = 24.0f;  // font pixel size at reference scale
+            bool Wrap = false;       // wrap text within ContentSize
+            GUIAlignment Alignment = GUIAlignment::TopLeft; // legacy alignment fallback
 
-                    uint32_t Content = 0;
-                    uint32_t FontPath = 0;
-
-            float FontSize = 16.0f;
-            Color FontColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-
-            enum class TextAlignment : uint8_t {
+            enum class HorizontalAlign : uint8_t {
                 Left = 0,
                 Center = 1,
-                Right = 2,
-                Justified = 3
-            } Alignment = TextAlignment::Left;
+                Right = 2
+            };
 
-            bool BestFit = false;                 // Auto-scale font to fit
-            float MinFontSize = 10.0f;
-            float MaxFontSize = 100.0f;
+            enum class VerticalAlign : uint8_t {
+                Top = 0,
+                Middle = 1,
+                Bottom = 2
+            };
 
-            bool RichText = false;                // Support for color tags, etc.
-            bool WordWrap = true;
+            HorizontalAlign HAlign = HorizontalAlign::Left; // horizontal text alignment
+            VerticalAlign VAlign = VerticalAlign::Top;      // vertical text alignment
 
-            // Shadow effect
-            bool CastShadow = false;
-            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.3f };
-            Vector2D ShadowOffset{ 1.0f, -1.0f };
+            void SetText(const std::string& text) {
+                TextId = text.empty() ? 0 : ECS::StringTable::Intern(text);
+            }
 
-            // Outline
-            bool HasOutline = false;
-            Color OutlineColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-            float OutlineWidth = 1.0f;
+            std::string GetText() const {
+                return TextId ? ECS::StringTable::Resolve(TextId) : std::string();
+            }
+
+            void SetFontPath(const std::string& path) {
+                FontPathId = path.empty() ? 0 : ECS::StringTable::Intern(path);
+            }
+
+            std::string GetFontPath() const {
+                return FontPathId ? ECS::StringTable::Resolve(FontPathId) : std::string();
+            }
         };
         static_assert(std::is_trivially_copyable_v<GUIText>, "GUIText must be trivially copyable");
 
-        struct GUITextSettings {
-            uint32_t FontPath = 0;
-            float FontSize = 16.0f;
-            Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-            GUIText::TextAlignment Alignment = GUIText::TextAlignment::Left;
-            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.0f };
-            Vector2D ShadowOffset{ 0.0f, 0.0f };
+        enum class GUIImageScaleMode : uint8_t {
+            Stretch = 0,
+            Fit = 1,
+            Fill = 2
         };
-        static_assert(std::is_trivially_copyable_v<GUITextSettings>, "GUITextSettings must be trivially copyable");
 
-        /**
-         * @brief Button component with state and interaction
-         */
-                struct GUIButton {
-                    ButtonState State = ButtonState::Normal;
+        struct GUIImage {
+            uint32_t TextureId = 0;      // runtime texture handle (optional)
+            uint32_t TexturePathId = 0;  // StringTable id for texture path
+            Color Color{ 1.0f, 1.0f, 1.0f, 1.0f }; // tint color
+            Vector4D UVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
+            GUIImageScaleMode ScaleMode = GUIImageScaleMode::Stretch; // fit/fill/none
+            bool UseSlicing = false;     // enable 9-slice layout
+            Vector4D SliceBorder{ 0.0f, 0.0f, 0.0f, 0.0f }; // border in pixels
+        };
+        static_assert(std::is_trivially_copyable_v<GUIImage>, "GUIImage must be trivially copyable");
 
-            // Colors for different states
-            Color ColorNormal{ 0.3f, 0.3f, 0.3f, 1.0f };
-            Color ColorHovered{ 0.4f, 0.4f, 0.4f, 1.0f };
-            Color ColorPressed{ 0.2f, 0.2f, 0.2f, 1.0f };
-            Color ColorDisabled{ 0.15f, 0.15f, 0.15f, 0.5f };
+        struct GUIInput {
+            bool Hovered = false;  // pointer currently over element
+            bool Pressed = false;  // pointer down while captured
+            bool Clicked = false;  // click triggered on release
+            bool Released = false; // release occurred this frame
+            bool Dragging = false; // pointer moving while captured
+            bool Entered = false;  // pointer entered this frame
+            bool Exited = false;   // pointer exited this frame
+        };
+        static_assert(std::is_trivially_copyable_v<GUIInput>, "GUIInput must be trivially copyable");
 
-              // Button properties
-              bool Interactable = true;
-              bool Pressed = false;                 // True if pressed this frame
-              bool Released = false;                // True if released this frame
-              bool Hovered = false;
+        struct GUIStateStyle {
+            Color NormalColor{ 1.0f, 1.0f, 1.0f, 1.0f };   // default color
+            Color HoverColor{ 0.9f, 0.9f, 0.9f, 1.0f };    // hover state color
+            Color PressedColor{ 0.8f, 0.8f, 0.8f, 1.0f };  // pressed state color
+            Color DisabledColor{ 0.6f, 0.6f, 0.6f, 0.6f }; // disabled state color
+        };
+        static_assert(std::is_trivially_copyable_v<GUIStateStyle>, "GUIStateStyle must be trivially copyable");
 
-                      // Action callback ID (maps to GUISystem's action registry)
-                      uint32_t ActionID = 0;
-
-                      // Button label (for convenience, usually separate Text component)
-                      uint32_t Label = 0;
-            bool UseLabelTextSettings = false;
-            GUITextSettings LabelTextSettings{};
-
-              // Transition effects
-              float TransitionDuration = 0.1f;      // Time to transition between states
-              float TransitionTimer = 0.0f;         // Current transition time
+        struct GUIButton {
+            uint32_t TextId = 0;
+            uint32_t FontPathId = 0;
+            uint32_t IconPathId = 0;
+            Color NormalColor{ 0.25f, 0.25f, 0.25f, 1.0f };   // idle background
+            Color HoverColor{ 0.35f, 0.35f, 0.35f, 1.0f };    // hover background
+            Color PressedColor{ 0.15f, 0.15f, 0.15f, 1.0f };  // pressed background
+            Color DisabledColor{ 0.2f, 0.2f, 0.2f, 0.6f };    // disabled background
+            Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // label color
+            Color IconColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // icon tint
+            float FontSize = 24.0f;       // label size
+            float CornerRadius = 0.0f;    // rounded rect radius
+            Vector2D IconSize{ 24.0f, 24.0f };   // icon size in pixels
+            Vector2D IconOffset{ 0.0f, 0.0f };   // icon offset from content origin
+            Vector4D Padding{ 8.0f, 6.0f, 8.0f, 6.0f }; // content padding
+            bool Disabled = false;  // ignores input and uses disabled color
+            bool Toggle = false;    // toggles state on click
+            bool Toggled = false;   // current toggle state
         };
         static_assert(std::is_trivially_copyable_v<GUIButton>, "GUIButton must be trivially copyable");
 
-        /**
-         * @brief Text input field component
-         */
-                struct GUIInputField {
-                    static constexpr size_t MaxTextLength = 1024;
-
-                    uint32_t Content = 0;
-                    uint32_t Placeholder = 0;
-
-              Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-              Color BackgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };
-              Color CaretColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-              Color SelectionColor{ 0.2f, 0.5f, 1.0f, 0.5f };
-
-              float FontSize = 16.0f;
-              uint32_t FontPath = 0;
-            bool UseTextSettings = false;
-            GUITextSettings TextSettings{};
-            bool UsePlaceholderSettings = false;
-            GUITextSettings PlaceholderSettings{};
-
-            uint32_t MaxCharacters = 0;           // 0 = unlimited
-            uint32_t CurrentCharCount = 0;
-
-            bool Focused = false;
-            bool Interactable = true;
-
-            uint32_t CaretPosition = 0;
-            uint32_t SelectionStart = 0;
-            uint32_t SelectionEnd = 0;
-
-            // Input validation
-            bool MultiLine = false;
-            bool PasswordMode = false;
-
-            enum class InputType : uint8_t {
-                Standard = 0,
-                Integer = 1,
-                Decimal = 2,
-                Password = 3,
-                Alphanumeric = 4
-            } Type = InputType::Standard;
-        };
-        static_assert(std::is_trivially_copyable_v<GUIInputField>, "GUIInputField must be trivially copyable");
-
-        /**
-         * @brief Slider component for continuous value selection
-         */
         struct GUISlider {
-            float MinValue = 0.0f;
-            float MaxValue = 100.0f;
-            float CurrentValue = 50.0f;
-            float StepSize = 1.0f;
-
-            // Visual configuration
-            Color BackgroundColor{ 0.2f, 0.2f, 0.2f, 1.0f };
-            Color FillColor{ 0.4f, 0.8f, 1.0f, 1.0f };
-            Color HandleColor{ 0.5f, 0.9f, 1.0f, 1.0f };
-
-            float HandleSize = 20.0f;
-            bool Interactable = true;
-            bool ShowValue = false;
-
-            // Callback
-            uint32_t ActionID = 0;
-
-            // State
-            bool Dragging = false;
-            float DragOffset = 0.0f;
+            float Value = 0.0f; // current value
+            float Min = 0.0f;   // minimum value
+            float Max = 1.0f;   // maximum value
+            float Step = 0.0f;  // optional snapping step
+            Color TrackColor{ 0.2f, 0.2f, 0.2f, 1.0f }; // background bar
+            Color FillColor{ 0.4f, 0.4f, 0.4f, 1.0f };  // filled bar
+            Color KnobColor{ 0.9f, 0.9f, 0.9f, 1.0f };  // knob color
+            float CornerRadius = 0.0f;  // rounded rect radius
+            Vector2D KnobSize{ 16.0f, 16.0f }; // knob size
+            Vector4D Padding{ 6.0f, 6.0f, 6.0f, 6.0f }; // track padding
+            bool Horizontal = true; // horizontal vs vertical slider
+            bool Disabled = false;  // ignores input
+            bool ValueChanged = false; // set when value updated this frame
         };
         static_assert(std::is_trivially_copyable_v<GUISlider>, "GUISlider must be trivially copyable");
-
-        /**
-         * @brief Checkbox component for boolean toggling
-         */
-                struct GUICheckbox {
-                    bool IsChecked = false;
-                    bool Interactable = true;
-
-            Color CheckedColor{ 0.2f, 0.8f, 0.2f, 1.0f };
-            Color UncheckedColor{ 0.3f, 0.3f, 0.3f, 1.0f };
-            Color BorderColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-
-            float BorderThickness = 1.0f;
-            float CheckSize = 20.0f;
-            float LabelFontSize = 16.0f;
-            HorizontalAlignment LabelAlignment = HorizontalAlignment::Left;
-            bool UseLabelTextSettings = false;
-            GUITextSettings LabelTextSettings{};
-
-            // Callback
-            uint32_t ActionID = 0;
-
-                    // Label (usually separate Text component)
-                    uint32_t Label = 0;
-                };
-        static_assert(std::is_trivially_copyable_v<GUICheckbox>, "GUICheckbox must be trivially copyable");
-
-        /**
-         * @brief Dropdown/Combo box component
-         */
-                struct GUIDropdown {
-                    static constexpr size_t MaxOptions = 64;
-
-                    // Option strings (newline-separated for simplicity)
-                    uint32_t Options = 0;
-                    uint32_t OptionCount = 0;
-                    uint32_t SelectedIndex = 0;
-
-            bool IsOpen = false;
-            bool Interactable = true;
-
-            Color BackgroundColor{ 0.2f, 0.2f, 0.2f, 1.0f };
-            Color HighlightColor{ 0.4f, 0.6f, 1.0f, 1.0f };
-
-            float ItemHeight = 30.0f;
-            float MaxHeight = 200.0f;            // Max height before scrolling
-            bool UseOptionTextSettings = false;
-            GUITextSettings OptionTextSettings{};
-
-            // Callback
-            uint32_t ActionID = 0;
-
-            // State
-            float ScrollPosition = 0.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<GUIDropdown>, "GUIDropdown must be trivially copyable");
-
-        /**
-         * @brief Scroll view component for scrollable content areas
-         */
-        struct GUIScrollView {
-            // Scroll offset (in pixels)
-            Vector2D ScrollPosition{ 0.0f, 0.0f };
-
-            // Content size (calculated from children)
-            Vector2D ContentSize{ 0.0f, 0.0f };
-
-            // Scroll bar configuration
-            bool HorizontalScroll = false;
-            bool VerticalScroll = true;
-            float ScrollBarWidth = 10.0f;
-            Color ScrollBarColor{ 0.5f, 0.5f, 0.5f, 0.8f };
-            Color ScrollBarHoverColor{ 0.7f, 0.7f, 0.7f, 1.0f };
-
-            // Scroll behavior
-            float ScrollSensitivity = 20.0f;     // Pixels per scroll wheel tick
-            float ScrollDamping = 0.95f;         // For smooth scrolling
-            bool Inertia = false;                // Enable momentum scrolling
-
-            // Clipping
-            bool ClipContent = true;
-
-            // State
-            bool VerticalDragging = false;
-            bool HorizontalDragging = false;
-            float VerticalScrollVelocity = 0.0f;
-            float HorizontalScrollVelocity = 0.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<GUIScrollView>, "GUIScrollView must be trivially copyable");
-
-        /**
-         * @brief Separator/Divider component
-         */
-        struct GUISeparator {
-            enum class Orientation : uint8_t {
-                Horizontal = 0,
-                Vertical = 1
-            } Orient = Orientation::Horizontal;
-
-            Color Color{ 0.5f, 0.5f, 0.5f, 1.0f };
-            float Thickness = 1.0f;
-
-            // Space around separator
-            float Margin = 5.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<GUISeparator>, "GUISeparator must be trivially copyable");
-
-
-        /**
-         * @brief GUI Layout Group component (for automatic layout calculation)
-         * Used by containers to manage child sizing
-         */
-        struct GUILayoutGroup {
-            // Preferred size calculation
-            float PreferredWidth = 0.0f;
-            float PreferredHeight = 0.0f;
-
-            // Flexible size (how much extra space the element can take)
-            float FlexibleWidth = 0.0f;
-            float FlexibleHeight = 0.0f;
-
-            // Layout priority (higher = laid out later, so higher priority elements get priority)
-            int LayoutPriority = 0;
-
-            // Mark that this element's size has changed
-            bool DirtyPreferredSize = true;
-        };
-        static_assert(std::is_trivially_copyable_v<GUILayoutGroup>, "GUILayoutGroup must be trivially copyable");
-
-        /**
-         * @brief GUI Tooltip component
-         */
-                struct GUITooltip {
-                    static constexpr size_t MaxLength = 256;
-
-                    uint32_t Text = 0;
-                    float DelaySeconds = 1.0f;
-                    float ShowDuration = 5.0f;
-
-            bool Visible = false;
-            float ShowTimer = 0.0f;
-
-            Vector2D Offset{ 10.0f, 10.0f };
-            Color BackgroundColor{ 0.1f, 0.1f, 0.1f, 0.9f };
-            Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-        };
-        static_assert(std::is_trivially_copyable_v<GUITooltip>, "GUITooltip must be trivially copyable");
 
     }
 }

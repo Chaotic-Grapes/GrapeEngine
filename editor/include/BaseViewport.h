@@ -33,6 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <glm/glm.hpp>
 #include <memory>
 #include <functional>
+#include <string>
 
 // Forward declarations
 namespace ECS { class RendererSystem; }
@@ -55,6 +56,8 @@ public:
     ViewportType GetViewportType() const { return m_viewportType; }
     bool IsSceneViewport() const { return m_viewportType == ViewportType::Scene; }
     bool IsGameViewport() const { return m_viewportType == ViewportType::Game; }
+    void SetViewportName(const std::string& name) { m_viewportName = name; }
+    const std::string& GetViewportName() const { return m_viewportName; }
 
     virtual void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
         ECS::World* world, Scenes::SceneManager* sceneManager);
@@ -139,6 +142,7 @@ protected:
 
     // Viewport type (Scene vs Game)
     ViewportType m_viewportType = ViewportType::Scene;
+    std::string m_viewportName;
 };
 
 #endif // BASE_VIEWPORT_H

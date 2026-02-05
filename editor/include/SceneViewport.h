@@ -34,8 +34,8 @@ private:
     void _renderViewport();
     TilePalettePanel* m_tilePalettePanel = nullptr;
     // Overlay toggles for scene helpers.
-    bool m_showGrid = true;
-    bool m_showAxes = true;
+    bool m_showGrid = false;
+    bool m_showAxes = false;
     bool m_showBounds = true;
     bool m_showColliders = true;
     bool m_showLights = true;

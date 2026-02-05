@@ -4,8 +4,9 @@
 
 void TileMapRenderer::Submit(
     const TileMap& tileMap,
-    const Tileset& tileset,
-    Renderer& renderer
+    const std::vector<const Tileset*>& tilesets,
+    Renderer& renderer,
+    const glm::vec2& worldOffset
 ) const
 {
     const uint32_t layerIndex = 0; // render base layer for now
@@ -15,7 +16,6 @@ void TileMapRenderer::Submit(
     const uint32_t height = layer.Height();
     const float tileSize = tileMap.TileSize();
 
-    const GLuint textureId = tileset.GetTextureId();
     const glm::vec4 color(1.0f); // white = no tint
 
     for (uint32_t y = 0; y < height; ++y)
@@ -28,6 +28,14 @@ void TileMapRenderer::Submit(
 
             TileID baseID = GetTileBaseID(fullID);
             uint8_t rotIdx = GetTileRotation(fullID);
+            uint8_t tilesetIndex = GetTileTilesetIndex(fullID);
+
+            if (tilesetIndex >= tilesets.size() || !tilesets[tilesetIndex]) {
+                continue; // Skip tiles that reference missing tilesets.
+            }
+
+            const Tileset& tileset = *tilesets[tilesetIndex];
+            const GLuint textureId = tileset.GetTextureId();
 
             TileUV uv;
             if (!tileset.GetTileUV(baseID, uv))
@@ -39,10 +47,14 @@ void TileMapRenderer::Submit(
                 uv.u1, uv.v1
             };
 
+            const float half = tileSize * 0.5f; // Renderer::submitQuad expects center coordinates.
+            const int32_t signedX = tileMap.OriginX() + static_cast<int32_t>(x);
+            const int32_t signedY = tileMap.OriginY() + static_cast<int32_t>(y);
+
             const glm::vec2 pos{
-                tileMap.TileToWorld(x),
-                tileMap.TileToWorld(y)
-            };
+                worldOffset.x + tileMap.TileToWorldSigned(signedX) + half,
+                worldOffset.y + tileMap.TileToWorldSigned(signedY) + half
+            }; // Convert signed tile coords to world space and add the tilemap's world origin.
 
             const glm::vec2 size{ tileSize, tileSize };
             

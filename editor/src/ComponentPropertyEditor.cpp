@@ -45,6 +45,127 @@ namespace {
         return id;
     }
 
+    const std::unordered_set<std::string> kImageExtensions = { ".png", ".jpg", ".jpeg" };
+    const std::unordered_set<std::string> kFontExtensions = { ".ttf", ".otf", ".ttc" };
+    const std::unordered_set<std::string> kAudioExtensions = { ".wav", ".ogg", ".mp3", ".flac" };
+    static bool s_showAssetDropError = false;
+    static std::string s_assetDropErrorMessage;
+
+    std::string GetLowercaseExtension(const std::string& path) {
+        std::string ext = std::filesystem::path(path).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext;
+    }
+
+    // Builds a comma-separated list of extensions for validation messages
+    std::string FormatExtensionList(const std::unordered_set<std::string>& extensions) {
+        std::string out;
+        for (const auto& ext : extensions) {
+            if (!out.empty()) {
+                out += ", ";
+            }
+            out += ext;
+        }
+        return out;
+    }
+
+    // Queue a modal popup that explains why a dropped asset was rejected
+    void QueueAssetDropError(const std::string& path, const std::unordered_set<std::string>& allowedExtensions) {
+        const std::string ext = GetLowercaseExtension(path);
+        s_assetDropErrorMessage = "Unsupported format: " + (ext.empty() ? std::string("<unknown>") : ext) +
+            ". Supported: " + FormatExtensionList(allowedExtensions);
+        s_showAssetDropError = true;
+        ImGui::OpenPopup("Unsupported Asset Format");
+    }
+
+    // Draws the modal popup if a drag/drop rejection was queued
+    void RenderAssetDropErrorPopup() {
+        if (!s_showAssetDropError) {
+            return;
+        }
+        if (ImGui::BeginPopupModal("Unsupported Asset Format", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextWrapped("%s", s_assetDropErrorMessage.c_str());
+            ImGui::Spacing();
+            if (ImGui::Button("Close")) {
+                s_showAssetDropError = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    // Renders a small inline preview thumbnail for a texture ID
+    void RenderInlineTexturePreview(uint32_t textureId, const char* tooltip) {
+        if (textureId == 0) {
+            return;
+        }
+        const float previewSize = 36.0f;
+        const float rightEdge = ImGui::GetWindowContentRegionMax().x;
+        const float previewX = rightEdge - previewSize - ImGui::GetStyle().FramePadding.x;
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(previewX);
+        ImGui::Image((ImTextureID)(uintptr_t)textureId,
+            ImVec2(previewSize, previewSize), ImVec2(0, 1), ImVec2(1, 0));
+        if (tooltip && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+    }
+
+    bool HandleAssetDragDropTarget(const std::unordered_set<std::string>& allowedExtensions,
+        const std::function<bool(const std::string&)>& onAccepted,
+        const std::function<void(const std::string&)>& onRejected = nullptr) {
+        if (!ImGui::BeginDragDropTarget()) {
+            return false;
+        }
+
+        bool accepted = false;
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            if (droppedPath && *droppedPath) {
+                std::string path(droppedPath);
+                std::string ext = GetLowercaseExtension(path);
+                if (!allowedExtensions.empty() && allowedExtensions.find(ext) == allowedExtensions.end()) {
+                    if (onRejected) {
+                        onRejected(path);
+                    }
+                } else {
+                    accepted = onAccepted(path);
+                }
+            }
+        }
+
+        if (!accepted) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* dataBuf = static_cast<const char*>(payload->Data);
+                const char* end = dataBuf + payload->DataSize;
+                std::string firstPath;
+                while (dataBuf < end) {
+                    std::string path(dataBuf);
+                    dataBuf += path.size() + 1;
+                    if (path.empty()) {
+                        continue;
+                    }
+                    if (firstPath.empty()) {
+                        firstPath = path;
+                    }
+                    std::string ext = GetLowercaseExtension(path);
+                    if (!allowedExtensions.empty() && allowedExtensions.find(ext) == allowedExtensions.end()) {
+                        continue;
+                    }
+                    accepted = onAccepted(path);
+                    break;
+                }
+                if (!accepted && !firstPath.empty() && onRejected) {
+                    onRejected(firstPath);
+                }
+            }
+        }
+
+        ImGui::EndDragDropTarget();
+        return accepted;
+    }
+
     struct ImGuiIdScope {
         explicit ImGuiIdScope(const char* id) {
             ImGui::PushID(id);
@@ -53,6 +174,40 @@ namespace {
             ImGui::PopID();
         }
     };
+
+    bool RenderClearTrashButton(const char* id, const char* tooltip, ImFont* symbolsFont) {
+        ImGui::SameLine();
+
+        // Vertically center the button with the surrounding text
+        const float lineHeight = ImGui::GetTextLineHeight();
+        const float frameHeight = ImGui::GetFrameHeight();
+        const float y = ImGui::GetCursorPosY();
+
+        // Adjust cursor position to vertically center the button
+        // Style adjustments for button appearance
+        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::PushID(id);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+
+        // Render the clear trash button with optional symbols font
+        if (symbolsFont) ImGui::PushFont(symbolsFont);
+        const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
+        const bool clicked = ImGui::SmallButton(icon);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+        if (symbolsFont) ImGui::PopFont();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(4);
+        ImGui::PopID();
+        return clicked;
+    }
 
     void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
         if (!world || entity.IsNull() || !world->IsAlive(entity))
@@ -77,10 +232,10 @@ namespace {
         int windowCount = 0;
 
         if (useRow) {
-            const int rowIndex = std::clamp(animData.value("RowIndex", 0), 0, totalRows - 1);
-            const int startCol = std::clamp(animData.value("RowStartColumn", 0), 0, totalCols - 1);
+            const int rowIndex = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(animData.value("FrameOffset", 0), 0, totalCols - 1);
             const int available = totalCols - startCol;
-            int rowCount = animData.value("RowFrameCount", 0);
+            int rowCount = animData.value("FrameLength", 0);
             if (rowCount <= 0 || rowCount > available)
                 rowCount = available;
             windowStart = rowIndex * totalCols + startCol;
@@ -197,6 +352,14 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
+
+    // Share the symbols font with EditorUI helpers for icon-only reset buttons
+    EditorUI::SetSymbolsFont(symbolsFont);
+}
+
+// Render any queued drag/drop validation popups
+void ComponentUI::RenderAssetDropFeedbackPopup() {
+    RenderAssetDropErrorPopup();
 }
 
 // -----------------------------------------------------------------------------
@@ -476,69 +639,32 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
-
-    // Tracks whether a valid texture was dropped this frame
-    bool dropped = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Payload data is a char buffer containing the file path
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-            // Extract file extension and normalise to lowercase for comparison
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as sprite textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                // Load texture through the resource manager using the dropped path
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    // Store texture ID and path in JSON so renderer can use them
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = droppedPath;
-
-                    // Cache width and height for UV or layout calculations
-                    data["Width"] = tex->Width();
-                    data["Height"] = tex->Height();
-
-                    dropped = true;
-                    LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped texture: " << droppedPath);
-                }
-            }
-        }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = path;
-                    data["Width"] = tex->Width();
-                    data["Height"] = tex->Height();
-                    dropped = true;
-                    LOG_INFO("Dropped texture: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped texture: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
+    if (!texPath.empty() && RenderClearTrashButton("SpriteClear", "Clear sprite", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["Width"] = 0;
+        data["Height"] = 0;
     }
+    // Inline thumbnail preview to confirm the assigned sprite quickly
+    if (EditorUI::PropertyFilterAllows("Sprite")) {
+        RenderInlineTexturePreview(data.value("TextureId", 0u), "Sprite preview");
+    }
+
+    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["TextureId"] = static_cast<uint32_t>(tex->ID());
+            data["TexturePath"] = droppedPath;
+            data["Width"] = tex->Width();
+            data["Height"] = tex->Height();
+            LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
+            return true;
+        }
+        LOG_ERROR("Failed to load dropped texture: " << droppedPath);
+        return false;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
 
     // If a valid texture was dropped, show a small success message inline
     if (dropped) {
@@ -548,50 +674,27 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
-    bool droppedNormal = false;
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = droppedPath;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
-                }
-            }
-        }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = path;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal map: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal map: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
+    if (!normalPath.empty() && RenderClearTrashButton("NormalMapClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
     }
+    // Inline thumbnail preview for the normal map
+    if (EditorUI::PropertyFilterAllows("Normal Map")) {
+        RenderInlineTexturePreview(data.value("NormalTextureId", 0u), "Normal map preview");
+    }
+    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["NormalTexturePath"] = droppedPath;
+            LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
+            return true;
+        }
+        LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
+        return false;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
 
     if (droppedNormal) {
         ImGui::SameLine();
@@ -600,72 +703,23 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
 
     // Emissive map row
     EditorUI::RenderStaticValueRow("Emissive Map", emissiveValueText, emissivePath.empty());
-    bool droppedEmissive = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as emissive textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-
-                // If successful, store texture ID and path in JSON so renderer can use them
-                if (tex) {
-                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["EmissiveTexturePath"] = droppedPath;
-                    droppedEmissive = true;
-                    LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
-                }
-            }
-        }
-
-        // Support multiple paths payloads
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-
-            // Process each path in the payload
-            while (dataBuf < end) {
-                // Extract null-terminated path string
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-
-                // Skip empty paths
-                if (path.empty()) continue;
-
-                // Extract file extension and normalise to lowercase for comparison
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-                // Only accept common image formats as emissive textures
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-
-                // Try to load the texture
-                auto tex = RM.Get<Texture>(path);
-
-                // If successful, store texture ID and path in JSON so renderer can use them
-                if (tex) {
-                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["EmissiveTexturePath"] = path;
-                    droppedEmissive = true;
-                    LOG_INFO("Dropped emissive map: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped emissive map: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
+    // Inline thumbnail preview for the emissive map
+    if (EditorUI::PropertyFilterAllows("Emissive Map")) {
+        RenderInlineTexturePreview(data.value("EmissiveTextureId", 0u), "Emissive map preview");
     }
+    const bool droppedEmissive = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["EmissiveTexturePath"] = droppedPath;
+            LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
+            return true;
+        }
+        LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
+        return false;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
 
     if (droppedEmissive) {
         ImGui::SameLine();
@@ -1072,120 +1126,61 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
     // Group all sprite sheet related rows under one aligned section
     EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
-        "Mode", "Start Frame", "Frame Count", "Row Index", "Row Start Column", "Row Frame Count", "FPS", "Loop", "Playing" });
+        "Mode", "Start Frame", "Frame Count", "Row", "Frame Offset", "Frame Length", "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
-
-    // Tracks whether a valid texture was dropped this frame
-    bool dropped = false;
-
-    // Allow users to drag a texture asset from the asset browser into this control
-    if (ImGui::BeginDragDropTarget()) {
-        // Accept payloads tagged as ASSET_PATH which contain a file path string
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Payload data is a char buffer containing the file path
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-            // Extract file extension and normalise to lowercase for comparison
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            // Only accept common image formats as sprite sheet textures
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                // Load texture through the resource manager using the dropped path
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    // Store texture ID and path in JSON so renderer can use them
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = droppedPath;
-
-                    // Cache sheet dimensions from the texture
-                    data["SheetWidth"] = tex->Width();
-                    data["SheetHeight"] = tex->Height();
-
-                    dropped = true;
-                    LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
-                }
-            }
-        }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["TexturePath"] = path;
-                    data["SheetWidth"] = tex->Width();
-                    data["SheetHeight"] = tex->Height();
-                    dropped = true;
-                    LOG_INFO("Dropped sprite sheet: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped sprite sheet: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
+    if (!texPath.empty() && RenderClearTrashButton("SpriteSheetClear", "Clear sprite sheet", m_symbolsFont)) {
+        data["TextureId"] = 0;
+        data["TexturePath"] = "";
+        data["SheetWidth"] = 0;
+        data["SheetHeight"] = 0;
     }
+    // Inline thumbnail preview for the sprite sheet texture
+    if (EditorUI::PropertyFilterAllows("Sprite Sheet")) {
+        RenderInlineTexturePreview(data.value("TextureId", 0u), "Sprite sheet preview");
+    }
+
+    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["TextureId"] = static_cast<uint32_t>(tex->ID());
+            data["TexturePath"] = droppedPath;
+            data["SheetWidth"] = tex->Width();
+            data["SheetHeight"] = tex->Height();
+            LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
+            return true;
+        }
+        LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
+        return false;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
+    (void)dropped; // suppress for now, could be used for feedback
 
     // Normal map row
     EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
-    bool droppedNormal = false;
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            std::string droppedPath = static_cast<const char*>(payLoad->Data);
-            auto ext = std::filesystem::path(droppedPath).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                auto tex = RM.Get<Texture>(droppedPath);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = droppedPath;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
-                }
-            }
-        }
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payLoad->Data);
-            const char* end = dataBuf + payLoad->DataSize;
-            while (dataBuf < end) {
-                std::string path(dataBuf);
-                dataBuf += path.size() + 1;
-                if (path.empty()) continue;
-                auto ext = std::filesystem::path(path).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                auto tex = RM.Get<Texture>(path);
-                if (tex) {
-                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-                    data["NormalTexturePath"] = path;
-                    droppedNormal = true;
-                    LOG_INFO("Dropped normal sheet: " << path << ", id=" << tex->ID());
-                }
-                else {
-                    LOG_ERROR("Failed to load dropped normal sheet: " << path);
-                }
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
+    if (!normalPath.empty() && RenderClearTrashButton("SpriteSheetNormalClear", "Clear normal map", m_symbolsFont)) {
+        data["NormalTextureId"] = 0;
+        data["NormalTexturePath"] = "";
     }
+    // Inline thumbnail preview for the normal sheet
+    if (EditorUI::PropertyFilterAllows("Normal Map")) {
+        RenderInlineTexturePreview(data.value("NormalTextureId", 0u), "Normal sheet preview");
+    }
+    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        auto tex = RM.Get<Texture>(droppedPath);
+        if (tex) {
+            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+            data["NormalTexturePath"] = droppedPath;
+            LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
+            return true;
+        }
+        LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
+        return false;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
 
     if (droppedNormal) {
         ImGui::SameLine();
@@ -1218,9 +1213,9 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         // How many frames in the animation sequence
         EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
     } else {
-        EditorUI::RenderIntProperty("Row Index", data, "RowIndex");
-        EditorUI::RenderIntProperty("Row Start Column", data, "RowStartColumn");
-        EditorUI::RenderIntProperty("Row Frame Count", data, "RowFrameCount");
+        EditorUI::RenderIntProperty("Row", data, "Row");
+        EditorUI::RenderIntProperty("Frame Offset", data, "FrameOffset");
+        EditorUI::RenderIntProperty("Frame Length", data, "FrameLength");
     }
 
     // Animation speed in frames per second
@@ -1386,25 +1381,20 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
     ImGuiIdScope id("GUICanvas");
 
     if (!data.contains("ReferenceSize")) data["ReferenceSize"] = { {"X", 1920.0f}, {"Y", 1080.0f} };
-    if (!data.contains("ScaleFactor")) data["ScaleFactor"] = 1.0f;
-    if (!data.contains("Alignment")) data["Alignment"] = 0;
     if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
     if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
-    if (!data.contains("DebugDraw")) data["DebugDraw"] = false;
-    if (!data.contains("DebugBoundsColor")) data["DebugBoundsColor"] = { {"R", 0.2f}, {"G", 0.8f}, {"B", 1.0f}, {"A", 0.6f} };
-    if (!data.contains("DebugPaddingColor")) data["DebugPaddingColor"] = { {"R", 1.0f}, {"G", 0.8f}, {"B", 0.2f}, {"A", 0.6f} };
-    if (!data.contains("DebugAnchorColor")) data["DebugAnchorColor"] = { {"R", 1.0f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.8f} };
 
-    EditorUI::BeginPropertySection({ "Reference Size", "Scale Factor", "Scale Mode", "Alignment", "Offset", "Debug Draw", "Bounds Color", "Padding Color", "Anchor Color" });
+    EditorUI::BeginPropertySection({ "Reference Size", "Offset", "Scale Mode" });
     EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f);
-    EditorUI::RenderFloatRow("Scale Factor", "x", data, "ScaleFactor", 0.01f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+
     const char* scaleModes[] = { "Fit", "Fill", "Match Width", "Match Height" };
     int scaleMode = data.value("ScaleMode", 0);
     scaleMode = std::max(0, std::min(scaleMode, 3));
     ImGui::Text("Scale Mode");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUICanvasScaleMode", scaleModes[scaleMode])) {
+    if (ImGui::BeginCombo("##GUIScaleMode", scaleModes[scaleMode])) {
         for (int i = 0; i < 4; ++i) {
             bool selected = (scaleMode == i);
             if (ImGui::Selectable(scaleModes[i], selected)) {
@@ -1415,31 +1405,7 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
         }
         ImGui::EndCombo();
     }
-    const char* alignOptions[] = {
-        "Center", "Top Left", "Top", "Top Right",
-        "Left", "Right", "Bottom Left", "Bottom", "Bottom Right"
-    };
-    int alignment = data.value("Alignment", 0);
-    alignment = std::max(0, std::min(alignment, 8));
-    ImGui::Text("Alignment");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUICanvasAlignCombo", alignOptions[alignment])) {
-        for (int i = 0; i < 9; ++i) {
-            bool selected = (alignment == i);
-            if (ImGui::Selectable(alignOptions[i], selected)) {
-                alignment = i;
-                data["Alignment"] = alignment;
-            }
-            if (selected) ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
-    EditorUI::RenderCheckboxProperty("Debug Draw", data, "DebugDraw");
-    EditorUI::RenderColorRow("Bounds Color", data["DebugBoundsColor"]);
-    EditorUI::RenderColorRow("Padding Color", data["DebugPaddingColor"]);
-    EditorUI::RenderColorRow("Anchor Color", data["DebugAnchorColor"]);
+
     EditorUI::EndPropertySection();
 }
 
@@ -1450,51 +1416,112 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
 
     if (!data.contains("Position")) data["Position"] = { {"X", 0.0f}, {"Y", 0.0f} };
     if (!data.contains("Size")) data["Size"] = { {"X", 100.0f}, {"Y", 100.0f} };
-    if (!data.contains("AnchorMin")) data["AnchorMin"] = { {"X", 0.0f}, {"Y", 0.0f} };
-    if (!data.contains("AnchorMax")) data["AnchorMax"] = { {"X", 0.0f}, {"Y", 0.0f} };
-    if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
-    if (!data.contains("Active")) data["Active"] = true;
     if (!data.contains("Visible")) data["Visible"] = true;
-    if (!data.contains("Raycast")) data["Raycast"] = true;
-    if (!data.contains("HAlign")) data["HAlign"] = 0;
-    if (!data.contains("VAlign")) data["VAlign"] = 0;
-    if (!data.contains("ElementType")) data["ElementType"] = 0;
-    if (!data.contains("PaddingLeft")) data["PaddingLeft"] = 0.0f;
-    if (!data.contains("PaddingRight")) data["PaddingRight"] = 0.0f;
-    if (!data.contains("PaddingTop")) data["PaddingTop"] = 0.0f;
-    if (!data.contains("PaddingBottom")) data["PaddingBottom"] = 0.0f;
+    if (!data.contains("Alignment")) data["Alignment"] = 0;
     if (!data.contains("ZOrder")) data["ZOrder"] = 0;
+    if (!data.contains("Margin")) data["Margin"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
 
-    EditorUI::BeginPropertySection({
-        "Position", "Size", "Anchor Min", "Anchor Max", "Offset",
-        "Active", "Visible", "Raycast", "H Align", "V Align",
-        "Element Type", "Padding Left", "Padding Right", "Padding Top", "Padding Bottom",
-        "Z Order"
-    });
-
+    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order", "Margin", "Padding" });
     EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
     EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
-    EditorUI::RenderVector2DRow("Anchor Min", data["AnchorMin"], "X", "Y", 0.01f);
-    EditorUI::RenderVector2DRow("Anchor Max", data["AnchorMax"], "X", "Y", 0.01f);
-    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
-
-    EditorUI::RenderCheckboxProperty("Active", data, "Active");
     EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
-    EditorUI::RenderCheckboxProperty("Raycast", data, "Raycast");
-
-    const char* hAlignOptions[] = { "Left", "Center", "Right", "Stretch" };
-    const char* vAlignOptions[] = { "Top", "Middle", "Bottom", "Stretch" };
-    const char* elementTypes[] = {
-        "Custom", "Container", "Button", "Panel", "Text", "Image",
-        "InputField", "Slider", "Checkbox", "Dropdown", "ScrollView", "Separator"
+    const char* alignmentOptions[] = {
+        "Top Left", "Top", "Top Right",
+        "Left", "Center", "Right",
+        "Bottom Left", "Bottom", "Bottom Right"
     };
+    int alignment = data.value("Alignment", 0);
+    alignment = std::max(0, std::min(alignment, 8));
+    ImGui::Text("Alignment");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIAlignment", alignmentOptions[alignment])) {
+        for (int i = 0; i < 9; ++i) {
+            bool selected = (alignment == i);
+            if (ImGui::Selectable(alignmentOptions[i], selected)) {
+                alignment = i;
+                data["Alignment"] = alignment;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
+    EditorUI::RenderVector4DRow("Margin", data["Margin"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::EndPropertySection();
+}
 
+void ComponentUI::RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIPanel");
+
+    if (!data.contains("Color")) data["Color"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+
+    EditorUI::BeginPropertySection({ "Color", "Corner Radius" });
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIText");
+
+    if (!data.contains("Text")) data["Text"] = "Text";
+    if (!data.contains("FontPath")) data["FontPath"] = "";
+    if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("FontSize")) {
+        if (data.contains("PixelSize")) {
+            data["FontSize"] = data["PixelSize"];
+        } else {
+            data["FontSize"] = 24.0f;
+        }
+    }
+    if (!data.contains("Wrap")) data["Wrap"] = false;
+    if (!data.contains("HAlign")) data["HAlign"] = 0;
+    if (!data.contains("VAlign")) data["VAlign"] = 0;
+
+    EditorUI::BeginPropertySection({ "Text", "Font", "Color", "Font Size", "Wrap", "H Align", "V Align" });
+    EditorUI::RenderTextProperty("Text", data, "Text");
+
+    std::string fontPath = data.value("FontPath", std::string());
+    std::string fontValueText;
+    if (!fontPath.empty()) {
+        fontValueText = std::filesystem::path(fontPath).filename().string();
+    }
+    else {
+        fontValueText = "None (drag font here)";
+    }
+
+    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
+    if (!fontPath.empty() && RenderClearTrashButton("GUITextFontClear", "Clear font", m_symbolsFont)) {
+        data["FontPath"] = "";
+    }
+
+    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
+        data["FontPath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kFontExtensions);
+    });
+
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::RenderCheckboxProperty("Wrap", data, "Wrap");
+
+    const char* hAlignOptions[] = { "Left", "Center", "Right" };
     int hAlign = data.value("HAlign", 0);
+    hAlign = std::max(0, std::min(hAlign, 2));
     ImGui::Text("H Align");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##HAlignCombo", hAlignOptions[hAlign])) {
-        for (int i = 0; i < 4; ++i) {
+    if (ImGui::BeginCombo("##GUITextHAlign", hAlignOptions[hAlign])) {
+        for (int i = 0; i < 3; ++i) {
             bool selected = (hAlign == i);
             if (ImGui::Selectable(hAlignOptions[i], selected)) {
                 hAlign = i;
@@ -1505,12 +1532,14 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
         ImGui::EndCombo();
     }
 
+    const char* vAlignOptions[] = { "Top", "Middle", "Bottom" };
     int vAlign = data.value("VAlign", 0);
+    vAlign = std::max(0, std::min(vAlign, 2));
     ImGui::Text("V Align");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##VAlignCombo", vAlignOptions[vAlign])) {
-        for (int i = 0; i < 4; ++i) {
+    if (ImGui::BeginCombo("##GUITextVAlign", vAlignOptions[vAlign])) {
+        for (int i = 0; i < 3; ++i) {
             bool selected = (vAlign == i);
             if (ImGui::Selectable(vAlignOptions[i], selected)) {
                 vAlign = i;
@@ -1520,83 +1549,228 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
         }
         ImGui::EndCombo();
     }
-
-    int elementType = data.value("ElementType", 0);
-    ImGui::Text("Element Type");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##ElementTypeCombo", elementTypes[elementType])) {
-        for (int i = 0; i < 12; ++i) {
-            bool selected = (elementType == i);
-            if (ImGui::Selectable(elementTypes[i], selected)) {
-                elementType = i;
-                data["ElementType"] = elementType;
-            }
-            if (selected) ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-
-    EditorUI::RenderFloatRow("Padding Left", "px", data, "PaddingLeft", 0.1f);
-    EditorUI::RenderFloatRow("Padding Right", "px", data, "PaddingRight", 0.1f);
-    EditorUI::RenderFloatRow("Padding Top", "px", data, "PaddingTop", 0.1f);
-    EditorUI::RenderFloatRow("Padding Bottom", "px", data, "PaddingBottom", 0.1f);
-    EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
-
     EditorUI::EndPropertySection();
 }
 
-void ComponentUI::RenderGUIContainer(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
-    ImGuiIdScope id("GUIContainer");
+    ImGuiIdScope id("GUIImage");
 
-    if (!data.contains("Layout")) data["Layout"] = 2;
-    if (!data.contains("Spacing")) data["Spacing"] = 5.0f;
-    if (!data.contains("ChildForceExpandWidth")) data["ChildForceExpandWidth"] = false;
-    if (!data.contains("ChildForceExpandHeight")) data["ChildForceExpandHeight"] = false;
-    if (!data.contains("GridColumns")) data["GridColumns"] = 1;
-    if (!data.contains("GridCellPaddingX")) data["GridCellPaddingX"] = 0.0f;
-    if (!data.contains("GridCellPaddingY")) data["GridCellPaddingY"] = 0.0f;
-    if (!data.contains("PreferredWidthDynamic")) data["PreferredWidthDynamic"] = false;
-    if (!data.contains("PreferredHeightDynamic")) data["PreferredHeightDynamic"] = false;
-    if (!data.contains("MinWidth")) data["MinWidth"] = 0.0f;
-    if (!data.contains("MinHeight")) data["MinHeight"] = 0.0f;
+    if (!data.contains("TexturePath")) data["TexturePath"] = "";
+    if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("UVRect")) data["UVRect"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f} };
+    if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+    if (!data.contains("UseSlicing")) data["UseSlicing"] = false;
+    if (!data.contains("SliceBorder")) data["SliceBorder"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
 
-    EditorUI::BeginPropertySection({
-        "Layout", "Spacing", "Expand Width", "Expand Height",
-        "Grid Columns", "Grid Pad X", "Grid Pad Y",
-        "Prefer Width", "Prefer Height", "Min Width", "Min Height"
+    EditorUI::BeginPropertySection({ "Texture", "Color", "UV Rect", "Scale Mode", "Use Slicing", "Slice Border" });
+
+    std::string texturePath = data.value("TexturePath", std::string());
+    std::string textureValueText;
+    if (!texturePath.empty()) {
+        textureValueText = std::filesystem::path(texturePath).filename().string();
+    } else {
+        textureValueText = "None (drag texture here)";
+    }
+    EditorUI::RenderStaticValueRow("Texture", textureValueText, texturePath.empty());
+    if (!texturePath.empty() && RenderClearTrashButton("GUIImageTextureClear", "Clear texture", m_symbolsFont)) {
+        data["TexturePath"] = "";
+    }
+    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        data["TexturePath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
     });
 
-    const char* layoutOptions[] = { "Absolute", "Horizontal Box", "Vertical Box", "Grid", "Docking" };
-    int layout = data.value("Layout", 2);
-    ImGui::Text("Layout");
+    EditorUI::RenderColorRow("Color", data["Color"]);
+    EditorUI::RenderVector4DRow("UV Rect", data["UVRect"], "X", "Y", "Z", "W", 0.01f);
+
+    const char* scaleModes[] = { "Stretch", "Fit", "Fill" };
+    int scaleMode = data.value("ScaleMode", 0);
+    scaleMode = std::max(0, std::min(scaleMode, 2));
+    ImGui::Text("Scale Mode");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUILayoutCombo", layoutOptions[layout])) {
-        for (int i = 0; i < 5; ++i) {
-            bool selected = (layout == i);
-            if (ImGui::Selectable(layoutOptions[i], selected)) {
-                layout = i;
-                data["Layout"] = layout;
+    if (ImGui::BeginCombo("##GUIImageScaleMode", scaleModes[scaleMode])) {
+        for (int i = 0; i < 3; ++i) {
+            bool selected = (scaleMode == i);
+            if (ImGui::Selectable(scaleModes[i], selected)) {
+                scaleMode = i;
+                data["ScaleMode"] = scaleMode;
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
     }
 
-    EditorUI::RenderFloatRow("Spacing", "px", data, "Spacing", 0.1f);
-    EditorUI::RenderCheckboxProperty("Expand Width", data, "ChildForceExpandWidth");
-    EditorUI::RenderCheckboxProperty("Expand Height", data, "ChildForceExpandHeight");
-    EditorUI::RenderIntProperty("Grid Columns", data, "GridColumns");
-    EditorUI::RenderFloatRow("Grid Pad X", "px", data, "GridCellPaddingX", 0.1f);
-    EditorUI::RenderFloatRow("Grid Pad Y", "px", data, "GridCellPaddingY", 0.1f);
-    EditorUI::RenderCheckboxProperty("Prefer Width", data, "PreferredWidthDynamic");
-    EditorUI::RenderCheckboxProperty("Prefer Height", data, "PreferredHeightDynamic");
-    EditorUI::RenderFloatRow("Min Width", "px", data, "MinWidth", 0.1f);
-    EditorUI::RenderFloatRow("Min Height", "px", data, "MinHeight", 0.1f);
+    EditorUI::RenderCheckboxProperty("Use Slicing", data, "UseSlicing");
+    EditorUI::RenderVector4DRow("Slice Border", data["SliceBorder"], "X", "Y", "Z", "W", 0.1f);
+    EditorUI::EndPropertySection();
+}
 
+void ComponentUI::RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIInput");
+
+    if (!data.contains("Hovered")) data["Hovered"] = false;
+    if (!data.contains("Pressed")) data["Pressed"] = false;
+    if (!data.contains("Clicked")) data["Clicked"] = false;
+    if (!data.contains("Released")) data["Released"] = false;
+    if (!data.contains("Dragging")) data["Dragging"] = false;
+    if (!data.contains("Entered")) data["Entered"] = false;
+    if (!data.contains("Exited")) data["Exited"] = false;
+
+    EditorUI::BeginPropertySection({ "Hovered", "Pressed", "Clicked", "Released", "Dragging", "Entered", "Exited" });
+    ImGui::BeginDisabled();
+    EditorUI::RenderCheckboxProperty("Hovered", data, "Hovered");
+    EditorUI::RenderCheckboxProperty("Pressed", data, "Pressed");
+    EditorUI::RenderCheckboxProperty("Clicked", data, "Clicked");
+    EditorUI::RenderCheckboxProperty("Released", data, "Released");
+    EditorUI::RenderCheckboxProperty("Dragging", data, "Dragging");
+    EditorUI::RenderCheckboxProperty("Entered", data, "Entered");
+    EditorUI::RenderCheckboxProperty("Exited", data, "Exited");
+    ImGui::EndDisabled();
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIStateStyle(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIStateStyle");
+
+    if (!data.contains("NormalColor")) data["NormalColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("HoverColor")) data["HoverColor"] = { {"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f} };
+    if (!data.contains("PressedColor")) data["PressedColor"] = { {"R", 0.8f}, {"G", 0.8f}, {"B", 0.8f}, {"A", 1.0f} };
+    if (!data.contains("DisabledColor")) data["DisabledColor"] = { {"R", 0.6f}, {"G", 0.6f}, {"B", 0.6f}, {"A", 0.6f} };
+
+    EditorUI::BeginPropertySection({ "Normal Color", "Hover Color", "Pressed Color", "Disabled Color" });
+    EditorUI::RenderColorRow("Normal Color", data["NormalColor"]);
+    EditorUI::RenderColorRow("Hover Color", data["HoverColor"]);
+    EditorUI::RenderColorRow("Pressed Color", data["PressedColor"]);
+    EditorUI::RenderColorRow("Disabled Color", data["DisabledColor"]);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIButton");
+
+    if (!data.contains("Text")) data["Text"] = "Button";
+    if (!data.contains("FontPath")) data["FontPath"] = "";
+    if (!data.contains("IconPath")) data["IconPath"] = "";
+    if (!data.contains("NormalColor")) data["NormalColor"] = { {"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f} };
+    if (!data.contains("HoverColor")) data["HoverColor"] = { {"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f} };
+    if (!data.contains("PressedColor")) data["PressedColor"] = { {"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f} };
+    if (!data.contains("DisabledColor")) data["DisabledColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f} };
+    if (!data.contains("TextColor")) data["TextColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("IconColor")) data["IconColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    if (!data.contains("FontSize")) data["FontSize"] = 24.0f;
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+    if (!data.contains("IconSize")) data["IconSize"] = { {"X", 24.0f}, {"Y", 24.0f} };
+    if (!data.contains("IconOffset")) data["IconOffset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 8.0f}, {"Y", 6.0f}, {"Z", 8.0f}, {"W", 6.0f} };
+    if (!data.contains("Disabled")) data["Disabled"] = false;
+    if (!data.contains("Toggle")) data["Toggle"] = false;
+    if (!data.contains("Toggled")) data["Toggled"] = false;
+
+    EditorUI::BeginPropertySection({
+        "Text", "Font", "Icon", "Normal Color", "Hover Color", "Pressed Color",
+        "Disabled Color", "Text Color", "Icon Color", "Font Size", "Corner Radius",
+        "Icon Size", "Icon Offset", "Padding", "Disabled", "Toggle", "Toggled"
+    });
+
+    EditorUI::RenderTextProperty("Text", data, "Text");
+
+    std::string fontPath = data.value("FontPath", std::string());
+    std::string fontValueText = fontPath.empty()
+        ? "None (drag font here)"
+        : std::filesystem::path(fontPath).filename().string();
+    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
+    if (!fontPath.empty() && RenderClearTrashButton("GUIButtonFontClear", "Clear font", m_symbolsFont)) {
+        data["FontPath"] = "";
+    }
+    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
+        data["FontPath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kFontExtensions);
+    });
+
+    std::string iconPath = data.value("IconPath", std::string());
+    std::string iconValueText = iconPath.empty()
+        ? "None (drag icon here)"
+        : std::filesystem::path(iconPath).filename().string();
+    EditorUI::RenderStaticValueRow("Icon", iconValueText, iconPath.empty());
+    if (!iconPath.empty() && RenderClearTrashButton("GUIButtonIconClear", "Clear icon", m_symbolsFont)) {
+        data["IconPath"] = "";
+    }
+    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+        data["IconPath"] = droppedPath;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kImageExtensions);
+    });
+
+    EditorUI::RenderColorRow("Normal Color", data["NormalColor"]);
+    EditorUI::RenderColorRow("Hover Color", data["HoverColor"]);
+    EditorUI::RenderColorRow("Pressed Color", data["PressedColor"]);
+    EditorUI::RenderColorRow("Disabled Color", data["DisabledColor"]);
+    EditorUI::RenderColorRow("Text Color", data["TextColor"]);
+    EditorUI::RenderColorRow("Icon Color", data["IconColor"]);
+    EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::RenderVector2DRow("Icon Size", data["IconSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Icon Offset", data["IconOffset"], "X", "Y", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderCheckboxProperty("Disabled", data, "Disabled");
+    EditorUI::RenderCheckboxProperty("Toggle", data, "Toggle");
+    EditorUI::RenderCheckboxProperty("Toggled", data, "Toggled");
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUISlider");
+
+    if (!data.contains("Value")) data["Value"] = 0.0f;
+    if (!data.contains("Min")) data["Min"] = 0.0f;
+    if (!data.contains("Max")) data["Max"] = 1.0f;
+    if (!data.contains("Step")) data["Step"] = 0.0f;
+    if (!data.contains("TrackColor")) data["TrackColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
+    if (!data.contains("FillColor")) data["FillColor"] = { {"R", 0.4f}, {"G", 0.4f}, {"B", 0.4f}, {"A", 1.0f} };
+    if (!data.contains("KnobColor")) data["KnobColor"] = { {"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f} };
+    if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
+    if (!data.contains("KnobSize")) data["KnobSize"] = { {"X", 16.0f}, {"Y", 16.0f} };
+    if (!data.contains("Padding")) data["Padding"] = { {"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f} };
+    if (!data.contains("Horizontal")) data["Horizontal"] = true;
+    if (!data.contains("Disabled")) data["Disabled"] = false;
+    if (!data.contains("ValueChanged")) data["ValueChanged"] = false;
+
+    EditorUI::BeginPropertySection({
+        "Value", "Min", "Max", "Step", "Track Color", "Fill Color", "Knob Color",
+        "Corner Radius", "Knob Size", "Padding", "Horizontal", "Disabled", "Value Changed"
+    });
+
+    EditorUI::RenderFloatRow("Value", "", data, "Value", 0.01f);
+    EditorUI::RenderFloatRow("Min", "", data, "Min", 0.01f);
+    EditorUI::RenderFloatRow("Max", "", data, "Max", 0.01f);
+    EditorUI::RenderFloatRow("Step", "", data, "Step", 0.01f);
+    EditorUI::RenderColorRow("Track Color", data["TrackColor"]);
+    EditorUI::RenderColorRow("Fill Color", data["FillColor"]);
+    EditorUI::RenderColorRow("Knob Color", data["KnobColor"]);
+    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    EditorUI::RenderVector2DRow("Knob Size", data["KnobSize"], "X", "Y", 1.0f);
+    EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderCheckboxProperty("Horizontal", data, "Horizontal");
+    EditorUI::RenderCheckboxProperty("Disabled", data, "Disabled");
+    ImGui::BeginDisabled();
+    EditorUI::RenderCheckboxProperty("Value Changed", data, "ValueChanged");
+    ImGui::EndDisabled();
     EditorUI::EndPropertySection();
 }
 
@@ -1656,15 +1830,12 @@ void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entit
     EditorUI::EndPropertySection();
 }
 
-// Static variab/flags
-static bool s_showUnsupportedPopup = false;
-static std::string s_unsupportedPath;
-
-
 // Renders the AudioSource component Properties
 void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
+    // Note: Defaults are now handled by EditorComponentRegistry, not here
+    // This prevents JSON modification every frame which would mark component as dirty
     ImGuiIdScope id("AudioSource");
     // Ensure keys exist with defaults
     if (!data.contains("CueId"))       data["CueId"] = 0;
@@ -1675,56 +1846,27 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
 
     // SINGLE BeginPropertySection call with ALL field names for proper alignment
-    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D" });
+    // Note: Fade duration fields are conditionally shown, so we include all possible fields
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D", "Bus", "Pan",
+                                     "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
     auto& lib = AudioAssetLibrary::Get();
 
     const AudioAssetLibrary::ClipInfo* selectedClip = lib.FindById(cueId);
-    std::string currentLabel = selectedClip ? selectedClip->name : "None (drag audio here)";
+    std::string currentLabel = selectedClip ? selectedClip->Name : "None (drag audio here)";
 
     // Audio clip row + drag drop support like SpriteRenderer2D
     EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
 
     // Drag-drop support
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            const char* droppedPath = static_cast<const char*>(payload->Data);
-            std::filesystem::path path(droppedPath);
-
-            std::string ext = path.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
-
-            if (supported) {
-                const auto& clipInfo = lib.Register(path.string());
-                data["CueId"] = clipInfo.id;
-            }
-            else {
-                s_showUnsupportedPopup = true;
-                s_unsupportedPath = path.string();
-            }
-        }
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-            const char* dataBuf = static_cast<const char*>(payload->Data);
-            const char* end = dataBuf + payload->DataSize;
-            while (dataBuf < end) {
-                std::string pathStr(dataBuf);
-                dataBuf += pathStr.size() + 1;
-                if (pathStr.empty()) continue;
-                std::filesystem::path p(pathStr);
-                std::string ext = p.extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
-                if (!supported) continue;
-                const auto& clipInfo = lib.Register(p.string());
-                data["CueId"] = clipInfo.id;
-                break;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+    HandleAssetDragDropTarget(kAudioExtensions, [&](const std::string& droppedPath) {
+        const auto& clipInfo = lib.Register(droppedPath);
+        data["CueId"] = clipInfo.Id;
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kAudioExtensions);
+    });
 
     // Volume + Pitch sliders using EditorUI helpers
     EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
@@ -1735,29 +1877,51 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
     EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
 
+    // Bus selection
+    const char* busOptions[] = { "Master", "Music", "SFX", "UI", "Ambient" };
+    int bus = data.value("Bus", 2);
+    bus = std::clamp(bus, 0, 4);
+    ImGui::Text("Bus");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##AudioBusCombo", busOptions[bus])) {
+        for (int i = 0; i < 5; ++i) {
+            bool selected = (bus == i);
+            if (ImGui::Selectable(busOptions[i], selected)) {
+                bus = i;
+                data["Bus"] = bus;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    // Stereo pan (2D only)
+    bool spatial3D = data.value("Spatial3D", true);
+    if (!spatial3D) {
+        EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f);
+    }
+
+    // Fade settings
+    EditorUI::RenderCheckboxProperty("Enable Fade In", data, "EnableFadeIn");
+
+    // Only show fade duration if fade is enabled
+    bool fadeInEnabled = data.value("EnableFadeIn", false);
+    if (fadeInEnabled) {
+        EditorUI::RenderFloatRow("Fade In Duration", "s", data, "FadeInDuration", 0.1f);
+    }
+
+    EditorUI::RenderCheckboxProperty("Enable Fade Out", data, "EnableFadeOut");
+
+    // Only show fade duration if fade is enabled
+    bool fadeOutEnabled = data.value("EnableFadeOut", false);
+    if (fadeOutEnabled) {
+        EditorUI::RenderFloatRow("Fade Out Duration", "s", data, "FadeOutDuration", 0.1f);
+    }
+
     // SINGLE EndPropertySection call
     EditorUI::EndPropertySection();
-
-    // Unsupported format popup
-    if (s_showUnsupportedPopup) {
-        ImGui::OpenPopup("Unsupported Audio Format");
-        ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Appearing);
-    }
-
-    if (ImGui::BeginPopupModal("Unsupported Audio Format", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(
-            "The file you tried to assign is not a supported audio format.\n\n"
-            "Only .wav, .ogg, .mp3, and .flac files are allowed.\n\n"
-        );
-
-        if (ImGui::Button("OK", ImVec2(120, 0))) {
-            s_showUnsupportedPopup = false;
-            s_unsupportedPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
 }
 
 // Renders the Layer component properties
@@ -1848,48 +2012,22 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
 
         // Render a read-only row displaying the current texture
         EditorUI::RenderStaticValueRow(label, valueText, texPath.empty());
-
-        // Drag-and-drop target for texture assignment
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-                // Extract dropped file path
-                std::string droppedPath = static_cast<const char*>(payLoad->Data);
-
-                // Validate file extension
-                auto ext = std::filesystem::path(droppedPath).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-                // Accept only image formats
-                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                    auto tex = RM.Get<Texture>(droppedPath);
-                    if (tex) {
-                        // Store texture ID and path in serialized material data
-                        data[idKey] = static_cast<uint32_t>(tex->ID());
-                        data[pathKey] = droppedPath;
-                    }
-                }
-            }
-            // Lowkey copied from audio
-            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
-                const char* dataBuf = static_cast<const char*>(payLoad->Data);
-                const char* end = dataBuf + payLoad->DataSize;
-                while (dataBuf < end) {
-                    std::string path(dataBuf);
-                    dataBuf += path.size() + 1;
-                    if (path.empty()) continue;
-                    auto ext = std::filesystem::path(path).extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
-                    auto tex = RM.Get<Texture>(path);
-                    if (tex) {
-                        data[idKey] = static_cast<uint32_t>(tex->ID());
-                        data[pathKey] = path;
-                    }
-                    break; // Only accept the first valid texture
-                }
-            }
-            ImGui::EndDragDropTarget();
+        // Inline thumbnail preview for material texture assignments
+        if (EditorUI::PropertyFilterAllows(label)) {
+            RenderInlineTexturePreview(data.value(idKey, 0u), "Material texture preview");
         }
+
+        HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data[idKey] = static_cast<uint32_t>(tex->ID());
+                data[pathKey] = droppedPath;
+                return true;
+            }
+            return false;
+        }, [&](const std::string& rejectedPath) {
+            QueueAssetDropError(rejectedPath, kImageExtensions);
+        });
     };
 
     // Texture slots

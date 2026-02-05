@@ -20,8 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cstdint>
 
 // Forward declarations
-class Renderer;
-class Shader;
+namespace ECS { class RendererSystem; }
 
 namespace Editor {
 
@@ -36,18 +35,14 @@ namespace Editor {
         /**
          * @brief Render game camera frustum overlay
          * @param world ECS world containing camera entities
-         * @param renderer Batch renderer to use for drawing
-         * @param shader Shader to use for drawing (should be set up with viewProj)
-         * @param viewProj View-projection matrix of the editor camera
+         * @param rendererSystem Renderer system used to queue wireframe overlays
          * @param cameraOrthoSize Editor camera's orthographic size (for thickness calculation)
          * @param windowHeight Window height in pixels (for thickness calculation)
          * @param excludeEntityId Entity ID to exclude from rendering (typically editor camera)
          */
         static void RenderFrustum(
             ECS::World& world,
-            Renderer& renderer,
-            Shader& shader,
-            const glm::mat4& viewProj,
+            ECS::RendererSystem* rendererSystem,
             float cameraOrthoSize,
             float windowHeight,
             uint32_t excludeEntityId = 0);

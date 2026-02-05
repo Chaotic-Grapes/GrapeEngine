@@ -125,11 +125,15 @@ namespace ECS {
         }
     }
 
+    void PrefabManager::ClearInstanceTracking() {
+        m_instanceToHash.clear();
+        m_hashToInstances.clear();
+    }
+
     void PrefabManager::Clear() {
         m_hashToPath.clear();
         m_pathToHash.clear();
-        m_instanceToHash.clear();
-        m_hashToInstances.clear();
+        ClearInstanceTracking();
     }
 
     void PrefabManager::LoadPrefabRegistry(const std::string& prefabDirectory) {

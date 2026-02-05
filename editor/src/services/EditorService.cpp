@@ -209,12 +209,6 @@ void EditorService::BeginFrame() {
 void EditorService::Update() {
     if (!m_initialized) return;
 
-    // Ensure the SceneManager processes any pending transitions so the editor
-    // immediately sees newly created scenes (e.g. File->New Scene).
-    // Calling Update here is idempotent and cheap (it only processes pending
-    // transitions) and guarantees the editor's world is set correctly.
-    m_sceneManager.Update();
-
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;
         m_levelEditor.reset();

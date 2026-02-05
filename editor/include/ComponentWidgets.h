@@ -21,8 +21,31 @@ Used by component inspectors for both entity and prefab editing workflows.
 #include <string>
 #include <vector>
 
+struct ImFont;
+
 // Provides stateless widgets used across all component inspectors
 namespace EditorUI {
+    // -------------------------------------------------------------------------
+    // Filter + Defaults
+    // -------------------------------------------------------------------------
+
+    // Sets a case-insensitive filter used to hide non-matching property rows
+    void SetPropertyFilter(const std::string& filter);
+
+    // Clears the active property filter so all rows render
+    void ClearPropertyFilter();
+
+    // Returns true if the current property filter allows this label to render
+    bool PropertyFilterAllows(const std::string& label);
+
+    // Sets the symbols font used for icon-only buttons in property rows
+    void SetSymbolsFont(ImFont* symbolsFont);
+
+    // Registers a default-data mapping for the current component render
+    void RegisterDefaultDataScope(nlohmann::json& data, const nlohmann::json& defaults);
+
+    // Clears the active default-data mapping after a component finishes rendering
+    void ClearDefaultDataScope();
 
     // -------------------------------------------------------------------------
     // Section Management
@@ -57,6 +80,11 @@ namespace EditorUI {
     void RenderVector3DRow(const std::string& label, nlohmann::json& data, 
         const std::string& xKey, const std::string& yKey, const std::string& zKey, 
         float dragSpeed);
+
+    // Renders a 4D vector editor with X, Y, Z and W components as separate drag controls
+    void RenderVector4DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey,
+        const std::string& wKey, float dragSpeed);
 
     // Renders a quaternion editor with X, Y, Z and W components
     // Used for rotation values in 3D space

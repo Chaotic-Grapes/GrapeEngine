@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <unordered_map>
 #include <queue>
+#include <string>
 
 #include "graphics/TileMapRenderer.hpp"
 
@@ -85,9 +86,47 @@ namespace ECS {
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         Renderer* GetRenderer() const { return m_renderer.get(); }
 
+        struct GUIViewport {
+            Vector2D Origin{ 0.0f, 0.0f };
+            Vector2D Size{ 0.0f, 0.0f };
+            Vector2D DisplayScale{ 1.0f, 1.0f };
+            bool Active = false;
+        };
+
         // Static accessor for global access
         static RendererSystem* GetInstance();
 
+        Vector2D GetRenderTargetSize() const { return m_renderTargetSize; }
+        GUIViewport GetGUIViewport() const { return m_guiViewport; }
+        void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
+        void ResetGUIViewport();
+
+        // ====================================================================
+        // Viewport Management
+        // ====================================================================
+
+        struct Viewport {
+            std::string Name;
+            Engine::Camera* Camera = nullptr;
+            glm::ivec2 Size{ 1, 1 };
+            bool Active = true;
+
+            // Per-viewport render targets
+            std::unique_ptr<Framebuffer> HDR;
+            std::unique_ptr<Framebuffer> LDR;
+            std::unique_ptr<Framebuffer> BloomExtract;
+            std::unique_ptr<Framebuffer> BloomBlur;
+            std::unique_ptr<Framebuffer> PickingFBO;
+        };
+
+        void AddViewport(const std::string& name, Engine::Camera* camera, int w, int h);
+        void RemoveViewport(const std::string& name);
+        void ResizeViewport(const std::string& name, int w, int h);
+        void SetViewportCamera(const std::string& name, Engine::Camera* camera);
+        Viewport* GetViewport(const std::string& name);
+        GLuint GetViewportTexture(const std::string& name) const;
+
+        // ====================================================================
 
         /**
          * @brief Set the camera to use for rendering
@@ -150,6 +189,9 @@ namespace ECS {
          */
         void SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max, 
                                  const glm::vec4& color, float thickness);
+        // Submit a filled quad (editor overlays like tile previews).
+        void SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
+                              const glm::vec4& color);
 
         /**
          * @brief Submit a wireframe circle outline
@@ -195,6 +237,14 @@ namespace ECS {
                                  const uint32_t* indices, size_t indexCount,
                                  const glm::vec4& color, float thickness);
 
+        // Submit a textured overlay quad in world space (used by editor previews).
+        void SubmitOverlayQuad(const glm::vec2& center,
+                               const glm::vec2& size,
+                               GLuint textureId,
+                               const glm::vec4& uvRect,
+                               const glm::vec4& color,
+                               float rotation);
+
         /**
          * @brief Submit collider debug visualizations for an entity
          * @param world ECS world containing the entity
@@ -205,85 +255,24 @@ namespace ECS {
         void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
                                      const glm::vec4& color);
 
-        // ====================================================================
-        // GUI Rendering APIs
-        // ====================================================================
-        /**
-         * @brief Submit a GUI panel/quad to be rendered
-         * @param position Center in screen space
-         * @param size Width and height of the panel
-         * @param color RGBA color for the panel
-         * @param cornerRadius Corner radius for rounded rectangles (0 = sharp corners)
-         */
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                            const Color& color, float cornerRadius = 0.0f,
-                            bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
-                            const Vector2D& clipSize = {0.0f, 0.0f});
-
-        /**
-         * @brief Submit a GUI text to be rendered with SDF
-         * @param fontPath Path to font file
-         * @param text Text string to render
-         * @param position Top-left corner in screen space
-         * @param color Text color
-         * @param fontSize Font size in pixels
-         * @param shadowColor Optional shadow color (alpha=0 for no shadow)
-         * @param shadowOffset Shadow offset in pixels
-         */
-        void SubmitGUIText(const std::string& fontPath, const std::string& text,
-                           const Vector2D& position, const Color& color,
-                           float fontSize, const Color& shadowColor = Color(0U, 0U, 0U, 0U),
-                           const Vector2D& shadowOffset = Vector2D(0, 0),
-                           bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
-                           const Vector2D& clipSize = {0.0f, 0.0f});
-
-        /**
-         * @brief Submit a GUI slider to be rendered
-         * @param position Center in screen space
-         * @param size Width and height of the slider
-         * @param value Current value (0.0-1.0)
-         * @param backgroundColor Track background color
-         * @param handleColor Handle color
-         * @param borderColor Border color
-         * @param borderRadius Corner radius for handles
-         */
-        void SubmitGUISlider(const Vector2D& position, const Vector2D& size,
-                             float value, const Color& backgroundColor,
-                             const Color& handleColor, const Color& borderColor = Color(200U, 200U, 200U, 255U),
-                             float borderRadius = 4.0f,
-                             bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
-                             const Vector2D& clipSize = {0.0f, 0.0f});
-
-        /**
-         * @brief Submit a GUI checkbox to be rendered
-         * @param position Center in screen space
-         * @param size Size of the checkbox box
-         * @param checked Whether checkbox is checked
-         * @param boxColor Checkbox box color
-         * @param checkColor Checkmark color
-         * @param borderColor Border color
-         */
-        void SubmitGUICheckbox(const Vector2D& position, const Vector2D& size,
-                               bool checked, const Color& boxColor,
-                               const Color& checkColor, const Color& borderColor = Color(200U, 200U, 200U, 255U),
-                               bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
-                               const Vector2D& clipSize = {0.0f, 0.0f});
-
-        /**
-         * @brief Submit a GUI line (separator) to be rendered
-         * @param startPos Start position in screen space
-         * @param endPos End position in screen space
-         * @param color Line color
-         * @param thickness Line thickness in pixels
-         */
-        void SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
-                           const Color& color, float thickness = 1.0f,
-                           bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
-                           const Vector2D& clipSize = {0.0f, 0.0f});
+                            const Color& color, float cornerRadius = 0.0f);
+        void SubmitGUIImage(const Vector2D& position, const Vector2D& size,
+                            uint32_t textureId, const Vector4D& uvRect, const Color& color);
+        void SubmitGUIText(const Vector2D& position, const std::string& text,
+                           const std::string& fontPath, float pixelSize, const Color& color);
 
         // Call from editor when a tilemap should be rendered
-        void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
+        struct DebugTileMapEntry {
+            std::reference_wrapper<const TileMap> Map;
+            std::vector<const Tileset*> Tilesets;
+            glm::vec2 Offset;
+        };
+
+        void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);
+        void SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps);
         void ClearDebugTileMap();
+        void ClearDebugTileMaps();
 
     private:
         // ====================================================================
@@ -345,6 +334,8 @@ namespace ECS {
 
         std::optional<std::reference_wrapper<const TileMap>> m_debugTileMap;
         std::optional<std::reference_wrapper<const Tileset>> m_debugTileset;
+        glm::vec2 m_debugTileMapOffset = glm::vec2(0.0f, 0.0f); // World-space offset for debug tilemap rendering.
+        std::vector<DebugTileMapEntry> m_debugTileMaps; // Multiple tilemaps to render in the editor.
 
         TileMapRenderer m_tileMapRenderer; // value member, no pointer
 
@@ -366,34 +357,41 @@ namespace ECS {
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
 
-        // ====================================================================
-        // Member Variables - GUI Submissions
-        // ====================================================================
-        // GUI submissions are queued and rendered in screen-space during GUI pass
-        struct GUISubmission {
-            enum class Type { Panel, Text, Slider, Checkbox, Line };
-            Type type;
+        struct OverlayQuadSubmission {
+            glm::vec2 center;
+            glm::vec2 size;
+            GLuint textureId = 0;
+            glm::vec4 uvRect{0.0f, 0.0f, 1.0f, 1.0f};
+            glm::vec4 color{1.0f};
+            float rotation = 0.0f;
+        };
+        std::vector<OverlayQuadSubmission> m_overlayQuadQueue;
+
+        struct GUIPanelSubmission {
             Vector2D position;
             Vector2D size;
-            Vector2D startPos; // for lines
-            Vector2D endPos; // for lines
-            Vector2D clipPos;
-            Vector2D clipSize;
             Color color;
-            Color secondaryColor; // for sliders (handle color), checkboxes (check color)
-            Color borderColor; // for sliders, checkboxes
-            float cornerRadius; // for panels, sliders
-            float value; // for sliders (0.0-1.0)
-            float thickness; // for lines
-            bool checked; // for checkboxes
-            bool clipEnabled = false;
-            std::string fontPath; // for text
-            std::string text; // for text
-            float fontSize; // for text
-            Color shadowColor; // for text
-            Vector2D shadowOffset; // for text
+            float cornerRadius = 0.0f;
         };
-        std::vector<GUISubmission> m_guiSubmissionQueue;
+        std::vector<GUIPanelSubmission> m_guiPanelQueue;
+
+        struct GUITextSubmission {
+            Vector2D position;
+            std::string text;
+            std::string fontPath;
+            float pixelSize = 24.0f;
+            Color color;
+        };
+        std::vector<GUITextSubmission> m_guiTextQueue;
+
+        struct GUIImageSubmission {
+            Vector2D position;
+            Vector2D size;
+            uint32_t textureId = 0;
+            Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+            Color color;
+        };
+        std::vector<GUIImageSubmission> m_guiImageQueue;
 
         Graphics::LightManager m_lightManager;
 
@@ -401,18 +399,18 @@ namespace ECS {
         // Member Variables - Shaders
         // ====================================================================
 
-        std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
-        std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
-        std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
-        std::unique_ptr<Shader> m_blitShader;
-        glm::mat4 m_guiProjection = glm::identity<glm::mat4>();
-        glm::mat4 m_guiTextProjection = glm::identity<glm::mat4>();
-        float m_guiViewportHeight = 0.0f;
+        // MAKE IT SHARED SO THAT RM OWNS THE LIBRARY COPY AND THE SAME 
+        // TEXTURE/SHADER/FONT CAN BE REUSED WITHOUT DUPLICATING MEMORY
+
+        std::shared_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::shared_ptr<Shader> m_textShader;      ///< SDF text rendering shader
+        std::shared_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
+        std::shared_ptr<Shader> m_blitShader;
 
         // Post-process shaders
-        std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
-        std::unique_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
-        std::unique_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+        std::shared_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
+        std::shared_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
+        std::shared_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
 
         // ====================================================================
         // Member Variables - Object Picking
@@ -442,17 +440,8 @@ namespace ECS {
 
         std::optional<InFlightPick> m_inFlightPick;
 
-
-        // ====================================================================
-        // Member Variables - UI Scaling
-        // ====================================================================
-
-        /*!
-        \brief Reference resolution for UI design (1920x1080).
-        All UI elements are designed at this resolution and scaled proportionally.
-        */
-        static constexpr float kReferenceWidth = 1920.0f;
-        static constexpr float kReferenceHeight = 1080.0f;
+        Vector2D m_renderTargetSize{ 0.0f, 0.0f };
+        GUIViewport m_guiViewport{};
 
         // ====================================================================
         // Helper Methods - Camera
@@ -469,39 +458,23 @@ namespace ECS {
         bool GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize);
 
         // ====================================================================
-        // GUI Rendering - Internal Processing
+        // Viewport State
         // ====================================================================
+        std::vector<Viewport> m_viewports;
 
-        /**
-         * @brief Process all queued GUI submissions
-         * Called during render pass to render GUI elements
-         */
-        void ProcessGUISubmissions();
-
-        /**
-         * @brief Process a GUI panel submission
-         */
-        void ProcessGUIPanel(const GUISubmission& submission);
-
-        /**
-         * @brief Process a GUI text submission
-         */
-        void ProcessGUIText(const GUISubmission& submission);
-
-        /**
-         * @brief Process a GUI slider submission
-         */
-        void ProcessGUISlider(const GUISubmission& submission);
-
-        /**
-         * @brief Process a GUI checkbox submission
-         */
-        void ProcessGUICheckbox(const GUISubmission& submission);
-
-        /**
-         * @brief Process a GUI line submission
-         */
-        void ProcessGUILine(const GUISubmission& submission);
+        // ====================================================================
+        // Extracted Render Helpers (for multi-viewport)
+        // ====================================================================
+        void CollectLights(World& world);
+        void BucketEntities(World& world, std::vector<std::vector<Entity>>& buckets, int& maxLayerId);
+        void RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
+            const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
+        void RenderBloom(Viewport& vp, float bloomRadius);
+        void ToneMap(Viewport& vp);
+        void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
+        void RenderGUI(Viewport& vp);
+        void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
+            const std::vector<std::vector<Entity>>& buckets);
 
     };
 

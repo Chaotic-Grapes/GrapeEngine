@@ -3,7 +3,7 @@
 \file   AssetBrowserPanel.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   11th January 2026
 
 \brief
 Implements the AssetBrowserPanel which renders the asset browser UI.
@@ -359,18 +359,18 @@ void AssetBrowserPanel::_renderPrefabPopup() {
             // Show combo for template selection
             const char* currentTemplateName = nullptr;
             switch (m_selectedScriptTemplate) {
-                case Editor::Templates::ScriptTemplateType::BasicSystem:
-                    currentTemplateName = "BasicSystem";
-                    break;
-                case Editor::Templates::ScriptTemplateType::EditModeSystem:
-                    currentTemplateName = "EditModeSystem";
-                    break;
-                case Editor::Templates::ScriptTemplateType::HotReloadSystem:
-                    currentTemplateName = "HotReloadSystem";
-                    break;
-                case Editor::Templates::ScriptTemplateType::MetadataSystem:
-                    currentTemplateName = "MetadataSystem";
-                    break;
+            case Editor::Templates::ScriptTemplateType::BasicSystem:
+                currentTemplateName = "BasicSystem";
+                break;
+            case Editor::Templates::ScriptTemplateType::EditModeSystem:
+                currentTemplateName = "EditModeSystem";
+                break;
+            case Editor::Templates::ScriptTemplateType::HotReloadSystem:
+                currentTemplateName = "HotReloadSystem";
+                break;
+            case Editor::Templates::ScriptTemplateType::MetadataSystem:
+                currentTemplateName = "MetadataSystem";
+                break;
             }
 
             if (ImGui::BeginCombo("##ScriptTemplate", currentTemplateName)) {
@@ -566,6 +566,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                             }
                         }
                         m_selectedAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                     else {
                         // Normal click: single selection
@@ -573,6 +577,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         m_selectedAssets.insert(entryPath);
                         m_selectedAsset = entryPath;
                         m_anchorAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                 }
 
@@ -584,6 +592,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         m_selectedAssets.insert(entryPath);
                         m_selectedAsset = entryPath;
                         m_anchorAsset = entryPath;
+                        if (m_selectionCallback) {
+                            // Notify listeners that the active asset selection changed.
+                            m_selectionCallback(m_selectedAsset);
+                        }
                     }
                     ImGui::OpenPopup("ItemContextMenu");
                 }
@@ -712,7 +724,7 @@ void AssetBrowserPanel::_renderDeleteButton() {
 
 // Render the status bar and update its timer
 void AssetBrowserPanel::_renderStatusBar() {
-	constexpr float statusBarHeight = 24.0f;
+    constexpr float statusBarHeight = 24.0f;
     ImGui::BeginChild("StatusBar", ImVec2(0, statusBarHeight), false, ImGuiWindowFlags_NoScrollbar);
 
     // Pick text color based on whether the message indicates failure
@@ -777,14 +789,21 @@ void AssetBrowserPanel::_loadPrefab() {
                 std::filesystem::path p(m_selectedAsset);
                 std::string normalizedPath = p.lexically_normal().string();
 
-                uint32_t hash = ECS::PrefabManager::ComputeHash(
-                    ECS::PrefabManager::NormalizePath(normalizedPath)
-                );
+                uint32_t hash = 0;
+                ECS::PrefabManager* prefabManager = m_world->GetPrefabManager();
+                if (prefabManager) {
+                    hash = prefabManager->RegisterPrefab(normalizedPath);
+                    prefabManager->TrackInstance(entity, hash);
+                } else {
+                    hash = ECS::PrefabManager::ComputeHash(
+                        ECS::PrefabManager::NormalizePath(normalizedPath)
+                    );
+                }
 
                 ECS::Components::PrefabInstanceMetadata meta;
                 meta.PrefabHash = hash;
                 meta.Flags = 0;
-                Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
+                m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                 // Log info and update status message on successful load
                 LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
@@ -1063,7 +1082,7 @@ void AssetBrowserPanel::_createScript() {
     }
 
     // Replace separators with dots and sanitize a few problematic chars
-    for (char &c : ns) {
+    for (char& c : ns) {
         if (c == '/' || c == '\\')
             c = '.';
         else if (c == ':' || c == ' ')
@@ -1172,34 +1191,17 @@ void AssetBrowserPanel::_createFolder() {
     std::string folderName = m_newAssetNameBuffer;
     std::filesystem::path folderPath = std::filesystem::path(m_currentPath) / folderName;
 
-    // Check if folder already exists
-    if (exists(folderPath)) {
-        m_statusMessage = "Folder already exists: " + folderName;
+    // Use ResourceManager to create directory
+    if (RM.CreateDirectory(folderPath.string())) {
+        m_statusMessage = "Created folder: " + folderName;
         m_statusTimer = 3.0f;
-        LOG_WARNING("Folder already exists: " << folderPath.string());
-        return;
-    }
 
-    // Create the folder
-    try {
-        if (create_directory(folderPath)) {
-            m_statusMessage = "Created folder: " + folderName;
-            m_statusTimer = 3.0f;
-            LOG_INFO("Created folder: " << folderPath.string());
-
-            // Select the newly created folder
-            m_selectedAsset = folderPath.string();
-        }
-        else {
-            m_statusMessage = "Failed to create folder: " + folderName;
-            m_statusTimer = 3.0f;
-            LOG_ERROR("Failed to create folder: " << folderPath.string());
-        }
+        // Select the newly created folder
+        m_selectedAsset = folderPath.string();
     }
-    catch (const std::exception& e) {
-        m_statusMessage = "Error creating folder: " + std::string(e.what());
+    else {
+        m_statusMessage = "Failed to create folder: " + folderName;
         m_statusTimer = 3.0f;
-        LOG_ERROR("Exception creating folder: " << e.what());
     }
 }
 
@@ -1247,20 +1249,9 @@ void AssetBrowserPanel::_deleteSelectedAssets() {
 
     size_t deleteCount = 0;
     for (const auto& assetPath : m_selectedAssets) {
-        try {
-            std::filesystem::path path(assetPath);
-            if (exists(path)) {
-                if (is_directory(path)) {
-                    remove_all(path);
-                }
-                else {
-                    std::filesystem::remove(path);
-                }
-                deleteCount++;
-            }
-        }
-        catch (const std::exception& e) {
-            LOG_ERROR("Failed to delete " << assetPath << ": " << e.what());
+        // Use ResourceManager to delete the asset (handles cache cleanup automatically)
+        if (RM.DeleteAsset(assetPath)) {
+            deleteCount++;
         }
     }
 
@@ -1427,14 +1418,10 @@ void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& a
                 } while (std::filesystem::exists(destPath));
             }
 
-            if (std::filesystem::is_directory(srcPath)) {
-                std::filesystem::copy(srcPath, destPath,
-                    std::filesystem::copy_options::recursive);
+            // Use ResourceManager to add the asset (handles both files and directories)
+            if (RM.AddAsset(srcPath.string(), destPath.string())) {
+                copyCount++;
             }
-            else {
-                std::filesystem::copy_file(srcPath, destPath);
-            }
-            copyCount++;
         }
         catch (const std::exception& e) {
             LOG_ERROR("Failed to copy " << assetPath << ": " << e.what());

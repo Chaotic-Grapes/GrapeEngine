@@ -29,6 +29,8 @@
 #include <memory>
 #include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
+#include "audio/AudioEngine.h"
+#include "audio/AudioCueRegistry.h"
 #include "core/messaging/MessageSystem.h"
 #include "services/DeviceManager.h"
 
@@ -71,6 +73,14 @@ namespace Services {
 		// Const raw device pointer for read-only queries
 		const Audio::FmodAudioDevice* Device() const { return m_device.get(); }
 
+		// High-level audio engine (mixing/fades/policy)
+		Audio::AudioEngine* Engine() { return m_engine.get(); }
+		const Audio::AudioEngine* Engine() const { return m_engine.get(); }
+
+		// Shared cue registry for CueId/path resolution
+		Audio::AudioCueRegistry& CueRegistry() { return m_cueRegistry; }
+		const Audio::AudioCueRegistry& CueRegistry() const { return m_cueRegistry; }
+
 
 		// -----------------------------------------------------------------
 		// Convenience pass-throughs (most callers do not need raw device)
@@ -79,22 +89,27 @@ namespace Services {
 
 		// Load (or reuse) a cue by id and file path
 		bool LoadCue(const std::string& cueId, const std::string& path, const Audio::SoundParams& p) const {
-			return m_device->LoadCue(cueId, path, p);
+			return m_engine ? m_engine->LoadCue(cueId, path, p) : false;
 		}
 
 
 		// Play a previously-loaded cue with per-call settings
-		Audio::PlaybackHandle Play(const std::string& cueId, const Audio::PlaySettings& s) const {
-			return m_device->Play(cueId, s);
+		Audio::PlaybackHandle Play(const std::string& cueId, const Audio::PlaySettings& s, Audio::Bus bus = Audio::Bus::SFX) const {
+			return m_engine ? m_engine->Play(cueId, s, bus) : Audio::PlaybackHandle{};
 		}
 
 
 		//Stop a playing instance immediately or with a fade policy
-		void Stop(const Audio::PlaybackHandle handle, Audio::StopMode mode) const { m_device->Stop(handle, mode); }
+		void Stop(const Audio::PlaybackHandle handle, Audio::StopMode mode) const { if (m_engine) m_engine->Stop(handle, mode); }
 
 		// Pause/Resume all audio
-		void PauseAll() const { m_device->PauseAll(); }
-		void ResumeAll() const { m_device->ResumeAll(); }
+		void PauseAll() const { if (m_device) m_device->PauseAll(); }
+		void ResumeAll() const { if (m_device) m_device->ResumeAll(); }
+
+		// Mixer controls
+		void SetBusVolume(Audio::Bus bus, float volume) const { if (m_engine) m_engine->SetBusVolume(bus, volume); }
+		float GetBusVolume(Audio::Bus bus) const { return m_engine ? m_engine->GetBusVolume(bus) : 1.0f; }
+		void FadeBusVolume(Audio::Bus bus, float targetVolume, float duration) const { if (m_engine) m_engine->FadeBusVolume(bus, targetVolume, duration); }
 
 
 		// -----------------------------------------------------------------
@@ -143,6 +158,8 @@ namespace Services {
 	private:
 		// Owns the FMOD-backed device; created in Initialize(), destroyed in Terminate().
 		std::unique_ptr<Audio::FmodAudioDevice> m_device;
+		std::unique_ptr<Audio::AudioEngine> m_engine;
+		Audio::AudioCueRegistry m_cueRegistry;
 
 		// Window focus handling for audio muting
 		Messaging::SubscriptionHandle m_focusHandle;

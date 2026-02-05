@@ -147,6 +147,19 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Configure the next scene change to trigger audio transitions.
+    /// </summary>
+    /// <param name="fadeDuration">Duration of fade in seconds (0 for immediate stop).</param>
+    /// <param name="allowCrossfade">True to allow overlap between old and new audio.</param>
+    public void SetNextAudioTransition(float fadeDuration, bool allowCrossfade)
+    {
+        unsafe
+        {
+            SceneAPI.SetNextAudioTransition(_sceneManagerPtr, fadeDuration, allowCrossfade);
+        }
+    }
+
+    /// <summary>
     /// Gets the currently active scene.
     /// </summary>
     /// <returns>The active scene, or null if none is active.</returns>
@@ -200,6 +213,7 @@ public class SceneManager
             return SceneAPI.GetPendingIndex(_sceneManagerPtr);
         }
     }
+
 
     /// <summary>
     /// Updates the scene manager and processes any pending scene transitions.

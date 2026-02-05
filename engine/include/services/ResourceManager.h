@@ -3,14 +3,14 @@
 \file   ResourceManager.h
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   11th January 2026
 \brief
 Defines the ResourceManager class for loading, caching and managing game
-assets (textures, audio files and fonts).
+assets (textures, audio files, fonts, shaders and prefabs).
 
 Features:
 - Template-based asset retrieval with automatic caching
-- Support for Texture, AudioData, and Font asset types
+- Support for Texture, AudioData, Font, Shader, and PrefabData asset types
 - Cache management utilities (clear, unload, size tracking)
 - File validation and error handling with logging
 - Global singleton instance (RM) for engine-wide access
@@ -18,6 +18,8 @@ Features:
 Usage:
   auto texture = RM.Get<Texture>("assets/player.png");
   auto audio = RM.Get<AudioData>("assets/music.wav");
+  auto shader = RM.Get<Shader>("assets/shaders/sprite");
+  auto prefab = RM.Get<PrefabData>("assets/prefabs/enemy.prefab");
 
   auto font = RM.Get<Font>("assets/arial.ttf");           // Default 48px
   auto bigFont = RM.GetFont("assets/arial.ttf", 72);      // Custom size
@@ -30,6 +32,7 @@ Usage:
 
 #ifndef RESOURCE_MANAGER_H
 #define RESOURCE_MANAGER_H
+
 #include "Export.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -40,6 +43,7 @@ Usage:
 #include <glad/glad.h>
 #include "graphics/Texture.hpp"
 #include "graphics/Font.hpp"
+#include "graphics/Shader.hpp"
 
 // A struct is created for audio data since there's no audio class
 struct AudioData {
@@ -49,8 +53,23 @@ struct AudioData {
     bool IsValid = false;       // Flag indicating if the audio data was loaded successfully
 };
 
+// Prefab data structure for storing serialized prefab content
+struct PrefabData {
+    std::string Path;           // Original file path of the prefab
+    std::string JsonContent;    // Raw JSON content from the .prefab file
+    bool IsValid = false;       // Flag indicating if the prefab was loaded successfully
+};
+
+// Raw data structure for generic file loading
+// THIS IS FOR IMGUI FONT LOADING BECAUSE IT WANTS RAW BYTES
+struct RawData {
+    std::vector<uint8_t> Data;  // Raw file data
+    std::string Path;           // File path
+    bool IsValid = false;       // Success flag
+};
+
 // Centralized resource management system for game assets
-// Supports textures, audio and fonts
+// Supports textures, audio, fonts, shaders and prefabs
 class GRAPEENGINE_API ResourceManager {
 public:
     // Default constructor
@@ -58,13 +77,16 @@ public:
 
     // Default destructor
     ~ResourceManager() = default;
-    
+
     // Storage vector for cached string paths
     std::vector<std::string> ListCachedAudioPaths() const;
 
     // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
+
+    // Load shader from vertex and fragment paths that don't have the same base name
+    std::shared_ptr<Shader> GetShader(const std::string& vertexPath, const std::string& fragmentPath);
 
     // Load font with specified size (allows same font at different sizes)
     std::shared_ptr<Font> GetFont(const std::string& name, int pixelSize = 48);
@@ -84,6 +106,18 @@ public:
     // Check if a specific asset is already cached
     bool IsAssetCached(const std::string& name) const;
 
+    // File System Operations (Editor Support)
+    // Import/add an asset file to the project (copies to assets directory)
+    bool AddAsset(const std::string& sourcePath, const std::string& destPath);
+
+    // Delete an asset file from the project (removes from disk and cache)
+    bool DeleteAsset(const std::string& assetPath);
+
+    // Replace an existing asset with a new file (keeps same path)
+    bool ReplaceAsset(const std::string& assetPath, const std::string& newSourcePath);
+
+    // Create a new empty directory
+    bool CreateDirectory(const std::string& path);
     // Sets the current owner tag for asset tracking (e.g., scene id)
     void SetOwnerTag(const std::string& ownerTag);
 
@@ -122,11 +156,17 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
     std::unordered_map<std::string, std::shared_ptr<AudioData>> m_audioFiles;
     std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
+    std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders;
+    std::unordered_map<std::string, std::shared_ptr<PrefabData>> m_prefabs;
+    std::unordered_map<std::string, std::shared_ptr<RawData>> m_rawData;
 
     // Asset owners per type (asset path/cache key -> set of owner tags)
     std::unordered_map<std::string, std::unordered_set<std::string>> m_textureOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_audioOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_fontOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_shaderOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_prefabOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_rawDataOwners;
 
     std::string m_ownerTag;
 };
