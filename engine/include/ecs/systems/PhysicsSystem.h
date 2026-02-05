@@ -17,8 +17,27 @@
 #include "ecs/ComponentAccessAttribute.h"
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <functional>
 
 namespace ECS {
+    struct PackedEntityPair {
+        PackedEntityId A{};
+        PackedEntityId B{};
+
+        bool operator==(const PackedEntityPair& other) const {
+            return A == other.A && B == other.B;
+        }
+    };
+
+    struct PackedEntityPairHash {
+        size_t operator()(const PackedEntityPair& pair) const noexcept {
+            const size_t h1 = std::hash<uint64_t>{}(pair.A);
+            const size_t h2 = std::hash<uint64_t>{}(pair.B);
+            return h1 ^ (h2 + 0x9e3779b97f4a7c15ull + (h1 << 6) + (h1 >> 2));
+        }
+    };
+
     /**
      * @brief System that handles 2D physics simulation with broad/narrow-phase collision
      * Executes in Physics phase with executionOrder=0
@@ -38,8 +57,8 @@ namespace ECS {
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
     private:
-        std::unordered_set<uint64_t> m_previousCollisions;
-        std::unordered_set<uint64_t> m_previousTriggerOverlaps;
+        std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousCollisions;
+        std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousTriggerOverlaps;
     };
 }
 

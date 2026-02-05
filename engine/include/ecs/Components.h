@@ -495,6 +495,8 @@ namespace ECS {
 
             // Basics
             uint32_t CueId = 0;
+            // Persistent cue path ID (StringTable). 0 = invalid.
+            uint32_t CuePathId = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;

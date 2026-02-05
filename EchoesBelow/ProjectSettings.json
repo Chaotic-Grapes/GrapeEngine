@@ -3,7 +3,7 @@
         "Gravity": -9.8100004196167,
         "TimeStep": 0.01600000075995922
     },
-    "StartupScene": "EchoesBelow/Scenes/MainScene.scn",
+    "StartupScene": "EchoesBelow/Scenes/M4.scn",
     "Title": "Echoes Below",
     "Version": "1.0.0",
     "WindowSettings": {

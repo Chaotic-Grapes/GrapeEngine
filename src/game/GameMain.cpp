@@ -15,6 +15,10 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include <cstring>
 #include <filesystem>
 #include <vector>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
 #include "core/Logger.h"
@@ -22,8 +26,28 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include "platform/IPlatformContext.h"
 #include "physics/Physics.h"
 #include "scene/SceneManager.h"
+#include "scripting/ScriptManager.h"
+
+extern "C" {
+    // Request high-performance GPU
+    __declspec(dllexport) unsigned long NvOptimusEnablement         = 1;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance  = 1;
+}
 
 namespace {
+    std::filesystem::path GetExecutableDir() {
+#ifdef _WIN32
+        wchar_t buffer[MAX_PATH]{};
+        const DWORD len = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(std::size(buffer)));
+        if (len == 0 || len >= std::size(buffer)) {
+            return std::filesystem::current_path();
+        }
+        return std::filesystem::path(buffer).parent_path();
+#else
+        return std::filesystem::current_path();
+#endif
+    }
+
     std::string GetProjectRootFromArgs(int argc, char** argv) {
         for (int i = 1; i < argc; ++i) {
             if (std::strcmp(argv[i], "--project") == 0 || std::strcmp(argv[i], "-project") == 0) {
@@ -144,6 +168,22 @@ int main(int argc, char** argv) {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
+    // Load gameplay scripts (GameScripts.dll) before scene load so managed components register.
+    bool gameScriptsLoaded = false;
+    if (auto* scriptManager = engine.GetScriptManager(); scriptManager && scriptManager->IsInitialized()) {
+        const std::filesystem::path scriptsPath =
+            GetExecutableDir() / "GameScripts.dll";
+        if (std::filesystem::exists(scriptsPath)) {
+            if (!scriptManager->LoadAssembly(scriptsPath.string())) {
+                LOG_WARNING("Failed to load GameScripts.dll from: " << scriptsPath.string());
+            } else {
+                gameScriptsLoaded = true;
+            }
+        } else {
+            LOG_WARNING("GameScripts.dll not found at: " << scriptsPath.string());
+        }
+    }
+
     // Load startup scene
     const std::string& startupScene = projectSettings.StartupScene;
     if (startupScene.empty()) {
@@ -164,15 +204,47 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Ensure the startup scene is active before the first frame update.
+    sceneManager.SetActiveImmediate(sceneIndex);
+
+    // Register scripted systems after the scene world exists.
+    if (auto* scriptManager = engine.GetScriptManager(); scriptManager && scriptManager->IsInitialized()) {
+        const std::filesystem::path scriptsPath =
+            GetExecutableDir() / "GameScripts.dll";
+        const bool scriptsAvailable = std::filesystem::exists(scriptsPath);
+        if (!scriptsAvailable) {
+            LOG_WARNING("GameScripts.dll not found at: " << scriptsPath.string());
+        } else if (gameScriptsLoaded || scriptManager->LoadAssembly(scriptsPath.string())) {
+            ECS::World& world = scene->GetWorld();
+            int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager(), &world);
+            engine.GetSystemManager().BuildDependencyGraphs();
+            LOG_INFO("Registered " << systemCount << " scripted systems from " << scriptsPath.string());
+        }
+    }
+
+    engine.GetSystemManager().OnSceneStart(scene->GetWorld());
+
     // Game main loop
     while (engine.IsRunning()) {
-        // Update engine (all game systems run)
+        // ============================
+        // BEGIN FRAME
+        // ============================
+
+        // ============================
+        // UPDATE
+        // ============================
         engine.Update();
 
-        // Swap buffers
+        // ============================
+        // RENDER
+        // ============================
         for (auto* win : platformContext->GetAllWindows()) {
             win->SwapBuffers();
         }
+
+        // ============================
+        // END FRAME
+        // ============================
     }
 
     // Shutdown
@@ -183,7 +255,6 @@ int main(int argc, char** argv) {
 }
 
 #ifdef _WIN32
-#include <windows.h>
 // WinMain shim: when linked as a GUI/Windows subsystem the linker expects WinMain.
 // Provide a small wrapper that forwards to the regular `main()` function so the
 // same code works for both console and GUI subsystems.

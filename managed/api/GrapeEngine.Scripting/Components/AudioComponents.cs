@@ -9,6 +9,7 @@ Audio-related ECS component types.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Services;
 
 namespace GrapeEngine.Scripting.Components;
@@ -18,6 +19,7 @@ public record struct AudioSource(uint CueId)
 {
     // Basics
     public uint CueId = CueId;
+    public StringId CuePathId;
     public float Volume = 1.0f;
     public float Pitch = 1.0f;
     public bool Loop = false;
