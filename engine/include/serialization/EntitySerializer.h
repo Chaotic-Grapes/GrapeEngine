@@ -714,20 +714,33 @@ namespace Serialization {
 		template<typename T>
 		static void RegisterComponent(const char* name) {
 			const uint32_t typeHash = Serialization::FNV1aHash(name);
-			// Capture the concrete component id so serialization does not depend on hash registration order.
+			// Capture the concrete component id so serialization does not depend on hash registration order
 			const ECS::ComponentTypeId componentId = ECS::ComponentRegistry::Type<T>();
+			// Special case: For TileMapComponent, always use the captured component ID
+			const bool useCapturedIdOnly = (name && std::strcmp(name, "TileMapComponent") == 0);
+			// Resolver lambda
+			auto resolveId = [typeHash, componentId, useCapturedIdOnly]() -> ECS::ComponentTypeId {
+				if (useCapturedIdOnly) {
+					return componentId;
+				}
+				return ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+			};
+			// Register the component info
 			Registry()[typeHash] = ComponentInfo{
 				name,
 				typeHash,
 				// Serialize
-				[componentId](const ECS::World& world, ECS::Entity e, json& j) {
-					if (componentId == ECS::NULL_COMPONENT_ID) {
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](const ECS::World& world, ECS::Entity e, json& j) {
+					const ECS::ComponentTypeId id = resolveId();
+					if (id == ECS::NULL_COMPONENT_ID) {
 						j = nullptr;
 						return;
 					}
 
-					if (world.HasById(e, componentId)) {
-						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, componentId);
+					// Check if entity has the component
+					if (world.HasById(e, id)) {
+						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, id);
 						if (ptr) {
 							const T& component = *static_cast<const T*>(ptr);
 							Serialization::to_json_adl<T>(j, component);
@@ -738,33 +751,42 @@ namespace Serialization {
 					j = nullptr;
 				},
 				// Deserialize
-				[componentId](ECS::World& world, ECS::Entity e, const json& j) {
-					if (componentId == ECS::NULL_COMPONENT_ID) {
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](ECS::World& world, ECS::Entity e, const json& j) {
+					const ECS::ComponentTypeId id = resolveId();
+					if (id == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
 
 					T value = Serialization::from_json_adl<T>(j);
-					void* ptr = world.GetRawComponentPtr(e, componentId);
+					void* ptr = world.GetRawComponentPtr(e, id);
 					if (ptr) {
 						*static_cast<T*>(ptr) = value;
 					}
 					else {
-						world.AddComponentById(e, componentId, &value, sizeof(T));
+						// Component not present, add it
+						world.AddComponentById(e, id, &value, sizeof(T));
 					}
 				},
 				// Has
-				[componentId](const ECS::World& world, ECS::Entity e) -> bool {
-					if (componentId == ECS::NULL_COMPONENT_ID) {
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](const ECS::World& world, ECS::Entity e) -> bool {
+					const ECS::ComponentTypeId id = resolveId();
+					if (id == ECS::NULL_COMPONENT_ID) {
 						return false;
 					}
-					return world.HasById(e, componentId);
+					// Check presence by ID
+					return world.HasById(e, id);
 				},
 				// Remove
-				[componentId](ECS::World& world, ECS::Entity e) {
-					if (componentId == ECS::NULL_COMPONENT_ID) {
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](ECS::World& world, ECS::Entity e) {
+					const ECS::ComponentTypeId id = resolveId();
+					if (id == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
-					world.RemoveById(e, componentId);
+					// Remove by ID
+					world.RemoveById(e, id);
 				}
 			};
 		}
