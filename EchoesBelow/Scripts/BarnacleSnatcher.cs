@@ -22,9 +22,9 @@ public record struct BarnacleSnatcherComponent
     public int IdleFrameCount = 58;
     public float IdleFps = 24.0f;
     public int AnimRow = 26;
-    public int IdleFrameOffset = 19;
+    public int IdleFrameOffset = 0;
     public int IdleFrameLength = 60;
-    public int AttackStartFrame = 3;
+    public int AttackStartFrame = 60;
     public int AttackFrameCount = 18;
     public float AttackFps = 24.0f;
     public int AttackFrameOffset = 0;
