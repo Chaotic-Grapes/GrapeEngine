@@ -628,7 +628,23 @@ void PerformancePanel::_renderMemoryBenchmark() {
     ImGui::SameLine();
 
     // Run test with 10,000 allocations between 16 and 1024 bytes
+	// Style button to match frame background
+    const ImVec4 btnColor = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+
+	// Hover and active colors
+    const ImVec4 btnHover = ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered);
+    const ImVec4 btnActive = ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive);
+
+	// Style button colors
+    ImGui::PushStyleColor(ImGuiCol_Button, btnColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, btnHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, btnActive);
+
+	// On button press, run benchmark and store last test time
     if (ImGui::Button(btnLabel)) m_lastTestTime = MemoryManager::GetInstance().Benchmark(m_useCustomAllocator, 10000, 16, 1024);
+    
+	// Pop button style colors
+    ImGui::PopStyleColor(3);
 
     // Tooltip for button
     if (ImGui::IsItemHovered()) {

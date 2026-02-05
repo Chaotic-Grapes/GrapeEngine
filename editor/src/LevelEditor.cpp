@@ -966,9 +966,7 @@ void LevelEditor::_refreshTileMapCache() {
 
         std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
         const std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path.
-        LOG_INFO("[TileMap] Refresh entity " << entity.Index
-            << " mapPath=\"" << mapPath
-            << "\" legacyTileset=\"" << legacyTilesetPath << "\"");
+        (void)legacyTilesetPath;
 
         if (mapPath.empty() && !scenePath.empty()) {
             // Derive a tilemap path from the saved scene path when none exists.
@@ -1015,12 +1013,6 @@ void LevelEditor::_refreshTileMapCache() {
             entry.TileWorldSize != comp.TileWorldSize ||
             entry.DefaultWidth != comp.DefaultWidth ||
             entry.DefaultHeight != comp.DefaultHeight;
-        LOG_INFO("[TileMap] Cache state entity " << entity.Index
-            << " mapNeedsReload=" << (mapNeedsReload ? "true" : "false")
-            << " entryMapPath=\"" << entry.MapPath << "\""
-            << " hasMap=" << (entry.Map ? "true" : "false")
-            << " missingTilesetList=" << (missingTilesetList ? "true" : "false")
-            << " generationChanged=" << (generationChanged ? "true" : "false"));
 
         if (mapNeedsReload) {
             entry.Map = mapPath.empty() ? nullptr : LoadOrCreateTileMap(mapPath, comp.TileWorldSize, comp.DefaultWidth, comp.DefaultHeight);
@@ -1059,8 +1051,6 @@ void LevelEditor::_refreshTileMapCache() {
         }
 
         const std::vector<std::string>& mapTilesetPaths = entry.Map->GetTilesetPaths();
-        LOG_INFO("[TileMap] Map tileset paths entity " << entity.Index
-            << " count=" << mapTilesetPaths.size());
         if (legacyTilesetPath.empty() && !mapTilesetPaths.empty()) {
             // Keep the legacy component field in sync so scenes retain a usable tileset path.
             comp.TilesetTexturePath = ECS::StringTable::Intern(mapTilesetPaths.front());
