@@ -1182,24 +1182,26 @@ void LevelEditor::_renderTilemapCreateModal() {
 
         if (ImGui::Button("Create Tilemap", ImVec2(160, 0))) {
             if (m_world && !m_pendingTilesetPath.empty()) {
-                ECS::Entity target = m_world->Create();
+				// Create a new tilemap entity and apply the pending tileset
+                const EntityId newId = m_entityActions.AddEntity("Tilemap", ECS::Entity::NPOS32);
 
-                ECS::Components::Name name;
-                name.Value = ECS::StringTable::Intern("Tilemap");
-                m_world->Set<ECS::Components::Name>(target, name);
+				// Add TileMapComponent with default settings
+                ECS::Entity target = m_world->Resolve(newId);
 
-                ECS::Components::LocalTransform transform;
-                m_world->Set<ECS::Components::LocalTransform>(target, transform);
-
-                _applyTilesetToTilemap(target, m_pendingTilesetPath);
-
-                m_hierarchyWindow.SetSelectedEntity(target.Index);
-                m_inspector.InspectEntity(target.Index);
+				// If the entity is valid
+                if (m_world->IsAlive(target)) {
+					// Add TileMapComponent with default values
+                    _applyTilesetToTilemap(target, m_pendingTilesetPath);
+					// Select the new entity in the hierarchy and inspector
+                    m_hierarchyWindow.SetSelectedEntity(target.Index);
+                    m_inspector.InspectEntity(target.Index);
+                }
+				// Also select in viewports
                 if (m_sceneViewport.HasValidWorld()) {
-                    m_sceneViewport.SetSelectedEntity(target.Index);
+                    m_sceneViewport.SetSelectedEntity(newId);
                 }
                 if (m_gameViewport.HasValidWorld()) {
-                    m_gameViewport.SetSelectedEntity(target.Index);
+                    m_gameViewport.SetSelectedEntity(newId);
                 }
             }
 
