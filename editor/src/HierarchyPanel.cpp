@@ -251,12 +251,63 @@ void HierarchyPanel::Render() {
                     for (EntityId childId : children) {
                         collectRecursive(childId);
                     }
-                    };
+                };
                 collectRecursive(id);
 
+                // Snapshot entity handles before deletion for robust cleanup checks
+                const ECS::Entity rootHandle = m_world->Resolve(id);
+
+				// Check if root entity is still alive before deletion
+                const bool rootWasAlive = m_world->IsAlive(rootHandle);
+
+                // Pre-resolve handles to avoid issues during deletion
+                std::vector<ECS::Entity> deleteHandles;
+                deleteHandles.reserve(allDeletedIds.size());
+
+				// Resolve all entity handles
+                for (EntityId deletedId : allDeletedIds) {
+                    ECS::Entity handle = m_world->Resolve(deletedId);
+					// Only track alive entities for deletion
+                    if (m_world->IsAlive(handle)) {
+                        deleteHandles.push_back(handle);
+                    }
+                }
+
                 // Perform the deletion (this destroys parent + all children)
+                bool removed = false;
                 if (m_entityActions) {
-                    m_entityActions->RemoveEntity(id);
+                    removed = m_entityActions->RemoveEntity(id);
+                }
+
+                // If any tracked handles are still alive, force cleanup in this world
+                bool anyAlive = false;
+                for (const auto& handle : deleteHandles) {
+                    if (m_world->IsAlive(handle)) {
+                        anyAlive = true;
+                        break;
+                    }
+                }
+
+				// If any entities are still alive, destroy them now
+                if (anyAlive) {
+					// Record undo for root entity deletion if applicable
+                    if (!removed && m_undoSystem) {
+                        if (rootWasAlive && m_world->IsAlive(rootHandle)) {
+                            m_undoSystem->RecordEntityDeletion(id);
+                        }
+                    }
+
+					// Destroy in reverse order to safely remove children before parents
+                    for (auto it = deleteHandles.rbegin(); it != deleteHandles.rend(); ++it) {
+                        if (m_world->IsAlive(*it)) {
+                            m_world->Destroy(*it);
+                        }
+                    }
+
+					// Mark scene dirty after forced cleanup
+                    if (m_fileMenu) {
+                        m_fileMenu->MarkSceneDirty();
+                    }
                 }
 
                 // Remove ALL deleted entities from selection

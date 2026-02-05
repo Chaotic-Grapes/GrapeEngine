@@ -97,12 +97,12 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
 }
 
 // Delete an entity and all its children from the scene
-void EntityActions::RemoveEntity(EntityId id) {
-    if (!m_scene) return;
+bool EntityActions::RemoveEntity(EntityId id) {
+    if (!m_scene) return false;
     ECS::World& world = m_scene->GetWorld();
 
     ECS::Entity entity = world.Resolve(id);
-    if (entity.IsNull() || !world.IsAlive(entity)) return;
+    if (entity.IsNull() || !world.IsAlive(entity)) return false;
 
     // Record for undo system BEFORE deletion so the entity still exists for snapshotting
     if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
@@ -134,6 +134,7 @@ void EntityActions::RemoveEntity(EntityId id) {
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
+    return true;
 }
 
 
