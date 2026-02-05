@@ -441,6 +441,8 @@ namespace ECS {
 
         Vector2D m_renderTargetSize{ 0.0f, 0.0f };
         GUIViewport m_guiViewport{};
+        float m_windowAspectRatio = 0.0f;
+        bool m_windowAspectDirty = false;
 
         // ====================================================================
         // Helper Methods - Camera

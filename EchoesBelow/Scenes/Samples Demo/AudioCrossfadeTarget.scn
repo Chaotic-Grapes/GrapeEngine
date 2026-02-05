@@ -105,7 +105,7 @@
                 {
                     "Data": {
                         "Bus": 1,
-                        "CueId": 3383159033,
+                        "CuePath": "EchoesBelow/Assets/Obelisk_Chapter_5&6_BGM_Loop.wav",
                         "EnableFadeIn": true,
                         "EnableFadeOut": true,
                         "FadeInDuration": 2.0,
@@ -216,6 +216,6 @@
             "visible": true
         }
     ],
-    "SceneName": "Scene",
+    "SceneName": "AudioCrossfadeTarget",
     "Version": "1.0"
 }

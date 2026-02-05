@@ -127,12 +127,12 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.7040280103683472,
-                        "FOV": 45.0,
+                        "AspectRatio": 1.3412127494812012,
+                        "FOV": 140.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
-                        "OrthoSize": 2.0,
-                        "UsePerspective": false
+                        "OrthoSize": 5.0,
+                        "UsePerspective": true
                     },
                     "TypeName": "Camera3D"
                 },
@@ -220,7 +220,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 32,
+                        "TextureId": 16,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\StartMenuBG_1.png",
                         "Tiling": {
                             "X": 1.0,
@@ -328,7 +328,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 33,
+                        "TextureId": 18,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\EchoesBelowTitleCard.png",
                         "Tiling": {
                             "X": 1.0,
@@ -352,6 +352,92 @@
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.2999999523162842,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "GlobalLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.7349420785903931,
+                            "G": 0.0,
+                            "R": 0.9228070378303528
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": -3.5999999046325684
+                        },
+                        "Intensity": 2.0,
+                        "LightType": 0,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Range": 10.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
                             "m23": 0.0,
                             "m30": 0.0,
                             "m31": 0.0,
@@ -423,7 +509,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 34,
+                        "TextureId": 19,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.02083333395421505,
@@ -448,7 +534,7 @@
                         "SheetHeight": 298,
                         "SheetWidth": 21216,
                         "StartFrame": 0,
-                        "TextureId": 34,
+                        "TextureId": 19,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\WavyCorals_SpriteSheet01_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -546,7 +632,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 34,
+                        "TextureId": 19,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.02083333395421505,
@@ -571,7 +657,7 @@
                         "SheetHeight": 298,
                         "SheetWidth": 21216,
                         "StartFrame": 0,
-                        "TextureId": 34,
+                        "TextureId": 19,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\WavyCorals_SpriteSheet01_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -606,92 +692,6 @@
                         "ZOrder": -5
                     },
                     "TypeName": "ZIndex2D"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "GlobalLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.7349420785903931,
-                            "G": 0.0,
-                            "R": 0.9228070378303528
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": -3.5999999046325684
-                        },
-                        "Intensity": 2.0,
-                        "LightType": 0,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Range": 10.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -788,9 +788,21 @@
                 {
                     "Data": {
                         "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
                         "Position": {
-                            "X": 120.0,
-                            "Y": 330.0
+                            "X": 400.0,
+                            "Y": 930.0
                         },
                         "Size": {
                             "X": 320.0,
@@ -877,9 +889,21 @@
                 {
                     "Data": {
                         "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
                         "Position": {
-                            "X": 211.0,
-                            "Y": 394.0
+                            "X": 500.0,
+                            "Y": 933.0
                         },
                         "Size": {
                             "X": 100.0,
@@ -900,7 +924,10 @@
                         },
                         "FontPath": "",
                         "FontSize": 75.0,
-                        "Text": "Start"
+                        "HAlign": 0,
+                        "Text": "Start",
+                        "VAlign": 0,
+                        "Wrap": false
                     },
                     "TypeName": "GUIText"
                 },
@@ -968,9 +995,21 @@
                 {
                     "Data": {
                         "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
                         "Position": {
-                            "X": 544.0,
-                            "Y": 330.0
+                            "X": 800.0,
+                            "Y": 930.0
                         },
                         "Size": {
                             "X": 320.0,
@@ -1057,9 +1096,21 @@
                 {
                     "Data": {
                         "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
                         "Position": {
-                            "X": 627.0,
-                            "Y": 394.0
+                            "X": 900.0,
+                            "Y": 930.0
                         },
                         "Size": {
                             "X": 100.0,
@@ -1080,7 +1131,10 @@
                         },
                         "FontPath": "",
                         "FontSize": 75.0,
-                        "Text": "Exit"
+                        "HAlign": 0,
+                        "Text": "Exit",
+                        "VAlign": 0,
+                        "Wrap": false
                     },
                     "TypeName": "GUIText"
                 },
@@ -1120,20 +1174,20 @@
     "EntityCount": 12,
     "Hierarchy": [
         {
-            "child": 9,
-            "parent": 8
-        },
-        {
-            "child": 11,
-            "parent": 10
-        },
-        {
             "child": 8,
             "parent": 7
         },
         {
             "child": 10,
             "parent": 7
+        },
+        {
+            "child": 9,
+            "parent": 8
+        },
+        {
+            "child": 11,
+            "parent": 10
         }
     ],
     "Layers": [

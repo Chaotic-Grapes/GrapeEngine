@@ -80,6 +80,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
@@ -182,6 +183,8 @@ namespace ECS {
         const int height = mainWindow->GetHeight();
         m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
         ResetGUIViewport();
+        m_windowAspectRatio = (height > 0) ? (static_cast<float>(width) / height) : 1.0f;
+        m_windowAspectDirty = true;
 
         // Use RM instead!
         m_shader = RM.Get<Shader>("assets/shaders/batch");
@@ -251,6 +254,8 @@ namespace ECS {
 
                 m_renderTargetSize = { static_cast<float>(msg.Width), static_cast<float>(msg.Height) };
                 ResetGUIViewport();
+                m_windowAspectRatio = msg.AspectRatio;
+                m_windowAspectDirty = true;
             });
 
         // Projection matrix
@@ -289,33 +294,58 @@ namespace ECS {
         // Fall back to ECS camera
         bool foundActive = false;
         world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
-            [&](ECS::Entity /*e*/,
+            [&](ECS::Entity e,
                 const ECS::Components::LocalTransform& transform,
                 const ECS::Components::Camera3D& camera)
             {
                 if (foundActive || !camera.Active) return;
 
-                // --- View: eye looks forward along -Z
-                const glm::vec3 eye(
-                    transform.Position.X,
-                    transform.Position.Y,
-                    transform.Position.Z
-                );
-                const glm::vec3 target = eye + glm::vec3(0.f, 0.f, -1.f);
-                outView = glm::lookAt(eye, target, glm::vec3(0.f, 1.f, 0.f));
+                Vector3D position{};
+                Quaternion rotation{};
+                if (world.Has<Components::WorldTransform>(e)) {
+                    const auto& wt = world.Get<Components::WorldTransform>(e);
+                    bool useWorld = true;
+                    if (world.Has<Components::LocalTransform>(e)) {
+                        const float localLenSq = transform.Position.X * transform.Position.X
+                            + transform.Position.Y * transform.Position.Y
+                            + transform.Position.Z * transform.Position.Z;
+                        const bool worldAtOrigin = std::abs(wt.Matrix.m03) < 1e-4f
+                            && std::abs(wt.Matrix.m13) < 1e-4f
+                            && std::abs(wt.Matrix.m23) < 1e-4f;
+                        if (worldAtOrigin && localLenSq > 1e-6f) {
+                            useWorld = false;
+                        }
+                    }
+                    if (useWorld) {
+                        Vector3D scale;
+                        TransformUtils::DecomposeTRS(wt.Matrix, position, rotation, scale);
+                    } else {
+                        position = transform.Position;
+                        rotation = transform.Rotation;
+                    }
+                } else {
+                    position = transform.Position;
+                    rotation = transform.Rotation;
+                }
+
+                const glm::vec3 eye(position.X, position.Y, position.Z);
+                const glm::quat rot(rotation.W, rotation.X, rotation.Y, rotation.Z);
+                const glm::vec3 forward = rot * glm::vec3(0.0f, 0.0f, -1.0f);
+                const glm::vec3 up = rot * glm::vec3(0.0f, 1.0f, 0.0f);
+                outView = glm::lookAt(eye, eye + forward, up);
 
                 // --- Projection
                 if (camera.UsePerspective) {
-                    // camera.FOV assumed radians
+                    // camera.FOV stored in degrees
                     outProjection = glm::perspective(
-                        camera.FOV,
+                        glm::radians(camera.FOV),
                         camera.AspectRatio,
                         camera.NearPlane,
                         camera.FarPlane
                     );
                 }
                 else {
-                    const float halfH = camera.OrthoSize * 0.5f;
+                    const float halfH = camera.OrthoSize;
                     const float halfW = halfH * camera.AspectRatio;
                     outProjection = glm::ortho(
                         -halfW, +halfW,
@@ -353,6 +383,15 @@ namespace ECS {
         auto* context = Engine::CORE->GetPlatformContext();
         auto* win = context ? context->GetMainWindow() : nullptr;
         if (!win) return;
+
+        if (m_windowAspectDirty && m_viewports.empty() && !m_activeCamera) {
+            const float aspect = (m_windowAspectRatio > 0.0f) ? m_windowAspectRatio : 1.0f;
+            world.Each<ECS::Components::Camera3D>([&](ECS::Entity /*e*/, ECS::Components::Camera3D& camera)
+                {
+                    camera.AspectRatio = aspect;
+                });
+            m_windowAspectDirty = false;
+        }
 
         // ============================================================
         // SHARED WORK (once per frame)

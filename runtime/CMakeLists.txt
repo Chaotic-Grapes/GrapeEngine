@@ -151,15 +151,7 @@ if(MSVC)
         COMMENT "Normalize game executable name"
     )
     
-    # Provide GrapeEngine.exe alias for P/Invoke compatibility
-    add_custom_command(TARGET GrapeRuntime POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "Providing GrapeEngine.exe alias for scripting interop"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-            "$<TARGET_FILE_DIR:GrapeRuntime>/${GAME_FINAL_OUTPUT_NAME}.exe" 
-            "$<TARGET_FILE_DIR:GrapeRuntime>/GrapeEngine.exe"
-        COMMENT "Create GrapeEngine.exe alias"
-    )
-endif()
+  endif()
 
 # ======================= Compiler Definitions =========================
 # NO USE_IMGUI - runtime has no editor UI

@@ -37,6 +37,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <helpers/EntityUtils.h>
 #include "Serializer.h"
 #include <string.h>
+#include "audio/AudioCueRegistry.h"
 #include "services/ResourceManager.h"  // For texture loading during deserialization
 #include "core/Logger.h"
 
@@ -386,8 +387,9 @@ namespace ECS {
 
 		// Custom serialization for AudioSource to handle backward-compatible defaults
 		inline void to_json(nlohmann::json& j, const AudioSource& src) {
+			std::string cuePath = ECS::StringTable::Resolve(src.CuePathId);
 			j = nlohmann::json{
-				{"CueId", src.CueId},
+				{"CuePath", cuePath},
 				{"Volume", src.Volume},
 				{"Pitch", src.Pitch},
 				{"Loop", src.Loop},
@@ -400,10 +402,21 @@ namespace ECS {
 				{"FadeInDuration", src.FadeInDuration},
 				{"FadeOutDuration", src.FadeOutDuration}
 			};
+			if (cuePath.empty()) {
+				j["CueId"] = src.CueId;
+			}
 		}
 
 		inline void from_json(const nlohmann::json& j, AudioSource& src) {
-			src.CueId = j.value("CueId", 0u);
+			std::string cuePath = j.value("CuePath", std::string());
+			if (!cuePath.empty()) {
+				const std::string norm = Audio::AudioCueRegistry::NormalizePath(cuePath);
+				src.CuePathId = ECS::StringTable::Intern(norm);
+				src.CueId = Audio::AudioCueRegistry::HashPath(norm);
+			} else {
+				src.CuePathId = 0;
+				src.CueId = j.value("CueId", 0u);
+			}
 			src.Volume = j.value("Volume", 1.0f);
 			src.Pitch = j.value("Pitch", 1.0f);
 			src.Loop = j.value("Loop", false);
