@@ -38,6 +38,7 @@ public record struct BarnacleSnatcherComponent
     public int OverlapCount = 0;
     public ulong BrainHandle = 0;
     public float AttackCooldownTimer = 0.0f;
+    public bool AwaitingExit = false;
     public bool DebugLogs = false;
     public BarnacleState LastState = BarnacleState.Idle;
     public int LastAnimRow = -1;
@@ -156,7 +157,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     private const int BarnacleSheetWidth = 18900;
     private const int BarnacleSheetHeight = 220;
     private const int BarnacleFrameCount = 21;
-    private const float AttackCooldownSeconds = 3.0f;
+    private const float AttackCooldownSeconds = 1.0f;
     private static readonly Color IdleColor = Color.White;
     private static readonly Color AttackColor = Color.Red;
     private static StringId s_barnacleTexturePathId;
@@ -194,6 +195,12 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
                 ai.AttackCooldownTimer = Math.Max(0.0f, ai.AttackCooldownTimer - Time.DeltaTime);
             }
 
+            if (ai.AwaitingExit && !ai.IsInRange)
+            {
+                ai.AttackCooldownTimer = AttackCooldownSeconds;
+                ai.AwaitingExit = false;
+            }
+
             if (hasSquidward && result.Entity.TryGetComponent<LocalTransform>(out var barnacleTransform) &&
                 result.Entity.TryGetComponent<BoxCollider2D>(out var barnacleCollider))
             {
@@ -207,7 +214,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             nint attackState = brain.GetAttackState();
             nint patrolState = brain.GetPatrolState();
             bool isAttackState = currentState == attackState;
-            bool canAttack = ai.IsInRange && ai.AttackCooldownTimer <= 0.0f;
+            bool canAttack = ai.IsInRange && !ai.AwaitingExit && ai.AttackCooldownTimer <= 0.0f;
 
             if (!ai.IsInRange)
             {
@@ -219,7 +226,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             {
                 if (state.Finished)
                 {
-                    ai.AttackCooldownTimer = AttackCooldownSeconds;
+                    ai.AwaitingExit = true;
                     currentState = TransitionIfDifferent(brain, currentState, patrolState);
                 }
                 else if (!ai.IsInRange)
