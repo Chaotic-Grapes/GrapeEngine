@@ -328,6 +328,7 @@ namespace ECS {
         // ====================================================================
 
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
+        std::unique_ptr<Renderer> m_guiRenderer;                ///< Dedicated GUI batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
