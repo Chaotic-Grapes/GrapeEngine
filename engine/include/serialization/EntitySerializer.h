@@ -714,10 +714,14 @@ namespace Serialization {
 		template<typename T>
 		static void RegisterComponent(const char* name) {
 			const uint32_t typeHash = Serialization::FNV1aHash(name);
+
 			// Capture the concrete component id so serialization does not depend on hash registration order
 			const ECS::ComponentTypeId componentId = ECS::ComponentRegistry::Type<T>();
-			// Special case: For TileMapComponent, always use the captured component ID
-			const bool useCapturedIdOnly = (name && std::strcmp(name, "TileMapComponent") == 0);
+
+			// Special cases: For TileMapComponent/Prefab metadata, always use the captured component ID
+			const bool useCapturedIdOnly = (name && (std::strcmp(name, "TileMapComponent") == 0 || 
+				std::strcmp(name, "PrefabInstanceMetadata") == 0 || std::strcmp(name, "PrefabLink") == 0));
+
 			// Resolver lambda
 			auto resolveId = [typeHash, componentId, useCapturedIdOnly]() -> ECS::ComponentTypeId {
 				if (useCapturedIdOnly) {
