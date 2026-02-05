@@ -511,6 +511,11 @@ void SceneViewport::_renderViewport() {
                     // Don't pick if gizmo is being used or hovered
                     // Let tile palette consume clicks when active.
                     bool tilePaletteHandledClick = false;
+                    if (m_tilePalettePanel && isSceneImageHovered) {
+                        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                            m_tilePalettePanel->SetPaintMode(false);
+                        }
+                    }
                     const bool canUseTilePalette = m_tilePalettePanel && m_tilePalettePanel->CanHandleViewportInput();
                     if (isSceneImageHovered && canUseTilePalette) {
                         double mx = 0, my = 0;

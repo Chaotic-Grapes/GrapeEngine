@@ -42,8 +42,10 @@ public:
 
     void SetActive(bool active) { m_active = active; }
     bool IsActive() const { return m_active; }
+    // Toggle whether the palette captures viewport input for painting.
+    void SetPaintMode(bool enabled) { m_paintMode = enabled; }
     // Gate viewport input handling to valid tile-editing state.
-    bool CanHandleViewportInput() const { return m_active && m_tileMap && m_tileset; }
+    bool CanHandleViewportInput() const { return m_active && m_paintMode && m_tileMap && m_tileset; }
     // Access current tilemap data for viewport overlays.
     const std::shared_ptr<TileMap>& GetTileMap() const { return m_tileMap; }
     const std::shared_ptr<Tileset>& GetTileset() const { return m_tileset; }
@@ -62,6 +64,7 @@ public:
 
 private:
     bool m_active = true;
+    bool m_paintMode = true;
     
     std::shared_ptr<TileMap> m_tileMap;
     std::shared_ptr<Tileset> m_tileset;

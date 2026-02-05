@@ -189,6 +189,10 @@ void TilePalettePanel::Render()
         }
 
         // Toolbar: Eraser, Rotate
+        if (ImGui::Button(m_paintMode ? "Paint Mode: ON" : "Paint Mode: OFF")) {
+            m_paintMode = !m_paintMode;
+        }
+        ImGui::SameLine();
         if (ImGui::Button(m_isEraser ? "Eraser [ON]" : "Eraser"))
         {
             m_isEraser = !m_isEraser;
@@ -237,6 +241,7 @@ void TilePalettePanel::Render()
             {
                 m_selectedTileID = id;
                 m_isEraser = false;
+                m_paintMode = true;
             }
 
             const bool isHovered = ImGui::IsItemHovered(); // Track hover state for custom border drawing.
