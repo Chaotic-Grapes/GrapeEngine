@@ -46,6 +46,22 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+echo.
+echo ==========================================================
+echo           Compiling C# Scripts (%CONFIG%)
+echo ----------------------------------------------------------
+echo   Project: %PROJECT%
+echo   Output: export\%PROJECT%\%CONFIG%\GameScripts.dll
+echo ==========================================================
+
+dotnet run --project ..\managed\tools\ScriptCompiler\ScriptCompiler.csproj --configuration %CONFIG% -- "..\%PROJECT%" "export\%PROJECT%\%CONFIG%\GameScripts.dll"
+if %errorlevel% neq 0 (
+    echo ERROR: C# script compilation failed
+    cd ..
+    pause
+    exit /b 1
+)
+
 cd ..
 echo.
 echo ==========================================================
