@@ -28,9 +28,7 @@ namespace Editor::Templates {
     /// </summary>
     enum class ScriptTemplateType {
         BasicSystem,      // Simple ISystem with OnCreate/OnUpdate/OnDestroy
-        EditModeSystem,   // System marked with [ExecuteInEditMode]
-        HotReloadSystem,  // System with [Preserve] fields for state persistence
-        MetadataSystem    // System implementing ISystemMetadata
+        EditModeSystem    // System marked with [ExecuteInEditMode]
     };
 
     /// <summary>
@@ -69,16 +67,6 @@ namespace Editor::Templates {
         );
 
         static std::string GenerateEditModeSystemTemplate(
-            const std::string& className,
-            const std::string& namespaceName
-        );
-
-        static std::string GenerateHotReloadSystemTemplate(
-            const std::string& className,
-            const std::string& namespaceName
-        );
-
-        static std::string GenerateMetadataSystemTemplate(
             const std::string& className,
             const std::string& namespaceName
         );

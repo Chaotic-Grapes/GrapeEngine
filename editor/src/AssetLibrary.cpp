@@ -477,7 +477,7 @@ void AssetLibrary::_deleteSelectedAsset(std::string & selectedAsset, std::string
         selectedAsset.clear();
         return;
     }
-    bool isFolder = std::filesystem::is_directory(selectedPath);
+    // bool isFolder = std::filesystem::is_directory(selectedPath);
 
     // Only operate when inside the project's Assets folder
     std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();

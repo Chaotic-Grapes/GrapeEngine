@@ -234,7 +234,6 @@ void HierarchyPanel::Render() {
     // Render the main UI sections
     _renderHeader();           // Header with entity creation controls
     _renderEntityTree();       // Main entity tree with drag-drop
-    _renderFooterButtons();    // Footer buttons like Clear All
 
     // Process deferred deletions AFTER tree rendering is complete
     // This prevents crashes from modifying the hierarchy while iterating it
@@ -533,27 +532,6 @@ void HierarchyPanel::_renderEntityTree() {
     // Backup drag-drop target for bottom of tree
     // Ensures drop targets are available even when tree is empty
     _handleTreeDragDrop();
-}
-
-// Render footer buttons (Clear All)
-void HierarchyPanel::_renderFooterButtons() {
-    // Clear All button: removes all entities from the scene.
-    // Use danger styling to signal destructive action.
-    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
-    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
-    if (ImGui::Button("Clear All")) {
-        if (m_entityActions) {
-            m_entityActions->ClearAllEntities();
-        }
-        m_selectedEntityIds.clear();
-        m_anchorEntityId = ECS::Entity::NPOS32;
-        m_rootOrder.clear();
-        m_childOrder.clear(); // Clear order caches on delete-all.
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
-    }
-    ImGui::PopStyleColor(4);
 }
 
 // -------------------------------------------------------------------------

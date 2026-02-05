@@ -198,10 +198,10 @@ namespace {
         if (symbolsFont) ImGui::PushFont(symbolsFont);
         const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
         const bool clicked = ImGui::SmallButton(icon);
+        if (symbolsFont) ImGui::PopFont();
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", tooltip);
         }
-        if (symbolsFont) ImGui::PopFont();
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
