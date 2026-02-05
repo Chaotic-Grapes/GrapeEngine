@@ -290,53 +290,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
     {
         //Log("COLLIDED");
         //Collide with MarineSnow
-        //Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
-        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        //if (other.HasComponent<MS_ManagerComponent>())
-        //{
-        //    MS_Manager.instance.SendToPool(other.Id);
-        //    InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
-        //}
-
-        //if (other.HasComponent<TagMask>())
-        //{
-        //    Log("TagMask: " + other.GetComponent<TagMask>().Mask);
-        //    if (other.GetComponent<TagMask>().Mask == 32)
-        //    {
-
-        //        ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
-        //    }
-        //    else if(other.GetComponent<TagMask>().Mask == 4)
-        //    {
-        //        //door detected
-        //        other.GetComponent<Active>().Enabled = false;
-        //    }
-        //}
-
-
-    }
-
-    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
-    {
-        base.OnCollisionExit(self, evt);
-        //foreach (var gameObject in World!.Query<CollisionTestComponent>())
-        //{
-        //    Log("Hello I Exited");
-        //}
-    }
-}
-
-[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
-public class PlayerTriggerHandler : TriggerSystemBase
-{
-    protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
-    {
-        Log("TRIGGERED");
-        Console.WriteLine("TRIGGERED");
-        base.OnTriggerEnter(self, evt);
-        
-        //Collide with MarineSnow
-        //Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
+        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MS_ManagerComponent>())
         {
@@ -358,6 +312,52 @@ public class PlayerTriggerHandler : TriggerSystemBase
                 other.GetComponent<Active>().Enabled = false;
             }
         }
+
+
+    }
+
+    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
+    {
+        base.OnCollisionExit(self, evt);
+        //foreach (var gameObject in World!.Query<CollisionTestComponent>())
+        //{
+        //    Log("Hello I Exited");
+        //}
+    }
+}
+
+[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
+public class PlayerTriggerHandler : TriggerSystemBase
+{
+    protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
+    {
+        //Log("TRIGGERED");
+        //Console.WriteLine("TRIGGERED");
+        //base.OnTriggerEnter(self, evt);
+        
+        ////Collide with MarineSnow
+        ////Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
+        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        //if (other.HasComponent<MS_ManagerComponent>())
+        //{
+        //    MS_Manager.instance.SendToPool(other.Id);
+        //    InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
+        //}
+
+        //if (other.HasComponent<TagMask>())
+        //{
+        //    Log("TagMask: " + other.GetComponent<TagMask>().Mask);
+        //    if (other.GetComponent<TagMask>().Mask == 32)
+        //    {
+
+        //        ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+        //    }
+        //    else if (other.GetComponent<TagMask>().Mask == 4)
+        //    {
+        //        //door detected
+        //        other.GetComponent<Active>().Enabled = false;
+        //    }
+        //}
 
 
 

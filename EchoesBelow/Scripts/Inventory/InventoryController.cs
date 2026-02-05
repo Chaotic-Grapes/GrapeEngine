@@ -70,13 +70,14 @@ public class InventoryController : SystemBase
                 
             }
         }
-
+        
 
     }
     public void IncrementInStackSlot(int msID)
     {
         switch (msID)
         {
+            
             case 1:
                 ms01_Count++;
                 foreach(var ui in World!.Query<MatchSignifierComponent>())
