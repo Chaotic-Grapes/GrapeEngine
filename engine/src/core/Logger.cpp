@@ -50,8 +50,12 @@
  * by m_infoFile and m_errorFile.
  */
 Logger::Logger() {
-	m_infoStream.open(m_infoFile, std::ios::out | std::ios::app);
-	m_errorStream.open(m_errorFile, std::ios::out | std::ios::app);
+	if (!m_infoFile.empty()) {
+		m_infoStream.open(m_infoFile, std::ios::out | std::ios::app);
+	}
+	if (!m_errorFile.empty()) {
+		m_errorStream.open(m_errorFile, std::ios::out | std::ios::app);
+	}
 }
 
 /**
@@ -114,6 +118,22 @@ void Logger::Log(const LogLevel level, const std::stringstream& oss, LogSource s
  * @param filename The filename to use for that log file.
  */
 void Logger::SetLogFile(const LogLevel level, const std::string& filename) {
+	if (filename.empty()) {
+		if (level == LogLevel::INFO || level == LogLevel::WARNING) {
+			if (m_infoStream.is_open()) {
+				m_infoStream.close();
+			}
+			m_infoFile.clear();
+		}
+		else if (level == LogLevel::ERROR || level == LogLevel::CRITICAL) {
+			if (m_errorStream.is_open()) {
+				m_errorStream.close();
+			}
+			m_errorFile.clear();
+		}
+		return;
+	}
+
 	if (level == LogLevel::INFO || level == LogLevel::WARNING) {
 		m_infoFile = filename;
 		if (m_infoStream.is_open()) {

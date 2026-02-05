@@ -44,6 +44,10 @@ int main() {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+    // Initialize project paths early so logs go to the per-project folder.
+    // TODO: Remove hardcoded "EchoesBelow" when editor is separated from engine
+    Engine::ProjectPaths::Initialize("EchoesBelow");
+
     // Log current working directory for debugging
     LOG_INFO(std::filesystem::current_path());
 
