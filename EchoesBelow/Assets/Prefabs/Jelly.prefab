@@ -3,8 +3,8 @@
         {
             "Data": {
                 "Position": {
-                    "X": 8.018708229064941,
-                    "Y": 2.8230788707733154,
+                    "X": -25.36263656616211,
+                    "Y": 20.833045959472656,
                     "Z": 0.0
                 },
                 "Rotation": {
@@ -14,30 +14,18 @@
                     "Z": 0.0
                 },
                 "Scale": {
-                    "X": 0.25,
-                    "Y": 0.25,
-                    "Z": 0.25
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
                 }
             },
             "TypeName": "LocalTransform"
         },
         {
             "Data": {
-                "Value": "MS02_fakeprefab"
+                "Value": "Jelly"
             },
             "TypeName": "Name"
-        },
-        {
-            "Data": {
-                "Flags": 0,
-                "LayerMask": 4,
-                "Offset": {
-                    "X": 0.0,
-                    "Y": 0.0
-                },
-                "Radius": 0.5
-            },
-            "TypeName": "CircleCollider2D"
         },
         {
             "Data": {
@@ -47,23 +35,38 @@
         },
         {
             "Data": {
+                "AOStrength": 1.0,
+                "AlphaCutoff": 0.5,
+                "Flags": 1,
+                "MRA_TextureId": 0,
+                "MRA_TexturePath": "",
+                "Metallic": 0.38999998569488525,
+                "NormalStrength": 1.0,
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Smoothness": 0.5
+            },
+            "TypeName": "Material2D"
+        },
+        {
+            "Data": {
                 "Color": {
                     "A": 1.0,
-                    "B": 0.230241596698761,
-                    "G": 0.230241596698761,
+                    "B": 1.0,
+                    "G": 1.0,
                     "R": 1.0
                 },
                 "EmissiveStrength": 5.0,
                 "EmissiveTextureId": 0,
                 "EmissiveTexturePath": "",
-                "NormalTextureId": 0,
-                "NormalTexturePath": "",
+                "NormalTextureId": 32,
+                "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
                 "Offset": {
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 14,
-                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                "TextureId": 33,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
                 "Tiling": {
                     "X": 1.0,
                     "Y": 1.0
@@ -75,17 +78,17 @@
             "Data": {
                 "Dirty": false,
                 "Matrix": {
-                    "m00": 0.25,
+                    "m00": 1.0,
                     "m01": 0.0,
                     "m02": 0.0,
-                    "m03": 8.018708229064941,
+                    "m03": -25.36263656616211,
                     "m10": 0.0,
-                    "m11": 0.25,
+                    "m11": 1.0,
                     "m12": 0.0,
-                    "m13": 2.8230788707733154,
+                    "m13": 20.833045959472656,
                     "m20": 0.0,
                     "m21": 0.0,
-                    "m22": 0.25,
+                    "m22": 1.0,
                     "m23": 0.0,
                     "m30": 0.0,
                     "m31": 0.0,
@@ -94,19 +97,6 @@
                 }
             },
             "TypeName": "WorldTransform"
-        },
-        {
-            "Data": {
-                "msID": 2,
-                "start": false
-            },
-            "TypeName": "MS_Manager"
-        },
-        {
-            "Data": {
-                "Enabled": true
-            },
-            "TypeName": "ECS::Components::Active"
         }
     ]
 }

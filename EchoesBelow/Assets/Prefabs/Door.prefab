@@ -3,41 +3,51 @@
         {
             "Data": {
                 "Position": {
-                    "X": 8.018708229064941,
-                    "Y": 2.8230788707733154,
+                    "X": 7.322418689727783,
+                    "Y": -0.11985749006271362,
                     "Z": 0.0
                 },
                 "Rotation": {
-                    "W": 1.0,
+                    "W": 0.7071067094802856,
                     "X": 0.0,
                     "Y": 0.0,
-                    "Z": 0.0
+                    "Z": 0.7071068286895752
                 },
                 "Scale": {
-                    "X": 0.25,
-                    "Y": 0.25,
-                    "Z": 0.25
+                    "X": 2.999952793121338,
+                    "Y": 2.999952793121338,
+                    "Z": 3.0
                 }
             },
             "TypeName": "LocalTransform"
         },
         {
             "Data": {
-                "Value": "MS02_fakeprefab"
+                "Value": "Door"
             },
             "TypeName": "Name"
         },
         {
             "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
                 "Flags": 0,
-                "LayerMask": 4,
+                "HalfExtents": {
+                    "X": 0.20000000298023224,
+                    "Y": 0.5
+                },
+                "LayerMask": 4294967295,
                 "Offset": {
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "Radius": 0.5
+                "Rotation": 0.0
             },
-            "TypeName": "CircleCollider2D"
+            "TypeName": "BoxCollider2D"
         },
         {
             "Data": {
@@ -49,8 +59,8 @@
             "Data": {
                 "Color": {
                     "A": 1.0,
-                    "B": 0.230241596698761,
-                    "G": 0.230241596698761,
+                    "B": 1.0,
+                    "G": 1.0,
                     "R": 1.0
                 },
                 "EmissiveStrength": 5.0,
@@ -62,8 +72,8 @@
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 14,
-                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                "TextureId": 27,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                 "Tiling": {
                     "X": 1.0,
                     "Y": 1.0
@@ -73,19 +83,25 @@
         },
         {
             "Data": {
+                "Mask": 4
+            },
+            "TypeName": "TagMask"
+        },
+        {
+            "Data": {
                 "Dirty": false,
                 "Matrix": {
-                    "m00": 0.25,
-                    "m01": 0.0,
+                    "m00": -3.5762224115387653e-07,
+                    "m01": -2.999952554702759,
                     "m02": 0.0,
-                    "m03": 8.018708229064941,
-                    "m10": 0.0,
-                    "m11": 0.25,
+                    "m03": 7.322418689727783,
+                    "m10": 2.999952554702759,
+                    "m11": -3.5762224115387653e-07,
                     "m12": 0.0,
-                    "m13": 2.8230788707733154,
+                    "m13": -0.11985749006271362,
                     "m20": 0.0,
                     "m21": 0.0,
-                    "m22": 0.25,
+                    "m22": 3.0,
                     "m23": 0.0,
                     "m30": 0.0,
                     "m31": 0.0,
@@ -94,19 +110,6 @@
                 }
             },
             "TypeName": "WorldTransform"
-        },
-        {
-            "Data": {
-                "msID": 2,
-                "start": false
-            },
-            "TypeName": "MS_Manager"
-        },
-        {
-            "Data": {
-                "Enabled": true
-            },
-            "TypeName": "ECS::Components::Active"
         }
     ]
 }

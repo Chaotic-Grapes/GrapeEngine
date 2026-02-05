@@ -22,6 +22,9 @@ public class Player : SystemBase
 {
     public static Player instance;
 
+    PlayerAnimPreset dashState = new PlayerAnimPreset(0, 0, 20, 24f);
+    PlayerAnimPreset idleState = new PlayerAnimPreset(0, 20, 65, 30f);
+
     public static Compass abs_InputDirection = Compass.N;
     public Vector3 currentPos;
     const float lerpFac = 1;
@@ -30,6 +33,12 @@ public class Player : SystemBase
     float timer_forPeriodicForce = 0;
     float dashCoolDownTimer;
     bool isCoolingDown;
+
+    static bool isKeyDown_W = false;
+    static bool isKeyDown_A = false;
+    static bool isKeyDown_S = false;
+    static bool isKeyDown_D = false;
+
     protected override void OnCreate()
     {
         instance = this;
@@ -44,7 +53,7 @@ public class Player : SystemBase
         dashCoolDownTimer = 0;
         isCoolingDown = false;
 
-
+        PlayerAnimManager.instance.SetAnimState(idleState);
 
 
         //End of Start
@@ -52,15 +61,33 @@ public class Player : SystemBase
     }
     protected override void OnUpdate()
     {
-        foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
+        isKeyDown_W = Input.IsKeyDown(KeyCode.W);
+        isKeyDown_A = Input.IsKeyDown(KeyCode.A); 
+        isKeyDown_S = Input.IsKeyDown(KeyCode.S);
+        isKeyDown_D = Input.IsKeyDown(KeyCode.D);
+
+        foreach (var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
             //A Pseudo Start function, called once per obj at runtime
             //This allows onStart to work
             bool start = gameObject.Component1.start;
             gameObject.Component1.start = OnStart(ref start);
 
-            //Variables
-            ref LocalTransform transform = ref gameObject.Component4;
+            //Anim
+            if (isKeyDown_A || isKeyDown_D || isKeyDown_W || isKeyDown_S)
+            {
+                PlayerAnimManager.instance.SetAnimState(dashState);
+            }
+            else
+            {
+                PlayerAnimManager.instance.SetAnimState(idleState);
+            }
+
+
+
+
+                //Variables
+                ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
             ref AngularVelocity2D av = ref gameObject.Component3;
             Vector2 playerDir;
@@ -122,8 +149,8 @@ public class Player : SystemBase
             //Log($"absTarget: {abs_InputDirection}");
             //Log("flipFac2: " + flipFac);
 
-            if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S)
-            || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
+            if (isKeyDown_W || isKeyDown_S
+            || isKeyDown_A || isKeyDown_D)
             {
                 AddDriftForce(ref lv, playerDir, driftSpeed, maxSpeed);
                 AddPeriodicalForce(ref lv, periodicForceInterval, ref timer_forPeriodicForce, playerDir, moveSpeed);
@@ -149,6 +176,8 @@ public class Player : SystemBase
 
             //update Position
             currentPos = transform.Position;
+
+            
         }
     }
     private void SpeedLimit(ref LinearVelocity2D lv,float maxSpeed)
@@ -185,22 +214,22 @@ public class Player : SystemBase
     {
         //Find InputAbsDirection direction
         //For a quirk in the angles, Keycodes D and A (left and right) are swapped!
-        if (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.NW;
-        else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.SW;
-        else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.SE;
-        else if (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.NE;
-        else if (Input.IsKeyDown(KeyCode.W)) abs_InputDirection = Compass.N;
-        else if (Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.W;
-        else if (Input.IsKeyDown(KeyCode.S)) abs_InputDirection = Compass.S;
-        else if (Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.E;
+        if (isKeyDown_W && isKeyDown_D) abs_InputDirection = Compass.NW;
+        else if (isKeyDown_S && isKeyDown_D) abs_InputDirection = Compass.SW;
+        else if (isKeyDown_S && isKeyDown_A) abs_InputDirection = Compass.SE;
+        else if (isKeyDown_W && isKeyDown_A) abs_InputDirection = Compass.NE;
+        else if (isKeyDown_W) abs_InputDirection = Compass.N;
+        else if (isKeyDown_D) abs_InputDirection = Compass.W;
+        else if (isKeyDown_S) abs_InputDirection = Compass.S;
+        else if (isKeyDown_A) abs_InputDirection = Compass.E;
     }
 
-    private static Vector2 ProcessInput(Vector2 moveDir, float lerpFac)
+    private Vector2 ProcessInput(Vector2 moveDir, float lerpFac)
     {
-        if (Input.IsKeyDown(KeyCode.W)) moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
-        if (Input.IsKeyDown(KeyCode.S)) moveDir.Y = GMath.Lerp(moveDir.Y, -1, lerpFac);
-        if (Input.IsKeyDown(KeyCode.A)) moveDir.X = GMath.Lerp(moveDir.X, -1, lerpFac);
-        if (Input.IsKeyDown(KeyCode.D)) moveDir.X = GMath.Lerp(moveDir.X, 1, lerpFac);
+        if (isKeyDown_W) moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
+        if (isKeyDown_S) moveDir.Y = GMath.Lerp(moveDir.Y, -1, lerpFac);
+        if (isKeyDown_A) moveDir.X = GMath.Lerp(moveDir.X, -1, lerpFac);
+        if (isKeyDown_D) moveDir.X = GMath.Lerp(moveDir.X, 1, lerpFac);
         //Always decelerrating moveDir but at a slower rate
         moveDir.X = GMath.Lerp(moveDir.X, 0, lerpFac / 2);
         moveDir.Y = GMath.Lerp(moveDir.Y, 0, lerpFac / 2);
@@ -247,11 +276,6 @@ public class Player : SystemBase
 [System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
 public class PlayerCollisionHandler : CollisionSystemBase
 {
-    protected override void OnCreate()
-    {
-        Log("System CollisionTest initialized");
-    }
-
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
         base.OnCollisionEnter(self, evt);
@@ -261,7 +285,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
 
     private void CollisionEntered(Entity self, CollisionEvent evt)
     {
-        //do Everything in here
+        //Collide with MarineSnow
         Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MS_ManagerComponent>())
@@ -269,6 +293,23 @@ public class PlayerCollisionHandler : CollisionSystemBase
             MS_Manager.instance.SendToPool(other.Id);
             InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
         }
+
+        if (other.HasComponent<TagMask>())
+        {
+            Log("TagMask: " + other.GetComponent<TagMask>().Mask);
+            if (other.GetComponent<TagMask>().Mask == 32)
+            {
+
+                ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+            }
+            else if(other.GetComponent<TagMask>().Mask == 4)
+            {
+                //door detected
+                other.GetComponent<Active>().Enabled = false;
+            }
+        }
+
+        
     }
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
@@ -279,5 +320,19 @@ public class PlayerCollisionHandler : CollisionSystemBase
         //    Log("Hello I Exited");
         //}
     }
-
 }
+
+[System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
+public class PlayerTriggerHandler : TriggerSystemBase
+{
+    protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
+    {
+        base.OnTriggerEnter(self, evt);
+        Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        {
+            //Loadscene use dalton's
+        }
+    }
+}
+

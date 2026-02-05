@@ -11,6 +11,7 @@ namespace EchoesBelow.Scripts;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class CamFollow : SystemBase
 {
+    static Vector2 playerPos;
     protected override void OnCreate()
     {
         Log("System CamFollow initialized");
@@ -18,13 +19,14 @@ public class CamFollow : SystemBase
 
     protected override void OnUpdate()
     {
+        playerPos = new Vector2(Player.instance.currentPos.X, Player.instance.currentPos.Y);
         foreach(var gameObject in World!.Query<CamFollowComponent, LocalTransform>())
         {
             Entity entity = Entity.FromId(World!, gameObject.Entity.Id);
             ref LocalTransform transform = ref gameObject.Component2;
 
-            transform.Position = new Vector3(GMath.Lerp(transform.Position.X, Player.instance.currentPos.X, 0.1f),
-                                             GMath.Lerp(transform.Position.Y, Player.instance.currentPos.Y, 0.1f), transform.Position.Z);
+            transform.Position = new Vector3(GMath.Lerp(transform.Position.X, playerPos.X, 0.1f),
+                                             GMath.Lerp(transform.Position.Y, playerPos.Y, 0.1f), transform.Position.Z);
         }
     }
 

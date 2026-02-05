@@ -3,8 +3,8 @@
         {
             "Data": {
                 "Position": {
-                    "X": 8.018708229064941,
-                    "Y": 2.8230788707733154,
+                    "X": -2.324561834335327,
+                    "Y": -3.6708638668060303,
                     "Z": 0.0
                 },
                 "Rotation": {
@@ -14,28 +14,28 @@
                     "Z": 0.0
                 },
                 "Scale": {
-                    "X": 0.25,
-                    "Y": 0.25,
-                    "Z": 0.25
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
                 }
             },
             "TypeName": "LocalTransform"
         },
         {
             "Data": {
-                "Value": "MS02_fakeprefab"
+                "Value": "Spike03_prefab"
             },
             "TypeName": "Name"
         },
         {
             "Data": {
                 "Flags": 0,
-                "LayerMask": 4,
+                "LayerMask": 4294967295,
                 "Offset": {
-                    "X": 0.0,
-                    "Y": 0.0
+                    "X": -0.009999999776482582,
+                    "Y": 0.47999998927116394
                 },
-                "Radius": 0.5
+                "Radius": 0.07999999821186066
             },
             "TypeName": "CircleCollider2D"
         },
@@ -49,8 +49,8 @@
             "Data": {
                 "Color": {
                     "A": 1.0,
-                    "B": 0.230241596698761,
-                    "G": 0.230241596698761,
+                    "B": 1.0,
+                    "G": 1.0,
                     "R": 1.0
                 },
                 "EmissiveStrength": 5.0,
@@ -62,8 +62,8 @@
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 14,
-                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                "TextureId": 32,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike03.png",
                 "Tiling": {
                     "X": 1.0,
                     "Y": 1.0
@@ -73,19 +73,25 @@
         },
         {
             "Data": {
+                "Mask": 32
+            },
+            "TypeName": "TagMask"
+        },
+        {
+            "Data": {
                 "Dirty": false,
                 "Matrix": {
-                    "m00": 0.25,
+                    "m00": 1.0,
                     "m01": 0.0,
                     "m02": 0.0,
-                    "m03": 8.018708229064941,
+                    "m03": -2.324561834335327,
                     "m10": 0.0,
-                    "m11": 0.25,
+                    "m11": 1.0,
                     "m12": 0.0,
-                    "m13": 2.8230788707733154,
+                    "m13": -3.6708638668060303,
                     "m20": 0.0,
                     "m21": 0.0,
-                    "m22": 0.25,
+                    "m22": 1.0,
                     "m23": 0.0,
                     "m30": 0.0,
                     "m31": 0.0,
@@ -94,19 +100,6 @@
                 }
             },
             "TypeName": "WorldTransform"
-        },
-        {
-            "Data": {
-                "msID": 2,
-                "start": false
-            },
-            "TypeName": "MS_Manager"
-        },
-        {
-            "Data": {
-                "Enabled": true
-            },
-            "TypeName": "ECS::Components::Active"
         }
     ]
 }
