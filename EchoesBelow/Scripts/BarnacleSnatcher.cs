@@ -18,17 +18,17 @@ public enum BarnacleState : byte
 [Component(Name = "Barnacle Snatcher")]
 public record struct BarnacleSnatcherComponent
 {
-    public int IdleStartFrame = 21;
-    public int IdleFrameCount = 58;
-    public float IdleFps = 24.0f;
-    public int AnimRow = 26;
+    public int IdleStartFrame = 0;
+    public int IdleFrameCount = 20;
+    public float IdleFps = 30.0f;
+    public int AnimRow = 0;
     public int IdleFrameOffset = 0;
-    public int IdleFrameLength = 60;
-    public int AttackStartFrame = 60;
-    public int AttackFrameCount = 18;
+    public int IdleFrameLength = 20;
+    public int AttackStartFrame = 1;
+    public int AttackFrameCount = 20;
     public float AttackFps = 24.0f;
-    public int AttackFrameOffset = 0;
-    public int AttackFrameLength = 18;
+    public int AttackFrameOffset = 1;
+    public int AttackFrameLength = 20;
     public bool AttackLoop = false;
     public bool Initialized = false;
     public BarnacleState State = BarnacleState.Idle;
@@ -38,18 +38,24 @@ public record struct BarnacleSnatcherComponent
     public int OverlapCount = 0;
     public ulong BrainHandle = 0;
     public float AttackCooldownTimer = 0.0f;
+    public bool DebugLogs = false;
+    public BarnacleState LastState = BarnacleState.Idle;
+    public int LastAnimRow = -1;
+    public int LastFrameOffset = -1;
+    public int LastFrameLength = -1;
+    public float DebugLogTimer = 0.0f;
 
     public BarnacleSnatcherComponent() { }
 }
 
-public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
+public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
 {
-    private const string BarnacleName = "Barn Snatch";
-    private const string SquidwardColliderName = "Collider";
-    private static readonly string[] BarnacleColliderNames = { "Barn Snatch", "Attack AOE collider" };
+    private const string BarnacleName = "Barnacle Snatcher";
+    private const string SquidwardName = "squidward";
 
-    protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
+    protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
+        LogCollision(World!, "Enter", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
             return;
 
@@ -58,8 +64,9 @@ public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
         ai.IsInRange = ai.OverlapCount > 0;
     }
 
-    protected override void OnTriggerExit(Entity self, TriggerExitEvent evt)
+    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
     {
+        LogCollision(World!, "Exit", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
             return;
 
@@ -82,13 +89,13 @@ public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
         string selfName = GetName(self);
         string otherName = GetName(other);
 
-        bool selfIsSquidCollider = IsName(selfName, SquidwardColliderName);
-        bool otherIsSquidCollider = IsName(otherName, SquidwardColliderName);
-        bool selfIsBarnacleCollider = IsBarnacleCollider(selfName);
-        bool otherIsBarnacleCollider = IsBarnacleCollider(otherName);
+        bool selfIsBarnacle = IsName(selfName, BarnacleName);
+        bool otherIsBarnacle = IsName(otherName, BarnacleName);
+        bool selfIsSquidward = IsName(selfName, SquidwardName);
+        bool otherIsSquidward = IsName(otherName, SquidwardName);
 
-        if (!((selfIsSquidCollider && otherIsBarnacleCollider) ||
-              (otherIsSquidCollider && selfIsBarnacleCollider)))
+        if (!((selfIsBarnacle && otherIsSquidward) ||
+              (otherIsBarnacle && selfIsSquidward)))
         {
             return false;
         }
@@ -120,30 +127,43 @@ public sealed class BarnacleSnatcherTriggerSystem : TriggerSystemBase
         return Strings.Resolve(name.Value) ?? string.Empty;
     }
 
-    private static bool IsBarnacleCollider(string name)
-    {
-        if (name.Length == 0)
-            return false;
-
-        foreach (var candidate in BarnacleColliderNames)
-        {
-            if (IsName(name, candidate))
-                return true;
-        }
-
-        return false;
-    }
-
     private static bool IsName(string actual, string expected)
         => actual.Length != 0 && string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+
+    private static void LogCollision(World world, string kind, Entity self, ulong otherId)
+    {
+        Entity other = Entity.FromId(world, otherId);
+        string selfName = GetName(self);
+        string otherName = other.IsAlive ? GetName(other) : "<dead>";
+        bool involvesBarnacle = IsName(selfName, BarnacleName) || IsName(otherName, BarnacleName);
+        bool involvesSquidward = IsName(selfName, SquidwardName) || IsName(otherName, SquidwardName);
+        if (!involvesBarnacle && !involvesSquidward)
+        {
+            return;
+        }
+        System.Console.WriteLine(
+            $"[BarnacleSnatcher] Collision {kind}: self='{selfName}' other='{otherName}'");
+    }
 }
 
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public sealed class BarnacleSnatcherStateSystem : SystemBase
 {
+    private const string BarnacleTexturePath = "EchoesBelow/Assets/Sprites/NPCs/BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png";
+    private const string BarnacleName = "Barnacle Snatcher";
+    private const int BarnacleFrameWidth = 900;
+    private const int BarnacleFrameHeight = 220;
+    private const int BarnacleSheetWidth = 18900;
+    private const int BarnacleSheetHeight = 220;
+    private const int BarnacleFrameCount = 21;
     private const float AttackCooldownSeconds = 3.0f;
     private static readonly Color IdleColor = Color.White;
     private static readonly Color AttackColor = Color.Red;
+    private static StringId s_barnacleTexturePathId;
+    private static bool s_metadataLogged;
+    private static bool s_renderLogged;
+    private static bool s_entityLogged;
+    private static float s_modeLogTimer;
     private bool _logged;
 
     protected override void OnUpdate()
@@ -154,13 +174,17 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
             System.Console.WriteLine("[BarnacleSnatcherStateSystem] Update running");
         }
 
+        bool hasSquidward = TryGetSquidwardData(World!, out var squidwardTransform, out var squidwardCollider);
+        int barnacleCount = 0;
         foreach (var result in World!.Query<BarnacleSnatcherComponent, SpriteSheetAnimation2D, AnimationState2D, SpriteRenderer2D>())
         {
+            barnacleCount++;
             ref var ai = ref result.Component1;
             ref var anim = ref result.Component2;
             ref var state = ref result.Component3;
-            ref var renderer = ref result.Component4;
+            var renderer = result.Entity.GetComponent<SpriteRenderer2D>();
             EnsureDefaults(ref ai);
+            EnsureSheetMetadata(ref anim, ref renderer);
             Brain brain = GetOrCreateBrain(ref ai);
 
             brain.Update(Time.DeltaTime);
@@ -170,11 +194,26 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
                 ai.AttackCooldownTimer = Math.Max(0.0f, ai.AttackCooldownTimer - Time.DeltaTime);
             }
 
+            if (hasSquidward && result.Entity.TryGetComponent<LocalTransform>(out var barnacleTransform) &&
+                result.Entity.TryGetComponent<BoxCollider2D>(out var barnacleCollider))
+            {
+                bool overlap = AabbOverlap(barnacleTransform, barnacleCollider, squidwardTransform, squidwardCollider);
+                ai.IsInRange = overlap;
+                ai.OverlapCount = overlap ? 1 : 0;
+                LogAabb("Barnacle Snatcher", barnacleTransform, barnacleCollider, "squidward", squidwardTransform, squidwardCollider, overlap);
+            }
+
             nint currentState = brain.GetCurrentState();
             nint attackState = brain.GetAttackState();
             nint patrolState = brain.GetPatrolState();
             bool isAttackState = currentState == attackState;
             bool canAttack = ai.IsInRange && ai.AttackCooldownTimer <= 0.0f;
+
+            if (!ai.IsInRange)
+            {
+                currentState = TransitionIfDifferent(brain, currentState, patrolState);
+                isAttackState = false;
+            }
 
             if (isAttackState)
             {
@@ -183,7 +222,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
                     ai.AttackCooldownTimer = AttackCooldownSeconds;
                     currentState = TransitionIfDifferent(brain, currentState, patrolState);
                 }
-                else if (!ai.IsInRange && ai.AttackLoop)
+                else if (!ai.IsInRange)
                 {
                     currentState = TransitionIfDifferent(brain, currentState, patrolState);
                 }
@@ -207,6 +246,78 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
                 EnsureIdle(ref ai, ref anim, ref state);
                 renderer.Color = IdleColor;
             }
+
+            System.Console.WriteLine(
+                $"[BarnacleSnatcher] Mode={ai.State} InRange={ai.IsInRange} Cooldown={ai.AttackCooldownTimer:0.00}");
+            renderer.Color = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+            result.Entity.SetComponent(renderer);
+            var storedRenderer = result.Entity.GetComponent<SpriteRenderer2D>();
+
+            if (!s_renderLogged)
+            {
+                s_renderLogged = true;
+                System.Console.WriteLine(
+                    "[BarnacleSnatcher] Render state: " +
+                    $"animTexId={anim.TextureId} rendererTexId={renderer.TextureId} " +
+                    $"frame={anim.FrameWidth}x{anim.FrameHeight} sheet={anim.SheetWidth}x{anim.SheetHeight} " +
+                    $"row={anim.Row} offset={anim.FrameOffset} length={anim.FrameLength} useRow={anim.UseRow} " +
+                    $"playing={anim.Playing} fps={anim.FramesPerSecond:0.##} " +
+                    $"stateFrame={state.CurrentFrame} finished={state.Finished} " +
+                    $"renderSize={renderer.Width}x{renderer.Height} " +
+                    $"uvOffset={storedRenderer.Offset.X:0.###},{storedRenderer.Offset.Y:0.###} " +
+                    $"uvTiling={storedRenderer.Tiling.X:0.###},{storedRenderer.Tiling.Y:0.###} " +
+                    $"colorRGBA={storedRenderer.Color.R:0.##},{storedRenderer.Color.G:0.##}," +
+                    $"{storedRenderer.Color.B:0.##},{storedRenderer.Color.A:0.##}");
+            }
+
+            if (!s_entityLogged)
+            {
+                s_entityLogged = true;
+                var entity = result.Entity;
+                string activeState = "missing";
+                if (entity.TryGetComponent<Active>(out var active))
+                {
+                    activeState = active.Enabled ? "enabled" : "disabled";
+                }
+
+                string position = "missing";
+                string scale = "missing";
+                if (entity.TryGetComponent<LocalTransform>(out var local))
+                {
+                    position = $"{local.Position.X:0.###},{local.Position.Y:0.###},{local.Position.Z:0.###}";
+                    scale = $"{local.Scale.X:0.###},{local.Scale.Y:0.###},{local.Scale.Z:0.###}";
+                }
+
+                System.Console.WriteLine(
+                    "[BarnacleSnatcher] Entity state: " +
+                    $"active={activeState} pos={position} scale={scale}");
+            }
+
+            if (ai.DebugLogs)
+            {
+                ai.DebugLogTimer -= Time.DeltaTime;
+                bool animChanged = ai.LastAnimRow != anim.Row ||
+                                   ai.LastFrameOffset != anim.FrameOffset ||
+                                   ai.LastFrameLength != anim.FrameLength;
+                bool stateChanged = ai.LastState != ai.State;
+                if (ai.DebugLogTimer <= 0.0f || animChanged || stateChanged)
+                {
+                    ai.DebugLogTimer = 0.5f;
+                    ai.LastState = ai.State;
+                    ai.LastAnimRow = anim.Row;
+                    ai.LastFrameOffset = anim.FrameOffset;
+                    ai.LastFrameLength = anim.FrameLength;
+                    System.Console.WriteLine(
+                        $"[BarnacleSnatcher] State={ai.State} InRange={ai.IsInRange} Cooldown={ai.AttackCooldownTimer:0.00} " +
+                        $"Row={anim.Row} Offset={anim.FrameOffset} Length={anim.FrameLength} FPS={anim.FramesPerSecond:0.##} " +
+                        $"Finished={state.Finished} CurrentFrame={state.CurrentFrame}");
+                }
+            }
+        }
+
+        if (barnacleCount == 0)
+        {
+            System.Console.WriteLine("[BarnacleSnatcher] No entities matched BarnacleSnatcherComponent + Animation + Renderer.");
         }
     }
 
@@ -235,6 +346,11 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
         if (ai.BrainHandle == 0)
         {
             Brain created = Brain.Create();
+            nint patrolState = created.GetPatrolState();
+            if (patrolState != nint.Zero)
+            {
+                created.TransitionTo(patrolState);
+            }
             ai.BrainHandle = (ulong)created.Handle;
             return created;
         }
@@ -318,31 +434,143 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
 
         if (ai.IdleFrameCount <= 0 && ai.AttackFrameCount <= 0)
         {
-            ai.IdleStartFrame = 21;
-            ai.IdleFrameCount = 58;
-            ai.IdleFps = 24.0f;
-            ai.AttackStartFrame = 3;
-            ai.AttackFrameCount = 18;
-            ai.AttackFps = 19.0f;
+            ai.IdleStartFrame = 0;
+            ai.IdleFrameCount = 20;
+            ai.IdleFps = 30.0f;
+            ai.AttackStartFrame = 1;
+            ai.AttackFrameCount = 20;
+            ai.AttackFps = 24.0f;
             ai.AttackLoop = false;
             ai.State = BarnacleState.Idle;
         }
 
         if (ai.AnimRow < 0)
-            ai.AnimRow = 26;
+            ai.AnimRow = 0;
 
-        if (ai.IdleFrameLength <= 0)
-        {
-            ai.IdleFrameOffset = 19;
-            ai.IdleFrameLength = 60;
-        }
-
-        if (ai.AttackFrameLength <= 0)
-        {
-            ai.AttackFrameOffset = 0;
-            ai.AttackFrameLength = 18;
-        }
+        ai.AnimRow = 0;
+        ai.IdleFrameOffset = 0;
+        ai.IdleFrameLength = 1;
+        ai.AttackFrameOffset = 1;
+        ai.AttackFrameLength = 20;
 
         ai.Initialized = true;
+    }
+
+    private static bool TryFindBarnacle(World world, out Entity barnacle)
+    {
+        barnacle = default;
+        foreach (var result in world.Query<Name>())
+        {
+            string name = Strings.Resolve(result.Component1.Value) ?? string.Empty;
+            if (IsName(name, BarnacleName))
+            {
+                barnacle = result.Entity;
+                return barnacle.IsAlive && barnacle.HasComponent<BarnacleSnatcherComponent>();
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsName(string actual, string expected)
+        => actual.Length != 0 && string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryGetSquidwardData(World world, out LocalTransform transform, out BoxCollider2D collider)
+    {
+        foreach (var result in world.Query<Name, LocalTransform, BoxCollider2D>())
+        {
+            string name = Strings.Resolve(result.Component1.Value) ?? string.Empty;
+            if (IsName(name, "squidward"))
+            {
+                transform = result.Component2;
+                collider = result.Component3;
+                return true;
+            }
+        }
+
+        transform = default;
+        collider = default;
+        return false;
+    }
+
+    private static bool AabbOverlap(
+        in LocalTransform aTransform,
+        in BoxCollider2D aCollider,
+        in LocalTransform bTransform,
+        in BoxCollider2D bCollider)
+    {
+        float aScaleX = Math.Abs(aTransform.Scale.X);
+        float aScaleY = Math.Abs(aTransform.Scale.Y);
+        float bScaleX = Math.Abs(bTransform.Scale.X);
+        float bScaleY = Math.Abs(bTransform.Scale.Y);
+
+        float aCenterX = aTransform.Position.X + aCollider.Offset.X;
+        float aCenterY = aTransform.Position.Y + aCollider.Offset.Y;
+        float bCenterX = bTransform.Position.X + bCollider.Offset.X;
+        float bCenterY = bTransform.Position.Y + bCollider.Offset.Y;
+
+        float aHalfX = aCollider.HalfExtents.X * aScaleX;
+        float aHalfY = aCollider.HalfExtents.Y * aScaleY;
+        float bHalfX = bCollider.HalfExtents.X * bScaleX;
+        float bHalfY = bCollider.HalfExtents.Y * bScaleY;
+
+        return Math.Abs(aCenterX - bCenterX) <= (aHalfX + bHalfX) &&
+               Math.Abs(aCenterY - bCenterY) <= (aHalfY + bHalfY);
+    }
+
+    private static void LogAabb(
+        string aName,
+        in LocalTransform aTransform,
+        in BoxCollider2D aCollider,
+        string bName,
+        in LocalTransform bTransform,
+        in BoxCollider2D bCollider,
+        bool overlap)
+    {
+        float aCenterX = aTransform.Position.X + aCollider.Offset.X;
+        float aCenterY = aTransform.Position.Y + aCollider.Offset.Y;
+        float bCenterX = bTransform.Position.X + bCollider.Offset.X;
+        float bCenterY = bTransform.Position.Y + bCollider.Offset.Y;
+
+        float aHalfX = aCollider.HalfExtents.X * Math.Abs(aTransform.Scale.X);
+        float aHalfY = aCollider.HalfExtents.Y * Math.Abs(aTransform.Scale.Y);
+        float bHalfX = bCollider.HalfExtents.X * Math.Abs(bTransform.Scale.X);
+        float bHalfY = bCollider.HalfExtents.Y * Math.Abs(bTransform.Scale.Y);
+
+        System.Console.WriteLine(
+            $"[BarnacleSnatcher] AABB overlap={overlap} " +
+            $"{aName} center=({aCenterX:0.###},{aCenterY:0.###}) half=({aHalfX:0.###},{aHalfY:0.###}) " +
+            $"{bName} center=({bCenterX:0.###},{bCenterY:0.###}) half=({bHalfX:0.###},{bHalfY:0.###})");
+    }
+
+    private static void EnsureSheetMetadata(ref SpriteSheetAnimation2D anim, ref SpriteRenderer2D renderer)
+    {
+        if (!s_barnacleTexturePathId.IsValid)
+        {
+            s_barnacleTexturePathId = Strings.Intern(BarnacleTexturePath);
+        }
+
+        anim.TexturePath = s_barnacleTexturePathId;
+        renderer.TexturePath = s_barnacleTexturePathId;
+
+        anim.FrameWidth = BarnacleFrameWidth;
+        anim.FrameHeight = BarnacleFrameHeight;
+        anim.SheetWidth = BarnacleSheetWidth;
+        anim.SheetHeight = BarnacleSheetHeight;
+        anim.FrameCount = BarnacleFrameCount;
+        anim.StartFrame = 0;
+        if (anim.TextureId == 0 && renderer.TextureId != 0)
+        {
+            anim.TextureId = renderer.TextureId;
+        }
+
+        if (!s_metadataLogged)
+        {
+            s_metadataLogged = true;
+            System.Console.WriteLine(
+                "[BarnacleSnatcher] Applied sheet metadata from code: " +
+                $"{BarnacleTexturePath} {BarnacleSheetWidth}x{BarnacleSheetHeight} " +
+                $"frame {BarnacleFrameWidth}x{BarnacleFrameHeight} count={BarnacleFrameCount}");
+        }
     }
 }

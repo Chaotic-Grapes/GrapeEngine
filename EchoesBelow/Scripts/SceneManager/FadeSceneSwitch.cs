@@ -23,6 +23,7 @@ public class FadeSceneSwitch : SystemBase
 
     // Prevents repeated transitions once a switch succeeds or fails.
     private bool _switched;
+    private bool _loggedInactiveScene;
 
     protected override void OnUpdate()
     {
@@ -37,7 +38,6 @@ public class FadeSceneSwitch : SystemBase
         Scene? active = sceneManager.GetActive();
         if (active == null || !ScenePathMatches(active.Path, SourceScenePath))
         {
-            Log($"FadeSceneSwitch: Active scene is not the source scene file: '{active?.Path ?? "null"}'; aborting switch.");
             return;
         }
 

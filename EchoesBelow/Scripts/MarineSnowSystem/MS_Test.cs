@@ -14,6 +14,7 @@ namespace EchoesBelow.Scripts.MarineSnowSystem;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class MS_Test : SystemBase
 {
+
     protected override void OnCreate()
     {
         Log("System MS_Test initialized", LogLevel.Debug);

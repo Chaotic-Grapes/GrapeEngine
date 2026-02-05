@@ -16,6 +16,7 @@ public class AutoSceneSwitch : SystemBase
 
     private float _elapsed;
     private bool _switched;
+    private bool _loggedInactiveScene;
 
     protected override void OnUpdate()
     {
@@ -28,7 +29,6 @@ public class AutoSceneSwitch : SystemBase
         Scene? active = sceneManager.GetActive();
         if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
         {
-            Log($"AutoSceneSwitch: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
             return;
         }
 
