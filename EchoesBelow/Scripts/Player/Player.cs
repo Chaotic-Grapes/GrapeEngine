@@ -87,8 +87,8 @@ public class Player : SystemBase
 
 
 
-                //Variables
-                ref LocalTransform transform = ref gameObject.Component4;
+            //Variables
+            ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
             ref AngularVelocity2D av = ref gameObject.Component3;
             Vector2 playerDir;
