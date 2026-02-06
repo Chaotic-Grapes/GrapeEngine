@@ -30,6 +30,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageTypes.h"
 #include "ecs/StringTable.h"
 #include <filesystem>
+#include "services/TimeSystem.h"
+#include <algorithm>
 
 namespace {
     Audio::Bus ToBus(uint8_t raw) {
@@ -61,6 +63,14 @@ namespace ECS {
             m_sceneUnloadInProgress = false;
             const bool allowCrossfade = m_allowCrossfadeOnUnload;
             m_allowCrossfadeOnUnload = false;
+            if (allowCrossfade && m_crossfadeInDuration > 0.0f) {
+                m_crossfadeInRemaining = m_crossfadeInDuration;
+                m_crossfadeFadeInActive = true;
+            } else {
+                m_crossfadeInRemaining = 0.0f;
+                m_crossfadeFadeInActive = false;
+                m_crossfadeInDuration = 0.0f;
+            }
             m_activeSounds.clear();
 
             // Stop all fading sounds in the engine to prevent carryover
@@ -106,6 +116,17 @@ namespace ECS {
 
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
+
+        if (m_crossfadeFadeInActive) {
+            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            if (dt > 0.0f) {
+                m_crossfadeInRemaining = std::max(0.0f, m_crossfadeInRemaining - dt);
+                if (m_crossfadeInRemaining <= 0.0f) {
+                    m_crossfadeFadeInActive = false;
+                    m_crossfadeInDuration = 0.0f;
+                }
+            }
+        }
 
         // Track which entities we've processed this frame
         std::unordered_set<Entity, EntityHash> processedEntities;
@@ -221,7 +242,14 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 if (shouldPlay && !hasInstance) {
                     Audio::PlaySettings settings{};
-                    const bool doFadeIn = src.EnableFadeIn && src.FadeInDuration > 0.0f;
+                    const bool crossfadeFadeIn = m_crossfadeFadeInActive && m_crossfadeInRemaining > 0.0f;
+                    const bool hasSourceFadeIn = src.EnableFadeIn && src.FadeInDuration > 0.0f;
+                    const bool doFadeIn = hasSourceFadeIn || crossfadeFadeIn;
+                    const float fadeInDuration = doFadeIn
+                        ? (hasSourceFadeIn && crossfadeFadeIn
+                            ? std::max(src.FadeInDuration, m_crossfadeInRemaining)
+                            : (hasSourceFadeIn ? src.FadeInDuration : m_crossfadeInRemaining))
+                        : 0.0f;
                     settings.Volume = doFadeIn ? 0.0f : src.Volume;
                     settings.Pitch = src.Pitch;
                     settings.Loop = src.Loop;
@@ -233,9 +261,9 @@ namespace ECS {
                         m_activeSounds[e] = handle;
 
                         // Check if fadein is enabled
-                        if (doFadeIn) {
-							_fadeInHandle(handle, src.FadeInDuration, src.Volume);
-                            LOG_DEBUG("AudioSystem: Fade-in started (duration=" << src.FadeInDuration << "s)");
+                        if (doFadeIn && fadeInDuration > 0.0f) {
+							_fadeInHandle(handle, fadeInDuration, src.Volume);
+                            LOG_DEBUG("AudioSystem: Fade-in started (duration=" << fadeInDuration << "s)");
                         }
                         LOG_DEBUG("AudioSystem: Playback started (handle ID=" << handle.Id << ")");
                     }
@@ -323,6 +351,9 @@ namespace ECS {
         m_hasStarted = true;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
+        m_crossfadeInDuration = 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
@@ -331,6 +362,9 @@ namespace ECS {
         m_hasStarted = false;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
+        m_crossfadeInDuration = 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
@@ -393,6 +427,9 @@ namespace ECS {
     void AudioSystem::OnSceneWillUnload(float fadeDuration, bool allowCrossfade) {
         m_sceneUnloadInProgress = true;
         m_allowCrossfadeOnUnload = allowCrossfade;
+        m_crossfadeInDuration = allowCrossfade ? fadeDuration : 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
 
         if (m_activeSounds.empty()) {
             if (fadeDuration > 0.0f) {

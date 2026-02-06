@@ -113,6 +113,11 @@ namespace ECS {
         bool m_sceneUnloadInProgress = false;
         bool m_allowCrossfadeOnUnload = false;
 
+        // Crossfade-in support for new scene audio
+        float m_crossfadeInDuration = 0.0f;
+        float m_crossfadeInRemaining = 0.0f;
+        bool m_crossfadeFadeInActive = false;
+
         // Helper methods
         void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
