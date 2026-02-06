@@ -125,6 +125,12 @@ public class PauseMenu : SystemBase
             sceneManager.SetNextAudioTransition(2.0f, true);
             //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
             //Like creating a new scene / allocate a new scene in the registry
+            Time.TimeScale = 1;
+            isPaused = false;
+            foreach (ulong ui_id in pauseMenuElementObjIds)
+            {
+                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+            }
             var sceneIndex = SceneManager.Instance.AddScene();
             var ss = SceneManager.Instance.LoadScene(sceneIndex, TargetScenePath);
             SceneManager.Instance.SetActive(sceneIndex);

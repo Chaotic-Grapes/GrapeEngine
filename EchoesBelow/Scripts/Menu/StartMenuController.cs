@@ -8,14 +8,18 @@ using System;
 
 namespace EchoesBelow.Scripts;
 
-[Component] public record struct StartMenuControllerComponent(bool start, int startSignifier, int exitSignifier);
+[Component] public record struct StartMenuControllerComponent(bool start, int startSignifier, int exitSignifier, bool isEndScene, float timer);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class StartMenuController : SystemBase
 {
-
+    //For startscene
     private const string SourceSceneName = "M4StartScene";
     private const string TargetScenePath = "EchoesBelow/Scenes/Level_One.scn";
     private const float SwitchDelaySeconds = 5.0f;
+
+    //for endscene
+    private const string EndSceneName = "EndScene";
+    private const string StartSceneName = "EchoesBelow/Scenes/M4StartScene.scn";
 
     private float _elapsed;
     private bool _switched;
@@ -27,7 +31,7 @@ public class StartMenuController : SystemBase
     { //Application.Shutdown
         //Application.Quit();
     }
-    private bool OnStart(ref bool startBool)
+    private bool OnStart(ref bool startBool, ulong endSceneControllerId)
     {
         if (startBool == true) return true;
         startBool = true;
@@ -35,12 +39,34 @@ public class StartMenuController : SystemBase
         //Default
         isLeftSelected = true;
 
+        //reset endscene timer every time
+        Entity.FromId(World!,endSceneControllerId).GetComponent<StartMenuControllerComponent>().timer = 1f;
         //End of Start
         return true;
     }
     protected override void OnUpdate()
     {
         SceneManager sceneManager = SceneManager.Instance;
+        foreach(var controller in World!.Query<StartMenuControllerComponent>())
+        {
+            if (controller.Component1.isEndScene)
+            {
+                controller.Component1.timer -= Time.DeltaTime;
+                if(Input.IsKeyDown(KeyCode.Space)) //controller.Component1.timer < 0 &&
+                {
+                    //Fade out music
+                    sceneManager.SetNextAudioTransition(2.0f, true);
+                    //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
+                    //Like creating a new scene / allocate a new scene in the registry
+                    var sceneIndex = SceneManager.Instance.AddScene();
+                    var ss = SceneManager.Instance.LoadScene(sceneIndex, StartSceneName);
+                    SceneManager.Instance.SetActive(sceneIndex);
+                }
+            }
+            else continue;
+        }
+
+        
         Scene? active = sceneManager.GetActive();
         if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
         {
@@ -52,7 +78,7 @@ public class StartMenuController : SystemBase
         foreach (var controller in World!.Query<StartMenuControllerComponent>())
         {
             bool start = controller.Component1.start;
-            controller.Component1.start = OnStart(ref start);
+            controller.Component1.start = OnStart(ref start, controller.Entity.Id);
         }
 
         isKeyPressed_horizontal = Input.IsKeyPressed(KeyCode.A) || Input.IsKeyPressed(KeyCode.D);
