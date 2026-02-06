@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileSet.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+
+\brief
+The declaration of the Tileset class for managing tile definitions within a
+texture atlas. Provides methods to define tiles, query their UVs and collision types.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <unordered_map>

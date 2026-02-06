@@ -89,6 +89,7 @@ namespace ECS {
 		 * @brief Create an empty entity in the world.
 		 * @return ECS::Entity The newly created entity
          */
+        // Create.
         Entity Create() {
             EntityId idx;
             // If with identical then and else branches [bugprone-branch-close]
@@ -122,6 +123,7 @@ namespace ECS {
 		 * @return ECS::Entity The created entity with the specified ID, or a new entity if ID cannot be reused
          * @warning Do not use this function unless you know what you're doing! This is meant for advanced use cases like state restoration.
          */
+        // Create with id.
         Entity CreateWithId(EntityId targetId) {
             // Ensure generations and locations vectors are large enough
             if (targetId >= m_generations.size()) {
@@ -155,6 +157,7 @@ namespace ECS {
 		 * @return ECS::Entity The newly created entity with the specified components
          */
         template<typename... Ts>
+        // Create.
         Entity Create(const Ts&... comps) {
             // Basically the same as Create() + Add() for each component, but more efficient
 
@@ -169,6 +172,7 @@ namespace ECS {
 		 * @param e The entity to check
 		 * @return bool True if the entity is alive; false otherwise
          */
+        // Check whether alive.
         bool IsAlive(const Entity e) const {
             // An entity is considered alive if:
             // - its index is within the valid range,
@@ -184,6 +188,7 @@ namespace ECS {
          * @param id The entity index/id.
          * @return ECS::Entity with up-to-date generation, or NULL_ENTITY if out of range.
          */
+        // Resolve.
         Entity Resolve(const EntityId id) const {
             if (id >= m_generations.size()) {
                 return NULL_ENTITY;
@@ -196,6 +201,7 @@ namespace ECS {
 		 * @param e The entity to destroy
          * @note Assumes the entity is alive, behavior is undefined for dead entities.
          */
+        // Destroy.
         void Destroy(const Entity e) {
             // Assume entity is alive
             // If entity participates in hierarchy, unlink it first
@@ -226,6 +232,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Check for.
         bool Has(const Entity e) const {
             // Assume entity is alive
 
@@ -246,6 +253,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Return.
         inline T& Get(const Entity e) {
             // Assume entity is alive
 
@@ -264,6 +272,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Return.
         inline const T& Get(const Entity e) const {
             // Assume entity is alive
 
@@ -284,6 +293,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Try to get.
         T* TryGet(const Entity e) {
             // Assume entity is alive
 
@@ -307,6 +317,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Try to get.
         const T* TryGet(const Entity e) const {
             // Assume entity is alive
 
@@ -328,6 +339,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename... Ts>
+        // Try to get components.
         std::tuple<Ts*...> TryGetComponents(const Entity e) {
             // Assume entity is alive
 
@@ -357,6 +369,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename... Ts>
+        // Try to get components.
         std::tuple<const Ts*...> TryGetComponents(const Entity e) const {
 			// Assume entity is alive
 
@@ -385,6 +398,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T, typename... TArgs>
+        // Add.
         inline T& Add(Entity e, TArgs&&... args) {
             // Assume entity is alive
 
@@ -413,6 +427,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Remove.
         inline void Remove(Entity e) {
 			// Assume entity has the component
 
@@ -431,6 +446,7 @@ namespace ECS {
          * @note Assumes the entity is alive
          */
         template<typename T>
+        // Set.
         T& Set(Entity e, T value) {
             // Assume entity is alive
 
@@ -474,6 +490,7 @@ namespace ECS {
          * 
          * @note Batch operations can be nested (ref-counted)
          */
+        // Begin batch.
         void BeginBatch() {
             if (m_batchDepth == 0) {
                 m_batchStartVersion = m_archetypeVersion;
@@ -487,6 +504,7 @@ namespace ECS {
          * When the outermost batch ends (depth reaches 0), invalidates query caches
          * if any archetypes were created during the batch.
          */
+        // End batch.
         void EndBatch() {
             if (m_batchDepth > 0) {
                 --m_batchDepth;
@@ -499,6 +517,7 @@ namespace ECS {
          * @brief Check if currently inside a batch operation.
          * @return True if BeginBatch() was called more times than EndBatch()
          */
+        // Check whether in batch.
         bool IsInBatch() const { return m_batchDepth > 0; }
 
         // ************** Entity State Capture/Restore ************** //
@@ -513,6 +532,7 @@ namespace ECS {
          * @return Vector of serialized components; empty if entity is not alive
          * @note Assumes the entity is alive
          */
+        // Capture entity components.
         std::vector<SerializedComponent> CaptureEntityComponents(Entity e) const {
             std::vector<SerializedComponent> result;
             auto& loc = m_locations[e.Index];
@@ -523,6 +543,7 @@ namespace ECS {
                 SerializedComponent sc;
                 sc.Id = info.Id;
                 sc.Data.resize(info.Size);
+                // Copy raw component data.
                 std::memcpy(sc.Data.data(), ptr, info.Size);
                 result.push_back(std::move(sc));
             }
@@ -538,6 +559,7 @@ namespace ECS {
          * @param comps The serialized component snapshot
          * @note Does nothing if entity is not alive
          */
+        // Restore entity components.
         void RestoreEntityComponents(Entity e, const std::vector<SerializedComponent>& comps) {
             if (!IsAlive(e)) return;
 
@@ -578,6 +600,7 @@ namespace ECS {
          * @return Vector of component type IDs; empty if entity is not alive
          * @note Assumes the entity is alive
          */
+        // Return entity components.
         std::vector<ComponentTypeId> GetEntityComponents(Entity e) const {
             std::vector<ComponentTypeId> result;
             auto& loc = m_locations[e.Index];
@@ -596,6 +619,7 @@ namespace ECS {
          * @param sig The signature to match
          * @return Vector of matching archetypes
          */
+        // Return matching archetypes.
         inline const std::vector<Archetype*>& GetMatchingArchetypes(const Signature& sig) const {
             return _getMatchingArchetypes(sig);
         }
@@ -606,6 +630,7 @@ namespace ECS {
          * @param componentId The component type ID
          * @return True if entity has component
          */
+        // Check for by id.
         inline bool HasById(Entity e, ComponentTypeId componentId) const {
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr)
@@ -619,6 +644,7 @@ namespace ECS {
          * @param componentId The component type ID
          * @return Pointer to component data, or nullptr if not found
          */
+        // Return raw component ptr.
         inline void* GetRawComponentPtr(Entity e, ComponentTypeId componentId) {
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(componentId))
@@ -634,6 +660,7 @@ namespace ECS {
          * @param size Size of component data
          * @return Pointer to the added component
          */
+        // Add component by id.
         inline void* AddComponentById(Entity e, ComponentTypeId componentId, void* data, size_t size) {
             // Ensure component info exists
             if (m_componentSizes.find(componentId) == m_componentSizes.end()) {
@@ -669,14 +696,17 @@ namespace ECS {
                               << " (provided=" << size << ", expected=" << meta.Size << ")");
                       }
                       const size_t copySize = std::min(size, meta.Size);
+                      // Copy raw component data.
                       std::memcpy(componentPtr, data, copySize);
                       if (copySize < meta.Size) {
+                          // Zero-initialize component storage.
                           std::memset(static_cast<uint8_t*>(componentPtr) + copySize, 0, meta.Size - copySize);
                       }
                   } else {
                       const auto& meta = ComponentRegistry::Meta(componentId);
                       if (meta.ctor) {
                           meta.ctor(componentPtr);
+                      // Select the appropriate execution path.
                       } else if (meta.Size > 0) {
                         std::memset(componentPtr, 0, meta.Size);
                     }
@@ -709,6 +739,7 @@ namespace ECS {
                 if (info.Id == componentId) continue;
                 void* dst = to->GetRaw(info.Id, ci, slot);
                 const void* src = from->GetRaw(info.Id, loc.ChunkIndex, loc.SlotIndex);
+                // Copy raw component data.
                 std::memcpy(dst, src, info.Size);
             }
             
@@ -725,14 +756,17 @@ namespace ECS {
                           << " (provided=" << size << ", expected=" << meta.Size << ")");
                   }
                   const size_t copySize = std::min(size, meta.Size);
+                  // Copy raw component data.
                   std::memcpy(componentPtr, data, copySize);
                   if (copySize < meta.Size) {
+                      // Zero-initialize component storage.
                       std::memset(static_cast<uint8_t*>(componentPtr) + copySize, 0, meta.Size - copySize);
                   }
               } else {
                   const auto& meta = ComponentRegistry::Meta(componentId);
                   if (meta.ctor) {
                       meta.ctor(componentPtr);
+                // Select the appropriate execution path.
                 } else if (meta.Size > 0) {
                     std::memset(componentPtr, 0, meta.Size);
                 }
@@ -751,6 +785,7 @@ namespace ECS {
          * synthetic (C#) component types so that archetypes can be created
          * correctly when components are added via AddComponentById.
          */
+        // Register component size by id.
         inline void RegisterComponentSizeById(ComponentTypeId id, size_t size, size_t align) {
             if (m_componentSizes.find(id) == m_componentSizes.end()) {
                 m_componentSizes[id] = { size, align };
@@ -762,6 +797,7 @@ namespace ECS {
          * @param e The entity
          * @param componentId The component type ID
          */
+        // Remove by id.
         inline void RemoveById(Entity e, ComponentTypeId componentId) {
             auto& loc = m_locations[e.Index];
             
@@ -800,6 +836,7 @@ namespace ECS {
                 if (info.Id == componentId) continue;
                 void* dst = to->GetRaw(info.Id, ci, slot);
                 const void* src = from->GetRaw(info.Id, fromChunk, fromSlot);
+                // Copy raw component data.
                 std::memcpy(dst, src, info.Size);
             }
             
@@ -814,6 +851,7 @@ namespace ECS {
 		 * @param fn The function to invoke for each matching entity; should accept parameters (Entity, Ts&...)
          */
         template<typename... Ts, typename TFn>
+        // Iterate each.
         void Each(TFn&& fn) {
             // This will be a lengthy comment explaining what the function does
             // It iterates over all entities that have the specified components and invokes the provided function for each.
@@ -936,6 +974,7 @@ namespace ECS {
 		 * @param fn The function to invoke for each matching entity; should accept parameters (Entity, const Ts&...)
          */
         template<typename... Ts, typename TFn>
+        // Iterate each.
         void Each(TFn&& fn) const {
             // Similar to non-const Each(), but operates on const components
 
@@ -1036,6 +1075,7 @@ namespace ECS {
 		 * @note This operation may be slower and more expensive than Clear(), which skips hooks.
 		 * @note Consider using Clear() if you simply want to drop all entities quickly.
          */
+        // Destroy all.
         void DestroyAll() {
             std::vector<Entity> toDestroy;
             // Reserve a rough capacity to minimize reallocations
@@ -1081,6 +1121,7 @@ namespace ECS {
          * @brief Get all archetypes in the world.
          * @return Vector of pointers to all archetypes
          */
+        // Return all archetypes.
         std::vector<Archetype*> GetAllArchetypes() const {
             std::vector<Archetype*> result;
             for (const auto& kv : m_archetypes) {
@@ -1098,6 +1139,7 @@ namespace ECS {
 		 * @note However, existing Entity handles become invalid after this operation.
 		 * @note Furthermore, no per-entity destruction hooks are invoked; use DestroyAll() if needed.
          */
+        // Clear.
         void Clear() {
             m_archetypes.clear();
 
@@ -1127,6 +1169,7 @@ namespace ECS {
          * @note This operation calls _onComponentRemoving hooks for each entity.
          * @note The operation is relatively expensive as it iterates all entities.
          */
+        // Remove component from all entities.
         void RemoveComponentFromAllEntities(ComponentTypeId componentId) {
             // Collect all entities that have this component
             // We collect first to avoid invalidating iterators during removal
@@ -1168,6 +1211,7 @@ namespace ECS {
 		 * @param parent The parent entity to which the child will be attached
          * @note Assumes both entities are alive
          */
+        // Resolve parent relationships.
         void Attach(const Entity child, const Entity parent) { Set<Components::Parent>(child, Components::Parent{parent}); }
 
         /**
@@ -1175,6 +1219,7 @@ namespace ECS {
 		 * @param child The child entity to detach
          * @note Assumes the child entity is alive
          */
+        // Resolve parent relationships.
         void Detach(const Entity child)                      { if (Has<Components::Parent>(child)) Remove<Components::Parent>(child); }
 
         /**
@@ -1185,6 +1230,7 @@ namespace ECS {
          * @note Assumes the parent entity is alive
          */
         template<typename TFn>
+        // Iterate over child entities.
         void ForChildren(const Entity parent, TFn&& fn) const {
             // Iterate through children using the hierarchy index
             const auto it = m_hierarchy.FirstChild.find(parent);
@@ -1212,6 +1258,7 @@ namespace ECS {
 		 * @return ECS::Entity The parent entity, or NULL_ENTITY if the child has no parent
          * @note Assumes the child entity is alive
          */
+        // Return parent of.
         Entity ParentOf(const Entity child) const {
             // Lookup parent from hierarchy index
             const auto it = m_hierarchy.ParentOf.find(child);
@@ -1226,6 +1273,7 @@ namespace ECS {
          * @return bool True if entity and its parents are active (or missing Active).
          * @note Assumes the entity is alive.
          */
+        // Check whether active in hierarchy.
         bool IsActiveInHierarchy(const Entity entity) const {
             if (!IsAlive(entity)) {
                 return false;
@@ -1262,6 +1310,7 @@ namespace ECS {
          * @return ECS::Entity The first child entity, or NULL_ENTITY if no children
          * @note Assumes the parent entity is alive
          */
+        // Return first child of.
         Entity FirstChildOf(const Entity parent) const {
             const auto it = m_hierarchy.FirstChild.find(parent);
             return it == m_hierarchy.FirstChild.end() ? NULL_ENTITY : it->second;
@@ -1273,6 +1322,7 @@ namespace ECS {
          * @return ECS::Entity The next sibling entity, or NULL_ENTITY if no next sibling
          * @note Assumes the child entity is alive
          */
+        // Return next sibling of.
         Entity NextSiblingOf(const Entity child) const {
             const auto it = m_hierarchy.NextSibling.find(child);
             return it == m_hierarchy.NextSibling.end() ? NULL_ENTITY : it->second;
@@ -1284,6 +1334,7 @@ namespace ECS {
          * @return int Number of direct children
          * @note Assumes the parent entity is alive
          */
+        // Return child count of.
         int ChildCountOf(const Entity parent) const {
             int count = 0;
             const auto it = m_hierarchy.FirstChild.find(parent);
@@ -1307,6 +1358,7 @@ namespace ECS {
 		 * @return ECS::Entity The newly cloned entity
          * @note Assumes the source entity is alive
          */
+        // Clone.
         Entity Clone(const Entity src, const CloneOptions& opts = {}) {
             const Entity dst = Create(); // Create new empty entity
 
@@ -1368,18 +1420,21 @@ namespace ECS {
          * @brief Get the map of archetypes in the world.
          * @return const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Reference to the archetypes map
          */
+        // Iterate matching archetypes.
         const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Archetypes() const { return m_archetypes; }
 
         /**
          * @brief Get the PrefabManager associated with this world.
          * @return PrefabManager* Pointer to the PrefabManager, or nullptr if not set
          */
+        // Return prefab manager.
         PrefabManager* GetPrefabManager() const { return m_prefabManager; }
 
         /**
          * @brief Set the PrefabManager for this world.
          * @param manager Pointer to the PrefabManager
          */
+        // Set prefab manager.
         void SetPrefabManager(PrefabManager* manager) { m_prefabManager = manager; }
 
         // ************** Layer Management Access ************** //
@@ -1390,6 +1445,7 @@ namespace ECS {
          * for use by systems (PhysicsSystem, RendererSystem, etc.).
          * @return LayerManager* Pointer to the LayerManager, or nullptr if not set
          */
+        // Return layer manager.
         Scenes::LayerManager* GetLayerManager() const { return m_layerManager; }
 
         /**
@@ -1397,6 +1453,7 @@ namespace ECS {
          * Called by Scene when creating its World.
          * @param manager Pointer to the LayerManager
          */
+        // Set layer manager.
         void SetLayerManager(Scenes::LayerManager* manager) { m_layerManager = manager; }
 
         // ************** Entity Location ************** //
@@ -1415,6 +1472,7 @@ namespace ECS {
 		 * @param e The entity whose location is to be retrieved
 		 * @return const Location* Pointer to the entity's location; nullptr if the entity is not alive
          */
+        // Return location of.
         const Location* LocationOf(const Entity e) const {
             if (!IsAlive(e)) // Despite assumption for component API, check here
                 return nullptr;
@@ -1632,6 +1690,7 @@ namespace ECS {
                 // Copy component data from old archetype to new archetype
                 void* dst = to->GetRaw(info.Id, ci, slot);
                 const void* src = loc.ArchetypePtr->GetRaw(info.Id, fromChunk, fromSlot);
+                // Copy raw component data.
                 std::memcpy(dst, src, info.Size);
             }
 
@@ -1649,6 +1708,7 @@ namespace ECS {
             arch->GetChunk(chunkIndex)->SetEntity(slot, e);
         }
 
+        // Remove entities from archetype storage.
         void _removeFromArchetype(const Entity e, Location& loc) {
             (void)e;
             // Remove entity from its current archetype
@@ -1710,7 +1770,6 @@ namespace ECS {
 
         // Component lifecycle hooks
         void _onComponentAdded(const Entity e, const TypeId t) {
-            // Handle Parent component additions for hierarchy indexing
             // Update hierarchy indices accordingly
             // Assumes Parent component is well-formed
             if (t == TypeIdOf<Components::Parent>()) {
@@ -1760,7 +1819,6 @@ namespace ECS {
                 m_hierarchy.ParentOf[e] = p.ParentEntity;   // Set parent mapping
             }
 
-            // Handle Layer component additions for layer management
             if (t == TypeIdOf<Components::Layer>()) {
                 // Notify LayerManager if present
                 if (m_layerManager) {
@@ -1788,7 +1846,6 @@ namespace ECS {
                 m_hierarchy.ParentOf.erase(e);
             }
 
-            // Handle Layer component removals for layer management
             if (t == TypeIdOf<Components::Layer>()) {
                 if (m_layerManager) {
                     // Get Layer component and notify

@@ -1,3 +1,14 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Matrix4x4.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+
+\brief
+Matrix4x4 math type and operations.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <cmath>  // For trigonometric or arithmetic operations
 #include "math/Vector3D.h"

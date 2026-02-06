@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GUIRenderSystem.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+
+\brief
+Definition of the GUIRenderSystem class for rendering GUI elements. Provides
+functionality for translating ECS GUI components into draw calls.
+*/
+/* End Header *******************************************************************/
+
 #include "ecs/systems/GUIRenderSystem.h"
 
 #include <algorithm>
@@ -41,7 +53,6 @@ namespace ECS {
                 return fallback;
             }
 
-            // Return color based on state.
             switch (state) {
             case GUIState::Hovered:
                 return style->HoverColor;
@@ -152,6 +163,7 @@ namespace ECS {
             return lines;
         }
 
+        // Resolve GUI render space by walking up the parent chain.
         Components::GUIRenderSpace ResolveRenderSpace(World& world, Entity entity) {
             Entity current = entity;
             int depth = 0;
@@ -173,10 +185,12 @@ namespace ECS {
         }
     }
 
+    // Initialize GUI render system state for the world.
     void GUIRenderSystem::OnCreate(World& world) {
         (void)world;
     }
 
+    // Build draw lists and issue render calls for GUI elements.
     void GUIRenderSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
@@ -294,8 +308,8 @@ namespace ECS {
                 float startY = element.ContentPosition.Y;
                 if (text.VAlign == Components::GUIText::VerticalAlign::Middle) {
                     startY += (element.ContentSize.Y - totalHeight) * 0.5f;
-                } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
-                    startY += (element.ContentSize.Y - totalHeight);
+            } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
+                startY += (element.ContentSize.Y - totalHeight);
                 }
 
                 const Color textColor = ResolveStyleColor(style, text.Color, state);
@@ -307,8 +321,8 @@ namespace ECS {
                     float startX = element.ContentPosition.X;
                     if (text.HAlign == Components::GUIText::HorizontalAlign::Center) {
                         startX += (element.ContentSize.X - lineWidth) * 0.5f;
-                    } else if (text.HAlign == Components::GUIText::HorizontalAlign::Right) {
-                        startX += (element.ContentSize.X - lineWidth);
+                } else if (text.HAlign == Components::GUIText::HorizontalAlign::Right) {
+                    startX += (element.ContentSize.X - lineWidth);
                     }
 
                     // Submit each line as its own text draw.
@@ -545,10 +559,12 @@ namespace ECS {
         }
     }
 
+    // Tear down GUI render system state.
     void GUIRenderSystem::OnDestroy(World& world) {
         (void)world;
     }
 
+    // Return metadata used for system registration.
     SystemMetadata GUIRenderSystem::GetMetadata() const {
         ComponentAccessBuilder builder("GUIRenderSystem");
         builder.SetExecutionOrder(-10);

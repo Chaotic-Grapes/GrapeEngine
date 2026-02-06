@@ -1,7 +1,20 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileMapRenderer.cpp
+\author Choi Meng Yew (95%), Foo Rui Qin (5%)
+\par    choi.m@digipen.edu, ruiqin.foo@digipen.edu
+
+\brief
+Definition of the TileMapRenderer class for rendering tilemaps. Provides
+functionality to submit tilemap layers to the renderer using associated tilesets.
+*/
+/* End Header *******************************************************************/
+
 #include "graphics/renderer.hpp"
 #include "graphics/TileMapRenderer.hpp"
-#include "../include/core/World/TileLayer.hpp"
+#include "core/World/TileLayer.hpp"
 
+// Submit the tilemap contents to the renderer using the provided tilesets.
 void TileMapRenderer::Submit(
     const TileMap& tileMap,
     const std::vector<const Tileset*>& tilesets,

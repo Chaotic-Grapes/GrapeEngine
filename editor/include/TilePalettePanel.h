@@ -1,3 +1,17 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TilePalettePanel.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+
+\brief
+Declaration of the TilePalettePanel class for tilemap editing. Provides ImGui 
+UI for selecting tiles, painting them onto a tilemap, and managing tilesets.
+Integrates with the ECS world for physics synchronization and supports
+undo/redo via the editor's UndoSystem.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <memory>
@@ -22,10 +36,13 @@ public:
         std::string Name;
     };
 
+    // Construct and destroy the tile palette panel.
     TilePalettePanel() = default;
     ~TilePalettePanel() = default;
 
+    // Initialize the palette for a specific tilemap and tileset.
     void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world);
+    // Assign the ECS world used for physics syncing.
     void SetWorld(ECS::World* world) { m_world = world; }
 
 	// Set the undo system for recording tile edits.
@@ -39,14 +56,20 @@ public:
         const std::string& tileMapPath,
         const glm::vec2& worldOrigin);
 
-    void Render(); // ImGui Palette Window
+    // Render the ImGui palette window.
+    void Render();
 
     // Interaction hooks
+    // Track hover movement in world space for paint previews.
     void OnViewportHover(const glm::vec2& worldPos);
+    // Handle paint clicks and return whether the click was consumed.
     bool OnViewportClick(const glm::vec2& worldPos, bool isRightClick);
+    // Handle end viewport paint.
     void EndViewportPaint() { m_hasLastPaint = false; }
 
+    // Set active.
     void SetActive(bool active) { m_active = active; }
+    // Return whether the palette is visible and interactive.
     bool IsActive() const { return m_active; }
     // Toggle whether the palette captures viewport input for painting.
     void SetPaintMode(bool enabled) { m_paintMode = enabled; }
@@ -55,11 +78,14 @@ public:
     // Gate viewport paint handling to valid tile-editing state.
     bool CanHandleViewportPaint() const { return m_active && m_paintMode && m_tileMap && m_tileset; }
     // Access current tilemap data for viewport overlays.
+    // Access the current tilemap and tileset.
     const std::shared_ptr<TileMap>& GetTileMap() const { return m_tileMap; }
     const std::shared_ptr<Tileset>& GetTileset() const { return m_tileset; }
+    // Return tile map origin.
     const glm::vec2& GetTileMapOrigin() const { return m_worldOrigin; }
     // Allow external systems (LevelEditor, SceneViewport) to forward dropped assets.
     void SetAssetDropCallback(std::function<void(const std::string&)> callback) { m_assetDropCallback = std::move(callback); }
+    // Handle incoming asset drops forwarded by the editor.
     void HandleAssetDrop(const std::string& assetPath);
     // Update the list of tilemaps for the active tilemap dropdown.
     void SetTileMapList(const std::vector<TileMapListEntry>& entries, EntityId activeId);
@@ -101,6 +127,7 @@ private:
     std::map<int64_t, ECS::Entity> m_physicsEntities;
 
     void SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser);
+    // Pack grid coordinates into a single key.
     int64_t PackCoord(int32_t x, int32_t y) const {
         return (static_cast<int64_t>(x) << 32) | (static_cast<uint32_t>(y));
     }

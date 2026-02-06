@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TilePalettePanel.cpp
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+
+\brief
+Definition of the TilePalettePanel class for tilemap editing. Provides ImGui 
+UI for selecting tiles, painting them onto a tilemap, and managing tilesets.
+*/
+/* End Header *******************************************************************/
+
 #include "TilePalettePanel.h"
 
 #include <imgui.h>
@@ -35,6 +47,7 @@ namespace {
     }
 }
 
+// Initialize.
 void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world)
 {
     m_world = world; // Store world pointer for physics syncing.
@@ -44,6 +57,7 @@ void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const
     SetEditingContext(tileMap, tilesets, paths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 }
 
+// Handle asset drops onto the palette window.
 void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
 {
     if (m_assetDropCallback) {
@@ -52,12 +66,14 @@ void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
     }
 }
 
+// Set tile map list.
 void TilePalettePanel::SetTileMapList(const std::vector<TileMapListEntry>& entries, EntityId activeId)
 {
     m_tileMapList = entries; // Replace the list of tilemaps for the dropdown.
     m_activeTileMapId = activeId; // Track which tilemap is currently active.
 }
 
+// Update tilemap, tileset, and world context for editing operations.
 void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap,
     const std::vector<std::shared_ptr<Tileset>>& tilesets,
     const std::vector<std::string>& tilesetPaths,
@@ -91,6 +107,7 @@ void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap
     m_isEraser = false; // Reset eraser toggle.
 }
 
+// Render.
 void TilePalettePanel::Render()
 {
     if (!m_active) return;
@@ -278,6 +295,7 @@ void TilePalettePanel::Render()
     ImGui::End();
 }
 
+// Handle viewport hover.
 void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
 {
     if (!m_tileMap || !m_tileset) return;
@@ -322,6 +340,7 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
     }
 }
 
+// Handle viewport click.
 bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightClick)
 {
     if (!m_tileMap || !m_tileset) return false;
@@ -398,6 +417,7 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     return true;
 }
 
+// Handle sync physics.
 void TilePalettePanel::SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser)
 {
     if (!m_world) return;
