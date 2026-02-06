@@ -55,7 +55,7 @@ public class PauseMenu : SystemBase
         //}
         SceneManager sceneManager = SceneManager.Instance;
 
-        if (!isPaused && Input.IsKeyPressed(KeyCode.Escape))
+        if (Input.IsKeyPressed(KeyCode.Escape)==true && !isPaused)// && !isPaused)// && Input.IsKeyPressed(KeyCode.Escape))
         {
             Time.TimeScale = 0;
             isPaused = true;
@@ -64,9 +64,9 @@ public class PauseMenu : SystemBase
                 Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = true;
             }
             //Launch Pause Menu
-            Log(() => "Paused");
+            Log("1");
         }
-        else if(isPaused && Input.IsKeyPressed(KeyCode.Escape))
+        else if(Input.IsKeyPressed(KeyCode.Escape)==true && isPaused)// && isPaused)
         {
             Time.TimeScale = 1;
             isPaused = false;
@@ -75,7 +75,7 @@ public class PauseMenu : SystemBase
                 Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
             }
             //Close Pause Menu
-            Log(() => "unPaused");
+            Log("2");
         }
 
         if (isPaused)
@@ -107,7 +107,7 @@ public class PauseMenu : SystemBase
             }
         }
 
-        if (isFirstSelected && Input.IsKeyPressed(KeyCode.Space))
+        if (Input.IsKeyPressed(KeyCode.Space)==true && isFirstSelected)
         {
             Time.TimeScale = 1;
             isPaused = false;
@@ -116,7 +116,7 @@ public class PauseMenu : SystemBase
                 Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
             }
             //Close Pause Menu
-            Log(() => "unPaused");
+            Log("huh");
 
         }
         else if (!isFirstSelected && Input.IsKeyPressed(KeyCode.Space))
