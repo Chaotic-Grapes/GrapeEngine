@@ -13,6 +13,8 @@ namespace Scripts.Menu;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class PauseMenu : SystemBase
 {
+    private const string SourceSceneName = "Level_One";
+    private const string TargetScenePath = "EchoesBelow/Scenes/M4StartScene.scn";
     bool isPaused = false;
     protected override void OnCreate()
     {
@@ -21,6 +23,14 @@ public class PauseMenu : SystemBase
 
     protected override void OnUpdate()
     {
+        SceneManager sceneManager = SceneManager.Instance;
+        Scene? active = sceneManager.GetActive();
+        if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
+        {
+            Log($"PauseMenu: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
+            return;
+        }
+
         if (!isPaused && Input.IsKeyPressed(KeyCode.Escape))
         {
             Time.TimeScale = 0;
