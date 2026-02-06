@@ -2012,6 +2012,41 @@ namespace ECS {
         glViewport(0, 0, vp.Size.x, vp.Size.y);
         glDisable(GL_BLEND);
 
+        // Render circles with ID colors using SDF shader
+        m_sdfCircleShader->use();
+        m_sdfCircleShader->setMat4("uViewProj", viewProj);
+        m_sdfCircleShader->setUniform("uPicking", 1);
+        m_renderer->beginFrame();
+        for (const auto& bucket : buckets) {
+            for (Entity entity : bucket) {
+                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                uint32_t id = entity.Index + 1;
+                glm::vec4 idColor(
+                    ((id >> 0) & 0xFF) / 255.0f,
+                    ((id >> 8) & 0xFF) / 255.0f,
+                    ((id >> 16) & 0xFF) / 255.0f,
+                    1.0f
+                );
+
+                const auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position, scale; Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                DebugDraw2D::Circle(
+                    *m_renderer,
+                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
+                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
+                    idColor,
+                    0.0f,
+                    0
+                );
+            }
+        }
+        m_renderer->endFrame();
+
         // Render entities with ID colors (simplified - just sprites/boxes)
         m_shader->use();
         m_shader->setMat4("uViewProj", viewProj);

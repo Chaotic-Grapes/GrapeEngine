@@ -16,16 +16,78 @@ public abstract class CollisionSystemBase : SystemBase
     private readonly Dictionary<ulong, Dictionary<ulong, CollisionEvent>> _active = [];
     private int _lastProcessedFrame = -1;
     private IntPtr _lastWorldPtr = IntPtr.Zero;
-    private readonly List<ulong> _removeEnterBuffers = [];
-    private readonly List<ulong> _removeExitBuffers = [];
+    private const bool ClearBuffersAfterCache = true;
+    private static int s_cachedFrame = -1;
+    private static IntPtr s_cachedWorldPtr = IntPtr.Zero;
+    private static readonly Dictionary<ulong, List<CollisionEvent>> s_cachedEnterEvents = [];
+    private static readonly Dictionary<ulong, List<CollisionExitEvent>> s_cachedExitEvents = [];
+
+    private static void RefreshFrameCache(World world, IntPtr worldPtr, int frame)
+    {
+        if (s_cachedFrame == frame && s_cachedWorldPtr == worldPtr)
+            return;
+
+        s_cachedFrame = frame;
+        s_cachedWorldPtr = worldPtr;
+        s_cachedEnterEvents.Clear();
+        s_cachedExitEvents.Clear();
+
+        // Cache enter events
+        foreach (var (entity, buffer) in world.Query<CollisionEventBuffer>())
+        {
+            if (buffer.Count <= 0)
+                continue;
+
+            var events = new List<CollisionEvent>(buffer.Count);
+            for (var i = 0; i < buffer.Count; ++i)
+            {
+                events.Add(buffer.GetEvent(i));
+            }
+            s_cachedEnterEvents[entity.Id] = events;
+        }
+
+        // Exit events
+        foreach (var (entity, buffer) in world.Query<CollisionExitEventBuffer>())
+        {
+            if (buffer.Count <= 0)
+                continue;
+
+            var events = new List<CollisionExitEvent>(buffer.Count);
+            for (var i = 0; i < buffer.Count; ++i)
+            {
+                events.Add(buffer.GetEvent(i));
+            }
+            s_cachedExitEvents[entity.Id] = events;
+        }
+
+        // Clear buffers to avoid double-processing
+        if (ClearBuffersAfterCache)
+        {
+            foreach (var (entity, _) in world.Query<CollisionEventBuffer>())
+            {
+                if (entity.IsAlive && entity.HasComponent<CollisionEventBuffer>())
+                {
+                    entity.RemoveComponent<CollisionEventBuffer>();
+                }
+            }
+            foreach (var (entity, _) in world.Query<CollisionExitEventBuffer>())
+            {
+                if (entity.IsAlive && entity.HasComponent<CollisionExitEventBuffer>())
+                {
+                    entity.RemoveComponent<CollisionExitEventBuffer>();
+                }
+            }
+        }
+    }
 
     protected sealed override void OnUpdate()
     {
         var world = World!;
 
+        IntPtr worldPtr;
         unsafe
         {
-            var worldPtr = (IntPtr)world.NativePtr;
+            worldPtr = (IntPtr)world.NativePtr;
             if (worldPtr != _lastWorldPtr)
             {
                 _active.Clear();
@@ -42,24 +104,24 @@ public abstract class CollisionSystemBase : SystemBase
         var exitCount = 0;
         var stayCount = 0;
 
-        _removeEnterBuffers.Clear();
-        _removeExitBuffers.Clear();
+        RefreshFrameCache(world, worldPtr, frame);
 
         // Enter: CollisionEvent is only emitted on new collision pairs.
-        foreach (var (entity, buffer) in world.Query<CollisionEventBuffer>())
+        foreach (var (entityId, events) in s_cachedEnterEvents)
         {
+            var entity = Entity.FromId(world, entityId);
+            if (!entity.IsAlive)
+                continue;
+
             if (!_active.TryGetValue(entity.Id, out var map))
             {
                 map = [];
                 _active[entity.Id] = map;
             }
 
-            // Process enter events
-            for (var i = 0; i < buffer.Count; ++i)
+            for (var i = 0; i < events.Count; ++i)
             {
-                var evt = buffer.GetEvent(i);
-
-                // Only process enter events
+                var evt = events[i];
                 if (!map.ContainsKey(evt.OtherEntityId))
                 {
                     map[evt.OtherEntityId] = evt;
@@ -67,25 +129,27 @@ public abstract class CollisionSystemBase : SystemBase
                     enterCount++;
                 }
             }
-            _removeEnterBuffers.Add(entity.Id);
         }
 
         // Exit: remove and notify.
-        foreach (var (entity, buffer) in world.Query<CollisionExitEventBuffer>())
+        foreach (var (entityId, events) in s_cachedExitEvents)
         {
+            var entity = Entity.FromId(world, entityId);
+            if (!entity.IsAlive)
+                continue;
+
             if (!_active.TryGetValue(entity.Id, out var map))
                 continue;
 
-            for (var i = 0; i < buffer.Count; ++i)
+            for (var i = 0; i < events.Count; ++i)
             {
-                var evt = buffer.GetEvent(i);
+                var evt = events[i];
                 if (map.Remove(evt.OtherEntityId))
                 {
                     OnCollisionExit(entity, evt);
                     exitCount++;
                 }
             }
-            _removeExitBuffers.Add(entity.Id);
         }
 
         // Stay: emit for all currently active pairs.
@@ -102,23 +166,6 @@ public abstract class CollisionSystemBase : SystemBase
             }
         }
 
-        // Defensive: consume event buffers so stale data cannot re-enter.
-        foreach (var entityId in _removeEnterBuffers)
-        {
-            var entity = Entity.FromId(world, entityId);
-            if (entity.IsAlive && entity.HasComponent<CollisionEventBuffer>())
-            {
-                entity.RemoveComponent<CollisionEventBuffer>();
-            }
-        }
-        foreach (var entityId in _removeExitBuffers)
-        {
-            var entity = Entity.FromId(world, entityId);
-            if (entity.IsAlive && entity.HasComponent<CollisionExitEventBuffer>())
-            {
-                entity.RemoveComponent<CollisionExitEventBuffer>();
-            }
-        }
     }
 
     /// <summary>
