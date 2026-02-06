@@ -8,12 +8,17 @@ using GrapeEngine.Scripting.Systems.Attributes;
 namespace EchoesBelow.Scripts;
 
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
+// Auto switch from one scene to another after a delay.
 public class AutoSceneSwitch : SystemBase
 {
+    // Source scene to watch.
     private const string SourceSceneName = "AudioCrossfadeDemo";
+    // Target scene path to load/activate.
     private const string TargetScenePath = "EchoesBelow/Scenes/Samples Demo/AudioCrossfadeTarget.scn";
+    // Delay before switching.
     private const float SwitchDelaySeconds = 5.0f;
 
+    // Runtime state.
     private float _elapsed;
     private bool _switched;
     private bool _loggedInactiveScene;
@@ -26,6 +31,7 @@ public class AutoSceneSwitch : SystemBase
             return;
         }
 
+        // Only act in the source scene.
         SceneManager sceneManager = SceneManager.Instance;
         Scene? active = sceneManager.GetActive();
         if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
@@ -33,12 +39,14 @@ public class AutoSceneSwitch : SystemBase
             return;
         }
 
+        // Wait for the delay.
         _elapsed += Time.DeltaTime;
         if (_elapsed < SwitchDelaySeconds)
         {
             return;
         }
 
+        // Start audio transition and load target.
         sceneManager.SetNextAudioTransition(2.0f, true);
         Log("Beginning scene switch with audio transition.");
         Scene? loaded = sceneManager.LoadScene(TargetScenePath);
@@ -50,6 +58,7 @@ public class AutoSceneSwitch : SystemBase
             return;
         }
 
+        // Find the loaded scene index.
         ulong targetIndex = FindSceneIndex(sceneManager, TargetScenePath);
         if (targetIndex == ulong.MaxValue)
         {
@@ -58,11 +67,13 @@ public class AutoSceneSwitch : SystemBase
             return;
         }
 
+        // Activate target scene.
         sceneManager.SetActive(targetIndex);
         _switched = true;
         Log("AutoSceneSwitch: Switched to target scene after delay.");
     }
 
+    // Find scene index by path.
     private static ulong FindSceneIndex(SceneManager sceneManager, string targetPath)
     {
         string targetNormalized = NormalizePath(targetPath);
@@ -86,6 +97,7 @@ public class AutoSceneSwitch : SystemBase
         return ulong.MaxValue;
     }
 
+    // Normalize path for comparison.
     private static string NormalizePath(string path)
     {
         string normalized = path.Replace('\\', '/');

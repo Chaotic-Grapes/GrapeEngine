@@ -1,3 +1,15 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    StateMachine.cpp
+ * 
+ * @brief  the logic container for the FSM and states used for AI 
+ *  defines three empty state classes (PatrolState, ChaseState, AttackState) that inherit from State.
+ * Their logic is expected to live on the C# side.Brain owns those three state instances and a 
+ * pointer to the current state.
+ */
+
+
 #include "services/StateMachine.h"
 
 
