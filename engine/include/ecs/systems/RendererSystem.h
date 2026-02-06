@@ -470,6 +470,7 @@ namespace ECS {
             const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
         void RenderBloom(Viewport& vp, float bloomRadius);
         void ToneMap(Viewport& vp);
+        void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
         void RenderGUI(Viewport& vp);
         void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
