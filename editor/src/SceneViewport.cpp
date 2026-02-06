@@ -516,7 +516,7 @@ void SceneViewport::_renderViewport() {
                             m_tilePalettePanel->SetPaintMode(false);
                         }
                     }
-                    const bool canUseTilePalette = m_tilePalettePanel && m_tilePalettePanel->CanHandleViewportInput();
+                    const bool canUseTilePalette = m_tilePalettePanel && m_tilePalettePanel->CanHandleViewportHover();
                     if (isSceneImageHovered && canUseTilePalette) {
                         double mx = 0, my = 0;
                         Input::GetMousePosition(mx, my);
@@ -591,11 +591,14 @@ void SceneViewport::_renderViewport() {
                                 rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
                             }
                         }
+                        const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
                         bool left = Input::IsMouseDown(MOUSE_LEFT);
                         if (left) {
-                            // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
-                            m_tilePalettePanel->OnViewportClick(worldPos, false);
-                            tilePaletteHandledClick = true;
+                            if (canPaint) {
+                                // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
+                                m_tilePalettePanel->OnViewportClick(worldPos, false);
+                                tilePaletteHandledClick = true;
+                            }
                         } 
                         else {
                             m_tilePalettePanel->EndViewportPaint();
