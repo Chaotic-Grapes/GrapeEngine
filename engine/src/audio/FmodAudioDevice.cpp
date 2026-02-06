@@ -1,8 +1,17 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    FmodAudioDevice.cpp
+ *
+ * @brief   FMOD-backed audio device implementation.
+ */
+
 #include "audio/FmodAudioDevice.h"
 #include "core/Logger.h"
 #include "services/ResourceManager.h"
 
 namespace {
+    // Log FMOD errors and return success/failure.
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
         if (r == FMOD_OK) return true;
         LOG_ERROR(std::string("FMOD error") + (ctx 
@@ -10,6 +19,7 @@ namespace {
             : "") + ": " + std::to_string(r));
         return false;
     }
+    // Helper to check channel playback state.
     inline bool _is_playing(FMOD::Channel* ch) {
         if (!ch) return false;
         bool playing = false;
@@ -21,19 +31,23 @@ namespace {
 namespace Audio {
 
     bool FmodAudioDevice::Initialize() {
+        // Create system and initialize.
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
         if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init"))
             return false;
+        // Grab master channel group.
         if (!FMOD_OK_OR_LOG(m_system->getMasterChannelGroup(&m_master), "getMasterChannelGroup")) {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
+        // Apply cached master volume.
         SetMasterVolume(m_masterVolume);
         return true;
     }
 
     bool FmodAudioDevice::InitializeWithDevice(const std::string& deviceID) {
+        // Create FMOD system first.
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
 
@@ -60,29 +74,32 @@ namespace Audio {
             }
         }
 
-        // Set the driver before initialization
+        // Set the driver before initialization.
         if (!FMOD_OK_OR_LOG(m_system->setDriver(driverIndex), "setDriver"))
             return false;
 
-        // Initialize FMOD with the selected driver
+        // Initialize FMOD with the selected driver.
         if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init")) {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
 
+        // Grab master channel group.
         if (!FMOD_OK_OR_LOG(m_system->getMasterChannelGroup(&m_master), "getMasterChannelGroup")) {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
 
+        // Apply cached master volume.
         SetMasterVolume(m_masterVolume);
         return true;
     }
 
     void FmodAudioDevice::Update() {
+        // Pump FMOD update.
         if (m_system) m_system->update();
 
-        // prune finished singletons
+        // Prune finished singletons.
         for (auto it = m_activeByCue.begin(); it != m_activeByCue.end(); ) {
             FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second });
             if (!ch || !_is_playing(ch)) it = m_activeByCue.erase(it);
@@ -91,7 +108,7 @@ namespace Audio {
     }
 
     void FmodAudioDevice::Shutdown() {
-        // free channel user data
+        // Free channel user data.
         for (const auto& [id, ch] : m_channels) {
             void* data = nullptr;
             if (ch && ch->getUserData(&data) == FMOD_OK && data) {
@@ -101,12 +118,13 @@ namespace Audio {
         m_channels.clear();
         m_activeByCue.clear();
 
-        // release sounds
+        // Release sounds.
         for (auto& [cid, entry] : m_cues) {
             if (entry.Sound) { entry.Sound->release(); entry.Sound = nullptr; }
         }
         m_cues.clear();
 
+        // Shutdown FMOD.
         if (m_system) {
             m_system->close();
             m_system->release();
@@ -122,7 +140,7 @@ namespace Audio {
         if (!m_system) return false;
         if (m_cues.count(cueId)) return true; // already loaded
 
-        // Try ResourceManager memory path
+        // Try ResourceManager memory path.
         if (auto audioBytes = RM.Get<AudioData>(filePath)) {
             if (audioBytes->IsValid && !audioBytes->Data.empty()) {
                 if (FMOD::Sound* s = _createSoundFromMemory(cueId, filePath, params)) {
@@ -135,7 +153,7 @@ namespace Audio {
             }
         }
 
-        // Fallback: create from file path
+        // Fallback: create from file path.
         FMOD::Sound* s = nullptr;
         auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
         mode |= params.Is3D ? FMOD_3D : FMOD_2D;
@@ -167,7 +185,7 @@ namespace Audio {
         FMOD::Sound* snd = it->second.Sound;
         if (!snd) return {};
 
-        // Configure looping on the sound
+        // Configure looping on the sound.
         snd->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
         snd->setLoopCount(s.Loop ? -1 : 0);
 
@@ -175,6 +193,7 @@ namespace Audio {
         if (!FMOD_OK_OR_LOG(m_system->playSound(snd, nullptr, true, &ch), "playSound") || !ch)
             return {};
 
+        // Apply channel settings.
         ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
         ch->setVolume(s.Volume);
         ch->setPitch(s.Pitch);
@@ -183,6 +202,7 @@ namespace Audio {
         }
         ch->setPaused(s.StartPaused);
 
+        // Track playback handle.
         PlaybackHandle h{ m_nextId++ };
         m_channels.emplace(h.Id, ch);
         auto* storedId = new uint64_t(h.Id);
@@ -290,6 +310,7 @@ namespace Audio {
 
     void FmodAudioDevice::SetListener(const ListenerParams& l) {
         if (!m_system) return;
+        // Update listener attributes.
         const FMOD_VECTOR pos{ l.Position.x, l.Position.y, l.Position.z };
         const FMOD_VECTOR vel{ l.Velocity.x, l.Velocity.y, l.Velocity.z };
         const FMOD_VECTOR fwd{ l.Forward.x, l.Forward.y, l.Forward.z };
@@ -298,6 +319,7 @@ namespace Audio {
     }
 
     void FmodAudioDevice::SetMasterVolume(float volume) {
+        // Clamp and apply.
         m_masterVolume = (volume < 0.f) ? 0.f : (volume > 1.f ? 1.f : volume);
         if (m_master) m_master->setVolume(m_masterVolume);
     }
@@ -315,6 +337,7 @@ namespace Audio {
     }
 
     void FmodAudioDevice::GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const {
+        // Return cue id -> path list.
         out.clear();
         out.reserve(m_cues.size());
         for (const auto& [id, entry] : m_cues)
@@ -329,6 +352,7 @@ namespace Audio {
         if (const auto it = m_cues.find(cueId); it != m_cues.end())
             return it->second.Sound;
 
+        // Create sound and cache.
         FMOD::Sound* s = nullptr;
         auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
         mode |= params.Is3D ? FMOD_3D : FMOD_2D;
@@ -340,6 +364,7 @@ namespace Audio {
     }
 
     FMOD::Channel* FmodAudioDevice::_channelFromHandle(PlaybackHandle h) {
+        // Resolve channel by handle id.
         if (!h) return nullptr;
         const auto it = m_channels.find(h.Id);
         if (it == m_channels.end()) return nullptr;
@@ -350,12 +375,14 @@ namespace Audio {
         const std::string& path,
         const SoundParams& params)
     {
+        // Ignore cue id; use the audio data by path.
         (void)cueId;
 
         auto audioBytes = RM.Get<AudioData>(path);
         if (!audioBytes || !audioBytes->IsValid || audioBytes->Data.empty())
             return nullptr;
 
+        // Build FMOD open-from-memory info.
         FMOD_CREATESOUNDEXINFO exinfo{};
         exinfo.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
         exinfo.length = static_cast<unsigned int>(audioBytes->Data.size());
