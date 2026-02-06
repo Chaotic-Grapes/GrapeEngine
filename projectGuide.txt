@@ -221,11 +221,11 @@ TARGETS (Editor vs Standalone Game)
 
 The project produces two targets:
 - Editor: interactive level editor, built into `build\Debug` / `build\Release`
-- Standalone Game: gameplay-only executable, built via scripts into `build_game\Debug` / `build_game\Release`
+- Standalone Game: gameplay-only executable, built via scripts into `build_game\Debug` / `build_game\exports\Release`
 
 How to select targets:
 - Use 'script_build_editor.bat' / 'script_run_editor.bat' for the Editor
-- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game
+- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game (editor needs to be built first!)
 - In Visual Studio, open the solution in 'build\' and run the Editor; game builds are produced by scripts
 
 APPLICATION CONFIGURATION (config.json)
