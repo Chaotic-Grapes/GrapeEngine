@@ -335,7 +335,7 @@ public class PlayerTriggerHandler : TriggerSystemBase
     {
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001 &&
-            InventoryController.ms02_Count == 5 && InventoryController.ms01_Count == 5)
+            InventoryController.ms02_Count >= 5 && InventoryController.ms01_Count >= 5)
         {
             SceneManager sceneManager = SceneManager.Instance;
             //Loadscene use dalton's

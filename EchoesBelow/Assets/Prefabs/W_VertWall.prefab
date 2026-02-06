@@ -74,27 +74,6 @@
         },
         {
             "Data": {
-                "Color": {
-                    "A": 1.0,
-                    "B": 9.998999303206801e-05,
-                    "G": 9.998999303206801e-05,
-                    "R": 9.999999747378752e-05
-                },
-                "Filled": true,
-                "HalfExtents": {
-                    "X": 0.5,
-                    "Y": 3.0
-                },
-                "Offset": {
-                    "X": 0.0,
-                    "Y": 0.0
-                },
-                "Thickness": 0.0
-            },
-            "TypeName": "ShapeBox2D"
-        },
-        {
-            "Data": {
                 "Dirty": false,
                 "Matrix": {
                     "m00": 0.5099999904632568,
@@ -116,6 +95,27 @@
                 }
             },
             "TypeName": "WorldTransform"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 9.998999303206801e-05,
+                    "G": 9.998999303206801e-05,
+                    "R": 9.999999747378752e-05
+                },
+                "Filled": true,
+                "HalfExtents": {
+                    "X": 0.5,
+                    "Y": 3.0
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Thickness": 0.10000000149011612
+            },
+            "TypeName": "ECS::Components::ShapeBox2D"
         }
     ]
 }
