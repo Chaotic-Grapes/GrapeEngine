@@ -27,6 +27,7 @@ public class GravSwitcher : SystemBase
             //GetComponent
             ref Rigidbody2D rb = ref gameObject.Component2;
 
+
             if(gameObject.Component1.TimeAccumulator < 0)
             {
                 //Fire at Start and whenever we reverse polarity
@@ -38,6 +39,7 @@ public class GravSwitcher : SystemBase
 
             if(gameObject.Component1.TimeAccumulator > gameObject.Component1.switchInterval)
             {
+                gameObject.Entity.GetComponent<LinearVelocity2D>().Value = new Vector2(GMath.Random(-6,6), GMath.Random(-6,6));
                 gameObject.Component1.TimeAccumulator = 0;
                 rb.GravityScale *= -1;
             }

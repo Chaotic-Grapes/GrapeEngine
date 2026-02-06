@@ -56,6 +56,7 @@ public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
 
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
+        return;
         Log("SNATCH COLLISION entered");
         LogCollision(World!, "Enter", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
@@ -68,6 +69,7 @@ public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
     {
+        return;
         Log("SNATCH COLLISION exit");
         LogCollision(World!, "Exit", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))

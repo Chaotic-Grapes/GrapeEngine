@@ -21,6 +21,7 @@ public class CollisionTest : CollisionSystemBase
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
         base.OnCollisionEnter(self, evt);
+        Log("CollisionEntered");
         //Log("evt contact: " + evt.ContactPoint);
         //Log("self: " + self);
         ////foreach(var gameObject in World!.Query<CollisionTestComponent>())
@@ -31,6 +32,7 @@ public class CollisionTest : CollisionSystemBase
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
     {
         base.OnCollisionExit(self, evt);
+        Log("CollisionExit");
         //foreach (var gameObject in World!.Query<CollisionTestComponent>())
         //{
         //    Log("Hello I Exited");
