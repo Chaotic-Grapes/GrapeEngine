@@ -73,6 +73,24 @@ namespace Engine {
          * @return Full path to temporary build output directory
          */
         static std::string GetTempScriptsPath();
+
+        /**
+         * @brief Get the user's Documents directory (platform-specific)
+         * @return Full path to Documents/
+         */
+        static std::string GetDocumentsRoot();
+
+        /**
+         * @brief Get per-project Documents folder
+         * @return Full path to Documents/Grape Engine/<project-name>/
+         */
+        static std::string GetProjectDocumentsRoot();
+
+        /**
+         * @brief Get per-project logs folder
+         * @return Full path to Documents/Grape Engine/<project-name>/logs/
+         */
+        static std::string GetLogsPath();
         
         /**
          * @brief Get the build output directory for compiled scripts

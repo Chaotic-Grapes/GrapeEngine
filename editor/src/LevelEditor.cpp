@@ -1152,7 +1152,7 @@ void LevelEditor::_refreshTileMapCache() {
         std::vector<ECS::RendererSystem::DebugTileMapEntry> debugMaps;
         debugMaps.reserve(m_tileMapCache.size());
 
-    const bool hasMultiple = (m_tileMapCache.size() > 1);
+    // const bool hasMultiple = (m_tileMapCache.size() > 1);
     for (auto& [id, entry] : m_tileMapCache) {
         if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
             continue; // Skip hidden or incomplete tilemaps.

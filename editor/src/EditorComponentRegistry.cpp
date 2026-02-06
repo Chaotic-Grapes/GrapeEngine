@@ -359,6 +359,7 @@ Without these, the macro would end early and break the expansion
                 {"EmissiveTextureId", 0},
                 {"EmissiveStrength", 5.0f},
                 {"EmissiveTexturePath", ""},
+                {"TextureFilter", 0},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -390,7 +391,8 @@ Without these, the macro would end early and break the expansion
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
                 {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
-                {"Loop", true}, {"Playing", false}, {"UseRow", false}
+                {"Loop", true}, {"Playing", false}, {"UseRow", false},
+                {"TextureFilter", 0}
             }; 
             };
         }
@@ -604,6 +606,7 @@ Without these, the macro would end early and break the expansion
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"UVRect", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f}}},
                 {"ScaleMode", 0},
+                {"TextureFilter", 0},
                 {"UseSlicing", false},
                 {"SliceBorder", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}}
             };
@@ -758,6 +761,7 @@ static void _initializeDefaultRegistry() {
                 {"EmissiveTextureId", 0},
                 {"EmissiveStrength", 5.0f},
                 {"EmissiveTexturePath", ""},
+                {"TextureFilter", 0},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -792,7 +796,8 @@ static void _initializeDefaultRegistry() {
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
                 {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
-                {"Loop", true}, {"Playing", false}, {"UseRow", false}
+                {"Loop", true}, {"Playing", false}, {"UseRow", false},
+                {"TextureFilter", 0}
             }; }),
             COMPONENT_OPS_HASH(SpriteSheetAnimation2D, kHashSpriteSheetAnimation2D)
         },
@@ -1065,6 +1070,7 @@ static void _initializeDefaultRegistry() {
                 { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
                 { "UVRect", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f}} },
                 { "ScaleMode", 0 },
+                { "TextureFilter", 0 },
                 { "UseSlicing", false },
                 { "SliceBorder", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} }
             }; }),

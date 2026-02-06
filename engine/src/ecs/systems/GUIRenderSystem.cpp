@@ -376,11 +376,13 @@ namespace ECS {
                         if (slice.size.X <= 0.0f || slice.size.Y <= 0.0f) {
                             continue;
                         }
-                        renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor);
+                        renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
+                            image.TextureFilter);
                     }
                 } else {
                     // Non-sliced image uses a single quad.
-                    renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor);
+                    renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor,
+                        image.TextureFilter);
                 }
                 break;
             }

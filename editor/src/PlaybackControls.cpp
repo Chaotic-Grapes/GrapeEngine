@@ -31,6 +31,7 @@ Reference:
 #include "core/Logger.h"
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
+#include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "scripting/ScriptManager.h"
 #include "helpers/EntityUtils.h"
@@ -234,6 +235,23 @@ void Playback::Render() {
         ImVec2 boxMin(rowStartScreen.x + startX, rowStartScreen.y);
         ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
 
+        // Draw active scene name on the left without affecting layout.
+        const Scenes::Scene* activeScene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
+        const char* sceneName = activeScene ? activeScene->GetName().c_str() : "No Scene";
+        const float sceneLeftPad = 12.0f;
+        const float sceneY = boxMin.y + (boxHeight - ImGui::GetTextLineHeight()) * 0.5f;
+        ImFont* sceneFont = m_mainFont ? m_mainFont : ImGui::GetFont();
+        ImGui::PushFont(sceneFont);
+        const float sceneFontSize = ImGui::GetFontSize();
+        ImGui::PopFont();
+        ImGui::GetWindowDrawList()->AddText(
+            sceneFont,
+            sceneFontSize,
+            ImVec2(rowStartScreen.x + sceneLeftPad, sceneY),
+            ImGui::GetColorU32(EditorStyle::Muted),
+            sceneName
+        );
+
         // Draw background box
         ImGui::GetWindowDrawList()->AddRectFilled(
             boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 1.1f)),
@@ -342,6 +360,7 @@ void Playback::Render() {
             // Time scale presets
             ImGui::PushFont(m_mainFont);
             const float presets[] = { 0.25f, 0.5f, 1.0f, 2.0f };
+            const float presetButtonWidth = 57.0f;
             for (float preset : presets) {
                 bool active = std::fabs(m_userTimeScale - preset) < 0.01f;
                 // Highlight active preset for quick feedback.
@@ -355,7 +374,7 @@ void Playback::Render() {
                 // Preset button
                 char label[12];
                 snprintf(label, sizeof(label), "%.2fx", preset);
-                if (ImGui::Button(label, ImVec2(52, 0))) {
+                if (ImGui::Button(label, ImVec2(presetButtonWidth, 0))) {
                     m_userTimeScale = preset;
                     if (m_editorState == EditorState::Play) {
                         TimeSystem::Instance().SetTimeScale(m_userTimeScale);

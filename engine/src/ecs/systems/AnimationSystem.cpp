@@ -139,6 +139,7 @@ namespace ECS {
                     sprite->Height = anim.FrameHeight;
                     sprite->Tiling = Vector2D{ uv.z - uv.x, uv.w - uv.y };
                     sprite->Offset = Vector2D{ uv.x, uv.y };
+                    sprite->TextureFilter = anim.TextureFilter;
                 }
             }
         );

@@ -14,6 +14,7 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <iostream>
 #include <vector>
 #ifdef _WIN32
 #define NOMINMAX
@@ -82,9 +83,9 @@ namespace {
             return "";
         }
 
-        LOG_ERROR("Multiple projects found in working directory. Use --project <path>.");
+        std::cerr << "Multiple projects found in working directory. Use --project <path>.\n";
         for (const auto& candidate : candidates) {
-            LOG_ERROR("  Project: " << candidate);
+            std::cerr << "  Project: " << candidate << "\n";
         }
         return "__ambiguous__";
     }
@@ -97,6 +98,21 @@ int main(int argc, char** argv) {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+    std::string projectRoot = GetProjectRootFromArgs(argc, argv);
+    if (projectRoot.empty()) {
+        projectRoot = FindProjectRootInCwd();
+    }
+    if (projectRoot.empty()) {
+        std::cerr << "No project found. Place a project folder next to the executable or pass --project <path>.\n";
+        return 1;
+    }
+    if (projectRoot == "__ambiguous__") {
+        return 1;
+    }
+
+    // Initialize project paths
+    Engine::ProjectPaths::Initialize(projectRoot);
+
     LOG_INFO("Starting Standalone Game Build...");
 
     // Initialize engine in Game mode
@@ -106,21 +122,6 @@ int main(int argc, char** argv) {
 #else
     engine.Initialize(Engine::EngineMode::Game, false);
 #endif
-
-    std::string projectRoot = GetProjectRootFromArgs(argc, argv);
-    if (projectRoot.empty()) {
-        projectRoot = FindProjectRootInCwd();
-    }
-    if (projectRoot.empty()) {
-        LOG_ERROR("No project found. Place a project folder next to the executable or pass --project <path>.");
-        return 1;
-    }
-    if (projectRoot == "__ambiguous__") {
-        return 1;
-    }
-
-    // Initialize project paths
-    Engine::ProjectPaths::Initialize(projectRoot);
 
     // Load project settings
     if (!engine.LoadProjectSettings(projectRoot)) {

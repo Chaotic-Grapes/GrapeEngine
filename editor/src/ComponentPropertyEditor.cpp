@@ -198,10 +198,10 @@ namespace {
         if (symbolsFont) ImGui::PushFont(symbolsFont);
         const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
         const bool clicked = ImGui::SmallButton(icon);
+        if (symbolsFont) ImGui::PopFont();
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", tooltip);
         }
-        if (symbolsFont) ImGui::PopFont();
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
@@ -279,6 +279,8 @@ namespace {
         const uint32_t normalId = animData.value("NormalTextureId", 0u);
         if (normalId != 0)
             sprite->NormalTextureId = normalId;
+        sprite->TextureFilter = static_cast<Graphics::TextureFilter>(
+            animData.value("TextureFilter", 0));
         sprite->Width = frameWidth;
         sprite->Height = frameHeight;
         sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
@@ -635,7 +637,8 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
     }
 
     // Group all sprite related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite", "Normal Map", "Emissive Map", "Emissive Strength", "Color", "Tiling", "Offset" });
+    EditorUI::BeginPropertySection({ "Sprite", "Texture Filter", "Normal Map", "Emissive Map", "Emissive Strength",
+        "Color", "Tiling", "Offset" });
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
@@ -670,6 +673,25 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
     if (dropped) {
         ImGui::SameLine();
         ImGui::TextColored(EditorStyle::SuccessText, "Texture updated");
+    }
+
+    const char* filterLabels[] = { "Nearest", "Linear" };
+    int filter = data.value("TextureFilter", 0);
+    filter = std::clamp(filter, 0, 1);
+    ImGui::Text("Texture Filter");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##SpriteTextureFilter", filterLabels[filter])) {
+        for (int i = 0; i < 2; ++i) {
+            bool selected = (filter == i);
+            if (ImGui::Selectable(filterLabels[i], selected)) {
+                filter = i;
+                data["TextureFilter"] = filter;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
     }
 
     // Normal map row
@@ -1125,8 +1147,9 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
 
 
     // Group all sprite sheet related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
-        "Mode", "Start Frame", "Frame Count", "Row", "Frame Offset", "Frame Length", "FPS", "Loop", "Playing" });
+    EditorUI::BeginPropertySection({ "Sprite Sheet", "Texture Filter", "Normal Map", "Frame Width", "Frame Height",
+        "Sheet Width", "Sheet Height", "Mode", "Start Frame", "Frame Count", "Row", "Frame Offset", "Frame Length",
+        "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
@@ -1156,6 +1179,24 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     }, [&](const std::string& rejectedPath) {
         QueueAssetDropError(rejectedPath, kImageExtensions);
     });
+    const char* filterLabels[] = { "Nearest", "Linear" };
+    int filter = data.value("TextureFilter", 0);
+    filter = std::clamp(filter, 0, 1);
+    ImGui::Text("Texture Filter");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##SpriteSheetTextureFilter", filterLabels[filter])) {
+        for (int i = 0; i < 2; ++i) {
+            bool selected = (filter == i);
+            if (ImGui::Selectable(filterLabels[i], selected)) {
+                filter = i;
+                data["TextureFilter"] = filter;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
     (void)dropped; // suppress for now, could be used for feedback
 
     // Normal map row
@@ -1561,10 +1602,12 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
     if (!data.contains("Color")) data["Color"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     if (!data.contains("UVRect")) data["UVRect"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 1.0f}, {"W", 1.0f} };
     if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+    if (!data.contains("TextureFilter")) data["TextureFilter"] = 0;
     if (!data.contains("UseSlicing")) data["UseSlicing"] = false;
     if (!data.contains("SliceBorder")) data["SliceBorder"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
 
-    EditorUI::BeginPropertySection({ "Texture", "Color", "UV Rect", "Scale Mode", "Use Slicing", "Slice Border" });
+    EditorUI::BeginPropertySection({ "Texture", "Texture Filter", "Color", "UV Rect", "Scale Mode", "Use Slicing",
+        "Slice Border" });
 
     std::string texturePath = data.value("TexturePath", std::string());
     std::string textureValueText;
@@ -1583,6 +1626,25 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
     }, [&](const std::string& rejectedPath) {
         QueueAssetDropError(rejectedPath, kImageExtensions);
     });
+
+    const char* filterLabels[] = { "Nearest", "Linear" };
+    int filter = data.value("TextureFilter", 0);
+    filter = std::clamp(filter, 0, 1);
+    ImGui::Text("Texture Filter");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##GUIImageTextureFilter", filterLabels[filter])) {
+        for (int i = 0; i < 2; ++i) {
+            bool selected = (filter == i);
+            if (ImGui::Selectable(filterLabels[i], selected)) {
+                filter = i;
+                data["TextureFilter"] = filter;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
 
     EditorUI::RenderColorRow("Color", data["Color"]);
     EditorUI::RenderVector4DRow("UV Rect", data["UVRect"], "X", "Y", "Z", "W", 0.01f);

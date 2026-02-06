@@ -50,10 +50,10 @@ namespace Engine {
         static LONG WINAPI HandleCrash(EXCEPTION_POINTERS* info);
 #endif
 
-        static void WriteLog(const string& message, const string& exePath, const string& timeStamp);
+        static void WriteLog(const string& message, const string& outputDir, const string& timeStamp);
 
 #ifdef _WIN32
-        static void WriteMiniDump(EXCEPTION_POINTERS* info, const string& exePath, const string& timeStamp);
+        static void WriteMiniDump(EXCEPTION_POINTERS* info, const string& outputDir, const string& timeStamp);
         static void AppendCallStackToStream(ostringstream& oss, CONTEXT* context);
 #endif
 

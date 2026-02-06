@@ -151,6 +151,7 @@ namespace ECS {
 				{"EmissiveTextureId", sprite.EmissiveTextureId},
 				{"EmissiveTexturePath", emissiveTexturePath},
 				{"EmissiveStrength", sprite.EmissiveStrength},
+				{"TextureFilter", static_cast<uint8_t>(sprite.TextureFilter)},
 				{"Color", sprite.Color},
 				{"Tiling", sprite.Tiling},
 				{"Offset", sprite.Offset}
@@ -220,6 +221,8 @@ namespace ECS {
 			sprite.Tiling = j.value("Tiling", Vector2D{ 1, 1 });
 			sprite.Offset = j.value("Offset", Vector2D{ 0, 0 });
 			sprite.EmissiveStrength = j.value("EmissiveStrength", 5.0f);
+			sprite.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
@@ -245,7 +248,8 @@ namespace ECS {
 				{"FramesPerSecond", anim.FramesPerSecond},
 				{"Loop", anim.Loop},
 				{"Playing", anim.Playing},
-				{"UseRow", anim.UseRow}
+				{"UseRow", anim.UseRow},
+				{"TextureFilter", static_cast<uint8_t>(anim.TextureFilter)}
 			};
 		}
 
@@ -308,6 +312,8 @@ namespace ECS {
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
 			anim.UseRow = j.value("UseRow", false);
+			anim.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
 		}
 
 		// Custom serialization for TileMapComponent (StringId paths need special handling).
@@ -560,16 +566,17 @@ namespace ECS {
 		text.VAlign = static_cast<GUIText::VerticalAlign>(j.value("VAlign", 0));
 	}
 
-	inline void to_json(nlohmann::json& j, const GUIImage& image) {
-		j = nlohmann::json{
-			{"TexturePath", ResolveStringId(image.TexturePathId)},
-			{"Color", image.Color},
-			{"UVRect", image.UVRect},
-			{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
-			{"UseSlicing", image.UseSlicing},
-			{"SliceBorder", image.SliceBorder}
-		};
-	}
+		inline void to_json(nlohmann::json& j, const GUIImage& image) {
+			j = nlohmann::json{
+				{"TexturePath", ResolveStringId(image.TexturePathId)},
+				{"Color", image.Color},
+				{"UVRect", image.UVRect},
+				{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
+				{"TextureFilter", static_cast<uint8_t>(image.TextureFilter)},
+				{"UseSlicing", image.UseSlicing},
+				{"SliceBorder", image.SliceBorder}
+			};
+		}
 
 	inline void from_json(const nlohmann::json& j, GUIImage& image) {
 		image.TexturePathId = ReadStringId(j, "TexturePath", 0);
@@ -579,10 +586,12 @@ namespace ECS {
 		if (j.contains("UVRect")) {
 			image.UVRect = j.at("UVRect").get<Vector4D>();
 		}
-		image.ScaleMode = static_cast<GUIImageScaleMode>(j.value("ScaleMode", static_cast<uint8_t>(GUIImageScaleMode::Stretch)));
-		image.UseSlicing = j.value("UseSlicing", false);
-		image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
-	}
+			image.ScaleMode = static_cast<GUIImageScaleMode>(j.value("ScaleMode", static_cast<uint8_t>(GUIImageScaleMode::Stretch)));
+			image.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
+			image.UseSlicing = j.value("UseSlicing", false);
+			image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+		}
 
 	inline void to_json(nlohmann::json& j, const GUIInput& input) {
 		j = nlohmann::json{

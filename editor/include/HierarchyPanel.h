@@ -104,9 +104,6 @@ private:
     // Render the main entity tree with scrollable area and drag-drop support
     void _renderEntityTree();
 
-    // Render footer buttons like Clear All for scene management
-    void _renderFooterButtons();
-
     // -------------------------------------------------------------------------
     // Entity Tree Node Rendering
     // -------------------------------------------------------------------------

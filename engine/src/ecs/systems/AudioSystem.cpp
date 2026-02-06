@@ -28,10 +28,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
-#include "ecs/StringTable.h"
-#include <filesystem>
 #include "services/TimeSystem.h"
 #include <algorithm>
+#include "ecs/StringTable.h"
+#include <filesystem>
 
 namespace {
     Audio::Bus ToBus(uint8_t raw) {

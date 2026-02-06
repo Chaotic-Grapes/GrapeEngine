@@ -209,6 +209,7 @@ namespace ECS {
 
         // Renderer
         m_renderer = std::make_unique<Renderer>(15000);
+        m_guiRenderer = std::make_unique<Renderer>(4000);
 
         // RenderGraph now owns all framebuffers (no more m_fbos!)
         m_renderGraph = std::make_unique<RenderGraph>();
@@ -429,6 +430,7 @@ namespace ECS {
 
             m_wireframeQueue.clear();
             m_guiPanelQueue.clear();
+            m_guiImageQueue.clear();
             m_guiTextQueue.clear();
 
             Framebuffer::Unbind();
@@ -723,7 +725,8 @@ namespace ECS {
                                 smoothness,         // Material2D: smoothness value
                                 aoStrength,         // Material2D: AO strength
                                 normalStrength,     // Material2D: normal strength
-                                flags
+                                flags,
+                                sr.TextureFilter
                                 });
                         }
                     }
@@ -940,7 +943,17 @@ namespace ECS {
                                 angleZ,
                                 1.0f,
                                 0,      // emissiveTextureId (no emissive in picking pass)
-                                0.0f    // emissiveStrength (no emissive in picking pass)
+                                0.0f,   // emissiveStrength (no emissive in picking pass)
+                                0,      // texture width
+                                0,      // texture height
+                                0,      // normalTextureId
+                                0,      // mraTextureId
+                                0.0f,   // metallic
+                                0.5f,   // smoothness
+                                1.0f,   // aoStrength
+                                1.0f,   // normalStrength
+                                0,      // materialFlags
+                                sr.TextureFilter
                                 });
                         }
                     }
@@ -1323,6 +1336,11 @@ namespace ECS {
                     glScissor(scissorX, scissorY, scissorW, scissorH);
                 }
 
+                Renderer* guiRenderer = m_guiRenderer ? m_guiRenderer.get() : m_renderer.get();
+                if (!guiRenderer) {
+                    return;
+                }
+
                 // Render GUI panels (solid quads with optional corner radius).
                 if (!m_guiPanelQueue.empty()) {
                     if (m_shader) {
@@ -1330,7 +1348,7 @@ namespace ECS {
                         m_shader->setMat4("uViewProj", screenOrtho);
                         m_shader->setUniform("uLightingEnabled", 0);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& panel : m_guiPanelQueue) { // Render each panel
                         const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
                                                panel.position.Y + panel.size.Y * 0.5f);
@@ -1338,9 +1356,9 @@ namespace ECS {
                         const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
                         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
                         GLuint textureId = 0;
-                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Render GUI images/icons (textured quads).
@@ -1350,17 +1368,19 @@ namespace ECS {
                         m_shader->setMat4("uViewProj", screenOrtho);
                         m_shader->setUniform("uLightingEnabled", 0);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& image : m_guiImageQueue) {
                         const glm::vec2 center(image.position.X + image.size.X * 0.5f,
                                                image.position.Y + image.size.Y * 0.5f);
                         const glm::vec2 size(image.size.X, image.size.Y);
                         const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                        const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                        // GUI projection uses Y-down; flip V to keep textures upright.
+                        const glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
                         const GLuint textureId = image.textureId;
-                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                            0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Render GUI text (SDF font rendering in screen space).
@@ -1370,7 +1390,7 @@ namespace ECS {
                         m_textShader->use();
                         m_textShader->setMat4("uProjection", textOrtho);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& text : m_guiTextQueue) { // Render each text element
                         if (text.text.empty()) {
                             continue;
@@ -1391,9 +1411,9 @@ namespace ECS {
                         const float ascent = font->getAscent() * scale;
                         const glm::vec2 textPos(text.position.X, height - text.position.Y - ascent);
                         const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                        m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+                        guiRenderer->submitText(*font, text.text, textPos, color, text.pixelSize);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Disable scissor test if it was enabled.
@@ -1455,6 +1475,7 @@ namespace ECS {
         (void)world;
         // Cleanup rendering resources
         m_renderer.reset();
+        m_guiRenderer.reset();
         m_renderGraph.reset();
         m_shader.reset();
         m_textShader.reset();
@@ -1821,8 +1842,9 @@ namespace ECS {
                         ToGlm(sr.Color), sr.TextureId, angleZ, 1.0f,
                         sr.EmissiveTextureId, sr.EmissiveStrength, sr.Width, sr.Height,
                         normalTexId, mraTexId, metallic, smoothness, aoStrength, normalStrength,
-                          flags
-                          });
+                        flags,
+                        sr.TextureFilter
+                        });
                 }
             }
             m_renderer->endFrame();
@@ -1880,6 +1902,11 @@ namespace ECS {
     void RendererSystem::RenderGUI(Viewport& vp) {
         if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
 
+        Renderer* guiRenderer = m_guiRenderer ? m_guiRenderer.get() : m_renderer.get();
+        if (!guiRenderer) {
+            return;
+        }
+
         vp.LDR->Bind();
         glViewport(0, 0, vp.Size.x, vp.Size.y);
         glEnable(GL_BLEND);
@@ -1894,14 +1921,14 @@ namespace ECS {
             m_shader->use();
             m_shader->setMat4("uViewProj", screenOrtho);
             m_shader->setUniform("uLightingEnabled", 0);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& panel : m_guiPanelQueue) {
                 glm::vec2 center(panel.position.X + panel.size.X * 0.5f, panel.position.Y + panel.size.Y * 0.5f);
                 glm::vec2 size(panel.size.X, panel.size.Y);
                 glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
-                m_renderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
             }
-            m_renderer->endFrame();
+            guiRenderer->endFrame();
         }
 
         // Images
@@ -1909,15 +1936,17 @@ namespace ECS {
             m_shader->use();
             m_shader->setMat4("uViewProj", screenOrtho);
             m_shader->setUniform("uLightingEnabled", 0);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& image : m_guiImageQueue) {
                 glm::vec2 center(image.position.X + image.size.X * 0.5f, image.position.Y + image.size.Y * 0.5f);
                 glm::vec2 size(image.size.X, image.size.Y);
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
-                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                // GUI projection uses Y-down; flip V to keep textures upright.
+                glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
+                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
             }
-            m_renderer->endFrame();
+            guiRenderer->endFrame();
         }
 
         // Text
@@ -1925,7 +1954,7 @@ namespace ECS {
             glm::mat4 textOrtho = glm::ortho(0.0f, w, 0.0f, h, -1.0f, 1.0f);
             m_textShader->use();
             m_textShader->setMat4("uProjection", textOrtho);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
@@ -1935,9 +1964,9 @@ namespace ECS {
                 const float ascent = font->getAscent() * scale;
                 glm::vec2 pos(text.position.X, h - text.position.Y - ascent);
                 glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                m_renderer->submitText(*font, text.text, pos, color, text.pixelSize);
+                guiRenderer->submitText(*font, text.text, pos, color, text.pixelSize);
             }
-            m_renderer->endFrame();
+            guiRenderer->endFrame();
         }
 
         Framebuffer::Unbind();
@@ -2006,7 +2035,13 @@ namespace ECS {
                     float angleZ = std::atan2(2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
                     m_renderer->submitSprite({ ToGlm(Vector2D{position.X, position.Y}), ToGlm(Vector2D{scale.X, scale.Y}),
-                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f, 0, 0.0f });
+                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f,
+                        0, 0.0f,
+                        0, 0,
+                        0, 0,
+                        0.0f, 0.5f, 1.0f, 1.0f,
+                        0,
+                        sr.TextureFilter });
                 }
 
                 if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -2203,7 +2238,8 @@ namespace ECS {
     }
 
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
-                                        uint32_t textureId, const Vector4D& uvRect, const Color& color) {
+                                         uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                         Graphics::TextureFilter textureFilter) {
         if (!m_renderer) return;
 
         // Queue GUI image/icon draw for the GUI pass.
@@ -2213,6 +2249,7 @@ namespace ECS {
         submission.textureId = textureId;
         submission.uvRect = uvRect;
         submission.color = color;
+        submission.textureFilter = textureFilter;
         m_guiImageQueue.push_back(submission);
     }
 
