@@ -521,6 +521,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_tilePalette.Initialize(nullptr, nullptr, m_world);
             m_tilePalette.SetAssetDropCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
+            m_tilePalette.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_tilePalette.Render(); },
         [this](ECS::World* w) { m_tilePalette.SetWorld(w); }
@@ -925,8 +926,25 @@ void LevelEditor::_onAssetSelected(const std::string& assetPath) {
         return;
     }
 
-    m_pendingTilesetPath = assetPath; // Cache tileset path for the create prompt.
-    m_showTilemapCreateModal = true; // Trigger the modal to create a tilemap.
+    // Auto-create a tilemap if none exists.
+    const EntityId newId = m_entityActions.AddEntity("Tilemap", ECS::Entity::NPOS32);
+
+	// Add TileMapComponent to the new entity
+    ECS::Entity targetEntity = m_world->Resolve(newId);
+
+	// Initialize TileMapComponent with default values
+    if (m_world->IsAlive(targetEntity)) {
+        _applyTilesetToTilemap(targetEntity, assetPath);
+        m_hierarchyWindow.SetSelectedEntity(targetEntity.Index);
+        m_inspector.InspectEntity(targetEntity.Index);
+    }
+	// Sync viewports to new selection
+    if (m_sceneViewport.HasValidWorld()) {
+        m_sceneViewport.SetSelectedEntity(newId);
+    }
+    if (m_gameViewport.HasValidWorld()) {
+        m_gameViewport.SetSelectedEntity(newId);
+    }
 }
 
 void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
@@ -966,9 +984,7 @@ void LevelEditor::_refreshTileMapCache() {
 
         std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
         const std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path.
-        LOG_INFO("[TileMap] Refresh entity " << entity.Index
-            << " mapPath=\"" << mapPath
-            << "\" legacyTileset=\"" << legacyTilesetPath << "\"");
+        (void)legacyTilesetPath;
 
         if (mapPath.empty() && !scenePath.empty()) {
             // Derive a tilemap path from the saved scene path when none exists.
@@ -1015,12 +1031,6 @@ void LevelEditor::_refreshTileMapCache() {
             entry.TileWorldSize != comp.TileWorldSize ||
             entry.DefaultWidth != comp.DefaultWidth ||
             entry.DefaultHeight != comp.DefaultHeight;
-        LOG_INFO("[TileMap] Cache state entity " << entity.Index
-            << " mapNeedsReload=" << (mapNeedsReload ? "true" : "false")
-            << " entryMapPath=\"" << entry.MapPath << "\""
-            << " hasMap=" << (entry.Map ? "true" : "false")
-            << " missingTilesetList=" << (missingTilesetList ? "true" : "false")
-            << " generationChanged=" << (generationChanged ? "true" : "false"));
 
         if (mapNeedsReload) {
             entry.Map = mapPath.empty() ? nullptr : LoadOrCreateTileMap(mapPath, comp.TileWorldSize, comp.DefaultWidth, comp.DefaultHeight);
@@ -1059,8 +1069,6 @@ void LevelEditor::_refreshTileMapCache() {
         }
 
         const std::vector<std::string>& mapTilesetPaths = entry.Map->GetTilesetPaths();
-        LOG_INFO("[TileMap] Map tileset paths entity " << entity.Index
-            << " count=" << mapTilesetPaths.size());
         if (legacyTilesetPath.empty() && !mapTilesetPaths.empty()) {
             // Keep the legacy component field in sync so scenes retain a usable tileset path.
             comp.TilesetTexturePath = ECS::StringTable::Intern(mapTilesetPaths.front());
@@ -1158,63 +1166,15 @@ void LevelEditor::_refreshTileMapCache() {
             continue; // Skip hidden or incomplete tilemaps.
         }
 
-        std::vector<const Tileset*> tilesets;
+        std::vector<std::shared_ptr<const Tileset>> tilesets;
         tilesets.reserve(entry.Tilesets.size());
         for (const auto& tileset : entry.Tilesets) {
-            tilesets.push_back(tileset.get());
+            tilesets.push_back(tileset);
         }
         debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
     }
 
         renderer->SetDebugTileMaps(debugMaps);
-    }
-}
-
-void LevelEditor::_renderTilemapCreateModal() {
-    if (m_showTilemapCreateModal) {
-        ImGui::OpenPopup("Create Tilemap");
-        m_showTilemapCreateModal = false;
-    }
-
-    if (ImGui::BeginPopupModal("Create Tilemap", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("No Tilemap entity is selected. Create a new Tilemap entity to use this tileset?");
-        ImGui::Separator();
-
-        if (ImGui::Button("Create Tilemap", ImVec2(160, 0))) {
-            if (m_world && !m_pendingTilesetPath.empty()) {
-                ECS::Entity target = m_world->Create();
-
-                ECS::Components::Name name;
-                name.Value = ECS::StringTable::Intern("Tilemap");
-                m_world->Set<ECS::Components::Name>(target, name);
-
-                ECS::Components::LocalTransform transform;
-                m_world->Set<ECS::Components::LocalTransform>(target, transform);
-
-                _applyTilesetToTilemap(target, m_pendingTilesetPath);
-
-                m_hierarchyWindow.SetSelectedEntity(target.Index);
-                m_inspector.InspectEntity(target.Index);
-                if (m_sceneViewport.HasValidWorld()) {
-                    m_sceneViewport.SetSelectedEntity(target.Index);
-                }
-                if (m_gameViewport.HasValidWorld()) {
-                    m_gameViewport.SetSelectedEntity(target.Index);
-                }
-            }
-
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
     }
 }
 
@@ -1283,7 +1243,12 @@ void LevelEditor::_setActiveTileMap(EntityId id) {
     if (it != m_tileMapCache.end() && it->second.Map) {
         const TileMapCacheEntry& entry = it->second;
         const uint8_t activeTilesetIndex = entry.Tilesets.empty() ? 0 : std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+        
+        // Grab a shared_ptr to the active tileset
+        // This ensures the tileset remains alive even if the editor replaces it (e.g. via drag-and-drop) 
+        // before the renderer finishes the current frame
         const std::shared_ptr<Tileset> activeTileset = entry.Tilesets.empty() ? nullptr : entry.Tilesets[activeTilesetIndex];
+        
         m_activeTileMap = entry.Map;
         m_activeTileset = activeTileset;
         m_activeTileMapPath = entry.MapPath;
@@ -1402,9 +1367,6 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         ImGui::End();
     }
-
-    // Render tilemap creation modal after panels so it shows on top.
-    _renderTilemapCreateModal();
 }
 
 // -------------------------------------------------------------------------
@@ -1441,8 +1403,6 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
     m_tileMapList.clear(); // Drop tilemap list for the new scene.
-    m_pendingTilesetPath.clear();
-    m_showTilemapCreateModal = false;
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
     const std::vector<std::string> emptyPaths;
     m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));

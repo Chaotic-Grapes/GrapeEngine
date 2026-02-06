@@ -441,7 +441,7 @@ double MemoryManager::Benchmark(bool useCustom, int allocationCount, int minSize
 }
 
 MemoryManager& MemoryManager::GetInstance() {
-	// Static instance with 10 MB default pool size
-	static MemoryManager instance(10 * 1024 * 1024, false);
+	// Static instance with 64 MB default pool size
+	static MemoryManager instance(64 * 1024 * 1024, false);
 	return instance;
 }

@@ -423,12 +423,14 @@ namespace ECS {
                 RenderSceneToHDR(world, vp, viewProj, buckets, maxLayerId);
                 RenderBloom(vp, bloomRadius);
                 ToneMap(vp);
+                RenderOverlayQuads(vp, viewProj);
                 RenderWireframes(vp, viewProj);
                 RenderGUI(vp);
                 RenderPicking(world, vp, viewProj, buckets);
             }
 
             m_wireframeQueue.clear();
+            m_overlayQuadQueue.clear();
             m_guiPanelQueue.clear();
             m_guiImageQueue.clear();
             m_guiTextQueue.clear();
@@ -595,9 +597,20 @@ namespace ECS {
                         // Render all tilemaps requested by the editor.
                         TileMapRenderer tileRenderer;
                         for (const auto& entry : m_debugTileMaps) {
+							// Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
+                            std::vector<const Tileset*> rawTilesets;
+
+							// Preallocate for efficiency
+                            rawTilesets.reserve(entry.Tilesets.size());
+
+							// Populate raw pointer list
+                            for (const auto& ts : entry.Tilesets) {
+                                rawTilesets.push_back(ts.get());
+                            }
+							// Submit tilemap for rendering
                             tileRenderer.Submit(
                                 entry.Map.get(),
-                                entry.Tilesets,
+                                rawTilesets,
                                 *m_renderer,
                                 entry.Offset
                             );
@@ -1762,7 +1775,12 @@ namespace ECS {
                 TileMapRenderer tileRenderer;
 				// Same thing here, but for multiple tilemaps
                 for (const auto& entry : m_debugTileMaps) {
-                    tileRenderer.Submit(entry.Map.get(), entry.Tilesets, *m_renderer, entry.Offset);
+                    std::vector<const Tileset*> rawTilesets;
+                    rawTilesets.reserve(entry.Tilesets.size());
+                    for (const auto& ts : entry.Tilesets) {
+                        rawTilesets.push_back(ts.get());
+                    }
+                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset);
                 }
             }
 
@@ -1895,6 +1913,46 @@ namespace ECS {
                 m_renderer->endFrame();
             }
         }
+
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj) {
+        if (m_overlayQuadQueue.empty()) return;
+
+        vp.LDR->Bind();
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+
+        // Enable blending for overlay quads
+        GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Setup shader
+        if (m_shader) {
+            m_shader->use();
+            m_shader->setMat4("uViewProj", viewProj);
+            m_shader->setUniform("uPicking", 0);
+            m_shader->setUniform("uLightingEnabled", 0);
+        }
+
+        // Render quads
+        m_renderer->beginFrame();
+        for (const auto& quad : m_overlayQuadQueue) {
+            m_renderer->submitQuad(
+                quad.center,
+                quad.size,
+                quad.textureId,
+                quad.uvRect,
+                quad.color,
+                quad.rotation,
+                1.0f,
+                0
+            );
+        }
+        m_renderer->endFrame();
+
+        if (!blendWasEnabled) glDisable(GL_BLEND);
 
         Framebuffer::Unbind();
     }

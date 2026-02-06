@@ -48,7 +48,8 @@ public:
     EntityId AddEntity(const std::string& name, EntityId parent = ECS::Entity::NPOS32);
 
     // Deletes an entity and all its children from the scene
-    void RemoveEntity(EntityId id);
+    // Returns true if the entity existed and deletion was performed
+    bool RemoveEntity(EntityId id);
 
     // Removes every entity in the scene
     void ClearAllEntities();
