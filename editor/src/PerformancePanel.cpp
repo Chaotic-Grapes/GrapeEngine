@@ -620,7 +620,7 @@ void PerformancePanel::_renderMemoryBenchmark() {
     if (m_lastTestTime >= 0.0) snprintf(timeLabel, sizeof(timeLabel), "Time: %.2f ms", m_lastTestTime);
 
     // Access current style for size calculations
-    ImGuiStyle& style = ImGui::GetStyle();
+    // ImGuiStyle& style = ImGui::GetStyle();
 
     // Vertical alignment fix: Align text to frame padding to center vertically with buttons
     ImGui::AlignTextToFramePadding();

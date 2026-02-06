@@ -27,6 +27,7 @@ SpriteAnimation:
 #include <glad/glad.h>
 #include <vector>
 #include <GLFW/glfw3.h>
+#include "graphics/TextureFilter.h"
 
 struct Sprite {
     glm::vec2 pos;              // center position
@@ -53,6 +54,8 @@ struct Sprite {
     float aoStrength = 1.0f;
     float normalStrength = 1.0f;
     uint32_t materialFlags = 0;
+
+    Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
 
     void handleInput(GLFWwindow* window, float deltaTime);
 };

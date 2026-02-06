@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Matrix4x4.h"
 #include "ecs/StringTable.h"
 #include "audio/SoundTypes.h"
+#include "graphics/TextureFilter.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
 #include <string>
@@ -320,6 +321,9 @@ namespace ECS {
             uint32_t TexturePath = 0;
             uint32_t NormalTexturePath = 0;
             uint32_t EmissiveTexturePath = 0;
+
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
+            uint8_t _paddingFilter[3] = { 0, 0, 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -380,6 +384,9 @@ namespace ECS {
             // Persistent texture path IDs (StringTable). 0 = invalid.
             uint32_t TexturePath = 0;
             uint32_t NormalTexturePath = 0;
+
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
+            uint8_t _paddingFilter[3] = { 0, 0, 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
@@ -657,7 +664,9 @@ namespace ECS {
             Color Color{ 1.0f, 1.0f, 1.0f, 1.0f }; // tint color
             Vector4D UVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
             GUIImageScaleMode ScaleMode = GUIImageScaleMode::Stretch; // fit/fill/none
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
             bool UseSlicing = false;     // enable 9-slice layout
+            uint8_t _paddingFilter = 0;
             Vector4D SliceBorder{ 0.0f, 0.0f, 0.0f, 0.0f }; // border in pixels
         };
         static_assert(std::is_trivially_copyable_v<GUIImage>, "GUIImage must be trivially copyable");

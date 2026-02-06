@@ -106,8 +106,6 @@ namespace EditorUI {
 
         // Position the button correctly
         ImGui::SameLine();
-        const float lineHeight = ImGui::GetTextLineHeight();
-        const float frameHeight = ImGui::GetFrameHeight();
         ImGui::SetCursorPosY(ImGui::GetCursorPosY());
         ImGui::SetCursorPosX(buttonX);
         ImGui::PushID(("Reset_" + id).c_str());

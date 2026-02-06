@@ -257,7 +257,8 @@ namespace ECS {
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                             const Color& color, float cornerRadius = 0.0f);
         void SubmitGUIImage(const Vector2D& position, const Vector2D& size,
-                            uint32_t textureId, const Vector4D& uvRect, const Color& color);
+                            uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
         void SubmitGUIText(const Vector2D& position, const std::string& text,
                            const std::string& fontPath, float pixelSize, const Color& color);
 
@@ -390,6 +391,7 @@ namespace ECS {
             uint32_t textureId = 0;
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
+            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
 

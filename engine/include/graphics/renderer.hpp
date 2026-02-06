@@ -26,6 +26,7 @@ Features:
 #include "font.hpp"
 #include "graphics/vertex.hpp"
 #include "graphics/sprite.hpp"
+#include "graphics/TextureFilter.h"
 
 inline constexpr float kPixelsPerUnit = 100.0f; // 1 world unit == 100 pixels
 inline float PixelsToUnits(float px) { return px / kPixelsPerUnit; }
@@ -56,7 +57,8 @@ public:
         float smoothness = 0.5f,
         float aoStrength = 1.0f,
         float normalStrength = 1.0f,
-        uint32_t materialFlags = 0);
+        uint32_t materialFlags = 0,
+        Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
 
     // Generic triangles for helpers (polygons/circles/etc.)
     void submitTriangles(const Vertex* verts, size_t vCount,
@@ -112,7 +114,12 @@ private:
     static constexpr int EmissiveSlotBase = 26;
 
     // Texture slot caches (store texture IDs currently bound)
-    std::vector<GLuint> albedoTextureSlots;
+    struct AlbedoSlot {
+        GLuint id = 0;
+        Graphics::TextureFilter filter = Graphics::TextureFilter::Nearest;
+    };
+
+    std::vector<AlbedoSlot> albedoTextureSlots;
     std::vector<GLuint> emissiveTextureSlots;
     std::vector<GLuint> normalTextureSlots;
     std::vector<GLuint> mraTextureSlots;
@@ -123,10 +130,13 @@ private:
     void clearTextureSlots();
 
     // Unified texture slot assignment (returns local index 0..N-1)
-    int getOrAssignTextureSlot(GLuint textureId, bool& flushed);
+    int getOrAssignTextureSlot(GLuint textureId, Graphics::TextureFilter filter, bool& flushed);
     int getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed);
     int getOrAssignNormalTextureSlot(GLuint textureId, bool& flushed);
     int getOrAssignMRATextureSlot(GLuint textureId, bool& flushed);
 
     void bindTextureSlots() const;
+
+    GLuint m_samplerNearest = 0;
+    GLuint m_samplerLinear = 0;
 };

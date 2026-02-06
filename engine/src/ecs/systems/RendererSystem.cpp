@@ -725,7 +725,8 @@ namespace ECS {
                                 smoothness,         // Material2D: smoothness value
                                 aoStrength,         // Material2D: AO strength
                                 normalStrength,     // Material2D: normal strength
-                                flags
+                                flags,
+                                sr.TextureFilter
                                 });
                         }
                     }
@@ -942,7 +943,17 @@ namespace ECS {
                                 angleZ,
                                 1.0f,
                                 0,      // emissiveTextureId (no emissive in picking pass)
-                                0.0f    // emissiveStrength (no emissive in picking pass)
+                                0.0f,   // emissiveStrength (no emissive in picking pass)
+                                0,      // texture width
+                                0,      // texture height
+                                0,      // normalTextureId
+                                0,      // mraTextureId
+                                0.0f,   // metallic
+                                0.5f,   // smoothness
+                                1.0f,   // aoStrength
+                                1.0f,   // normalStrength
+                                0,      // materialFlags
+                                sr.TextureFilter
                                 });
                         }
                     }
@@ -1366,7 +1377,8 @@ namespace ECS {
                         // GUI projection uses Y-down; flip V to keep textures upright.
                         const glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
                         const GLuint textureId = image.textureId;
-                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                            0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
                     }
                     guiRenderer->endFrame();
                 }
@@ -1830,8 +1842,9 @@ namespace ECS {
                         ToGlm(sr.Color), sr.TextureId, angleZ, 1.0f,
                         sr.EmissiveTextureId, sr.EmissiveStrength, sr.Width, sr.Height,
                         normalTexId, mraTexId, metallic, smoothness, aoStrength, normalStrength,
-                          flags
-                          });
+                        flags,
+                        sr.TextureFilter
+                        });
                 }
             }
             m_renderer->endFrame();
@@ -1930,7 +1943,8 @@ namespace ECS {
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
                 // GUI projection uses Y-down; flip V to keep textures upright.
                 glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
-                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
             }
             guiRenderer->endFrame();
         }
@@ -2021,7 +2035,13 @@ namespace ECS {
                     float angleZ = std::atan2(2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
                     m_renderer->submitSprite({ ToGlm(Vector2D{position.X, position.Y}), ToGlm(Vector2D{scale.X, scale.Y}),
-                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f, 0, 0.0f });
+                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f,
+                        0, 0.0f,
+                        0, 0,
+                        0, 0,
+                        0.0f, 0.5f, 1.0f, 1.0f,
+                        0,
+                        sr.TextureFilter });
                 }
 
                 if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -2218,7 +2238,8 @@ namespace ECS {
     }
 
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
-                                        uint32_t textureId, const Vector4D& uvRect, const Color& color) {
+                                         uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                         Graphics::TextureFilter textureFilter) {
         if (!m_renderer) return;
 
         // Queue GUI image/icon draw for the GUI pass.
@@ -2228,6 +2249,7 @@ namespace ECS {
         submission.textureId = textureId;
         submission.uvRect = uvRect;
         submission.color = color;
+        submission.textureFilter = textureFilter;
         m_guiImageQueue.push_back(submission);
     }
 

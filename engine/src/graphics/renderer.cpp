@@ -72,12 +72,12 @@ void Renderer::flush() {
     beginFrame();
 }
 
-int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
+int Renderer::getOrAssignTextureSlot(GLuint textureId, Graphics::TextureFilter filter, bool& flushed) {
     flushed = false;
 
     // Check if texture is already bound
     for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
-        if (albedoTextureSlots[i] == textureId) {
+        if (albedoTextureSlots[i].id == textureId && albedoTextureSlots[i].filter == filter) {
             return i;
         }
     }
@@ -89,7 +89,7 @@ int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
     }
 
     // Add new texture to available slot
-    albedoTextureSlots.push_back(textureId);
+    albedoTextureSlots.push_back({ textureId, filter });
     return (int)albedoTextureSlots.size() - 1;
 }
 
@@ -160,25 +160,32 @@ void Renderer::bindTextureSlots() const {
     // Bind albedo textures to slots 0-15
     for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + AlbedoSlotBase + i);
-        glBindTexture(GL_TEXTURE_2D, albedoTextureSlots[i]);
+        glBindTexture(GL_TEXTURE_2D, albedoTextureSlots[i].id);
+        const GLuint sampler = (albedoTextureSlots[i].filter == Graphics::TextureFilter::Linear)
+            ? m_samplerLinear
+            : m_samplerNearest;
+        glBindSampler(AlbedoSlotBase + i, sampler);
     }
 
     // Bind normal maps to slots 16-21
     for (int i = 0; i < (int)normalTextureSlots.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + NormalSlotBase + i);
         glBindTexture(GL_TEXTURE_2D, normalTextureSlots[i]);
+        glBindSampler(NormalSlotBase + i, m_samplerLinear);
     }
 
     // Bind MRA maps to slots 22-25
     for (int i = 0; i < (int)mraTextureSlots.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + MRASlotBase + i);
         glBindTexture(GL_TEXTURE_2D, mraTextureSlots[i]);
+        glBindSampler(MRASlotBase + i, m_samplerLinear);
     }
 
     // Bind emissive textures to slots 26-31
     for (int i = 0; i < (int)emissiveTextureSlots.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + EmissiveSlotBase + i);
         glBindTexture(GL_TEXTURE_2D, emissiveTextureSlots[i]);
+        glBindSampler(EmissiveSlotBase + i, m_samplerLinear);
     }
 }
 
@@ -247,12 +254,26 @@ Renderer::Renderer(size_t maxQuads) {
     glEnableVertexArrayAttrib(vao, 10);
     glVertexArrayAttribFormat(vao, 10, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, materialFlags));
     glVertexArrayAttribBinding(vao, 10, 0);
+
+    glGenSamplers(1, &m_samplerNearest);
+    glSamplerParameteri(m_samplerNearest, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glSamplerParameteri(m_samplerNearest, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glSamplerParameteri(m_samplerNearest, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(m_samplerNearest, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenSamplers(1, &m_samplerLinear);
+    glSamplerParameteri(m_samplerLinear, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(m_samplerLinear, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(m_samplerLinear, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(m_samplerLinear, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 Renderer::~Renderer() {
     if (ebo) glDeleteBuffers(1, &ebo);
     if (vbo) glDeleteBuffers(1, &vbo);
     if (vao) glDeleteVertexArrays(1, &vao);
+    if (m_samplerNearest) glDeleteSamplers(1, &m_samplerNearest);
+    if (m_samplerLinear) glDeleteSamplers(1, &m_samplerLinear);
 }
 
 void Renderer::beginFrame() {
@@ -299,17 +320,18 @@ void Renderer::submitQuad(const glm::vec2& pos,
     float smoothness,
     float aoStrength,
     float normalStrength,
-    uint32_t materialFlags)
+    uint32_t materialFlags,
+    Graphics::TextureFilter textureFilter)
     // Depth buffer kinda breaks transparency (Render everything back to front if u have transparent stuff)
 {
     // Handle albedo texture
     float texIndex = -1.0f;
     if (textureId != 0) {
         bool flushed = false;
-        int slot = getOrAssignTextureSlot(textureId, flushed);
+        int slot = getOrAssignTextureSlot(textureId, textureFilter, flushed);
         if (flushed) {
             flush();
-            slot = getOrAssignTextureSlot(textureId, flushed);
+            slot = getOrAssignTextureSlot(textureId, textureFilter, flushed);
         }
         texIndex = static_cast<float>(slot);
     }
@@ -417,11 +439,11 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
 
     if (textureId != 0) {
         bool flushed = false;
-        int slot = getOrAssignTextureSlot(textureId, flushed);
+        int slot = getOrAssignTextureSlot(textureId, Graphics::TextureFilter::Nearest, flushed);
 
         if (flushed) {
             flush();
-            slot = getOrAssignTextureSlot(textureId, flushed);
+            slot = getOrAssignTextureSlot(textureId, Graphics::TextureFilter::Nearest, flushed);
         }
 
         texIndex = static_cast<float>(slot);
@@ -470,7 +492,8 @@ void Renderer::submitSprite(const Sprite& sprite) {
         sprite.smoothness,
         sprite.aoStrength,
         sprite.normalStrength,
-        sprite.materialFlags);
+        sprite.materialFlags,
+        sprite.textureFilter);
 }
 
 void Renderer::submitText(const Font& font,
@@ -526,7 +549,9 @@ void Renderer::submitText(const Font& font,
                 0.0f,       // metallic
                 0.5f,       // smoothness
                 1.0f,       // aoStrength
-                1.0f);      // normalStrength
+                1.0f,       // normalStrength
+                0,
+                Graphics::TextureFilter::Linear);
         }
         // Apply global tracking adjustment
         float tracking = 1.05f;          // 5% extra spacing
