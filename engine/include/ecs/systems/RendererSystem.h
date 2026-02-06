@@ -328,6 +328,7 @@ namespace ECS {
         // ====================================================================
 
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
+        std::unique_ptr<Renderer> m_guiRenderer;                ///< Dedicated GUI batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
@@ -441,6 +442,8 @@ namespace ECS {
 
         Vector2D m_renderTargetSize{ 0.0f, 0.0f };
         GUIViewport m_guiViewport{};
+        float m_windowAspectRatio = 0.0f;
+        bool m_windowAspectDirty = false;
 
         // ====================================================================
         // Helper Methods - Camera

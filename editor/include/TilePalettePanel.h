@@ -8,8 +8,8 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
-#include "../../engine/include/core/World/TileMap.hpp"
-#include "../../engine/include/core/World/Tileset.hpp"
+#include "core/World/TileMap.hpp"
+#include "core/World/Tileset.hpp"
 #include "ecs/Entity.h"
 
 namespace ECS { class World; }

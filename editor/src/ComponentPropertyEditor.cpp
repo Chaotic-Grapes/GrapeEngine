@@ -198,10 +198,10 @@ namespace {
         if (symbolsFont) ImGui::PushFont(symbolsFont);
         const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
         const bool clicked = ImGui::SmallButton(icon);
+        if (symbolsFont) ImGui::PopFont();
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", tooltip);
         }
-        if (symbolsFont) ImGui::PopFont();
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(4);
@@ -1839,6 +1839,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     ImGuiIdScope id("AudioSource");
     // Ensure keys exist with defaults
     if (!data.contains("CueId"))       data["CueId"] = 0;
+    if (!data.contains("CuePath"))     data["CuePath"] = "";
     if (!data.contains("Volume"))      data["Volume"] = 1.0f;
     if (!data.contains("Pitch"))       data["Pitch"] = 1.0f;
     if (!data.contains("Loop"))        data["Loop"] = false;
@@ -1851,9 +1852,19 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
                                      "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
+    std::string cuePath = data.value("CuePath", std::string());
     auto& lib = AudioAssetLibrary::Get();
 
-    const AudioAssetLibrary::ClipInfo* selectedClip = lib.FindById(cueId);
+    const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
+    if (!cuePath.empty()) {
+        selectedClip = lib.FindByPath(cuePath);
+    }
+    if (!selectedClip && cueId != 0) {
+        selectedClip = lib.FindById(cueId);
+        if (selectedClip && cuePath.empty()) {
+            data["CuePath"] = selectedClip->Path;
+        }
+    }
     std::string currentLabel = selectedClip ? selectedClip->Name : "None (drag audio here)";
 
     // Audio clip row + drag drop support like SpriteRenderer2D
@@ -1863,6 +1874,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     HandleAssetDragDropTarget(kAudioExtensions, [&](const std::string& droppedPath) {
         const auto& clipInfo = lib.Register(droppedPath);
         data["CueId"] = clipInfo.Id;
+        data["CuePath"] = clipInfo.Path;
         return true;
     }, [&](const std::string& rejectedPath) {
         QueueAssetDropError(rejectedPath, kAudioExtensions);

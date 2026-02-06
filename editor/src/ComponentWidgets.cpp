@@ -108,8 +108,7 @@ namespace EditorUI {
         ImGui::SameLine();
         const float lineHeight = ImGui::GetTextLineHeight();
         const float frameHeight = ImGui::GetFrameHeight();
-        const float y = ImGui::GetCursorPosY();
-        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
         ImGui::SetCursorPosX(buttonX);
         ImGui::PushID(("Reset_" + id).c_str());
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);

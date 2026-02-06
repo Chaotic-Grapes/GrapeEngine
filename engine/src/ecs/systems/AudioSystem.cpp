@@ -30,6 +30,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageTypes.h"
 #include "services/TimeSystem.h"
 #include <algorithm>
+#include "ecs/StringTable.h"
+#include <filesystem>
 
 namespace {
     Audio::Bus ToBus(uint8_t raw) {
@@ -147,11 +149,25 @@ namespace ECS {
                 // Resolve cueId -> clip info
                 // ----------------------------------------------------------------
                 const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
+                if (!cueInfo && src.CuePathId) {
+                    const std::string cuePathRaw = ECS::StringTable::Resolve(src.CuePathId);
+                    const std::string cuePath = Audio::AudioCueRegistry::NormalizePath(cuePathRaw);
+                    if (!cuePath.empty()) {
+                        cueInfo = m_audioService.CueRegistry().FindByPath(cuePath);
+                        if (!cueInfo) {
+                            cueInfo = &m_audioService.CueRegistry().Register(cuePath);
+                            LOG_INFO("AudioSystem: Registered cue from path '" << cuePath << "' (id=" << cueInfo->Id << ")");
+                        }
+                        src.CueId = cueInfo->Id;
+                    }
+                }
                 if (!cueInfo) {
                     static std::set<uint32_t> s_warnedCues;
                     if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
+                        const std::string cuePath = src.CuePathId ? ECS::StringTable::Resolve(src.CuePathId) : std::string();
                         LOG_WARNING("AudioSystem: Entity " << e.Index
                             << " has invalid CueId " << src.CueId
+                            << " (CuePath='" << cuePath << "')"
                             << " (audio file not found in assets/Audio)");
                         s_warnedCues.insert(src.CueId);
                     }

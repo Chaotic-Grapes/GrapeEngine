@@ -10,8 +10,24 @@ Implementation of centralized project path management.
 /* End Header *******************************************************************/
 
 #include "core/ProjectPaths.h"
+
+#ifdef _WIN32
+#include <ShlObj.h>
+#endif
+
 #include "core/Logger.h"
 #include <filesystem>
+#include <cstdlib>
+
+#ifdef INFO
+#undef INFO
+#endif
+#ifdef WARNING
+#undef WARNING
+#endif
+#ifdef ERROR
+#undef ERROR
+#endif
 
 namespace Engine {
     
@@ -20,14 +36,28 @@ namespace Engine {
     bool ProjectPaths::s_initialized = false;
     
     void ProjectPaths::Initialize(const std::string& projectRoot) {
+        if (s_initialized && s_projectRoot == projectRoot) {
+            return;
+        }
+
         s_projectRoot = projectRoot;
         s_initialized = true;
         
         // Ensure all required directories exist
         EnsureDirectoryExists(GetAssetsPath());
+        EnsureDirectoryExists(GetLogsPath());
+
+        const std::filesystem::path logsPath = GetLogsPath();
+        if (!logsPath.empty()) {
+            Logger::Get().SetLogFile(LogLevel::INFO, (logsPath / "engine.log").string());
+            Logger::Get().SetLogFile(LogLevel::ERROR, (logsPath / "error.log").string());
+        }
         
         LOG_INFO("ProjectPaths initialized: " << s_projectRoot);
         LOG_INFO("  Assets: " << GetAssetsPath());
+        if (!logsPath.empty()) {
+            LOG_INFO("  Logs: " << logsPath.string());
+        }
     }
     
     bool ProjectPaths::IsInitialized() {
@@ -73,6 +103,45 @@ namespace Engine {
             LOG_ERROR("Failed to get temp scripts path: " << e.what());
             return "";
         }
+    }
+
+    std::string ProjectPaths::GetDocumentsRoot() {
+#ifdef _WIN32
+        PWSTR widePath = nullptr;
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &widePath);
+        if (SUCCEEDED(hr) && widePath) {
+            std::filesystem::path docsPath(widePath);
+            CoTaskMemFree(widePath);
+            return docsPath.string();
+        }
+        if (widePath) {
+            CoTaskMemFree(widePath);
+        }
+#else
+        const char* home = std::getenv("HOME");
+        if (home && *home) {
+            return (std::filesystem::path(home) / "Documents").string();
+        }
+#endif
+        return std::filesystem::current_path().string();
+    }
+
+    std::string ProjectPaths::GetProjectDocumentsRoot() {
+        std::filesystem::path projectRoot = GetProjectRoot();
+        std::string projectName = projectRoot.filename().string();
+        if (projectName.empty()) {
+            projectName = "UnknownProject";
+        }
+        std::filesystem::path docsRoot = GetDocumentsRoot();
+        std::filesystem::path projectDocs = docsRoot / "Grape Engine" / projectName;
+        EnsureDirectoryExists(projectDocs.string());
+        return projectDocs.string();
+    }
+
+    std::string ProjectPaths::GetLogsPath() {
+        std::filesystem::path logsPath = std::filesystem::path(GetProjectDocumentsRoot()) / "logs";
+        EnsureDirectoryExists(logsPath.string());
+        return logsPath.string();
     }
     
     std::string ProjectPaths::GetCompiledScriptAssemblyPath() {

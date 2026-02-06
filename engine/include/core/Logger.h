@@ -130,8 +130,8 @@ private:
 
 	std::string _getCurrentTimestamp(const std::string& format = "%Y-%m-%d %H:%M:%S"); // Add timestamp to log entries
 
-	std::string m_infoFile{ "engine.log" }; // Default log file name
-	std::string m_errorFile{ "error.log" }; // Default error log file name
+	std::string m_infoFile;  // Set via ProjectPaths::Initialize
+	std::string m_errorFile; // Set via ProjectPaths::Initialize
 
 	std::ofstream m_infoStream;
 	std::ofstream m_errorStream;

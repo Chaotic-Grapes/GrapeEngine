@@ -515,6 +515,7 @@ Without these, the macro would end early and break the expansion
             defaults[id] = []() { 
                 return nlohmann::json{
                 {"CueId", 0 },
+                {"CuePath", "" },
                 {"Volume", 1.0f },
                 {"Pitch", 1.0f },
                 {"Loop", false },
@@ -944,6 +945,7 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "CueId", 0 },
+                { "CuePath", "" },
                 { "Volume", 1.0f },
                 { "Pitch", 1.0f },
                 { "Loop", false },

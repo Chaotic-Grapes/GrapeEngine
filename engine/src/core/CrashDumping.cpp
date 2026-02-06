@@ -28,6 +28,7 @@
 
 #include "core/CrashDumping.h"
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 
 
 #include <iostream>
@@ -166,14 +167,14 @@ namespace Engine
 
         AppendCallStackToStream(oss, info->ContextRecord);
 
-        string exePath = GetExePath();
+        string outputDir = ProjectPaths::IsInitialized() ? ProjectPaths::GetLogsPath() : GetExePath();
         string timeStamp = GetCurrentTimeStamp();
 
         if (createDump)
         {
-            WriteMiniDump(info, exePath, timeStamp);
+            WriteMiniDump(info, outputDir, timeStamp);
             oss << "A dump file '" << timeStamp
-                << ".dmp' was created at exe root folder.\n";
+                << ".dmp' was created at " << outputDir << ".\n";
         }
         else
         {
@@ -181,7 +182,7 @@ namespace Engine
            // LOG_INFO("[CrashHandler] Dump creation disabled.");
         }
 
-        WriteLog(oss.str(), exePath, timeStamp);
+        WriteLog(oss.str(), outputDir, timeStamp);
         CreateErrorPopup(oss.str());
 
         return EXCEPTION_EXECUTE_HANDLER;
@@ -196,11 +197,11 @@ namespace Engine
     */
     void CrashDumping::WriteLog(
         const string& message,
-        const string& exePath,
+        const string& outputDir,
         const string& timeStamp)
     {
         string filePath = timeStamp + ".txt";
-        string fullPath = (path(exePath) / filePath).string();
+        string fullPath = (path(outputDir) / filePath).string();
         ofstream logFile(fullPath);
 
         if (!logFile.is_open())
@@ -231,14 +232,14 @@ namespace Engine
     */
     void CrashDumping::WriteMiniDump(
         EXCEPTION_POINTERS* info,
-        const string& exePath,
+        const string& outputDir,
         const string& timeStamp)
     {
         string filePath = timeStamp + ".dmp";
 
-        int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, nullptr, 0);
+        int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, outputDir.c_str(), -1, nullptr, 0);
         std::wstring widePath(sizeNeeded - 1, 0);
-        MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, &widePath[0], sizeNeeded);
+        MultiByteToWideChar(CP_UTF8, 0, outputDir.c_str(), -1, &widePath[0], sizeNeeded);
 
         // build full path
         widePath += L"\\" + std::wstring(filePath.begin(), filePath.end());
