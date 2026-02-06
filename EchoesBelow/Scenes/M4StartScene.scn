@@ -127,7 +127,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.5977011919021606,
+                        "AspectRatio": 1.6299999952316284,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -274,8 +274,8 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 600.0,
-                            "Y": 331.0
+                            "X": 1173.0,
+                            "Y": 584.0
                         },
                         "Size": {
                             "X": 100.0,
@@ -295,10 +295,10 @@
                             "R": 0.5357917547225952
                         },
                         "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
-                        "FontSize": 75.0,
-                        "HAlign": 0,
+                        "FontSize": 120.0,
+                        "HAlign": 1,
                         "Text": "Exit",
-                        "VAlign": 0,
+                        "VAlign": 1,
                         "Wrap": false
                     },
                     "TypeName": "GUIText"
@@ -380,8 +380,8 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 176.0,
-                            "Y": 333.0
+                            "X": 529.0,
+                            "Y": 584.0
                         },
                         "Size": {
                             "X": 100.0,
@@ -401,10 +401,10 @@
                             "R": 0.5357917547225952
                         },
                         "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
-                        "FontSize": 75.0,
-                        "HAlign": 0,
+                        "FontSize": 120.0,
+                        "HAlign": 1,
                         "Text": "Start",
-                        "VAlign": 0,
+                        "VAlign": 1,
                         "Wrap": false
                     },
                     "TypeName": "GUIText"
@@ -486,12 +486,12 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 499.0,
-                            "Y": 330.0
+                            "X": 968.0,
+                            "Y": 528.0
                         },
                         "Size": {
-                            "X": 320.0,
-                            "Y": 84.0
+                            "X": 534.0,
+                            "Y": 180.0
                         },
                         "Visible": true,
                         "ZOrder": 0
@@ -587,12 +587,12 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 91.0,
-                            "Y": 330.0
+                            "X": 311.0,
+                            "Y": 528.0
                         },
                         "Size": {
-                            "X": 320.0,
-                            "Y": 84.0
+                            "X": 534.0,
+                            "Y": 180.0
                         },
                         "Visible": true,
                         "ZOrder": 0
@@ -688,12 +688,12 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 76.0,
-                            "Y": 322.0
+                            "X": 286.0,
+                            "Y": 510.0
                         },
                         "Size": {
-                            "X": 348.0,
-                            "Y": 100.0
+                            "X": 582.0,
+                            "Y": 227.0
                         },
                         "Visible": true,
                         "ZOrder": -10
@@ -795,12 +795,12 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 486.0,
-                            "Y": 322.0
+                            "X": 946.0,
+                            "Y": 510.0
                         },
                         "Size": {
-                            "X": 348.0,
-                            "Y": 100.0
+                            "X": 582.0,
+                            "Y": 227.0
                         },
                         "Visible": false,
                         "ZOrder": -10
@@ -1156,7 +1156,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 16,
+                        "TextureId": 18,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\ChaosGrapeInBubble.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1319,7 +1319,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 18,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\StartMenuBG_1.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1421,7 +1421,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 22,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.02083333395421505,
@@ -1447,7 +1447,7 @@
                         "SheetWidth": 21216,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 22,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\WavyCorals_SpriteSheet01_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -1546,7 +1546,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 22,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.02083333395421505,
@@ -1572,7 +1572,7 @@
                         "SheetWidth": 21216,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 22,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\WavyCorals_SpriteSheet01_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -1678,7 +1678,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 20,
+                        "TextureId": 23,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\EchoesBelowTitleCard.png",
                         "Tiling": {
                             "X": 1.0,

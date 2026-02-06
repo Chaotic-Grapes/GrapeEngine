@@ -303,7 +303,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
             Log("TagMask: " + other.GetComponent<TagMask>().Mask);
             if (other.GetComponent<TagMask>().Mask == 32)
             {
-
+                //Take damage
                 ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
             }
             else if (other.GetComponent<TagMask>().Mask == 4)
@@ -329,43 +329,22 @@ public class PlayerCollisionHandler : CollisionSystemBase
 [System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
 public class PlayerTriggerHandler : TriggerSystemBase
 {
+    private const string SourceSceneName = "Level_One";
+    private const string endSceneName = "EchoesBelow/Scenes/EndScene.scn";
     protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
     {
-        //Log("TRIGGERED");
-        //Console.WriteLine("TRIGGERED");
-        //base.OnTriggerEnter(self, evt);
-        
-        ////Collide with MarineSnow
-        ////Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
-        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        //if (other.HasComponent<MS_ManagerComponent>())
-        //{
-        //    MS_Manager.instance.SendToPool(other.Id);
-        //    InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
-        //}
-
-        //if (other.HasComponent<TagMask>())
-        //{
-        //    Log("TagMask: " + other.GetComponent<TagMask>().Mask);
-        //    if (other.GetComponent<TagMask>().Mask == 32)
-        //    {
-
-        //        ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
-        //    }
-        //    else if (other.GetComponent<TagMask>().Mask == 4)
-        //    {
-        //        //door detected
-        //        other.GetComponent<Active>().Enabled = false;
-        //    }
-        //}
-
-
-
-        //Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        //if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
-        //{
-        //    //Loadscene use dalton's
-        //}
+        Entity other = Entity.FromId(World!, evt.OtherEntityId);
+        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        {
+            SceneManager sceneManager = SceneManager.Instance;
+            //Loadscene use dalton's
+            sceneManager.SetNextAudioTransition(2.0f, true);
+            //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
+            //Like creating a new scene / allocate a new scene in the registry
+            var sceneIndex = SceneManager.Instance.AddScene();
+            var ss = SceneManager.Instance.LoadScene(sceneIndex, endSceneName);
+            SceneManager.Instance.SetActive(sceneIndex);
+        }
     }
 }
 
