@@ -387,7 +387,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 18,
+                        "TextureId": 16,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.011764705181121826,
@@ -413,7 +413,7 @@
                         "SheetWidth": 11900,
                         "StartFrame": 16,
                         "TextureFilter": 0,
-                        "TextureId": 18,
+                        "TextureId": 16,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheet_IdleDash_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -760,7 +760,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 16,
+                        "TextureId": 18,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\OceanBG_01@8x.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3010,9 +3010,9 @@
                     "Data": {
                         "Color": {
                             "A": 1.0,
-                            "B": 0.5825664401054382,
-                            "G": 0.37727442383766174,
-                            "R": 0.37014907598495483
+                            "B": 0.3050000071525574,
+                            "G": 0.07800000160932541,
+                            "R": 0.07100000232458115
                         },
                         "CornerRadius": 0.0
                     },
@@ -3140,9 +3140,9 @@
                     "Data": {
                         "Color": {
                             "A": 1.0,
-                            "B": 0.30588236451148987,
-                            "G": 0.0784313753247261,
-                            "R": 0.07058823853731155
+                            "B": 0.5839999914169312,
+                            "G": 0.37599998712539673,
+                            "R": 0.3700000047683716
                         },
                         "CornerRadius": 0.0
                     },
@@ -3924,40 +3924,12 @@
     "EntityCount": 40,
     "Hierarchy": [
         {
-            "child": 4,
+            "child": 3,
             "parent": 2
         },
         {
             "child": 16,
             "parent": 15
-        },
-        {
-            "child": 12,
-            "parent": 8
-        },
-        {
-            "child": 13,
-            "parent": 8
-        },
-        {
-            "child": 33,
-            "parent": 30
-        },
-        {
-            "child": 25,
-            "parent": 24
-        },
-        {
-            "child": 39,
-            "parent": 38
-        },
-        {
-            "child": 6,
-            "parent": 5
-        },
-        {
-            "child": 3,
-            "parent": 2
         },
         {
             "child": 31,
@@ -3966,6 +3938,10 @@
         {
             "child": 32,
             "parent": 30
+        },
+        {
+            "child": 6,
+            "parent": 5
         },
         {
             "child": 9,
@@ -4006,6 +3982,30 @@
         {
             "child": 11,
             "parent": 8
+        },
+        {
+            "child": 4,
+            "parent": 2
+        },
+        {
+            "child": 12,
+            "parent": 8
+        },
+        {
+            "child": 13,
+            "parent": 8
+        },
+        {
+            "child": 33,
+            "parent": 30
+        },
+        {
+            "child": 25,
+            "parent": 24
+        },
+        {
+            "child": 39,
+            "parent": 38
         },
         {
             "child": 34,

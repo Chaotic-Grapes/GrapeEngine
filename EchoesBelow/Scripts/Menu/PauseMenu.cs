@@ -21,8 +21,8 @@ public class PauseMenu : SystemBase
     public bool isKeyPressed_vertical;
     bool isFirstSelected;
 
-    Color unselectedCol = new Color(0.368f, 0.376f, 0.584f,1f);
-    Color selectedCol = new Color(0.070f, 0.078f, 0.305f,1f);
+    Color selectedCol = new Color(0.370f, 0.376f, 0.584f,1f);
+    Color unselectedCol = new Color(0.071f, 0.078f, 0.305f,1f);
 
     public static List<ulong> pauseMenuElementObjIds = new List<ulong>();
     protected override void OnCreate()
@@ -34,7 +34,7 @@ public class PauseMenu : SystemBase
         if (startBool == true) return true;
         startBool = true;
         //Todo
-    
+        isFirstSelected = true;
         //End of Start
         return true;
     }
@@ -53,7 +53,7 @@ public class PauseMenu : SystemBase
         //{
         //    Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
         //}
-
+        SceneManager sceneManager = SceneManager.Instance;
 
         if (!isPaused && Input.IsKeyPressed(KeyCode.Escape))
         {
@@ -93,18 +93,44 @@ public class PauseMenu : SystemBase
                         {
                             //ui.Entity.GetComponent<GUIElement>().Visible = !ui.Entity.GetComponent<GUIElement>().Visible;
                             ref GUIPanel panel = ref ui.Entity.GetComponent<GUIPanel>();
-                            if (panel.Color.R == unselectedCol.R) panel.Color = selectedCol;
-                            else panel.Color = unselectedCol;
-                        }
-                        else
-                        {
-
+                            if (panel.Color.R == unselectedCol.R)
+                            {
+                                panel.Color = selectedCol;
+                            }
+                            else if(panel.Color.R == selectedCol.R)
+                            {
+                                panel.Color = unselectedCol;
+                            }
                         }
                     }
                 }
             }
         }
-        
+
+        if (isFirstSelected && Input.IsKeyPressed(KeyCode.Space))
+        {
+            Time.TimeScale = 1;
+            isPaused = false;
+            foreach (ulong ui_id in pauseMenuElementObjIds)
+            {
+                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+            }
+            //Close Pause Menu
+            Log(() => "unPaused");
+
+        }
+        else if (!isFirstSelected && Input.IsKeyPressed(KeyCode.Space))
+        {
+            Log("QUitting . . . ");
+            sceneManager.SetNextAudioTransition(2.0f, true);
+            //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
+            //Like creating a new scene / allocate a new scene in the registry
+            var sceneIndex = SceneManager.Instance.AddScene();
+            var ss = SceneManager.Instance.LoadScene(sceneIndex, TargetScenePath);
+            SceneManager.Instance.SetActive(sceneIndex);
+           Log("Quit to screen");
+        }
+
     }
 
 }
