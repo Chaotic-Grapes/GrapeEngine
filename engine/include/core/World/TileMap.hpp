@@ -1,3 +1,29 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileMap.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Defines the TileMap class, which owns and coordinates multiple tile layers
+and provides world-to-tile mapping utilities.
+
+Details:
+The TileMap class manages a collection of TileLayer objects and defines a
+fixed world-units-per-tile scale. It serves as a thin data coordinator,
+routing tile access and mutation to individual layers while handling
+signed tile origins, resizing, and bounds expansion.
+
+This class contains no rendering, ECS, collision, or gameplay logic.
+It is intended to represent tile-based world data and support editor
+and runtime systems through safe access, serialization, and coordinate
+conversion utilities.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <vector>

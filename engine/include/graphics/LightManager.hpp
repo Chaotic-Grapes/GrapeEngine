@@ -1,3 +1,34 @@
+/* Start Header *****************************************************************/
+/*!
+\file   LightManager.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Declaration of the LightManager, responsible for managing dynamic lighting data
+and binding GPU-ready light buffers for the renderer.
+
+Details:
+The LightManager acts as the CPU-side controller for forward-rendered lighting.
+It collects light data from ECS components, converts them into GPU-compatible
+layouts, uploads them to Shader Storage Buffer Objects (SSBOs), and binds the
+required buffers and uniforms to shaders each frame.
+
+Specifically, this class:
+- Manages directional and point lights for physically based rendering
+- Maintains per-frame CPU-side light collections
+- Uploads light data to the GPU using stable, POD lighting structures
+- Exposes a clean authoring API for the renderer to submit lights
+- Binds lighting buffers and counts to shaders at render time
+
+This class contains no rendering logic or shading code; it exists purely to
+mediate data flow between ECS light components and GPU shaders.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include "LightingStructures.hpp"
