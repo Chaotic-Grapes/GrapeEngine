@@ -926,8 +926,25 @@ void LevelEditor::_onAssetSelected(const std::string& assetPath) {
         return;
     }
 
-    m_pendingTilesetPath = assetPath; // Cache tileset path for the create prompt.
-    m_showTilemapCreateModal = true; // Trigger the modal to create a tilemap.
+    // Auto-create a tilemap if none exists.
+    const EntityId newId = m_entityActions.AddEntity("Tilemap", ECS::Entity::NPOS32);
+
+	// Add TileMapComponent to the new entity
+    ECS::Entity targetEntity = m_world->Resolve(newId);
+
+	// Initialize TileMapComponent with default values
+    if (m_world->IsAlive(targetEntity)) {
+        _applyTilesetToTilemap(targetEntity, assetPath);
+        m_hierarchyWindow.SetSelectedEntity(targetEntity.Index);
+        m_inspector.InspectEntity(targetEntity.Index);
+    }
+	// Sync viewports to new selection
+    if (m_sceneViewport.HasValidWorld()) {
+        m_sceneViewport.SetSelectedEntity(newId);
+    }
+    if (m_gameViewport.HasValidWorld()) {
+        m_gameViewport.SetSelectedEntity(newId);
+    }
 }
 
 void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
@@ -1161,56 +1178,6 @@ void LevelEditor::_refreshTileMapCache() {
     }
 }
 
-void LevelEditor::_renderTilemapCreateModal() {
-    if (m_showTilemapCreateModal) {
-        ImGui::OpenPopup("Create Tilemap");
-        m_showTilemapCreateModal = false;
-    }
-
-    if (ImGui::BeginPopupModal("Create Tilemap", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("No Tilemap entity is selected. Create a new Tilemap entity to use this tileset?");
-        ImGui::Separator();
-
-        if (ImGui::Button("Create Tilemap", ImVec2(160, 0))) {
-            if (m_world && !m_pendingTilesetPath.empty()) {
-				// Create a new tilemap entity and apply the pending tileset
-                const EntityId newId = m_entityActions.AddEntity("Tilemap", ECS::Entity::NPOS32);
-
-				// Add TileMapComponent with default settings
-                ECS::Entity target = m_world->Resolve(newId);
-
-				// If the entity is valid
-                if (m_world->IsAlive(target)) {
-					// Add TileMapComponent with default values
-                    _applyTilesetToTilemap(target, m_pendingTilesetPath);
-					// Select the new entity in the hierarchy and inspector
-                    m_hierarchyWindow.SetSelectedEntity(target.Index);
-                    m_inspector.InspectEntity(target.Index);
-                }
-				// Also select in viewports
-                if (m_sceneViewport.HasValidWorld()) {
-                    m_sceneViewport.SetSelectedEntity(newId);
-                }
-                if (m_gameViewport.HasValidWorld()) {
-                    m_gameViewport.SetSelectedEntity(newId);
-                }
-            }
-
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-}
-
 void LevelEditor::_applyTilesetToTilemap(ECS::Entity entity, const std::string& assetPath) {
     if (!m_world || !m_world->IsAlive(entity)) {
         return;
@@ -1395,9 +1362,6 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         ImGui::End();
     }
-
-    // Render tilemap creation modal after panels so it shows on top.
-    _renderTilemapCreateModal();
 }
 
 // -------------------------------------------------------------------------
@@ -1434,8 +1398,6 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
     m_tileMapList.clear(); // Drop tilemap list for the new scene.
-    m_pendingTilesetPath.clear();
-    m_showTilemapCreateModal = false;
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
     const std::vector<std::string> emptyPaths;
     m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));

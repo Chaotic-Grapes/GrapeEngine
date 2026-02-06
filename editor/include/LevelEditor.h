@@ -107,8 +107,6 @@ private:
     void _saveActiveTileMapAsset(const std::string& scenePath);
     // Refresh cached tilemaps and push all visible tilemaps to the renderer.
     void _refreshTileMapCache();
-    // Render a modal to create a tilemap when a tileset is selected without an active tilemap.
-    void _renderTilemapCreateModal();
     // Apply a tileset asset path to an existing tilemap entity.
     void _applyTilesetToTilemap(ECS::Entity entity, const std::string& assetPath);
     // Activate the tilemap for palette editing without changing hierarchy selection.
@@ -158,8 +156,6 @@ private:
     EntityId m_activeTileMapEntityId = ECS::Entity::NPOS32;
     std::unordered_map<EntityId, TileMapCacheEntry> m_tileMapCache;
     std::vector<TilePalettePanel::TileMapListEntry> m_tileMapList;
-    std::string m_pendingTilesetPath;
-    bool m_showTilemapCreateModal = false;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;
