@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Interop_StateMachine.cpp
-\author
+\author Dalton Koh 
 \brief
 Interop bindings for the C++ Brain/StateMachine used by gameplay scripts.
 */
@@ -17,10 +17,12 @@ Interop bindings for the C++ Brain/StateMachine used by gameplay scripts.
 using Engine::Gameplay::Brain;
 using Engine::Gameplay::State;
 
+// Create a new Brain and return as opaque pointer.
 INTEROP_API void* StateMachineInterop_CreateBrain() {
     return new Brain();
 }
 
+// Destroy a Brain created by the interop layer.
 INTEROP_API void StateMachineInterop_DestroyBrain(void* brainPtr) {
     if (!brainPtr) {
         return;
@@ -28,6 +30,7 @@ INTEROP_API void StateMachineInterop_DestroyBrain(void* brainPtr) {
     delete static_cast<Brain*>(brainPtr);
 }
 
+// Update the Brain state machine.
 INTEROP_API void StateMachineInterop_Update(void* brainPtr, float deltaTime) {
     if (!brainPtr) {
         return;
@@ -35,6 +38,7 @@ INTEROP_API void StateMachineInterop_Update(void* brainPtr, float deltaTime) {
     static_cast<Brain*>(brainPtr)->Update(deltaTime);
 }
 
+// Transition the Brain to a new state.
 INTEROP_API void StateMachineInterop_TransitionTo(void* brainPtr, void* statePtr) {
     if (!brainPtr) {
         return;
@@ -42,6 +46,7 @@ INTEROP_API void StateMachineInterop_TransitionTo(void* brainPtr, void* statePtr
     static_cast<Brain*>(brainPtr)->TransitionTo(static_cast<State*>(statePtr));
 }
 
+// Return the current state pointer.
 INTEROP_API void* StateMachineInterop_GetCurrentState(void* brainPtr) {
     if (!brainPtr) {
         return nullptr;
@@ -49,6 +54,7 @@ INTEROP_API void* StateMachineInterop_GetCurrentState(void* brainPtr) {
     return static_cast<void*>(static_cast<Brain*>(brainPtr)->GetCurrentState());
 }
 
+// Return patrol state pointer.
 INTEROP_API void* StateMachineInterop_GetPatrolState(void* brainPtr) {
     if (!brainPtr) {
         return nullptr;
@@ -56,6 +62,7 @@ INTEROP_API void* StateMachineInterop_GetPatrolState(void* brainPtr) {
     return static_cast<void*>(static_cast<Brain*>(brainPtr)->GetPatrolState());
 }
 
+// Return chase state pointer.
 INTEROP_API void* StateMachineInterop_GetChaseState(void* brainPtr) {
     if (!brainPtr) {
         return nullptr;
@@ -63,6 +70,7 @@ INTEROP_API void* StateMachineInterop_GetChaseState(void* brainPtr) {
     return static_cast<void*>(static_cast<Brain*>(brainPtr)->GetChaseState());
 }
 
+// Return attack state pointer.
 INTEROP_API void* StateMachineInterop_GetAttackState(void* brainPtr) {
     if (!brainPtr) {
         return nullptr;
