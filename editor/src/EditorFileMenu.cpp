@@ -555,6 +555,7 @@ void EditorFileMenu::_openScene(const std::string& path) {
     std::vector<uint32_t> entityOrder;
     if (m_sceneManager->LoadScene(idx, path, &entityOrder)) {
         m_sceneManager->SetActive(idx);
+        m_sceneManager->Update(); // Apply pending activation so editor UI uses the loaded scene immediately.
         if (m_hierarchyPanel) {
             m_hierarchyPanel->ClearUIState();
             m_hierarchyPanel->SetEntityOrder(entityOrder);

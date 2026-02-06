@@ -569,6 +569,16 @@ namespace ECS {
             MatchHeight = 3
         };
 
+        enum class GUIRenderSpace : uint8_t {
+            Screen = 0,
+            World = 1
+        };
+
+        struct GUIRenderMode {
+            GUIRenderSpace Space = GUIRenderSpace::Screen; // Screen = pixels, World = world units
+        };
+        static_assert(std::is_trivially_copyable_v<GUIRenderMode>, "GUIRenderMode must be trivially copyable");
+
         struct GUICanvas {
             Vector2D ReferenceSize{ 1920.0f, 1080.0f }; // logical design size used for scaling
             Vector2D Offset{ 0.0f, 0.0f };              // pixel offset applied after scaling
@@ -694,10 +704,6 @@ namespace ECS {
             uint32_t TextId = 0;
             uint32_t FontPathId = 0;
             uint32_t IconPathId = 0;
-            Color NormalColor{ 0.25f, 0.25f, 0.25f, 1.0f };   // idle background
-            Color HoverColor{ 0.35f, 0.35f, 0.35f, 1.0f };    // hover background
-            Color PressedColor{ 0.15f, 0.15f, 0.15f, 1.0f };  // pressed background
-            Color DisabledColor{ 0.2f, 0.2f, 0.2f, 0.6f };    // disabled background
             Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // label color
             Color IconColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // icon tint
             float FontSize = 24.0f;       // label size

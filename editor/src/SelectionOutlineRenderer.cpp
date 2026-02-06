@@ -168,12 +168,9 @@ namespace Editor {
         if (entity.IsNull() || !world.IsAlive(entity)) return;
         if (!Editor::ECSUtils::HasComponent(&world, entity, "LocalTransform")) return;
 
-        // Skip inactive entities
-        if (Editor::ECSUtils::HasComponent(&world, entity, "Active")) {
-            const auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(&world, entity, "Active");
-            if (active && !active->Enabled) {
-                return;
-            }
+        // Skip inactive entities (including inactive parents).
+        if (!world.IsActiveInHierarchy(entity)) {
+            return;
         }
 
         // Calculate 2.5px thick outline in screen space
