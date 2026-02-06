@@ -110,6 +110,21 @@
                 }
             },
             "TypeName": "WorldTransform"
+        },
+        {
+            "Data": {
+                "AOStrength": 1.0,
+                "AlphaCutoff": 0.5,
+                "Flags": 32,
+                "MRA_TextureId": 0,
+                "MRA_TexturePath": "",
+                "Metallic": 0.0,
+                "NormalStrength": 1.0,
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Smoothness": 0.0
+            },
+            "TypeName": "ECS::Components::Material2D"
         }
     ]
 }

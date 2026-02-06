@@ -1,3 +1,16 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GUIInputSystem.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+
+\brief
+Definition of the GUIInputSystem class for processing input interactions with GUI
+elements. Provides functionality for handling mouse events, hover states, and
+pointer capture within the GUI system.
+*/
+/* End Header *******************************************************************/
+
 #include <algorithm>
 #include <cmath>
 #include "ecs/Components.h"
@@ -10,6 +23,7 @@ namespace ECS {
         Entity s_captureEntity = NULL_ENTITY; // Tracks the element that owns pointer capture.
     }
 
+    // Initialize GUI input system state for the world.
     void GUIInputSystem::OnCreate(World& world) {
         (void)world;
     }
@@ -19,13 +33,13 @@ namespace ECS {
         return p.X >= pos.X && p.Y >= pos.Y && p.X <= (pos.X + size.X) && p.Y <= (pos.Y + size.Y);
     }
 
+    // Update GUI hover/press state from the current input.
     void GUIInputSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
             return;
         }
 
-        // Release capture if the captured entity no longer exists.
         if (!s_captureEntity.IsNull() && !world.IsAlive(s_captureEntity)) {
             s_captureEntity = NULL_ENTITY;
         }
@@ -53,12 +67,23 @@ namespace ECS {
         const bool mousePressed = Input::IsMousePressed(MOUSE_LEFT);
         const bool mouseReleased = Input::IsMouseUp(MOUSE_LEFT);
 
+        // Iterate GUI elements and update per-entity input state.
         world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput& input) {
             // Clear one-frame flags before recomputing state.
             input.Clicked = false;
             input.Released = false;
             input.Entered = false;
             input.Exited = false;
+
+            if (!world.IsActiveInHierarchy(entity)) {
+                if (s_captureEntity == entity) {
+                    s_captureEntity = NULL_ENTITY;
+                }
+                input.Hovered = false;
+                input.Pressed = false;
+                input.Dragging = false;
+                return;
+            }
 
             if (!element.Visible) {
                 input.Hovered = false;
@@ -85,7 +110,6 @@ namespace ECS {
             input.Pressed = captured && mouseDown;
             input.Dragging = captured && mouseDown;
 
-            // Release capture when the button is released.
             if (captured && mouseReleased) {
                 input.Pressed = false;
                 input.Dragging = false;
@@ -176,14 +200,18 @@ namespace ECS {
         });
     }
 
+    // Tear down GUI input system state.
     void GUIInputSystem::OnDestroy(World& world) {
         (void)world;
     }
 
+    // Return metadata used for system registration.
     SystemMetadata GUIInputSystem::GetMetadata() const {
         ComponentAccessBuilder builder("GUIInputSystem");
         builder.SetExecutionOrder(-15);
         return builder
+            .ReadComponent<Components::Active>()
+            .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUIElement>()
             .WriteComponent<Components::GUIInput>()
             .WriteComponent<Components::GUIButton>()

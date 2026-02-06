@@ -1,3 +1,16 @@
+/* Start Header *****************************************************************/
+/*!
+\file   CrashDumping.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+
+\brief
+Declaration of the CrashDumping class for handling application crashes,
+including generating dump files and logging error information. Provides mechanisms
+to set program name, toggle dump creation, and register shutdown callbacks.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <string>
 #include <sstream>
@@ -44,6 +57,7 @@ namespace Engine {
         static inline string name{ "Game" };
         static inline function<void()> ShutdownCallback;
 
+        // Handle shutdown callback.
         static inline void Shutdown() { if (ShutdownCallback) ShutdownCallback(); }
 
 #ifdef _WIN32

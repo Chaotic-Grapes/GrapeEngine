@@ -91,7 +91,7 @@
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 36,
+                "TextureId": 40,
                 "TexturePath": "",
                 "Tiling": {
                     "X": 0.0476190485060215,
@@ -116,7 +116,7 @@
                 "SheetHeight": 220,
                 "SheetWidth": 18900,
                 "StartFrame": 0,
-                "TextureId": 36,
+                "TextureId": 40,
                 "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                 "UseRow": true
             },

@@ -511,6 +511,15 @@ namespace ECS {
 		}
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
+	inline void to_json(nlohmann::json& j, const GUIRenderMode& mode) {
+		j = nlohmann::json{
+			{"Space", static_cast<uint8_t>(mode.Space)}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIRenderMode& mode) {
+		mode.Space = static_cast<GUIRenderSpace>(j.value("Space", static_cast<uint8_t>(GUIRenderSpace::Screen)));
+	}
 	inline void to_json(nlohmann::json& j, const GUIElement& element) {
 		j = nlohmann::json{
 			{"Position", element.Position},
@@ -636,10 +645,6 @@ namespace ECS {
 			{"Text", ResolveStringId(button.TextId)},
 			{"FontPath", ResolveStringId(button.FontPathId)},
 			{"IconPath", ResolveStringId(button.IconPathId)},
-			{"NormalColor", button.NormalColor},
-			{"HoverColor", button.HoverColor},
-			{"PressedColor", button.PressedColor},
-			{"DisabledColor", button.DisabledColor},
 			{"TextColor", button.TextColor},
 			{"IconColor", button.IconColor},
 			{"FontSize", button.FontSize},
@@ -657,10 +662,6 @@ namespace ECS {
 		button.TextId = ReadStringId(j, "Text", 0);
 		button.FontPathId = ReadStringId(j, "FontPath", 0);
 		button.IconPathId = ReadStringId(j, "IconPath", 0);
-		if (j.contains("NormalColor")) button.NormalColor = j.at("NormalColor").get<::Color>();
-		if (j.contains("HoverColor")) button.HoverColor = j.at("HoverColor").get<::Color>();
-		if (j.contains("PressedColor")) button.PressedColor = j.at("PressedColor").get<::Color>();
-		if (j.contains("DisabledColor")) button.DisabledColor = j.at("DisabledColor").get<::Color>();
 		if (j.contains("TextColor")) button.TextColor = j.at("TextColor").get<::Color>();
 		if (j.contains("IconColor")) button.IconColor = j.at("IconColor").get<::Color>();
 		button.FontSize = j.value("FontSize", 24.0f);
@@ -1139,6 +1140,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(PrefabInstanceMetadata, ECS::Components::PrefabInstanceMetadata, "PrefabInstanceMetadata")
 	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
 	REGISTER_COMPONENT_SERIALIZER(GUICanvas, ECS::Components::GUICanvas, "GUICanvas")
+	REGISTER_COMPONENT_SERIALIZER(GUIRenderMode, ECS::Components::GUIRenderMode, "GUIRenderMode")
 	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
 	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel");
 	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");

@@ -1,0 +1,113 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": 16.579105377197266,
+                    "Y": -13.04365062713623,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 0.6000000238418579,
+                    "Y": 0.6000000238418579,
+                    "Z": 0.6000000238418579
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "MS04"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
+                "Flags": 0,
+                "LayerMask": 4294967294,
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Radius": 0.5
+            },
+            "TypeName": "CircleCollider2D"
+        },
+        {
+            "Data": {
+                "Id": 2
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 1.0,
+                    "G": 1.0,
+                    "R": 1.0
+                },
+                "EmissiveStrength": 5.0,
+                "EmissiveTextureId": 0,
+                "EmissiveTexturePath": "",
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureFilter": 0,
+                "TextureId": 20,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS04.png",
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 0.6000000238418579,
+                    "m01": 0.0,
+                    "m02": 0.0,
+                    "m03": 16.579105377197266,
+                    "m10": 0.0,
+                    "m11": 0.6000000238418579,
+                    "m12": 0.0,
+                    "m13": -13.04365062713623,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 0.6000000238418579,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        },
+        {
+            "Data": {
+                "msID": 4,
+                "start": false
+            },
+            "TypeName": "MS_Manager"
+        }
+    ]
+}

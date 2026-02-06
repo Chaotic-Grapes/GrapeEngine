@@ -67,11 +67,12 @@ public record struct BarnacleSnatcherComponent
 public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
 {
     private const string BarnacleName = "Barnacle Snatcher";
-    private const string SquidwardName = "squidward";
+    private const string SquidwardName = "NPCInteractor_squidward";
 
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
-        // Log and resolve barnacle for this collision.
+        return;
+        Log("SNATCH COLLISION entered");
         LogCollision(World!, "Enter", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
             return;
@@ -84,7 +85,8 @@ public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
     {
-        // Log and resolve barnacle for this collision.
+        return;
+        Log("SNATCH COLLISION exit");
         LogCollision(World!, "Exit", self, evt.OtherEntityId);
         if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
             return;
@@ -428,6 +430,11 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     // Apply attack animation settings.
     private static void SetAttack(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
     {
+        Log("SNATCH SNATCH SNATCH");
+        //It will eat both for now
+        InventoryController.instance.DecrementInStackSlot(1);
+        InventoryController.instance.DecrementInStackSlot(2);
+
         ai.State = BarnacleState.Attack;
         anim.Row = ai.AnimRow;
         anim.FrameOffset = Math.Max(0, ai.AttackFrameOffset);

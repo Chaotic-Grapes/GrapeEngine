@@ -6,6 +6,7 @@ using GrapeEngine.Scripting.Systems.Attributes;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
 using EchoesBelow.Scripts.MarineSnowSystem;
+using System;
 
 namespace EchoesBelow.Scripts;
 
@@ -86,8 +87,8 @@ public class Player : SystemBase
 
 
 
-                //Variables
-                ref LocalTransform transform = ref gameObject.Component4;
+            //Variables
+            ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
             ref AngularVelocity2D av = ref gameObject.Component3;
             Vector2 playerDir;
@@ -278,6 +279,8 @@ public class PlayerCollisionHandler : CollisionSystemBase
 {
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
+        Log("COLLIDED");
+        Console.WriteLine("COLLIDED");
         base.OnCollisionEnter(self, evt);
 
         if (self.HasComponent<PlayerComponent>()) CollisionEntered(self, evt);
@@ -285,8 +288,9 @@ public class PlayerCollisionHandler : CollisionSystemBase
 
     private void CollisionEntered(Entity self, CollisionEvent evt)
     {
+        //Log("COLLIDED");
         //Collide with MarineSnow
-        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}",LogLevel.Debug);
+        Log($"{self.GetComponent<Name>().ToString()} collided with {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} at {evt.ContactPoint}", LogLevel.Debug);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
         if (other.HasComponent<MS_ManagerComponent>())
         {
@@ -299,17 +303,17 @@ public class PlayerCollisionHandler : CollisionSystemBase
             Log("TagMask: " + other.GetComponent<TagMask>().Mask);
             if (other.GetComponent<TagMask>().Mask == 32)
             {
-
+                //Take damage
                 ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
             }
-            else if(other.GetComponent<TagMask>().Mask == 4)
+            else if (other.GetComponent<TagMask>().Mask == 4)
             {
                 //door detected
                 other.GetComponent<Active>().Enabled = false;
             }
         }
 
-        
+
     }
 
     protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
@@ -325,13 +329,22 @@ public class PlayerCollisionHandler : CollisionSystemBase
 [System(SystemGroup.PostPhysics, SystemRunMode.PlayOnly)]
 public class PlayerTriggerHandler : TriggerSystemBase
 {
+    private const string SourceSceneName = "Level_One";
+    private const string endSceneName = "EchoesBelow/Scenes/EndScene.scn";
     protected override void OnTriggerEnter(Entity self, TriggerEvent evt)
     {
-        base.OnTriggerEnter(self, evt);
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
-        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001)
+        if (other.HasComponent<MatchSignifierComponent>() && other.GetComponent<MatchSignifierComponent>().signifierID == 86118001 &&
+            InventoryController.ms02_Count >= 5 && InventoryController.ms01_Count >= 5)
         {
+            SceneManager sceneManager = SceneManager.Instance;
             //Loadscene use dalton's
+            sceneManager.SetNextAudioTransition(2.0f, true);
+            //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
+            //Like creating a new scene / allocate a new scene in the registry
+            var sceneIndex = SceneManager.Instance.AddScene();
+            var ss = SceneManager.Instance.LoadScene(sceneIndex, endSceneName);
+            SceneManager.Instance.SetActive(sceneIndex);
         }
     }
 }

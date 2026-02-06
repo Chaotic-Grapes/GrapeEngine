@@ -182,6 +182,7 @@ namespace ECS {
         builder.ReadComponent<Components::BoxCollider2D>();
         builder.ReadComponent<Components::Rigidbody2D>();
         builder.ReadComponent<Components::Active>();
+        builder.ReadComponent<Components::Parent>();
         // Write accesses
         builder.WriteComponent<Components::LocalTransform>();
         builder.WriteComponent<Components::Rigidbody2D>();
@@ -497,9 +498,8 @@ namespace ECS {
                 const Components::Rigidbody2D& rb,
                 Components::LinearVelocity2D&,
                 Components::LocalTransform&) {
-                    // Check if entity is active (optional component)
-                    if (const auto* a = world.TryGet<Components::Active>(e)) {
-                        if (!a->Enabled) return;
+                    if (!world.IsActiveInHierarchy(e)) {
+                        return;
                     }
                     
                     if (rb.Mass <= 0.0f) return; // only dynamics here
@@ -525,7 +525,9 @@ namespace ECS {
         world.Each<Components::Rigidbody2D, Components::LocalTransform>(
             [&](const Entity e, const Components::Rigidbody2D& rb, const Components::LocalTransform&) {
                 if (rb.Mass > 0.0f) return; // only statics here
-                if (const auto* a = world.TryGet<Components::Active>(e)) if (!a->Enabled) return;
+                if (!world.IsActiveInHierarchy(e)) {
+                    return;
+                }
                 
                 // === Layer-wide physics gating for static entities ===
                 if (layerManager) {
@@ -550,8 +552,8 @@ namespace ECS {
             if (broadphaseIds.find(e.Index) != broadphaseIds.end())
                 return;
 
-            if (const auto* a = world.TryGet<Components::Active>(e)) {
-                if (!a->Enabled) return;
+            if (!world.IsActiveInHierarchy(e)) {
+                return;
             }
 
             if (layerManager) {
@@ -582,8 +584,8 @@ namespace ECS {
                         Components::LinearVelocity2D& linVel,
                         Components::LocalTransform& xf)
                     {
-                        if (const auto* a = world.TryGet<Components::Active>(e)) {
-                            if (!a->Enabled) return;
+                        if (!world.IsActiveInHierarchy(e)) {
+                            return;
                         }
                         if (rb.Mass <= 0.0f) return; // only dynamic bodies integrate
 
@@ -703,9 +705,9 @@ namespace ECS {
                     auto* tB = world.TryGet<Components::LocalTransform>(B);
                     // cannot resolve without positions
                     if (!tA || !tB) continue;
-                    // Honor Active flags: if present and disabled, skip.
-                    if (const auto* aA = world.TryGet<Components::Active>(A); aA && !aA->Enabled) continue;
-                    if (const auto* aB = world.TryGet<Components::Active>(B); aB && !aB->Enabled) continue;
+                    // Honor Active flags (including parents): if disabled, skip.
+                    if (!world.IsActiveInHierarchy(A)) continue;
+                    if (!world.IsActiveInHierarchy(B)) continue;
 
                     // Query collider shapes present on each entity.
                     const auto* circA = world.TryGet<Components::CircleCollider2D>(A);

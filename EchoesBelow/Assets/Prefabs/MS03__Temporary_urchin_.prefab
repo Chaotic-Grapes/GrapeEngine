@@ -36,7 +36,7 @@
         {
             "Data": {
                 "Flags": 0,
-                "LayerMask": 4,
+                "LayerMask": 4294967294,
                 "Offset": {
                     "X": 0.0,
                     "Y": 0.0
@@ -47,7 +47,7 @@
         },
         {
             "Data": {
-                "Id": 0
+                "Id": 2
             },
             "TypeName": "Layer"
         },
@@ -68,7 +68,8 @@
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 22,
+                "TextureFilter": 0,
+                "TextureId": 25,
                 "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                 "Tiling": {
                     "X": 1.0,

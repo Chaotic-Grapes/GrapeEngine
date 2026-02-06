@@ -1,16 +1,33 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Quaternion.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+
+\brief
+Quaternion math utilities and operations.
+*/
+/* End Header *******************************************************************/
+
 #include "math/Quaternion.h"
 #include <cmath>
 
 # define M_PI 3.14159265358979323846
 
+// Construct an identity quaternion.
 Quaternion::Quaternion() : X(0.0f), Y(0.0f), Z(0.0f), W(1.0f) {}
+// Construct a quaternion from explicit components.
 Quaternion::Quaternion(float x, float y, float z, float w) : X(x), Y(y), Z(z), W(w) {}
 
+// Return the identity quaternion.
 Quaternion Quaternion::Identity() { return Quaternion(0,0,0,1); }
 
+// Return the quaternion length.
 float Quaternion::Length() const { return std::sqrt(X*X + Y*Y + Z*Z + W*W); }
+// Return the squared quaternion length.
 float Quaternion::SquareLength() const { return X*X + Y*Y + Z*Z + W*W; }
 
+// Normalize the quaternion in place.
 void Quaternion::Normalize() {
     float len = Length();
     if (len > 0.0f) {
@@ -18,6 +35,7 @@ void Quaternion::Normalize() {
         X *= inv; Y *= inv; Z *= inv; W *= inv;
     }
 }
+// Return a normalized copy of the quaternion.
 Quaternion Quaternion::Normalized() const {
     float len = Length();
     if (len > 0.0f) {
@@ -27,8 +45,10 @@ Quaternion Quaternion::Normalized() const {
     return Quaternion::Identity();
 }
 
+// Return the conjugate of the quaternion.
 Quaternion Quaternion::Conjugate() const { return Quaternion(-X, -Y, -Z, W); }
 
+// Return the inverse quaternion (identity if near zero length).
 Quaternion Quaternion::Inverse() const {
     float sq = SquareLength();
     if (sq > 0.0f) {
@@ -39,6 +59,7 @@ Quaternion Quaternion::Inverse() const {
     return Quaternion::Identity();
 }
 
+// Multiply two quaternions (Hamilton product).
 Quaternion Quaternion::Multiply(const Quaternion& a, const Quaternion& b) {
     // Hamilton product (a followed by b)
     return Quaternion(
@@ -49,6 +70,7 @@ Quaternion Quaternion::Multiply(const Quaternion& a, const Quaternion& b) {
     );
 }
 
+// Create a quaternion from an axis-angle rotation.
 Quaternion Quaternion::FromAxisAngle(const Vector3D& axis, float angleRadians) {
     float half = angleRadians * 0.5f;
     float s = std::sin(half);
@@ -57,6 +79,7 @@ Quaternion Quaternion::FromAxisAngle(const Vector3D& axis, float angleRadians) {
     return Quaternion(axis.X * s, axis.Y * s, axis.Z * s, c);
 }
 
+// Create a quaternion from Euler angles (radians).
 Quaternion Quaternion::FromEulerRad(float pitchX, float yawY, float rollZ) {
     // ZYX convention: roll around Z, yaw around Y, pitch around X
     float cx = std::cos(pitchX * 0.5f), sx = std::sin(pitchX * 0.5f);
@@ -70,6 +93,7 @@ Quaternion Quaternion::FromEulerRad(float pitchX, float yawY, float rollZ) {
     return Multiply(Multiply(qx, qy), qz).Normalized();
 }
 
+// Perform spherical linear interpolation between two quaternions.
 Quaternion Quaternion::Slerp(const Quaternion& a, const Quaternion& b, float t) {
     // Clamp t
     if (t <= 0.0f) return a;
@@ -113,6 +137,7 @@ Quaternion Quaternion::Slerp(const Quaternion& a, const Quaternion& b, float t) 
     );
 }
 
+// Rotate a vector by this quaternion.
 Vector3D Quaternion::Rotate(const Vector3D& v) const {
     // v' = q * (v,0) * q^{-1}
     Quaternion qv(v.X, v.Y, v.Z, 0.0f);
@@ -121,11 +146,14 @@ Vector3D Quaternion::Rotate(const Vector3D& v) const {
     return Vector3D(res.X, res.Y, res.Z);
 }
 
+// Compare quaternions for exact equality.
 bool Quaternion::operator==(const Quaternion& other) const {
     return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
 }
+// Compare quaternions for exact inequality.
 bool Quaternion::operator!=(const Quaternion& other) const { return !(*this == other); }
 
+// Multiply two quaternions.
 Quaternion operator*(const Quaternion& a, const Quaternion& b) {
     return Quaternion::Multiply(a, b);
 }

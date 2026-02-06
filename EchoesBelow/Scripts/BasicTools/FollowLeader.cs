@@ -40,8 +40,7 @@ public class FollowLeader : SystemBase
             Entity targetEntity = Entity.FromId(World!, targetObjId);
             ref LocalTransform targetTransform = ref targetEntity.GetComponent<LocalTransform>();
 
-            transform.Position = new Vector3(GMath.Lerp(transform.Position.X, targetTransform.Position.X, 1f),
-                                             GMath.Lerp(transform.Position.Y, targetTransform.Position.Y, 1f), 0f);
+            transform.Position = new Vector3(targetTransform.Position.X,targetTransform.Position.Y, 0f);
         }
     }
 

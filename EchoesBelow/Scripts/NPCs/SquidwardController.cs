@@ -11,11 +11,12 @@ namespace EchoesBelow.Scripts;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public sealed class SquidwardController : SystemBase
 {
-    private const string SquidwardName = "squidward";
-    private const float MoveSpeed = 2.5f;
+    private const string SquidwardName = "NPCInteractor_squidward";
+    //private const float MoveSpeed = 2.5f;
 
     protected override void OnUpdate()
     {
+        return; //Dont need this anymore
         if (World == null)
             return;
 
@@ -50,8 +51,9 @@ public sealed class SquidwardController : SystemBase
 
         ref var transform = ref entity.GetComponent<LocalTransform>();
         var position = transform.Position;
-        position.X += x * MoveSpeed * Time.DeltaTime;
-        position.Y += y * MoveSpeed * Time.DeltaTime;
+        //Dont need this anymore
+        //position.X += x * MoveSpeed * Time.DeltaTime;
+        //position.Y += y * MoveSpeed * Time.DeltaTime;
         transform.Position = position;
     }
 
