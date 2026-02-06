@@ -15,8 +15,8 @@ public class InventoryController : SystemBase
 {
     //I think i only need one instance
     public static InventoryController instance;
-    public static ushort ms01_Count;
-    public static ushort ms02_Count;
+    public static int ms01_Count;
+    public static int ms02_Count;
 
     public static List<ulong> ms01_List;
     public static List<ulong> ms02_List;
@@ -79,7 +79,8 @@ public class InventoryController : SystemBase
         {
             
             case 1:
-                ms01_Count++;
+                ms01_Count = GMath.Clamp(++ms01_Count,(ushort)0,(ushort)10);
+                
                 foreach(var ui in World!.Query<MatchSignifierComponent>())
                 {
                     foreach(var inventory in World!.Query<InventoryControllerComponent>())
@@ -92,7 +93,8 @@ public class InventoryController : SystemBase
                 }
                 break;
             case 2:
-                ms02_Count++;
+                ms02_Count = GMath.Clamp(++ms02_Count, (ushort)0, (ushort)10);
+               
                 foreach (var ui in World!.Query<MatchSignifierComponent>())
                 {
                     foreach (var inventory in World!.Query<InventoryControllerComponent>())
@@ -114,10 +116,32 @@ public class InventoryController : SystemBase
         switch (msID)
         {
             case 1:
-                ms01_Count--;
+                ms01_Count = GMath.Clamp(--ms01_Count, 0, 10);
+
+                foreach (var ui in World!.Query<MatchSignifierComponent>())
+                {
+                    foreach (var inventory in World!.Query<InventoryControllerComponent>())
+                    {
+                        if (ui.Component1.signifierID == inventory.Component1.ms01_signifier)
+                        {
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"{ms01_Count}");
+                        }
+                    }
+                }
                 break;
             case 2:
-                ms02_Count--;
+                ms02_Count = GMath.Clamp(--ms02_Count, 0, 10);
+
+                foreach (var ui in World!.Query<MatchSignifierComponent>())
+                {
+                    foreach (var inventory in World!.Query<InventoryControllerComponent>())
+                    {
+                        if (ui.Component1.signifierID == inventory.Component1.ms02_signifier)
+                        {
+                            ui.Entity.GetComponent<GUIText>().TextId = Strings.Intern($"{ms02_Count}");
+                        }
+                    }
+                }
                 break;
         }
         Log($"ms01 Slot: {ms01_Count}items");

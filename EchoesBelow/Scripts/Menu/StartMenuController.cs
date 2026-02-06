@@ -44,7 +44,7 @@ public class StartMenuController : SystemBase
         Scene? active = sceneManager.GetActive();
         if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
         {
-            Log($"StartMenuController: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
+            //Log($"StartMenuController: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
             return;
         }
 

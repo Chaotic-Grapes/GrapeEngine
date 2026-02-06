@@ -1,0 +1,120 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": 0.679415225982666,
+                    "Y": 1.1538236141204834,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "squidward"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
+                "Flags": 0,
+                "HalfExtents": {
+                    "X": 0.3799999952316284,
+                    "Y": 0.5
+                },
+                "LayerMask": 4294967295,
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Rotation": 0.0
+            },
+            "TypeName": "BoxCollider2D"
+        },
+        {
+            "Data": {
+                "Id": 2
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "AngularDamping": 0.0,
+                "Flags": 0,
+                "GravityScale": 1.0,
+                "InverseMass": 1.0,
+                "LinearDamping": 0.0,
+                "Mass": 1.0
+            },
+            "TypeName": "Rigidbody2D"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 1.0,
+                    "G": 1.0,
+                    "R": 1.0
+                },
+                "EmissiveStrength": 5.0,
+                "EmissiveTextureId": 0,
+                "EmissiveTexturePath": "",
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureId": 29,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 1.0,
+                    "m01": 0.0,
+                    "m02": 0.0,
+                    "m03": 0.679415225982666,
+                    "m10": 0.0,
+                    "m11": 1.0,
+                    "m12": 0.0,
+                    "m13": 1.1538236141204834,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 1.0,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        }
+    ]
+}
