@@ -1,3 +1,11 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    BarnacleSnatcher.cs
+ * 
+ * @brief   Barnacle snatcher AI, animation, and collision handling.
+ */
+
 using System;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Core;

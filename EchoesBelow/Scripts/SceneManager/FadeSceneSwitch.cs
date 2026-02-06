@@ -1,3 +1,11 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    FadeSceneSwitch.cs
+ * 
+ * @brief   Manual scene switch with audio fade/crossfade.
+ */
+
 using System;
 using System.IO;
 using GrapeEngine.Scripting.Core;
