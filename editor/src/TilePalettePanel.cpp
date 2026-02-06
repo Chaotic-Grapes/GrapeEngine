@@ -1,3 +1,30 @@
+/* Start Header *****************************************************************/
+/*!
+\file    TilePalettePanel.cpp
+\author Samantha Leong 
+\par    s.leong@digipen.edu
+\date   3rd February 2026
+\brief
+Implements the TilePalettePanel editor UI responsible for:
+
+- Displaying available tiles from loaded tilesets
+- Allowing tile selection, rotation, and erasing
+- Handling drag-and-drop asset loading
+- Painting tiles into the active tilemap
+- Synchronizing tile collisions with ECS physics entities
+- Rendering hover previews in the editor viewport
+
+This panel bridges editor UI interactions with runtime tilemap data,
+ensuring visual edits are immediately reflected in both rendering and
+physics systems.
+
+Dependencies include ImGui for UI, ECS world systems for physics,
+and tilemap/tileset asset management.
+
+*/
+/* End Header *******************************************************************/
+
+
 #include "TilePalettePanel.h"
 
 #include <imgui.h>
@@ -18,6 +45,15 @@
 // We cast it to ImTextureID.
 
 namespace {
+    /*!
+    \brief Extracts the first asset path from an ImGui drag-drop payload.
+
+    The payload format contains multiple null-terminated strings. This
+    function safely reads the first string and returns it.
+
+    \param payload Drag-drop payload from ImGui
+    \return First asset path string, or empty string if invalid
+    */
     // Extract the first path from the ASSET_PATHS payload format.
     std::string ParseFirstAssetPath(const ImGuiPayload* payload) {
         if (!payload || !payload->Data || payload->DataSize == 0) {
@@ -35,6 +71,23 @@ namespace {
     }
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Initializes the TilePalettePanel editing environment.
+
+This function establishes the initial editor context by:
+
+- Storing a pointer to the ECS world for physics synchronization
+- Preparing a tileset collection (if provided)
+- Resetting editor state via SetEditingContext()
+
+The initialization funnels all setup through SetEditingContext()
+to ensure consistent state resets and avoid duplicated logic.
+
+\param tileMap  Tilemap to edit
+\param tileset  Initial tileset used for palette display
+\param world    ECS world used for spawning/removing physics entities
+*/
 void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world)
 {
     m_world = world; // Store world pointer for physics syncing.
@@ -44,6 +97,15 @@ void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const
     SetEditingContext(tileMap, tilesets, paths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Handles asset drop events forwarded from the UI.
+
+This delegates asset handling to the editor-level callback so that
+tilemaps or tilesets can be resolved externally.
+
+\param assetPath Path of dropped asset
+*/
 void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
 {
     if (m_assetDropCallback) {
@@ -52,12 +114,33 @@ void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
     }
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Updates the list of tilemaps available for editing.
+
+\param entries Tilemap dropdown entries
+\param activeId Currently active tilemap ID
+*/
 void TilePalettePanel::SetTileMapList(const std::vector<TileMapListEntry>& entries, EntityId activeId)
 {
     m_tileMapList = entries; // Replace the list of tilemaps for the dropdown.
     m_activeTileMapId = activeId; // Track which tilemap is currently active.
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Sets the active editing context.
+
+This resets physics entities from previous maps, switches tilesets,
+resets selection state, and updates editor metadata.
+
+\param tileMap Active tilemap
+\param tilesets Available tilesets
+\param tilesetPaths UI labels for tilesets
+\param activeTilesetIndex Active tileset index
+\param tileMapPath Asset path for saving
+\param worldOrigin Tilemap origin in world space
+*/
 void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap,
     const std::vector<std::shared_ptr<Tileset>>& tilesets,
     const std::vector<std::string>& tilesetPaths,
@@ -91,6 +174,20 @@ void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap
     m_isEraser = false; // Reset eraser toggle.
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Renders the ImGui tile palette window.
+
+Provides:
+
+- Drag-drop asset handling
+- Tilemap & tileset selection
+- Tile grid display
+- Tile inspector
+- Rotation/eraser tools
+
+All editor interactions are processed here.
+*/
 void TilePalettePanel::Render()
 {
     if (!m_active) return;
@@ -278,6 +375,17 @@ void TilePalettePanel::Render()
     ImGui::End();
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Draws a tile preview overlay while hovering inside the viewport.
+
+Converts world coordinates into tilemap coordinates and renders a
+semi-transparent preview using the renderer system. Supports rotation
+hotkeys and eraser visualization.
+
+\param worldPos Cursor position in world space
+*/
+
 void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
 {
     if (!m_tileMap || !m_tileset) return;
@@ -289,9 +397,11 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
     }
 
     const glm::vec2 localPos = worldPos - m_worldOrigin; // Convert world space to tilemap-local space.
+    // Compute signed tile indices so negative coordinates are supported.
     const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x); // Signed tile coordinate in map space.
     const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y); // Signed tile coordinate in map space.
 
+    // Calculate tile world-space bounds for rendering preview overlay.
     float tileSize = m_tileMap->TileSize();
     glm::vec2 tilePos(m_tileMap->TileToWorldSigned(tx), m_tileMap->TileToWorldSigned(ty)); // Tile origin in local space.
     tilePos += m_worldOrigin; // Shift tile origin into world space.
@@ -322,6 +432,17 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
     }
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Applies tile paint or erase operation.
+
+Handles coordinate conversion, map expansion, undo integration,
+physics syncing, and persistence updates.
+
+\param worldPos Cursor position
+\param isRightClick True if erase input
+\return True if tile changed
+*/
 bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightClick)
 {
     if (!m_tileMap || !m_tileset) return false;
@@ -398,6 +519,18 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     return true;
 }
 
+/*------------------------------------------------------------------*/
+/*!
+\brief Synchronizes ECS physics colliders with tile state.
+
+Removes stale entities and spawns new static collider entities
+based on tile collision metadata.
+
+\param x Tile X coordinate
+\param y Tile Y coordinate
+\param id Packed tile ID
+\param isEraser True if tile removed
+*/
 void TilePalettePanel::SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser)
 {
     if (!m_world) return;
@@ -450,14 +583,6 @@ void TilePalettePanel::SyncPhysics(int32_t x, int32_t y, TileID id, bool isErase
     // Handle Rotation
     uint8_t rotIdx = GetTileRotation(id);
     collider.Rotation = rotIdx * 1.57079632679f; // 90 deg steps in radians
-    
-    // Adjust Collider based on Diagonal?
-    // User said: "If it is SOLID or DIAGONAL, spawn a static ECS Entity... using Rigidbody2D and BoxCollider2D."
-    // For diagonal, a BoxCollider is an approximation unless we have PolygonCollider.
-    // User instructions: "Use the ECS::Components::BoxCollider2D component."
-    // So we use BoxCollider even for slopes (maybe rotated?).
-    // "When syncing a rotated tile, convert the rotation bits... and set the BoxCollider2D::Rotation field."
-    // So we just use BoxCollider with rotation.
     
     m_world->Add<ECS::Components::BoxCollider2D>(e, collider);
 
