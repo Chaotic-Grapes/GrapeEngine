@@ -75,7 +75,7 @@ public class MS_Spawner : SystemBase
                 int msID = msID_selected[(GMath.Random(0, msID_selected.Count-1))];
 
                 //How many to spawn
-                int spawnCount = GMath.Random(1, 2);
+                int spawnCount = GMath.Random(2, 5);
                 //Spawner
                 for (int i = 0; i < spawnCount; i++)
                 {

@@ -3,8 +3,8 @@
         {
             "Data": {
                 "Position": {
-                    "X": -12.461140632629395,
-                    "Y": -4.287209987640381,
+                    "X": -2.468599557876587,
+                    "Y": 1.3156070709228516,
                     "Z": 0.0
                 },
                 "Rotation": {
@@ -23,22 +23,16 @@
         },
         {
             "Data": {
-                "Value": "BigWall"
+                "Value": "VertWall"
             },
             "TypeName": "Name"
         },
         {
             "Data": {
-                "Value": 0.0
-            },
-            "TypeName": "AngularVelocity2D"
-        },
-        {
-            "Data": {
                 "Flags": 0,
                 "HalfExtents": {
-                    "X": 11.5,
-                    "Y": 4.5
+                    "X": 0.5,
+                    "Y": 3.0
                 },
                 "LayerMask": 4294967295,
                 "Offset": {
@@ -54,15 +48,6 @@
                 "Id": 0
             },
             "TypeName": "Layer"
-        },
-        {
-            "Data": {
-                "Value": {
-                    "X": 0.0,
-                    "Y": 0.0
-                }
-            },
-            "TypeName": "LinearVelocity2D"
         },
         {
             "Data": {
@@ -83,41 +68,9 @@
             "Data": {
                 "Friction": 0.5,
                 "PositionCorrectPercent": 0.20000000298023224,
-                "Restitution": 4.389999866485596
+                "Restitution": 2.0
             },
             "TypeName": "PhysicsMaterial2D"
-        },
-        {
-            "Data": {
-                "AngularDamping": 0.0,
-                "Flags": 0,
-                "GravityScale": 1.0,
-                "InverseMass": 0.0,
-                "LinearDamping": 0.0,
-                "Mass": 0.0
-            },
-            "TypeName": "Rigidbody2D"
-        },
-        {
-            "Data": {
-                "Color": {
-                    "A": 1.0,
-                    "B": 9.998999303206801e-05,
-                    "G": 9.998999303206801e-05,
-                    "R": 9.999999747378752e-05
-                },
-                "Filled": true,
-                "HalfExtents": {
-                    "X": 11.5,
-                    "Y": 4.5
-                },
-                "Offset": {
-                    "X": 0.0,
-                    "Y": 0.0
-                },
-                "Thickness": 0.0
-            },
-            "TypeName": "ShapeBox2D"
         },
         {
             "Data": {
@@ -126,11 +79,11 @@
                     "m00": 0.5099999904632568,
                     "m01": 0.0,
                     "m02": 0.0,
-                    "m03": -12.461140632629395,
+                    "m03": -2.468599557876587,
                     "m10": 0.0,
                     "m11": 1.0,
                     "m12": 0.0,
-                    "m13": -4.287209987640381,
+                    "m13": 1.3156070709228516,
                     "m20": 0.0,
                     "m21": 0.0,
                     "m22": 1.0,
@@ -142,6 +95,27 @@
                 }
             },
             "TypeName": "WorldTransform"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 9.998999303206801e-05,
+                    "G": 9.998999303206801e-05,
+                    "R": 9.999999747378752e-05
+                },
+                "Filled": true,
+                "HalfExtents": {
+                    "X": 0.5,
+                    "Y": 3.0
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Thickness": 0.10000000149011612
+            },
+            "TypeName": "ECS::Components::ShapeBox2D"
         }
     ]
 }
