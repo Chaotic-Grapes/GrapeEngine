@@ -349,7 +349,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.9938524961471558,
+                        "AspectRatio": 1.7777777910232544,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -2189,49 +2189,9 @@
                 },
                 {
                     "Data": {
-                        "Value": "ms01_Slot"
+                        "Value": "Hotbar"
                     },
                     "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Alignment": 0,
-                        "Margin": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Padding": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Position": {
-                            "X": 25.0,
-                            "Y": 11.0
-                        },
-                        "Size": {
-                            "X": 87.0,
-                            "Y": 73.0
-                        },
-                        "Visible": true,
-                        "ZOrder": 10
-                    },
-                    "TypeName": "GUIElement"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.6842623949050903,
-                            "G": 0.7398353219032288,
-                            "R": 0.8360008001327515
-                        },
-                        "CornerRadius": 0.0
-                    },
-                    "TypeName": "GUIPanel"
                 },
                 {
                     "Data": {
@@ -2262,331 +2222,6 @@
                         }
                     },
                     "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ms02_Slot"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Alignment": 0,
-                        "Margin": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Padding": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Position": {
-                            "X": 142.0,
-                            "Y": 11.0
-                        },
-                        "Size": {
-                            "X": 87.0,
-                            "Y": 73.0
-                        },
-                        "Visible": true,
-                        "ZOrder": 10
-                    },
-                    "TypeName": "GUIElement"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.28335148096084595,
-                            "G": 0.36189883947372437,
-                            "R": 0.7313071489334106
-                        },
-                        "CornerRadius": 0.0
-                    },
-                    "TypeName": "GUIPanel"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ms01_Text"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Alignment": 0,
-                        "Margin": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Padding": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Position": {
-                            "X": 60.0,
-                            "Y": 29.0
-                        },
-                        "Size": {
-                            "X": 153.0,
-                            "Y": 82.0
-                        },
-                        "Visible": true,
-                        "ZOrder": 12
-                    },
-                    "TypeName": "GUIElement"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 9.998999303206801e-05,
-                            "G": 9.998999303206801e-05,
-                            "R": 9.999999747378752e-05
-                        },
-                        "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
-                        "FontSize": 37.0,
-                        "HAlign": 0,
-                        "Text": "0",
-                        "VAlign": 0,
-                        "Wrap": false
-                    },
-                    "TypeName": "GUIText"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "signifierID": 666666
-                    },
-                    "TypeName": "Match Signifier"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ms02_Text"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Alignment": 0,
-                        "Margin": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Padding": {
-                            "W": 0.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Position": {
-                            "X": 176.0,
-                            "Y": 28.0
-                        },
-                        "Size": {
-                            "X": 153.0,
-                            "Y": 82.0
-                        },
-                        "Visible": true,
-                        "ZOrder": 12
-                    },
-                    "TypeName": "GUIElement"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 9.998999303206801e-05,
-                            "G": 9.998999303206801e-05,
-                            "R": 9.999999747378752e-05
-                        },
-                        "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
-                        "FontSize": 37.0,
-                        "HAlign": 0,
-                        "Text": "0",
-                        "VAlign": 0,
-                        "Wrap": false
-                    },
-                    "TypeName": "GUIText"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "signifierID": 777777
-                    },
-                    "TypeName": "Match Signifier"
                 }
             ]
         },
@@ -2756,8 +2391,8 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 134.0,
-                            "Y": 1.0
+                            "X": 63.0,
+                            "Y": 14.0
                         },
                         "Size": {
                             "X": 102.0,
@@ -2863,8 +2498,8 @@
                             "Z": 0.0
                         },
                         "Position": {
-                            "X": 18.0,
-                            "Y": 1.0
+                            "X": -54.0,
+                            "Y": 15.0
                         },
                         "Size": {
                             "X": 102.0,
@@ -2922,6 +2557,652 @@
                         "signifierID": 1234
                     },
                     "TypeName": "Match Signifier"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ms02_Slot"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": 70.0,
+                            "Y": 23.0
+                        },
+                        "Size": {
+                            "X": 87.0,
+                            "Y": 73.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 5
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.28335148096084595,
+                            "G": 0.36189883947372437,
+                            "R": 0.7313071489334106
+                        },
+                        "CornerRadius": 0.0
+                    },
+                    "TypeName": "GUIPanel"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.31561267375946045,
+                            "G": 0.0,
+                            "R": 0.14183256030082703
+                        },
+                        "FontPath": "",
+                        "FontSize": 60.0,
+                        "HAlign": 1,
+                        "Text": "0",
+                        "VAlign": 1,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "signifierID": 777777
+                    },
+                    "TypeName": "Match Signifier"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ms01_Slot"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": -47.0,
+                            "Y": 24.0
+                        },
+                        "Size": {
+                            "X": 87.0,
+                            "Y": 73.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 5
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.6842623949050903,
+                            "G": 0.7398353219032288,
+                            "R": 0.8360008001327515
+                        },
+                        "CornerRadius": 0.0
+                    },
+                    "TypeName": "GUIPanel"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.33143699169158936,
+                            "G": 0.0,
+                            "R": 0.0796826109290123
+                        },
+                        "FontPath": "",
+                        "FontSize": 60.0,
+                        "HAlign": 1,
+                        "Text": "0",
+                        "VAlign": 1,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "signifierID": 666666
+                    },
+                    "TypeName": "Match Signifier"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "PauseMenu"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "PauseBG"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": -23.0,
+                            "Y": 37.0
+                        },
+                        "Size": {
+                            "X": 800.0,
+                            "Y": 450.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 10
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 0.6759581565856934,
+                            "B": 1.0,
+                            "G": 0.25920569896698,
+                            "R": 0.3195723295211792
+                        },
+                        "CornerRadius": 0.0
+                    },
+                    "TypeName": "GUIPanel"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Exit"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": 21.0,
+                            "Y": 292.0
+                        },
+                        "Size": {
+                            "X": 279.0,
+                            "Y": 86.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 11
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.5825664401054382,
+                            "G": 0.37727442383766174,
+                            "R": 0.37014907598495483
+                        },
+                        "CornerRadius": 0.0
+                    },
+                    "TypeName": "GUIPanel"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9999281764030457,
+                            "R": 0.9998999834060669
+                        },
+                        "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
+                        "FontSize": 60.0,
+                        "HAlign": 1,
+                        "Text": "Exit",
+                        "VAlign": 1,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Resume"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": 26.0,
+                            "Y": 171.0
+                        },
+                        "Size": {
+                            "X": 279.0,
+                            "Y": 86.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 11
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.5843137502670288,
+                            "G": 0.3764705955982208,
+                            "R": 0.3686274588108063
+                        },
+                        "CornerRadius": 0.0
+                    },
+                    "TypeName": "GUIPanel"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "FontPath": "EchoesBelow\\Assets\\Fonts\\Roboto\\Roboto-Regular.ttf",
+                        "FontSize": 60.0,
+                        "HAlign": 1,
+                        "Text": "Resume",
+                        "VAlign": 1,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -3418,15 +3699,39 @@
             ]
         }
     ],
-    "EntityCount": 35,
+    "EntityCount": 38,
     "Hierarchy": [
         {
-            "child": 13,
+            "child": 30,
+            "parent": 29
+        },
+        {
+            "child": 2,
+            "parent": 1
+        },
+        {
+            "child": 8,
             "parent": 7
         },
         {
-            "child": 12,
+            "child": 9,
             "parent": 7
+        },
+        {
+            "child": 10,
+            "parent": 7
+        },
+        {
+            "child": 11,
+            "parent": 7
+        },
+        {
+            "child": 23,
+            "parent": 22
+        },
+        {
+            "child": 29,
+            "parent": 22
         },
         {
             "child": 15,
@@ -3457,48 +3762,20 @@
             "parent": 1
         },
         {
-            "child": 27,
-            "parent": 22
+            "child": 12,
+            "parent": 7
         },
         {
-            "child": 23,
-            "parent": 22
+            "child": 13,
+            "parent": 7
         },
         {
             "child": 24,
-            "parent": 22
+            "parent": 23
         },
         {
-            "child": 2,
-            "parent": 1
-        },
-        {
-            "child": 8,
-            "parent": 7
-        },
-        {
-            "child": 9,
-            "parent": 7
-        },
-        {
-            "child": 10,
-            "parent": 7
-        },
-        {
-            "child": 11,
-            "parent": 7
-        },
-        {
-            "child": 25,
-            "parent": 22
-        },
-        {
-            "child": 26,
-            "parent": 22
-        },
-        {
-            "child": 31,
-            "parent": 30
+            "child": 34,
+            "parent": 33
         },
         {
             "child": 3,
@@ -3509,8 +3786,8 @@
             "parent": 7
         },
         {
-            "child": 34,
-            "parent": 33
+            "child": 37,
+            "parent": 36
         },
         {
             "child": 4,
@@ -3521,16 +3798,32 @@
             "parent": 14
         },
         {
-            "child": 28,
-            "parent": 22
+            "child": 25,
+            "parent": 23
         },
         {
-            "child": 29,
-            "parent": 22
+            "child": 26,
+            "parent": 23
         },
         {
             "child": 6,
             "parent": 1
+        },
+        {
+            "child": 31,
+            "parent": 29
+        },
+        {
+            "child": 27,
+            "parent": 23
+        },
+        {
+            "child": 28,
+            "parent": 23
+        },
+        {
+            "child": 32,
+            "parent": 29
         }
     ],
     "Layers": [
