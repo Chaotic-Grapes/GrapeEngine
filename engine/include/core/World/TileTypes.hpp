@@ -3,6 +3,9 @@
 \file   TileTypes.hpp
 \author Choi Meng Yew
 \date   31st January 2026
+\author Samantha Leong
+\par    s.leong@digipen.edu
+\date   3rd February 2026
 \brief
 Defines the TileID type and helper utilities for packing and unpacking tile data.
 

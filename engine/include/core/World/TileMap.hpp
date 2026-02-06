@@ -3,6 +3,9 @@
 \file   TileMap.hpp
 \author Choi Meng Yew
 \date   31st January 2026
+\author Samantha Leong
+\par    s.leong@digipen.edu
+\date   3rd February 2026
 \brief
 Defines the TileMap class, which owns and coordinates multiple tile layers
 and provides world-to-tile mapping utilities.
