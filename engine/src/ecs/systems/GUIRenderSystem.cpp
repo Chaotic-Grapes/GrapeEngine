@@ -19,6 +19,7 @@ functionality for translating ECS GUI components into draw calls.
 #include <string>
 #include <vector>
 #include "ecs/Components.h"
+#include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 #include "graphics/font.hpp"
 #include "graphics/texture.hpp"
@@ -26,6 +27,10 @@ functionality for translating ECS GUI components into draw calls.
 
 namespace ECS {
     namespace {
+
+        /**
+         * @brief GUI interaction states.
+         */
         enum class GUIState {
             Normal,
             Hovered,
@@ -33,7 +38,12 @@ namespace ECS {
             Disabled
         };
 
-        // Resolve interaction state from input + disabled flag.
+        /**
+         * @brief Determine the GUI state based on input and disabled status.
+         * @param input Pointer to GUIInput component (may be nullptr).
+         * @param disabled Whether the element is disabled.
+         * @return The resolved GUIState.
+         */
         GUIState ResolveState(const Components::GUIInput* input, bool disabled) {
             if (disabled) {
                 return GUIState::Disabled;
@@ -47,7 +57,13 @@ namespace ECS {
             return GUIState::Normal;
         }
 
-        // Pick a style color for the given GUI state (or fallback if no style component).
+        /**
+         * @brief Resolve the color for a GUI element based on its style and state.
+         * @param style Pointer to GUIStateStyle component (may be nullptr).
+         * @param fallback The fallback color if no style is provided.
+         * @param state The current GUIState.
+         * @return The resolved Color.
+         */
         Color ResolveStyleColor(const Components::GUIStateStyle* style, const Color& fallback, GUIState state) {
             if (!style) {
                 return fallback;
@@ -66,7 +82,13 @@ namespace ECS {
             }
         }
 
-        // Approximate line width using glyph advances and tracking.
+        /**
+         * @brief Measure the width of a single line of text using the specified font and pixel size.
+         * @param font The Font object to use for measurement.
+         * @param line The line of text to measure.
+         * @param pixelSize The desired pixel size for the font.
+         * @return The measured width in pixels.
+         */
         float MeasureLineWidth(const Font& font, std::string_view line, float pixelSize) {
             const float scale = pixelSize / static_cast<float>(font.getPixelSize());
             const float tracking = 1.05f;
@@ -78,7 +100,15 @@ namespace ECS {
             return width;
         }
 
-        // Split text into lines, optionally wrapping to maxWidth.
+        /**
+         * @brief Wrap text into multiple lines based on maximum width and wrapping settings.
+         * @param font The Font object to use for measurement.
+         * @param text The input text to wrap.
+         * @param pixelSize The desired pixel size for the font.
+         * @param maxWidth The maximum width in pixels for each line.
+         * @param wrap Whether to enable wrapping.
+         * @return A vector of strings representing the wrapped lines.
+         */
         std::vector<std::string> WrapText(const Font& font, const std::string& text, float pixelSize, float maxWidth, bool wrap) {
             std::vector<std::string> lines;
             if (text.empty()) {
@@ -163,34 +193,20 @@ namespace ECS {
             return lines;
         }
 
-        // Resolve GUI render space by walking up the parent chain.
-        Components::GUIRenderSpace ResolveRenderSpace(World& world, Entity entity) {
-            Entity current = entity;
-            int depth = 0;
-            while (!current.IsNull() && depth < 32) {
-                if (world.Has<Components::GUIRenderMode>(current)) {
-                    return world.Get<Components::GUIRenderMode>(current).Space;
-                }
-                if (!world.Has<Components::Parent>(current)) {
-                    break;
-                }
-                const auto& parent = world.Get<Components::Parent>(current);
-                current = parent.ParentEntity;
-                if (current.IsNull() || !world.IsAlive(current) || !world.Has<Components::GUIElement>(current)) {
-                    break;
-                }
-                ++depth;
-            }
-            return Components::GUIRenderSpace::Screen;
-        }
     }
 
-    // Initialize GUI render system state for the world.
+    /**
+     * @brief Initialize GUI render system state for the world.
+     * @param world The ECS world to initialize.
+     */
     void GUIRenderSystem::OnCreate(World& world) {
         (void)world;
     }
 
-    // Build draw lists and issue render calls for GUI elements.
+    /**
+     * @brief Update and render all GUI elements in the world.
+     * @param world The ECS world containing GUI components.
+     */
     void GUIRenderSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
@@ -254,7 +270,7 @@ namespace ECS {
             // Use resolved size to compute per-element scale for padding, icons, and fonts.
             const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
             const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
-            const bool isWorldSpace = (ResolveRenderSpace(world, item.entity) == Components::GUIRenderSpace::World);
+            const bool isWorldSpace = (ResolveGUIRenderSpace(world, item.entity) == Components::GUIRenderSpace::World);
 
             // Cache common optional components for styling decisions.
             const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
@@ -485,8 +501,9 @@ namespace ECS {
                 const std::string label = button.TextId ? ECS::StringTable::Resolve(button.TextId) : std::string();
                 if (!label.empty()) {
                     // Label text is anchored at the inner content origin.
+                    const float labelSize = button.FontSize * (isWorldSpace ? 1.0f : scaleX);
                     renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
-                        button.FontSize * scaleX, button.TextColor);
+                        labelSize, button.TextColor);
                 }
 
                 if (button.IconPathId != 0) {

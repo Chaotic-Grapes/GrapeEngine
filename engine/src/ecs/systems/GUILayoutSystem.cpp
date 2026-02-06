@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <glm/glm.hpp>
 #include "ecs/Components.h"
 #include "ecs/systems/GUILayoutSystem.h"
+#include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 
 namespace ECS {
@@ -31,7 +32,12 @@ namespace ECS {
         (void)world;
     }
 
-    // Compute canvas scale based on reference size and scale mode.
+    /**
+     * @brief Compute the scale factor for the GUI canvas based on the viewport size and scale mode.
+     * @param canvas The GUICanvas component defining reference size and scale mode.
+     * @param viewportSize The current size of the GUI viewport.
+     * @return The computed scale factor as a Vector2D.
+     */
     static Vector2D ComputeScale(const Components::GUICanvas& canvas, const Vector2D& viewportSize) {
         Vector2D scale{ 1.0f, 1.0f };
         if (canvas.ReferenceSize.X <= 0.0f || canvas.ReferenceSize.Y <= 0.0f) {
@@ -62,7 +68,13 @@ namespace ECS {
         return scale;
     }
 
-    // Resolve anchor position based on alignment within a given rect.
+    /**
+     * @brief Align an anchor point within a rectangle based on the specified alignment.
+     * @param origin The top-left origin of the rectangle.
+     * @param size The size of the rectangle.
+     * @param alignment The desired alignment.
+     * @return The computed anchor point position.
+     */
     static Vector2D AlignAnchor(const Vector2D& origin, const Vector2D& size, Components::GUIAlignment alignment) {
         switch (alignment) {
         case Components::GUIAlignment::Top:
@@ -152,26 +164,6 @@ namespace ECS {
         std::unordered_map<Entity, bool, EntityHash> resolved;   // cache layout completion per element
         std::unordered_set<Entity, EntityHash> resolving;        // cycle guard for parent chains
 
-        auto resolveRenderSpace = [&](Entity entity) {
-            Entity current = entity;
-            int depth = 0;
-            while (!current.IsNull() && depth < 32) {
-                if (world.Has<Components::GUIRenderMode>(current)) {
-                    return world.Get<Components::GUIRenderMode>(current).Space;
-                }
-                if (!world.Has<Components::Parent>(current)) {
-                    break;
-                }
-                const auto& parent = world.Get<Components::Parent>(current);
-                current = parent.ParentEntity;
-                if (current.IsNull() || !world.IsAlive(current) || !world.Has<Components::GUIElement>(current)) {
-                    break;
-                }
-                ++depth;
-            }
-            return Components::GUIRenderSpace::Screen;
-        };
-
         auto resolveElement = [&](auto&& self, Entity entity) -> void {
             // Skip elements already computed this frame.
             if (resolved[entity]) {
@@ -187,7 +179,7 @@ namespace ECS {
             auto& element = world.Get<Components::GUIElement>(entity);
             bool worldSpace = false;
             if (hasCameraBasis) {
-                worldSpace = (resolveRenderSpace(entity) == Components::GUIRenderSpace::World);
+                worldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
             }
 
             // World-space GUI
