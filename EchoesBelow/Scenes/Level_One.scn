@@ -122,6 +122,86 @@
                 },
                 {
                     "Data": {
+                        "Value": "GlobalLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9999066591262817,
+                            "G": 0.9998999834060669,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": -0.6000000238418579
+                        },
+                        "Intensity": 0.699999988079071,
+                        "LightType": 0,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Range": 10.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
                         "Value": "PlayerGroup"
                     },
                     "TypeName": "Name"
@@ -276,7 +356,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 18,
+                        "TextureId": 22,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\OceanBG_01@8x.png",
                         "Tiling": {
                             "X": 1.0,
@@ -349,7 +429,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.7777777910232544,
+                        "AspectRatio": 1.5977011919021606,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -545,7 +625,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 16,
+                        "TextureId": 23,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.011764705181121826,
@@ -571,7 +651,7 @@
                         "SheetWidth": 11900,
                         "StartFrame": 16,
                         "TextureFilter": 0,
-                        "TextureId": 16,
+                        "TextureId": 23,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheet_IdleDash_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -1110,61 +1190,6 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 0.43541258573532104,
-                            "Y": 3.3796327114105225,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "SceneManager"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.43541258573532104,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 3.3796327114105225,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
                             "X": 0.0,
                             "Y": 0.0,
                             "Z": 0.0
@@ -1224,6 +1249,61 @@
                             "m11": 1.0,
                             "m12": 0.0,
                             "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.43541258573532104,
+                            "Y": 3.3796327114105225,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "SceneManager"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.43541258573532104,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 3.3796327114105225,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1377,7 +1457,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 24,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1490,7 +1570,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 20,
+                        "TextureId": 25,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS04.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1603,7 +1683,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 21,
+                        "TextureId": 26,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1716,7 +1796,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 22,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS06.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1829,7 +1909,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS07.png",
                         "Tiling": {
                             "X": 1.0,
@@ -1942,7 +2022,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 24,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS05.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2055,7 +2135,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 25,
+                        "TextureId": 30,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2995,6 +3075,76 @@
                 },
                 {
                     "Data": {
+                        "Value": "PauseMenuController"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "exitSignifier": 22,
+                        "isPauseable": true,
+                        "resumeSiginifier": 23,
+                        "start": false
+                    },
+                    "TypeName": "Pause Menu"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
                         "Value": "Button_Exit"
                     },
                     "TypeName": "Name"
@@ -3023,7 +3173,7 @@
                             "Y": 86.0
                         },
                         "Visible": true,
-                        "ZOrder": 11
+                        "ZOrder": 12
                     },
                     "TypeName": "GUIElement"
                 },
@@ -3147,7 +3297,7 @@
                             "Y": 86.0
                         },
                         "Visible": true,
-                        "ZOrder": 11
+                        "ZOrder": 12
                     },
                     "TypeName": "GUIElement"
                 },
@@ -3155,9 +3305,9 @@
                     "Data": {
                         "Color": {
                             "A": 1.0,
-                            "B": 0.5843137502670288,
-                            "G": 0.3764705955982208,
-                            "R": 0.3686274588108063
+                            "B": 0.30588236451148987,
+                            "G": 0.0784313753247261,
+                            "R": 0.07058823853731155
                         },
                         "CornerRadius": 0.0
                     },
@@ -3249,64 +3399,58 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
                             "X": 0.0,
                             "Y": 0.0,
                             "Z": 0.0
                         },
-                        "Rotation": {
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": -223.0,
+                            "Y": -292.0
+                        },
+                        "Size": {
+                            "X": 1000.0,
+                            "Y": 1000.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 11
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "ScaleMode": 1,
+                        "SliceBorder": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI\\MenuControls.png",
+                        "UVRect": {
                             "W": 1.0,
                             "X": 0.0,
                             "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
                             "Z": 1.0
-                        }
+                        },
+                        "UseSlicing": false
                     },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "PauseMenuController"
-                    },
-                    "TypeName": "Name"
+                    "TypeName": "GUIImage"
                 },
                 {
                     "Data": {
@@ -3495,7 +3639,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 26,
+                        "TextureId": 31,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -3521,7 +3665,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 26,
+                        "TextureId": 31,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -3554,86 +3698,6 @@
                 {
                     "Data": {},
                     "TypeName": "Barnacle Snatcher"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "GlobalLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9999066591262817,
-                            "G": 0.9998999834060669,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": -0.6000000238418579
-                        },
-                        "Intensity": 0.699999988079071,
-                        "LightType": 0,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Range": 10.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -3785,7 +3849,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 32,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\SpawnGrape_Bulb.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3836,136 +3900,136 @@
     "EntityCount": 40,
     "Hierarchy": [
         {
-            "child": 13,
-            "parent": 7
-        },
-        {
-            "child": 12,
-            "parent": 7
-        },
-        {
-            "child": 15,
-            "parent": 14
-        },
-        {
-            "child": 16,
-            "parent": 14
-        },
-        {
-            "child": 17,
-            "parent": 14
-        },
-        {
-            "child": 18,
-            "parent": 14
-        },
-        {
-            "child": 19,
-            "parent": 14
-        },
-        {
-            "child": 20,
-            "parent": 14
-        },
-        {
-            "child": 5,
-            "parent": 1
-        },
-        {
-            "child": 23,
-            "parent": 22
-        },
-        {
-            "child": 29,
-            "parent": 22
-        },
-        {
-            "child": 33,
-            "parent": 29
-        },
-        {
-            "child": 34,
-            "parent": 29
-        },
-        {
-            "child": 30,
-            "parent": 29
-        },
-        {
-            "child": 24,
-            "parent": 23
-        },
-        {
-            "child": 2,
-            "parent": 1
-        },
-        {
-            "child": 8,
-            "parent": 7
-        },
-        {
-            "child": 9,
-            "parent": 7
-        },
-        {
-            "child": 10,
-            "parent": 7
+            "child": 22,
+            "parent": 15
         },
         {
             "child": 11,
-            "parent": 7
+            "parent": 8
         },
         {
-            "child": 36,
-            "parent": 35
-        },
-        {
-            "child": 3,
+            "child": 7,
             "parent": 2
         },
         {
             "child": 14,
-            "parent": 7
+            "parent": 8
+        },
+        {
+            "child": 32,
+            "parent": 30
+        },
+        {
+            "child": 25,
+            "parent": 24
         },
         {
             "child": 39,
             "parent": 38
         },
         {
-            "child": 4,
-            "parent": 2
-        },
-        {
-            "child": 21,
-            "parent": 14
-        },
-        {
-            "child": 25,
-            "parent": 23
-        },
-        {
-            "child": 26,
-            "parent": 23
-        },
-        {
-            "child": 6,
-            "parent": 1
-        },
-        {
-            "child": 27,
-            "parent": 23
-        },
-        {
-            "child": 28,
-            "parent": 23
+            "child": 5,
+            "parent": 3
         },
         {
             "child": 31,
-            "parent": 29
+            "parent": 30
         },
         {
-            "child": 32,
-            "parent": 29
+            "child": 3,
+            "parent": 2
+        },
+        {
+            "child": 9,
+            "parent": 8
+        },
+        {
+            "child": 10,
+            "parent": 8
+        },
+        {
+            "child": 12,
+            "parent": 8
+        },
+        {
+            "child": 24,
+            "parent": 23
+        },
+        {
+            "child": 30,
+            "parent": 23
+        },
+        {
+            "child": 16,
+            "parent": 15
+        },
+        {
+            "child": 17,
+            "parent": 15
+        },
+        {
+            "child": 18,
+            "parent": 15
+        },
+        {
+            "child": 19,
+            "parent": 15
+        },
+        {
+            "child": 20,
+            "parent": 15
+        },
+        {
+            "child": 21,
+            "parent": 15
+        },
+        {
+            "child": 6,
+            "parent": 2
+        },
+        {
+            "child": 13,
+            "parent": 8
+        },
+        {
+            "child": 37,
+            "parent": 36
+        },
+        {
+            "child": 4,
+            "parent": 3
+        },
+        {
+            "child": 15,
+            "parent": 8
+        },
+        {
+            "child": 26,
+            "parent": 24
+        },
+        {
+            "child": 27,
+            "parent": 24
+        },
+        {
+            "child": 28,
+            "parent": 24
+        },
+        {
+            "child": 29,
+            "parent": 24
+        },
+        {
+            "child": 33,
+            "parent": 30
+        },
+        {
+            "child": 34,
+            "parent": 30
+        },
+        {
+            "child": 35,
+            "parent": 30
         }
     ],
     "Layers": [
