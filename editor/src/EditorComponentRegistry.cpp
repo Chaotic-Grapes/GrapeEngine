@@ -65,6 +65,7 @@ namespace {
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
     const uint32_t kHashGUICanvas = Editor::ECSUtils::FNV1aHash("GUICanvas");
+    const uint32_t kHashGUIRenderMode = Editor::ECSUtils::FNV1aHash("GUIRenderMode");
     const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
     const uint32_t kHashGUIPanel = Editor::ECSUtils::FNV1aHash("GUIPanel");
     const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
@@ -268,6 +269,10 @@ Without these, the macro would end early and break the expansion
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUICanvas(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIRenderMode, "GUIRenderMode"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIRenderMode(d, e, w); };
         }
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"); id != ECS::NULL_COMPONENT_ID) {
@@ -555,10 +560,18 @@ Without these, the macro would end early and break the expansion
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"); id != ECS::NULL_COMPONENT_ID) {
             defaults[id] = []() {
                 return nlohmann::json{
-                {"ReferenceSize", {{"X", 1920.0f}, {"Y", 1080.0f}}},
-                {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-                {"ScaleMode", 0}
+                    {"ReferenceSize", {{"X", 1920.0f}, {"Y", 1080.0f}}},
+                    {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
+                    {"ScaleMode", 0}
+                };
             };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIRenderMode, "GUIRenderMode"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                    {"Space", 0}
+                };
             };
         }
 
@@ -641,16 +654,12 @@ Without these, the macro would end early and break the expansion
         if (const auto id = GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"); id != ECS::NULL_COMPONENT_ID) {
             defaults[id] = []() {
                 return nlohmann::json{
-                {"Text", "Button"},
-                {"FontPath", ""},
-                {"IconPath", ""},
-                {"NormalColor", {{"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f}}},
-                {"HoverColor", {{"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f}}},
-                {"PressedColor", {{"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f}}},
-                {"DisabledColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f}}},
-                {"TextColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-                {"IconColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-                {"FontSize", 24.0f},
+                    {"Text", "Button"},
+                    {"FontPath", ""},
+                    {"IconPath", ""},
+                    {"TextColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                    {"IconColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+                    {"FontSize", 24.0f},
                 {"CornerRadius", 0.0f},
                 {"IconSize", {{"X", 24.0f}, {"Y", 24.0f}}},
                 {"IconOffset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -1004,6 +1013,16 @@ static void _initializeDefaultRegistry() {
             }; }),
             COMPONENT_OPS_HASH(GUICanvas, kHashGUICanvas)
         },
+        // GUI Render Mode
+        {
+            "GUI Render Mode", "GUIRenderMode", "ECS::Components::GUIRenderMode",
+            GetComponentIdFromHashOrWarn(kHashGUIRenderMode, "GUIRenderMode"), kHashGUIRenderMode, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIRenderMode(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "Space", 0 }
+            }; }),
+            COMPONENT_OPS_HASH(GUIRenderMode, kHashGUIRenderMode)
+        },
         // GUI Element
         {
             "GUI Element", "GUIElement", "ECS::Components::GUIElement",
@@ -1101,10 +1120,6 @@ static void _initializeDefaultRegistry() {
                 { "Text", "Button" },
                 { "FontPath", "" },
                 { "IconPath", "" },
-                { "NormalColor", {{"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f}} },
-                { "HoverColor", {{"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f}} },
-                { "PressedColor", {{"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f}} },
-                { "DisabledColor", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f}} },
                 { "TextColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
                 { "IconColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
                 { "FontSize", 24.0f },

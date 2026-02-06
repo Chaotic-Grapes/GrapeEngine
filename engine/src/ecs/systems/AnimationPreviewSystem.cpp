@@ -25,6 +25,7 @@ namespace ECS {
         builder.ReadComponent<Components::SpriteSheetAnimation2D>();
         builder.ReadComponent<Components::AnimationState2D>();
         builder.ReadComponent<Components::Active>();
+        builder.ReadComponent<Components::Parent>();
         builder.WriteComponent<Components::SpriteRenderer2D>();
         builder.SetExecutionOrder(190);
         builder.SetGroup(SystemGroup::Update);
@@ -36,10 +37,9 @@ namespace ECS {
         // Update sprite UVs for all entities with SpriteSheetAnimation2D and SpriteRenderer2D
         world.Each<Components::SpriteSheetAnimation2D, Components::SpriteRenderer2D>(
             [&](Entity entity, const Components::SpriteSheetAnimation2D& anim, Components::SpriteRenderer2D& sprite) {
-                // Skip if entity is not active, needless to say
-                if (const auto* active = world.TryGet<Components::Active>(entity)) {
-                    if (!active->Enabled)
-                        return;
+                // Skip if entity or its parents are disabled.
+                if (!world.IsActiveInHierarchy(entity)) {
+                    return;
                 }
 
                 // Validate animation parameters

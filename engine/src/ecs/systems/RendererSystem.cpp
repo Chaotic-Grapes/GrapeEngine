@@ -109,6 +109,45 @@ namespace ECS {
         m_guiViewport.Active = true;
     }
 
+    bool RendererSystem::WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
+        const Vector2D& viewportSize, Vector2D& outScreen) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::vec4 clip = projection * view * glm::vec4(worldPos.X, worldPos.Y, worldPos.Z, 1.0f);
+        if (std::abs(clip.w) < 1e-6f) {
+            return false;
+        }
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        if (ndc.z < -1.0f || ndc.z > 1.0f) {
+            return false;
+        }
+
+        const float screenX = viewportOrigin.X + (ndc.x * 0.5f + 0.5f) * viewportSize.X;
+        const float screenY = viewportOrigin.Y + (1.0f - (ndc.y * 0.5f + 0.5f)) * viewportSize.Y;
+        outScreen = { screenX, screenY };
+        return true;
+    }
+
+    bool RendererSystem::GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::mat4 invView = glm::inverse(view);
+        outRight = glm::normalize(glm::vec3(invView[0]));
+        outUp = glm::normalize(glm::vec3(invView[1]));
+        return true;
+    }
+
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
     static void GetRenderTransform(World& world, const Entity entity,
@@ -539,8 +578,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
@@ -619,8 +657,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles here (already drawn by SDF pass)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -855,8 +892,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Only render circles in this pass
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -905,8 +941,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles (already rendered above)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -1411,7 +1446,7 @@ namespace ECS {
 
                         // Load font (fallback to default if path is empty).
                         const std::string fontPath = text.fontPath.empty()
-                            ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
+                            ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                             : text.fontPath;
                         const int pixelSize = std::max(1, static_cast<int>(std::round(text.pixelSize)));
                         auto font = RM.GetFont(fontPath, pixelSize);
@@ -1599,8 +1634,7 @@ namespace ECS {
 
         world.Each<Components::LocalTransform, Components::Light2D>(
             [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
-                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
-                    return;
+                if (!world.IsActiveInHierarchy(e)) return;
 
                 Vector3D position, scale;
                 Quaternion rotation;
@@ -1735,7 +1769,7 @@ namespace ECS {
             m_renderer->beginFrame();
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 const auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -1785,7 +1819,7 @@ namespace ECS {
             }
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -2015,7 +2049,7 @@ namespace ECS {
             guiRenderer->beginFrame();
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
-                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
+                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
                 if (!font) continue;
                 const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
@@ -2077,7 +2111,7 @@ namespace ECS {
         m_renderer->beginFrame();
         for (const auto& bucket : buckets) {
             for (Entity entity : bucket) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 uint32_t id = entity.Index + 1;
@@ -2114,7 +2148,7 @@ namespace ECS {
 
         for (const auto& bucket : buckets) {
             for (Entity entity : bucket) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
 
                 uint32_t id = entity.Index + 1;
                 glm::vec4 idColor(((id >> 0) & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f);

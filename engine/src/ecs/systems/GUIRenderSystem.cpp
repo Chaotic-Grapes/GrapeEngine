@@ -41,6 +41,7 @@ namespace ECS {
                 return fallback;
             }
 
+            // Return color based on state.
             switch (state) {
             case GUIState::Hovered:
                 return style->HoverColor;
@@ -96,6 +97,7 @@ namespace ECS {
                     return;
                 }
 
+                // Check for wrapping.
                 const float tokenW = tokenWidth(token);
                 const bool canWrap = wrap && maxWidth > 0.0f;
                 if (canWrap && !line.empty() && (lineWidth + tokenW) > maxWidth && !forceNewLine) {
@@ -120,6 +122,7 @@ namespace ECS {
                     continue;
                 }
 
+                // Whitespace: flush current token and handle space separately.
                 if (std::isspace(static_cast<unsigned char>(c))) {
                     flushToken(false);
                     const std::string space(1, c);
@@ -148,6 +151,26 @@ namespace ECS {
 
             return lines;
         }
+
+        Components::GUIRenderSpace ResolveRenderSpace(World& world, Entity entity) {
+            Entity current = entity;
+            int depth = 0;
+            while (!current.IsNull() && depth < 32) {
+                if (world.Has<Components::GUIRenderMode>(current)) {
+                    return world.Get<Components::GUIRenderMode>(current).Space;
+                }
+                if (!world.Has<Components::Parent>(current)) {
+                    break;
+                }
+                const auto& parent = world.Get<Components::Parent>(current);
+                current = parent.ParentEntity;
+                if (current.IsNull() || !world.IsAlive(current) || !world.Has<Components::GUIElement>(current)) {
+                    break;
+                }
+                ++depth;
+            }
+            return Components::GUIRenderSpace::Screen;
+        }
     }
 
     void GUIRenderSystem::OnCreate(World& world) {
@@ -167,8 +190,12 @@ namespace ECS {
             enum class Type { Panel, Text, Image, Button, Slider } type;
         };
 
+        // Collect all GUI elements with their Z order.
         std::vector<RenderItem> items;
         auto pushItem = [&](Entity entity, const Components::GUIElement& element, RenderItem::Type type) {
+            if (!world.IsActiveInHierarchy(entity)) {
+                return;
+            }
             if (!element.Visible) {
                 return;
             }
@@ -213,6 +240,7 @@ namespace ECS {
             // Use resolved size to compute per-element scale for padding, icons, and fonts.
             const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
             const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+            const bool isWorldSpace = (ResolveRenderSpace(world, item.entity) == Components::GUIRenderSpace::World);
 
             // Cache common optional components for styling decisions.
             const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
@@ -246,13 +274,15 @@ namespace ECS {
                 }
 
                 // Load the font to measure text for wrapping/alignment.
-                const std::string fontPath = text.GetFontPath();
-                const float pixelSize = text.FontSize * scaleX;
+                auto textFontPath = text.GetFontPath();
+                const std::string fontPath = textFontPath.empty()
+                                                ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
+                                                : textFontPath;
+                const float pixelSize = text.FontSize * (isWorldSpace ? 1.0f : scaleX);
                 const int fontSize = std::max(1, static_cast<int>(std::round(pixelSize)));
-                auto font = RM.GetFont(fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : fontPath, fontSize);
-                if (!font) {
-                    break;
-                }
+                auto font = RM.GetFont(fontPath, fontSize);
+
+                if (!font) break;
 
                 // Build wrapped lines and compute total height for vertical alignment.
                 const float maxWidth = text.Wrap ? element.ContentSize.X : 0.0f;
@@ -272,6 +302,7 @@ namespace ECS {
                 for (size_t i = 0; i < lines.size(); ++i) {
                     const std::string& line = lines[i];
                     const float lineWidth = MeasureLineWidth(*font, line, pixelSize);
+
                     // Adjust start X based on horizontal alignment.
                     float startX = element.ContentPosition.X;
                     if (text.HAlign == Components::GUIText::HorizontalAlign::Center) {
@@ -337,6 +368,7 @@ namespace ECS {
                     const float top = std::min(borderScaled.Y, size.Y * 0.5f);
                     const float bottom = std::min(borderScaled.W, size.Y * 0.5f);
 
+                    // Compute adjusted UVs based on border sizes.
                     const float u0 = uv.X;
                     const float v0 = uv.Y;
                     const float u1 = uv.Z;
@@ -346,6 +378,7 @@ namespace ECS {
                     const float vTop = texH > 0.0f ? (v0 + (border.Y / texH) * (v1 - v0)) : v0;
                     const float vBottom = texH > 0.0f ? (v1 - (border.W / texH) * (v1 - v0)) : v1;
 
+                    // Compute slice positions.
                     const float x0 = pos.X;
                     const float x1 = pos.X + left;
                     const float x2 = pos.X + size.X - right;
@@ -361,17 +394,19 @@ namespace ECS {
                         Vector2D size;
                         Vector4D uv;
                     } slices[] = {
-                        { {x0, y0}, {x1 - x0, y1 - y0}, {u0, v0, uLeft, vTop} },
-                        { {x1, y0}, {x2 - x1, y1 - y0}, {uLeft, v0, uRight, vTop} },
-                        { {x2, y0}, {x3 - x2, y1 - y0}, {uRight, v0, u1, vTop} },
-                        { {x0, y1}, {x1 - x0, y2 - y1}, {u0, vTop, uLeft, vBottom} },
-                        { {x1, y1}, {x2 - x1, y2 - y1}, {uLeft, vTop, uRight, vBottom} },
-                        { {x2, y1}, {x3 - x2, y2 - y1}, {uRight, vTop, u1, vBottom} },
-                        { {x0, y2}, {x1 - x0, y3 - y2}, {u0, vBottom, uLeft, v1} },
-                        { {x1, y2}, {x2 - x1, y3 - y2}, {uLeft, vBottom, uRight, v1} },
-                        { {x2, y2}, {x3 - x2, y3 - y2}, {uRight, vBottom, u1, v1} }
+                        // {Position}, {Size}, {UV}
+                        { {x0, y0}, {x1 - x0, y1 - y0}, {u0, v0, uLeft, vTop} },            // Top-left
+                        { {x1, y0}, {x2 - x1, y1 - y0}, {uLeft, v0, uRight, vTop} },        // Top-center
+                        { {x2, y0}, {x3 - x2, y1 - y0}, {uRight, v0, u1, vTop} },           // Top-right
+                        { {x0, y1}, {x1 - x0, y2 - y1}, {u0, vTop, uLeft, vBottom} },       // Middle-left
+                        { {x1, y1}, {x2 - x1, y2 - y1}, {uLeft, vTop, uRight, vBottom} },   // Middle-center
+                        { {x2, y1}, {x3 - x2, y2 - y1}, {uRight, vTop, u1, vBottom} },      // Middle-right
+                        { {x0, y2}, {x1 - x0, y3 - y2}, {u0, vBottom, uLeft, v1} },         // Bottom-left
+                        { {x1, y2}, {x2 - x1, y3 - y2}, {uLeft, vBottom, uRight, v1} },     // Bottom-center
+                        { {x2, y2}, {x3 - x2, y3 - y2}, {uRight, vBottom, u1, v1} }         // Bottom-right
                     };
 
+                    // Submit each slice as its own quad.
                     for (const auto& slice : slices) {
                         if (slice.size.X <= 0.0f || slice.size.Y <= 0.0f) {
                             continue;
@@ -388,17 +423,35 @@ namespace ECS {
             }
             case RenderItem::Type::Button: {
                 const auto& button = world.Get<Components::GUIButton>(item.entity);
-                // Pick background color based on state (or override with GUIStateStyle if present).
-                Color bgColor = ResolveStyleColor(style, button.NormalColor, state);
-                if (!style) {
-                    if (button.Disabled) {
-                        bgColor = button.DisabledColor;
-                    } else if (button.Toggle && button.Toggled) {
-                        bgColor = button.PressedColor;
-                    } else if (input && input->Pressed) {
-                        bgColor = button.PressedColor;
-                    } else if (input && input->Hovered) {
-                        bgColor = button.HoverColor;
+                // Pick background color based on GUIStateStyle with sensible fallback palette.
+                const Color fallbackNormal{ 0.25f, 0.25f, 0.25f, 1.0f };
+                const Color fallbackHover{ 0.35f, 0.35f, 0.35f, 1.0f };
+                const Color fallbackPressed{ 0.15f, 0.15f, 0.15f, 1.0f };
+                const Color fallbackDisabled{ 0.2f, 0.2f, 0.2f, 0.6f };
+
+                GUIState effectiveState = state;
+                if (button.Toggle && button.Toggled && effectiveState != GUIState::Disabled) {
+                    effectiveState = GUIState::Pressed;
+                }
+
+                Color bgColor = fallbackNormal;
+                if (style) {
+                    bgColor = ResolveStyleColor(style, fallbackNormal, effectiveState);
+                } else {
+                    switch (effectiveState) {
+                    case GUIState::Hovered:
+                        bgColor = fallbackHover;
+                        break;
+                    case GUIState::Pressed:
+                        bgColor = fallbackPressed;
+                        break;
+                    case GUIState::Disabled:
+                        bgColor = fallbackDisabled;
+                        break;
+                    case GUIState::Normal:
+                    default:
+                        bgColor = fallbackNormal;
+                        break;
                     }
                 }
 
@@ -500,6 +553,8 @@ namespace ECS {
         ComponentAccessBuilder builder("GUIRenderSystem");
         builder.SetExecutionOrder(-10);
         return builder
+            .ReadComponent<Components::Active>()
+            .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUICanvas>()
             .ReadComponent<Components::GUIElement>()
             .ReadComponent<Components::GUIPanel>()

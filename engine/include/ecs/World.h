@@ -1221,6 +1221,42 @@ namespace ECS {
         }
 
         /**
+         * @brief Check if an entity is active, honoring Active on its parents.
+         * @param entity The entity to check.
+         * @return bool True if entity and its parents are active (or missing Active).
+         * @note Assumes the entity is alive.
+         */
+        bool IsActiveInHierarchy(const Entity entity) const {
+            if (!IsAlive(entity)) {
+                return false;
+            }
+
+            Entity current = entity;
+            int depth = 0;
+            while (!current.IsNull() && depth < 64) {
+                if (const auto* active = TryGet<Components::Active>(current)) {
+                    if (!active->Enabled) {
+                        return false;
+                    }
+                }
+
+                if (!Has<Components::Parent>(current)) {
+                    break;
+                }
+
+                const Entity parent = ParentOf(current);
+                if (parent.IsNull() || !IsAlive(parent)) {
+                    break;
+                }
+
+                current = parent;
+                ++depth;
+            }
+
+            return true;
+        }
+
+        /**
          * @brief Get the first child of a parent entity, or NULL_ENTITY if none.
          * @param parent The parent entity whose first child will be retrieved
          * @return ECS::Entity The first child entity, or NULL_ENTITY if no children

@@ -144,6 +144,18 @@ public enum GUIScaleMode : byte
     MatchHeight = 3
 }
 
+public enum GUIRenderSpace : byte
+{
+    Screen = 0,
+    World = 1
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIRenderMode
+{
+    public GUIRenderSpace Space;
+}
+
 public enum GUIAlignment : byte
 {
     TopLeft = 0,
@@ -252,10 +264,6 @@ public record struct GUIButton
     public StringId TextId;
     public StringId FontPathId;
     public StringId IconPathId;
-    public Color NormalColor;
-    public Color HoverColor;
-    public Color PressedColor;
-    public Color DisabledColor;
     public Color TextColor;
     public Color IconColor;
     public float FontSize;

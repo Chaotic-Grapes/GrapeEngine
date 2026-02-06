@@ -1450,6 +1450,36 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
     EditorUI::EndPropertySection();
 }
 
+void ComponentUI::RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("GUIRenderMode");
+
+    if (!data.contains("Space")) data["Space"] = 0;
+
+    EditorUI::BeginPropertySection({ "Space" });
+
+    const char* spaceOptions[] = { "Screen", "World" };
+    int space = data.value("Space", 0);
+    space = std::max(0, std::min(space, 1));
+    ImGui::Text("Space");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUIRenderModeSpace", spaceOptions[space])) {
+        for (int i = 0; i < 2; ++i) {
+            bool selected = (space == i);
+            if (ImGui::Selectable(spaceOptions[i], selected)) {
+                space = i;
+                data["Space"] = space;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::EndPropertySection();
+}
+
 void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
@@ -1724,10 +1754,6 @@ void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS:
     if (!data.contains("Text")) data["Text"] = "Button";
     if (!data.contains("FontPath")) data["FontPath"] = "";
     if (!data.contains("IconPath")) data["IconPath"] = "";
-    if (!data.contains("NormalColor")) data["NormalColor"] = { {"R", 0.25f}, {"G", 0.25f}, {"B", 0.25f}, {"A", 1.0f} };
-    if (!data.contains("HoverColor")) data["HoverColor"] = { {"R", 0.35f}, {"G", 0.35f}, {"B", 0.35f}, {"A", 1.0f} };
-    if (!data.contains("PressedColor")) data["PressedColor"] = { {"R", 0.15f}, {"G", 0.15f}, {"B", 0.15f}, {"A", 1.0f} };
-    if (!data.contains("DisabledColor")) data["DisabledColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.6f} };
     if (!data.contains("TextColor")) data["TextColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     if (!data.contains("IconColor")) data["IconColor"] = { {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     if (!data.contains("FontSize")) data["FontSize"] = 24.0f;
@@ -1740,8 +1766,7 @@ void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS:
     if (!data.contains("Toggled")) data["Toggled"] = false;
 
     EditorUI::BeginPropertySection({
-        "Text", "Font", "Icon", "Normal Color", "Hover Color", "Pressed Color",
-        "Disabled Color", "Text Color", "Icon Color", "Font Size", "Corner Radius",
+        "Text", "Font", "Icon", "Text Color", "Icon Color", "Font Size", "Corner Radius",
         "Icon Size", "Icon Offset", "Padding", "Disabled", "Toggle", "Toggled"
     });
 
@@ -1777,10 +1802,6 @@ void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS:
         QueueAssetDropError(rejectedPath, kImageExtensions);
     });
 
-    EditorUI::RenderColorRow("Normal Color", data["NormalColor"]);
-    EditorUI::RenderColorRow("Hover Color", data["HoverColor"]);
-    EditorUI::RenderColorRow("Pressed Color", data["PressedColor"]);
-    EditorUI::RenderColorRow("Disabled Color", data["DisabledColor"]);
     EditorUI::RenderColorRow("Text Color", data["TextColor"]);
     EditorUI::RenderColorRow("Icon Color", data["IconColor"]);
     EditorUI::RenderFloatRow("Font Size", "px", data, "FontSize", 1.0f);

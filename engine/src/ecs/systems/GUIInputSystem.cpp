@@ -60,6 +60,16 @@ namespace ECS {
             input.Entered = false;
             input.Exited = false;
 
+            if (!world.IsActiveInHierarchy(entity)) {
+                if (s_captureEntity == entity) {
+                    s_captureEntity = NULL_ENTITY;
+                }
+                input.Hovered = false;
+                input.Pressed = false;
+                input.Dragging = false;
+                return;
+            }
+
             if (!element.Visible) {
                 input.Hovered = false;
                 input.Pressed = false;
@@ -184,6 +194,8 @@ namespace ECS {
         ComponentAccessBuilder builder("GUIInputSystem");
         builder.SetExecutionOrder(-15);
         return builder
+            .ReadComponent<Components::Active>()
+            .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUIElement>()
             .WriteComponent<Components::GUIInput>()
             .WriteComponent<Components::GUIButton>()

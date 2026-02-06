@@ -729,7 +729,7 @@ void SceneViewport::_renderViewport() {
                         world->Each<ECS::Components::LocalTransform, ECS::Components::Light2D>(
                             [&](ECS::Entity e, const ECS::Components::LocalTransform& lt, const ECS::Components::Light2D& light) {
                                 // Skip inactive lights
-                                if (const auto* active = world->TryGet<ECS::Components::Active>(e); active && !active->Enabled) {
+                                if (!world->IsActiveInHierarchy(e)) {
                                     return;
                                 }
 
