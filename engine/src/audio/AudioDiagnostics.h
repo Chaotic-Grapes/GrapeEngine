@@ -1,7 +1,15 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    AudioDiagnostics.h
+ *
+ * @brief   Helper diagnostics for audio system setup and runtime checks.
+ */
 
 #ifndef AUDIODIAGNOSTICS_H
 #define AUDIODIAGNOSTICS_H
 
+// Engine and audio includes used by the diagnostics.
 #include "scene/Scene.h"
 #include "core/Application.h"
 #include "core/Logger.h"
@@ -9,6 +17,7 @@
 #include "ecs/systems/AudioSystem.h"
 #include "ecs/StringTable.h"
 
+// Inline helpers for logging/diagnostics.
 namespace AudioDiagnostics {
 
     /**
@@ -17,6 +26,7 @@ namespace AudioDiagnostics {
      * @return True if all checks pass, false if issues found
      */
     inline bool DiagnoseAudioSystem(Scenes::Scene* scene) {
+        // Validate scene.
         if (!scene) {
             LOG_ERROR("=== AUDIO DIAGNOSIS: FAILED ===");
             LOG_ERROR("No active scene");
@@ -168,6 +178,7 @@ namespace AudioDiagnostics {
      * @return True if entity can play audio, false otherwise
      */
     inline bool CanEntityPlayAudio(Scenes::Scene* scene, uint32_t entityId) {
+        // Validate scene and entity id.
         if (!scene) return false;
 
         auto& world = scene->GetWorld();
@@ -189,6 +200,7 @@ namespace AudioDiagnostics {
             return false;
         }
 
+        // Ensure cue exists in the asset library.
         auto& lib = AudioAssetLibrary::Get();
         const auto* clip = lib.FindById(src.CueId);
         if (!clip) {
