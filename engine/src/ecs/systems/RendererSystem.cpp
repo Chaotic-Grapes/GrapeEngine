@@ -2,7 +2,7 @@
 /*!
 \file   RendererSystem.cpp
 \author Choi Meng Yew
-\date   31st October 2025
+\date   31st January 2026
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline
 for the ECS. Manages shader programs, framebuffers, and the RenderGraph

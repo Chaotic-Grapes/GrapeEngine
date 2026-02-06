@@ -1,3 +1,27 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Tileset.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Defines the Tileset class, which maps tile identifiers to texture atlas UVs
+and per-tile collision metadata.
+
+Details:
+This file provides lightweight data structures for tile definition, including
+normalized UV coordinates and collision type classification. The Tileset class
+associates TileID values with regions in a texture atlas and optional collision
+semantics, serving as a data source for rendering, collision, and editor systems.
+
+The Tileset contains no rendering, editor, or physics logic; it acts purely as
+a lookup table for tile properties shared across engine subsystems.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <unordered_map>

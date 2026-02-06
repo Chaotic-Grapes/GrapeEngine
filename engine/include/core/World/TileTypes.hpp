@@ -1,3 +1,26 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileTypes.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Defines the TileID type and helper utilities for packing and unpacking tile data.
+
+Details:
+This file specifies the TileID bit layout used throughout the tile system,
+including base tile identifier, rotation, and tileset index packed into a
+single 32-bit value. It also defines a sentinel value for empty tiles and
+provides inline helpers for extracting and composing packed tile data.
+
+These definitions are intentionally lightweight and header-only, serving as
+a common foundation for tile layers, tilemaps, tilesets, and editor tooling.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <cstdint>
