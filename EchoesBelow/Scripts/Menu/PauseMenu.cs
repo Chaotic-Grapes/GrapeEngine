@@ -18,7 +18,13 @@ public class PauseMenu : SystemBase
     private const string TargetScenePath = "EchoesBelow/Scenes/M4StartScene.scn";
     bool isPaused = false;
 
-    public static List<ulong> pauseMenuElementObjIds;
+    public bool isKeyPressed_vertical;
+    bool isFirstSelected;
+
+    Color unselectedCol = new Color(0.368f, 0.376f, 0.584f,1f);
+    Color selectedCol = new Color(0.070f, 0.078f, 0.305f,1f);
+
+    public static List<ulong> pauseMenuElementObjIds = new List<ulong>();
     protected override void OnCreate()
     {
         Log("System PauseMenu initialized");
@@ -28,25 +34,35 @@ public class PauseMenu : SystemBase
         if (startBool == true) return true;
         startBool = true;
         //Todo
-        pauseMenuElementObjIds = new List<ulong>();
-
+    
         //End of Start
         return true;
     }
+    //Pause Menu is off by default
     protected override void OnUpdate()
     {
-        foreach(var pauseController in World!.Query<PauseMenuComponent>())
+        foreach (var pauseController in World!.Query<PauseMenuComponent>())
         {
             bool start = pauseController.Component1.start;
             pauseController.Component1.start = OnStart(ref start);
 
             if (!pauseController.Component1.isPauseable) return;
         }
+        //Test
+        //foreach (ulong ui_id in pauseMenuElementObjIds)
+        //{
+        //    Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+        //}
+
 
         if (!isPaused && Input.IsKeyPressed(KeyCode.Escape))
         {
             Time.TimeScale = 0;
             isPaused = true;
+            foreach (ulong ui_id in pauseMenuElementObjIds)
+            {
+                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = true;
+            }
             //Launch Pause Menu
             Log(() => "Paused");
         }
@@ -54,10 +70,40 @@ public class PauseMenu : SystemBase
         {
             Time.TimeScale = 1;
             isPaused = false;
+            foreach (ulong ui_id in pauseMenuElementObjIds)
+            {
+                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+            }
             //Close Pause Menu
             Log(() => "unPaused");
         }
 
+        if (isPaused)
+        {
+            isKeyPressed_vertical = Input.IsKeyPressed(KeyCode.W) || Input.IsKeyPressed(KeyCode.A) || Input.IsKeyPressed(KeyCode.S) || Input.IsKeyPressed(KeyCode.D);
+            if (isKeyPressed_vertical)
+            {
+                isFirstSelected = !isFirstSelected;
+                //Log("isLeftSelected: " + isFirstSelected);
+                foreach (var controller in World!.Query<PauseMenuComponent>())
+                {
+                    foreach (var ui in World!.Query<GUIElement, MatchSignifierComponent>())
+                    {
+                        if (ui.Component2.signifierID == controller.Component1.resumeSiginifier || ui.Component2.signifierID == controller.Component1.exitSignifier)
+                        {
+                            //ui.Entity.GetComponent<GUIElement>().Visible = !ui.Entity.GetComponent<GUIElement>().Visible;
+                            ref GUIPanel panel = ref ui.Entity.GetComponent<GUIPanel>();
+                            if (panel.Color.R == unselectedCol.R) panel.Color = selectedCol;
+                            else panel.Color = unselectedCol;
+                        }
+                        else
+                        {
+
+                        }
+                    }
+                }
+            }
+        }
         
     }
 

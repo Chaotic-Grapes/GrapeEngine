@@ -54,6 +54,7 @@ public class StartMenuController : SystemBase
             bool start = controller.Component1.start;
             controller.Component1.start = OnStart(ref start);
         }
+
         isKeyPressed_horizontal = Input.IsKeyPressed(KeyCode.A) || Input.IsKeyPressed(KeyCode.D);
         if (isKeyPressed_horizontal)
         {
