@@ -521,6 +521,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_tilePalette.Initialize(nullptr, nullptr, m_world);
             m_tilePalette.SetAssetDropCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
+            m_tilePalette.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_tilePalette.Render(); },
         [this](ECS::World* w) { m_tilePalette.SetWorld(w); }

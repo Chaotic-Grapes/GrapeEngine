@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 #include "core/Logger.h"
 #include "EditorECSUtils.h"
+#include "../include/core/World/TileMap.hpp"
 #include <algorithm>
 #include <cstring>
 #include <unordered_map>
@@ -462,6 +463,52 @@ namespace Editor {
         }
         m_after = after;
         return true;
+    }
+
+    // ========================================================================
+    // TilePaintCommand Implementation
+    // ========================================================================
+
+    TilePaintCommand::TilePaintCommand(
+        std::shared_ptr<TileMap> map,
+        int32_t x, int32_t y,
+        uint32_t oldTile,
+        uint32_t newTile,
+        std::function<void(int32_t, int32_t, uint32_t)> onTileChanged
+    )
+		: m_map(std::move(map))  // std::move for efficiency
+        , m_x(x)                 
+        , m_y(y)
+        , m_oldTile(oldTile)
+        , m_newTile(newTile)
+        , m_onTileChanged(std::move(onTileChanged))
+    {
+    }
+
+    void TilePaintCommand::Execute() {
+		// Execute = Redo
+        if (!m_map) return;
+
+		// Set the tile to the new value
+        m_map->SetTileSigned(0, m_x, m_y, m_newTile);
+
+		// Notify via callback
+        if (m_onTileChanged) {
+            m_onTileChanged(m_x, m_y, m_newTile);
+        }
+    }
+
+    void TilePaintCommand::Undo() {
+		// Undo = Revert to old tile
+        if (!m_map) return;
+
+		// Set the tile back to the old value
+        m_map->SetTileSigned(0, m_x, m_y, m_oldTile);
+
+		// Notify via callback
+        if (m_onTileChanged) {
+            m_onTileChanged(m_x, m_y, m_oldTile);
+        }
     }
 
     // ========================================================================

@@ -9,7 +9,8 @@
 #include "ecs/systems/RendererSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
-#include "../include/core/World/TileTypes.hpp"
+#include "core/World/TileTypes.hpp"
+#include "UndoSystem.h"
 #include <cstring>
 
 // Assuming ImGui::ImageButton takes ImTextureID (void*)
@@ -343,24 +344,51 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
         return false; // Skip redundant paint when dragging over the same tile.
     }
     
-    if (erasing)
-    {
-        m_tileMap->SetTileSigned(0, tx, ty, EMPTY_TILE);
-        SyncPhysics(tx, ty, EMPTY_TILE, true);
-    }
-    else
-    {
-        TileID packed = PackTile(m_selectedTileID, m_currentRotation, m_activeTilesetIndex);
-        m_tileMap->SetTileSigned(0, tx, ty, packed);
-        SyncPhysics(tx, ty, packed, false);
+	// Perform the tile paint/erase operation.
+    TileID oldTile = m_tileMap->GetTileSigned(0, tx, ty);
+
+	// Determine new tile ID based on eraser state.
+    TileID newTile = EMPTY_TILE;
+
+	// If not erasing, pack the selected tile with rotation and tileset index.
+    if (!erasing) {
+        newTile = PackTile(m_selectedTileID, m_currentRotation, m_activeTilesetIndex);
     }
 
-    // Mark the scene dirty so saves are enabled and tracked.
-    Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap paint"));
+	// No-op if tile is unchanged.
+    if (oldTile == newTile) {
+        return false;
+    }
 
-    if (!m_tileMapPath.empty()) {
-        // Persist edits immediately so the tilemap asset stays in sync.
-        m_tileMap->SaveMap(m_tileMapPath);
+	// Define the tile changed callback to sync physics and handle saves.
+    auto onTileChanged = [this](int32_t x, int32_t y, TileID id) {
+		// Sync physics entities for this tile change.
+        bool isEraser = (id == EMPTY_TILE);
+        this->SyncPhysics(x, y, id, isEraser);
+
+        // Mark the scene dirty so saves are enabled and tracked.
+        Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap paint"));
+
+		// Auto-save the tilemap if we have a valid path.
+        if (!m_tileMapPath.empty()) {
+            // Persist edits immediately so the tilemap asset stays in sync.
+            m_tileMap->SaveMap(m_tileMapPath);
+        }
+    };
+
+	// Use undo system if available.
+    if (m_undoSystem) {
+		// Create and execute a TilePaintCommand for undo/redo support.
+        auto command = std::make_unique<Editor::TilePaintCommand>(
+            m_tileMap, tx, ty, oldTile, newTile, onTileChanged
+        );
+		// Execute the command via the undo system.
+        m_undoSystem->ExecuteCommand(std::move(command));
+    } 
+	// Directly set the tile if no undo system is present.
+    else {
+        m_tileMap->SetTileSigned(0, tx, ty, newTile);
+        onTileChanged(tx, ty, newTile);
     }
 
     m_hasLastPaint = true;

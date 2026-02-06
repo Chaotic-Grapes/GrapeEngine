@@ -13,6 +13,7 @@
 #include "ecs/Entity.h"
 
 namespace ECS { class World; }
+namespace Editor { class UndoSystem; }
 
 class TilePalettePanel {
 public:
@@ -26,6 +27,10 @@ public:
 
     void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world);
     void SetWorld(ECS::World* world) { m_world = world; }
+
+	// Set the undo system for recording tile edits.
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+
     // Update the active tilemap/tileset and map path used for save operations.
     void SetEditingContext(const std::shared_ptr<TileMap>& tileMap,
         const std::vector<std::shared_ptr<Tileset>>& tilesets,
@@ -79,6 +84,7 @@ private:
     std::function<void(EntityId)> m_activeTileMapCallback;
     std::function<void(uint8_t)> m_activeTilesetCallback;
     ECS::World* m_world = nullptr;
+    Editor::UndoSystem* m_undoSystem = nullptr;
 
     std::vector<TileMapListEntry> m_tileMapList;
     EntityId m_activeTileMapId = ECS::Entity::NPOS32;
