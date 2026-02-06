@@ -1166,10 +1166,10 @@ void LevelEditor::_refreshTileMapCache() {
             continue; // Skip hidden or incomplete tilemaps.
         }
 
-        std::vector<const Tileset*> tilesets;
+        std::vector<std::shared_ptr<const Tileset>> tilesets;
         tilesets.reserve(entry.Tilesets.size());
         for (const auto& tileset : entry.Tilesets) {
-            tilesets.push_back(tileset.get());
+            tilesets.push_back(tileset);
         }
         debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
     }
@@ -1243,7 +1243,12 @@ void LevelEditor::_setActiveTileMap(EntityId id) {
     if (it != m_tileMapCache.end() && it->second.Map) {
         const TileMapCacheEntry& entry = it->second;
         const uint8_t activeTilesetIndex = entry.Tilesets.empty() ? 0 : std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+        
+        // Grab a shared_ptr to the active tileset
+        // This ensures the tileset remains alive even if the editor replaces it (e.g. via drag-and-drop) 
+        // before the renderer finishes the current frame
         const std::shared_ptr<Tileset> activeTileset = entry.Tilesets.empty() ? nullptr : entry.Tilesets[activeTilesetIndex];
+        
         m_activeTileMap = entry.Map;
         m_activeTileset = activeTileset;
         m_activeTileMapPath = entry.MapPath;

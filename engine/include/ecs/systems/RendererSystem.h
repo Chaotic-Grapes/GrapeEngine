@@ -264,7 +264,13 @@ namespace ECS {
         // Call from editor when a tilemap should be rendered
         struct DebugTileMapEntry {
             std::reference_wrapper<const TileMap> Map;
-            std::vector<const Tileset*> Tilesets;
+            
+            // Shared pointer is required here to extend the lifetime of the Tileset
+            // In the editor, a user might hot-swap a tileset (e.g. drag-and-drop) which could destroy the old Tileset 
+            // while the RendererSystem is still processing the current frame
+            // Holding a shared_ptr prevents use-after-free
+            std::vector<std::shared_ptr<const Tileset>> Tilesets;
+            
             glm::vec2 Offset;
         };
 

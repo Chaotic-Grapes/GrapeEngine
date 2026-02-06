@@ -184,7 +184,8 @@ void TilePalettePanel::Render()
 
         if (!m_tileset)
         {
-            ImGui::Text("No Tileset Loaded");
+            // Use TextDisabled for a gray "placeholder" look, consistent with Property Editor
+            ImGui::TextDisabled("Drag and drop an asset here");
             ImGui::End();
             return;
         }

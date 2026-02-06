@@ -556,9 +556,20 @@ namespace ECS {
                         // Render all tilemaps requested by the editor.
                         TileMapRenderer tileRenderer;
                         for (const auto& entry : m_debugTileMaps) {
+							// Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
+                            std::vector<const Tileset*> rawTilesets;
+
+							// Preallocate for efficiency
+                            rawTilesets.reserve(entry.Tilesets.size());
+
+							// Populate raw pointer list
+                            for (const auto& ts : entry.Tilesets) {
+                                rawTilesets.push_back(ts.get());
+                            }
+							// Submit tilemap for rendering
                             tileRenderer.Submit(
                                 entry.Map.get(),
-                                entry.Tilesets,
+                                rawTilesets,
                                 *m_renderer,
                                 entry.Offset
                             );
@@ -1704,7 +1715,12 @@ namespace ECS {
                 TileMapRenderer tileRenderer;
 				// Same thing here, but for multiple tilemaps
                 for (const auto& entry : m_debugTileMaps) {
-                    tileRenderer.Submit(entry.Map.get(), entry.Tilesets, *m_renderer, entry.Offset);
+                    std::vector<const Tileset*> rawTilesets;
+                    rawTilesets.reserve(entry.Tilesets.size());
+                    for (const auto& ts : entry.Tilesets) {
+                        rawTilesets.push_back(ts.get());
+                    }
+                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset);
                 }
             }
 
