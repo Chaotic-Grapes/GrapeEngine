@@ -97,12 +97,12 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
 }
 
 // Delete an entity and all its children from the scene
-void EntityActions::RemoveEntity(EntityId id) {
-    if (!m_scene) return;
+bool EntityActions::RemoveEntity(EntityId id) {
+    if (!m_scene) return false;
     ECS::World& world = m_scene->GetWorld();
 
     ECS::Entity entity = world.Resolve(id);
-    if (entity.IsNull() || !world.IsAlive(entity)) return;
+    if (entity.IsNull() || !world.IsAlive(entity)) return false;
 
     // Record for undo system BEFORE deletion so the entity still exists for snapshotting
     if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
@@ -111,14 +111,10 @@ void EntityActions::RemoveEntity(EntityId id) {
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
         // Collect children first to avoid iterator invalidation
         std::vector<EntityId> children;
-        const ECS::ComponentTypeId parentId = Editor::ECSUtils::GetComponentIdFromName("Parent");
-        if (parentId != ECS::NULL_COMPONENT_ID) {
-            world.Each([&](ECS::Entity e) {
-                if (!world.HasById(e, parentId)) return;
-                const auto* parent = static_cast<const ECS::Components::Parent*>(world.GetRawComponentPtr(e, parentId));
-                if (parent && parent->ParentEntity.Index == entityId) {
-                    children.push_back(e.Index);
-                }
+        ECS::Entity parent = world.Resolve(entityId);
+        if (!parent.IsNull() && world.IsAlive(parent)) {
+            world.ForChildren(parent, [&](ECS::Entity child) {
+                children.push_back(child.Index);
             });
         }
 
@@ -138,6 +134,7 @@ void EntityActions::RemoveEntity(EntityId id) {
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
+    return true;
 }
 
 
@@ -207,10 +204,9 @@ EntityId EntityActions::CloneEntity(EntityId id) {
             if (!newParent.IsNull() && world.IsAlive(newParent)) {
                 world.Attach(clone, newParent);
             }
-        }
-        else {
+        } else {
             // Remove parent component if cloning as root
-            if (Editor::ECSUtils::HasComponent(&world, clone, "Parent")) {
+            if (world.Has<ECS::Components::Parent>(clone)) {
                 world.Detach(clone);
             }
         }
@@ -220,16 +216,9 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
         // Find and clone all children
         std::vector<EntityId> children;
-        const ECS::ComponentTypeId parentId = Editor::ECSUtils::GetComponentIdFromName("Parent");
-        if (parentId != ECS::NULL_COMPONENT_ID) {
-            world.Each([&](ECS::Entity e) {
-                if (!world.HasById(e, parentId)) return;
-                const auto* parent = static_cast<const ECS::Components::Parent*>(world.GetRawComponentPtr(e, parentId));
-                if (parent && parent->ParentEntity.Index == entityId) {
-                    children.push_back(e.Index);
-                }
-            });
-        }
+        world.ForChildren(original, [&](ECS::Entity child) {
+            children.push_back(child.Index);
+        });
 
         // Recursively clone children with this clone as their parent
         for (auto childId : children) {
@@ -241,9 +230,9 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
-    if (Editor::ECSUtils::HasComponent(&world, entity, "Parent")) {
-        const auto& parent = world.ParentOf(entity);
-        originalParentId = parent.Index;
+    const ECS::Entity originalParent = world.ParentOf(entity);
+    if (!originalParent.IsNull()) {
+        originalParentId = originalParent.Index;
     }
 
     // Clone the entity hierarchy

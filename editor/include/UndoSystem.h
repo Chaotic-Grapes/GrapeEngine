@@ -35,6 +35,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <deque>
 #include <functional>
 
+// Forward declaration (global namespace)
+class TileMap;
+
 namespace Editor {
 
     // Snapshot of a single entity for undo/redo restore operations.
@@ -186,6 +189,36 @@ namespace Editor {
         std::function<void(const std::vector<EntityId>&)> m_applyOrder; // Apply hook for order updates.
         std::vector<EntityId> m_before; // Original order for undo.
         std::vector<EntityId> m_after; // New order for redo.
+    };
+
+    // ========================================================================
+    // Tile Paint Command
+    // ========================================================================
+
+    class TilePaintCommand : public ICommand {
+    public:
+		// Paint a single tile with undo/redo support.
+        TilePaintCommand(
+            std::shared_ptr<TileMap> map,
+            int32_t x, int32_t y,
+            uint32_t oldTile,
+            uint32_t newTile,
+            std::function<void(int32_t, int32_t, uint32_t)> onTileChanged
+        );
+
+		// Execute the tile paint (redo).
+        void Execute() override;
+
+		// Undo the tile paint.
+        void Undo() override;
+
+    private:
+		std::shared_ptr<TileMap> m_map;  // Target tilemap.
+		int32_t m_x;                     // Tile X coordinate.
+		int32_t m_y;                     // Tile Y coordinate.
+		uint32_t m_oldTile;              // Previous tile ID.
+		uint32_t m_newTile;              // New tile ID.
+		std::function<void(int32_t, int32_t, uint32_t)> m_onTileChanged;  // Callback after tile change.
     };
     // ========================================================================
     // Undo System Manager

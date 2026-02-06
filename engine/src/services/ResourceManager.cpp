@@ -365,7 +365,9 @@ std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixe
     // Check cache first
     auto it = m_fonts.find(cacheKey);
     if (it != m_fonts.end()) {
-        LOG_DEBUG("[CACHE HIT] Font: " << name << " (" << pixelSize << "px)");
+        if (m_loggedFontCacheHits.insert(cacheKey).second) {
+            LOG_DEBUG("[CACHE HIT] Font: " << name << " (" << pixelSize << "px)");
+        }
         TrackOwner<Font>(cacheKey);
         return it->second;  // Cache hit
     }
@@ -420,6 +422,7 @@ void ResourceManager::ClearCache() {
     m_shaderOwners.clear();
     m_prefabOwners.clear();
     m_rawDataOwners.clear();
+    m_loggedFontCacheHits.clear();
     LOG_INFO("Cleared all cached assets");
 }
 
@@ -436,9 +439,11 @@ void ResourceManager::UnloadAsset(const std::string& name) {
     removed |= m_audioFiles.erase(name) > 0;
 
     // Fonts use composite key (name:size), so we must iterate
+    const std::string fontPrefix = name + ":";
     for (auto it = m_fonts.begin(); it != m_fonts.end(); ) {
         // Check if key starts with "name:"
-        if (it->first.find(name + ":") == 0) {
+        if (it->first.rfind(fontPrefix, 0) == 0) {
+            m_loggedFontCacheHits.erase(it->first);
             it = m_fonts.erase(it);
             removed = true;
         }
@@ -447,7 +452,10 @@ void ResourceManager::UnloadAsset(const std::string& name) {
         }
     }
     // Also try direct match (just in case)
-    removed |= m_fonts.erase(name) > 0;
+    if (m_fonts.erase(name) > 0) {
+        m_loggedFontCacheHits.erase(name);
+        removed = true;
+    }
     removed |= m_shaders.erase(name) > 0;
     removed |= m_prefabs.erase(name) > 0;
     removed |= m_rawData.erase(name) > 0;
@@ -714,6 +722,16 @@ void ResourceManager::UnloadAssetsByOwner(const std::string& ownerTag) {
     removeOwner(m_shaderOwners, m_shaders);
     removeOwner(m_prefabOwners, m_prefabs);
     removeOwner(m_rawDataOwners, m_rawData);
+
+	// Clean up logged font cache hits to remove any fonts that were unloaded
+    for (auto it = m_loggedFontCacheHits.begin(); it != m_loggedFontCacheHits.end(); ) {
+        if (m_fonts.find(*it) == m_fonts.end()) {
+            it = m_loggedFontCacheHits.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
 }
 
 // Define the global ResourceManager instance

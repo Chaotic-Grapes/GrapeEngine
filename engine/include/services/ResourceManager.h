@@ -168,6 +168,8 @@ private:
     std::unordered_map<std::string, std::unordered_set<std::string>> m_prefabOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_rawDataOwners;
 
+    std::unordered_set<std::string> m_loggedFontCacheHits;
+
     std::string m_ownerTag;
 };
 
