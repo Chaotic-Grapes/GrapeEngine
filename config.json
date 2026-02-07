@@ -1,8 +1,9 @@
 {
-  "WindowSettings": {
-    "Width": 1600,
-    "Height": 900,
-    "Maximized": true,
-    "VSync": true
-  }
+    "WindowSettings": {
+        "Width": 1600,
+        "Height": 900,
+        "Maximized": true,
+        "VSync": true,
+        "Mode": "Windowed"
+    }
 }

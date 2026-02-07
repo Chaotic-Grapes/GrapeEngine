@@ -112,7 +112,7 @@ namespace Serialization {
             settingsJson["WindowSettings"]["Height"] = settings.WindowSettings.Height;
             const std::string mode = _normalizeWindowMode(settings.WindowSettings.Mode);
             settingsJson["WindowSettings"]["Mode"] = mode;
-            settingsJson["WindowSettings"]["Fullscreen"] = (mode == "Fullscreen");
+            settingsJson["WindowSettings"]["Fullscreen"] = (mode == "Fullscreen" || mode == "BorderlessFullscreen");
             settingsJson["WindowSettings"]["VSync"] = settings.WindowSettings.VSync;
             
             settingsJson["Physics"]["Gravity"] = settings.Physics.Gravity;
@@ -150,7 +150,10 @@ namespace Serialization {
             if (lowered == "fullscreen" || lowered == "exclusive") {
                 return "Fullscreen";
             }
-            if (lowered == "borderless" || lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen") {
+            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen") {
+                return "BorderlessFullscreen";
+            }
+            if (lowered == "borderless") {
                 return "Borderless";
             }
             if (lowered == "windowed" || lowered == "window") {
@@ -169,7 +172,7 @@ namespace Serialization {
             }
             if (configJson.contains("Mode")) {
                 window.Mode = _normalizeWindowMode(configJson["Mode"].get<std::string>());
-                window.Fullscreen = (window.Mode == "Fullscreen");
+                window.Fullscreen = (window.Mode == "Fullscreen" || window.Mode == "BorderlessFullscreen");
             } else if (configJson.contains("Fullscreen")) {
                 window.Fullscreen = configJson["Fullscreen"].get<bool>();
                 window.Mode = window.Fullscreen ? "Fullscreen" : "Windowed";

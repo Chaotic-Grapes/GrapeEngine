@@ -242,71 +242,193 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     if (!Engine::CORE) return;
     
     ProjectSettings& settings = Engine::CORE->GetProjectSettings();
+    static double lastSavedTime = -100.0;
+    static bool showCloseConfirm = false;
+
+    auto markSaved = []() {
+        lastSavedTime = ImGui::GetTime();
+    };
+
+    auto saveSettings = [&]() -> bool {
+        std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
+        if (Engine::CORE->SaveProjectSettings(projectRoot)) {
+            m_projectSettingsDirty = false;
+            markSaved();
+            return true;
+        }
+        return false;
+    };
+
+    auto revertSettings = [&]() {
+        std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
+        if (Engine::CORE->LoadProjectSettings(projectRoot)) {
+            m_projectSettingsDirty = false;
+        }
+    };
+
+    auto resetProjectDefaults = [&]() {
+        settings.Title = "GrapeEngine Game Project";
+        settings.Version = "1.0.0";
+        settings.StartupScene.clear();
+        m_projectSettingsDirty = true;
+    };
+
+    auto resetWindowDefaults = [&]() {
+        settings.WindowSettings.Width = 1600;
+        settings.WindowSettings.Height = 900;
+        settings.WindowSettings.Mode = "Fullscreen";
+        settings.WindowSettings.Fullscreen = true;
+        settings.WindowSettings.VSync = true;
+        m_projectSettingsDirty = true;
+    };
+
+    auto resetPhysicsDefaults = [&]() {
+        settings.Physics.Gravity = -9.81f;
+        settings.Physics.TimeStep = 0.016f;
+        m_projectSettingsDirty = true;
+    };
+
+    auto drawHelp = [](const char* text) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(text);
+            ImGui::EndTooltip();
+        }
+    };
+
+    const bool titleValid = !settings.Title.empty();
+    const bool widthValid = settings.WindowSettings.Width > 0;
+    const bool heightValid = settings.WindowSettings.Height > 0;
+    const bool settingsValid = titleValid && widthValid && heightValid;
+
     ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Project Settings", &m_showProjectSettings, ImGuiWindowFlags_NoCollapse)) {
-        // Title
-        ImGui::Text("Project Information");
-        ImGui::Separator();
-        
-        char titleBuf[256];
-        strncpy_s(titleBuf, settings.Title.c_str(), sizeof(titleBuf) - 1);
-        if (ImGui::InputText("Title", titleBuf, sizeof(titleBuf))) {
-            settings.Title = titleBuf;
-            m_projectSettingsDirty = true;
-        }
-        
-        char versionBuf[64];
-        strncpy_s(versionBuf, settings.Version.c_str(), sizeof(versionBuf) - 1);
-        if (ImGui::InputText("Version", versionBuf, sizeof(versionBuf))) {
-            settings.Version = versionBuf;
-            m_projectSettingsDirty = true;
-        }
-        
-        char sceneBuf[512];
-        strncpy_s(sceneBuf, settings.StartupScene.c_str(), sizeof(sceneBuf) - 1);
-        if (ImGui::InputText("Startup Scene", sceneBuf, sizeof(sceneBuf))) {
-            settings.StartupScene = sceneBuf;
-            m_projectSettingsDirty = true;
-        }
-        
-        ImGui::Spacing();
-        ImGui::Text("Window Settings");
-        ImGui::Separator();
-        
-        if (ImGui::InputInt("Width", &settings.WindowSettings.Width)) {
-            m_projectSettingsDirty = true;
-        }
-        if (ImGui::InputInt("Height", &settings.WindowSettings.Height)) {
-            m_projectSettingsDirty = true;
-        }
-        {
-            const char* modes[] = { "Windowed", "Fullscreen", "Borderless" };
-            int modeIndex = 0;
-            if (settings.WindowSettings.Mode == "Fullscreen") {
-                modeIndex = 1;
-            } else if (settings.WindowSettings.Mode == "Borderless") {
-                modeIndex = 2;
+        if (ImGui::CollapsingHeader("Project Information", ImGuiTreeNodeFlags_DefaultOpen)) {
+            char titleBuf[256];
+            strncpy_s(titleBuf, settings.Title.c_str(), sizeof(titleBuf) - 1);
+            if (!titleValid) {
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
             }
-
-            if (ImGui::Combo("Mode", &modeIndex, modes, 3)) {
-                settings.WindowSettings.Mode = modes[modeIndex];
-                settings.WindowSettings.Fullscreen = (modeIndex == 1);
+            if (ImGui::InputText("Title", titleBuf, sizeof(titleBuf))) {
+                settings.Title = titleBuf;
                 m_projectSettingsDirty = true;
             }
-        }
-        if (ImGui::Checkbox("VSync", &settings.WindowSettings.VSync)) {
-            m_projectSettingsDirty = true;
+            if (!titleValid) {
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted("Title cannot be empty.");
+                    ImGui::EndTooltip();
+                }
+            }
+            
+            char versionBuf[64];
+            strncpy_s(versionBuf, settings.Version.c_str(), sizeof(versionBuf) - 1);
+            if (ImGui::InputText("Version", versionBuf, sizeof(versionBuf))) {
+                settings.Version = versionBuf;
+                m_projectSettingsDirty = true;
+            }
+            
+            char sceneBuf[512];
+            strncpy_s(sceneBuf, settings.StartupScene.c_str(), sizeof(sceneBuf) - 1);
+            if (ImGui::InputText("Startup Scene", sceneBuf, sizeof(sceneBuf))) {
+                settings.StartupScene = sceneBuf;
+                m_projectSettingsDirty = true;
+            }
+
+            if (ImGui::Button("Reset Project")) {
+                resetProjectDefaults();
+            }
         }
         
-        ImGui::Spacing();
-        ImGui::Text("Physics Settings");
-        ImGui::Separator();
-        
-        if (ImGui::InputFloat("Gravity", &settings.Physics.Gravity)) {
-            m_projectSettingsDirty = true;
+        if (ImGui::CollapsingHeader("Window Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (!widthValid) {
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
+            }
+            if (ImGui::InputInt("Width", &settings.WindowSettings.Width)) {
+                m_projectSettingsDirty = true;
+            }
+            if (!widthValid) {
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted("Width must be greater than 0.");
+                    ImGui::EndTooltip();
+                }
+            }
+
+            if (!heightValid) {
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
+            }
+            if (ImGui::InputInt("Height", &settings.WindowSettings.Height)) {
+                m_projectSettingsDirty = true;
+            }
+            if (!heightValid) {
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted("Height must be greater than 0.");
+                    ImGui::EndTooltip();
+                }
+            }
+
+            {
+                const char* modes[] = { "Windowed", "Fullscreen", "Borderless Fullscreen", "Borderless" };
+                if (settings.WindowSettings.Mode.empty()) {
+                    settings.WindowSettings.Mode = settings.WindowSettings.Fullscreen ? "Fullscreen" : "Windowed";
+                    m_projectSettingsDirty = true;
+                }
+
+                int modeIndex = 0;
+                if (settings.WindowSettings.Mode == "Fullscreen") {
+                    modeIndex = 1;
+                } else if (settings.WindowSettings.Mode == "BorderlessFullscreen") {
+                    modeIndex = 2;
+                } else if (settings.WindowSettings.Mode == "Borderless") {
+                    modeIndex = 3;
+                }
+
+                if (ImGui::Combo("Mode", &modeIndex, modes, 4)) {
+                    if (modeIndex == 0) {
+                        settings.WindowSettings.Mode = "Windowed";
+                        settings.WindowSettings.Fullscreen = false;
+                    } else if (modeIndex == 1) {
+                        settings.WindowSettings.Mode = "Fullscreen";
+                        settings.WindowSettings.Fullscreen = true;
+                    } else if (modeIndex == 2) {
+                        settings.WindowSettings.Mode = "BorderlessFullscreen";
+                        settings.WindowSettings.Fullscreen = true;
+                    } else {
+                        settings.WindowSettings.Mode = "Borderless";
+                        settings.WindowSettings.Fullscreen = false;
+                    }
+                    m_projectSettingsDirty = true;
+                }
+                drawHelp("Fullscreen is exclusive. Borderless fullscreen is capture-friendly.");
+            }
+            if (ImGui::Checkbox("VSync", &settings.WindowSettings.VSync)) {
+                m_projectSettingsDirty = true;
+            }
+            drawHelp("Disables tearing but can add latency.");
+
+            if (ImGui::Button("Reset Window")) {
+                resetWindowDefaults();
+            }
         }
-        if (ImGui::InputFloat("Time Step", &settings.Physics.TimeStep, 0.001f, 0.01f, "%.4f")) {
-            m_projectSettingsDirty = true;
+        
+        if (ImGui::CollapsingHeader("Physics Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::InputFloat("Gravity", &settings.Physics.Gravity)) {
+                m_projectSettingsDirty = true;
+            }
+            if (ImGui::InputFloat("Time Step", &settings.Physics.TimeStep, 0.001f, 0.01f, "%.4f")) {
+                m_projectSettingsDirty = true;
+            }
+
+            if (ImGui::Button("Reset Physics")) {
+                resetPhysicsDefaults();
+            }
         }
         
         ImGui::Spacing();
@@ -320,10 +442,12 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
         }
 
+        if (!settingsValid) {
+            ImGui::BeginDisabled();
+        }
         if (ImGui::Button(m_projectSettingsDirty ? "Save*" : "Save", ImVec2(120, 0))) {
-            std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
-            if (Engine::CORE->SaveProjectSettings(projectRoot)) {
-                m_projectSettingsDirty = false;
+            if (saveSettings()) {
+                m_showProjectSettings = false;
             }
         }
 
@@ -332,11 +456,56 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         }
 
         ImGui::SameLine();
+        if (ImGui::Button("Apply", ImVec2(120, 0))) {
+            saveSettings();
+        }
+        if (!settingsValid) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Revert", ImVec2(120, 0))) {
+            revertSettings();
+        }
+
+        ImGui::SameLine();
         if (ImGui::Button("Close", ImVec2(120, 0))) {
             if (m_projectSettingsDirty) {
-                // TODO: Add unsaved changes warning
+                showCloseConfirm = true;
+                ImGui::OpenPopup("Unsaved Project Settings");
+            } else {
+                m_showProjectSettings = false;
             }
-            m_showProjectSettings = false;
+        }
+
+        if (ImGui::GetTime() - lastSavedTime < 2.0) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.3f, 1.0f), "Saved");
+        }
+
+        if (showCloseConfirm && ImGui::BeginPopupModal("Unsaved Project Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextWrapped("You have unsaved changes. Save before closing?");
+            ImGui::Separator();
+            if (ImGui::Button("Save", ImVec2(120, 0))) {
+                if (settingsValid) {
+                    saveSettings();
+                    m_showProjectSettings = false;
+                    showCloseConfirm = false;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Discard", ImVec2(120, 0))) {
+                m_showProjectSettings = false;
+                showCloseConfirm = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                showCloseConfirm = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
     }
     ImGui::End();
