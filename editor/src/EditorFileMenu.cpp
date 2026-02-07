@@ -279,8 +279,20 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         if (ImGui::InputInt("Height", &settings.WindowSettings.Height)) {
             m_projectSettingsDirty = true;
         }
-        if (ImGui::Checkbox("Fullscreen", &settings.WindowSettings.Fullscreen)) {
-            m_projectSettingsDirty = true;
+        {
+            const char* modes[] = { "Windowed", "Fullscreen", "Borderless" };
+            int modeIndex = 0;
+            if (settings.WindowSettings.Mode == "Fullscreen") {
+                modeIndex = 1;
+            } else if (settings.WindowSettings.Mode == "Borderless") {
+                modeIndex = 2;
+            }
+
+            if (ImGui::Combo("Mode", &modeIndex, modes, 3)) {
+                settings.WindowSettings.Mode = modes[modeIndex];
+                settings.WindowSettings.Fullscreen = (modeIndex == 1);
+                m_projectSettingsDirty = true;
+            }
         }
         if (ImGui::Checkbox("VSync", &settings.WindowSettings.VSync)) {
             m_projectSettingsDirty = true;

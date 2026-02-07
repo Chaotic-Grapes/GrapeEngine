@@ -9,6 +9,7 @@
     "WindowSettings": {
         "Fullscreen": true,
         "Height": 900,
+        "Mode": "Fullscreen",
         "VSync": true,
         "Width": 1600
     }

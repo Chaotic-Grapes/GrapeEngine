@@ -2,6 +2,8 @@
 #define SERIALIZATION_H
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cctype>
 #include <vector>
 #include "EntitySerializer.h"
 #include "Serializer.h"
@@ -23,6 +25,7 @@ struct ProjectSettings {
         int Height = 900;           // Window height in pixels
         bool Fullscreen = true;     // Whether to start in fullscreen mode
         bool VSync = true;          // Whether to enable vertical sync
+        std::string Mode = "Fullscreen"; // Windowed, Fullscreen, Borderless
     } WindowSettings;
 
     /**
@@ -107,7 +110,9 @@ namespace Serialization {
             
             settingsJson["WindowSettings"]["Width"] = settings.WindowSettings.Width;
             settingsJson["WindowSettings"]["Height"] = settings.WindowSettings.Height;
-            settingsJson["WindowSettings"]["Fullscreen"] = settings.WindowSettings.Fullscreen;
+            const std::string mode = _normalizeWindowMode(settings.WindowSettings.Mode);
+            settingsJson["WindowSettings"]["Mode"] = mode;
+            settingsJson["WindowSettings"]["Fullscreen"] = (mode == "Fullscreen");
             settingsJson["WindowSettings"]["VSync"] = settings.WindowSettings.VSync;
             
             settingsJson["Physics"]["Gravity"] = settings.Physics.Gravity;
@@ -125,12 +130,36 @@ namespace Serialization {
             // Basic validation: width/height positive, game name non-empty
             if (settings.WindowSettings.Width <= 0 || settings.WindowSettings.Height <= 0)
                 return false;
+            if (_normalizeWindowMode(settings.WindowSettings.Mode).empty())
+                return false;
             if (settings.Title.empty())
                 return false;
             return true;
         }
         
     private:
+        static std::string _normalizeWindowMode(const std::string& mode) {
+            if (mode.empty()) {
+                return "Windowed";
+            }
+
+            std::string lowered = mode;
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (lowered == "fullscreen" || lowered == "exclusive") {
+                return "Fullscreen";
+            }
+            if (lowered == "borderless" || lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen") {
+                return "Borderless";
+            }
+            if (lowered == "windowed" || lowered == "window") {
+                return "Windowed";
+            }
+
+            return "Windowed";
+        }
+
         static void _parseWindowConfig(const json& configJson, ProjectSettings::Window& window) {
             if (configJson.contains("Width")) {
                 window.Width = configJson["Width"].get<int>();
@@ -138,8 +167,12 @@ namespace Serialization {
             if (configJson.contains("Height")) {
                 window.Height = configJson["Height"].get<int>();
             }
-            if (configJson.contains("Fullscreen")) {
+            if (configJson.contains("Mode")) {
+                window.Mode = _normalizeWindowMode(configJson["Mode"].get<std::string>());
+                window.Fullscreen = (window.Mode == "Fullscreen");
+            } else if (configJson.contains("Fullscreen")) {
                 window.Fullscreen = configJson["Fullscreen"].get<bool>();
+                window.Mode = window.Fullscreen ? "Fullscreen" : "Windowed";
             }
             if (configJson.contains("VSync")) {
                 window.VSync = configJson["VSync"].get<bool>();
