@@ -247,6 +247,45 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     ProjectSettings& settings = Engine::CORE->GetProjectSettings();
     static double lastSavedTime = -100.0;
     static bool showCloseConfirm = false;
+    static bool baselineValid = false;
+    static nlohmann::json baselineProject;
+    static nlohmann::json baselineWindow;
+    static nlohmann::json baselinePhysics;
+
+    static const nlohmann::json projectDefaults = {
+        {"Title", "GrapeEngine Game Project"},
+        {"Version", "1.0.0"},
+        {"StartupScene", ""}
+    };
+    static const nlohmann::json windowDefaults = {
+        {"Width", 1600},
+        {"Height", 900},
+        {"Mode", "Fullscreen"},
+        {"VSync", true}
+    };
+    static const nlohmann::json physicsDefaults = {
+        {"Gravity", -9.81f},
+        {"TimeStep", 0.016f}
+    };
+
+    if (!baselineValid) {
+        baselineProject = {
+            {"Title", settings.Title},
+            {"Version", settings.Version},
+            {"StartupScene", settings.StartupScene}
+        };
+        baselineWindow = {
+            {"Width", settings.WindowSettings.Width},
+            {"Height", settings.WindowSettings.Height},
+            {"Mode", settings.WindowSettings.Mode},
+            {"VSync", settings.WindowSettings.VSync}
+        };
+        baselinePhysics = {
+            {"Gravity", settings.Physics.Gravity},
+            {"TimeStep", settings.Physics.TimeStep}
+        };
+        baselineValid = true;
+    }
 
     // Helper to mark the settings as saved
     auto markSaved = []() {
@@ -274,26 +313,26 @@ void EditorFileMenu::_renderProjectSettingsModal() {
 
     // Helpers to reset specific sections to defaults
     auto resetProjectDefaults = [&]() {
-        settings.Title = "GrapeEngine Game Project";
-        settings.Version = "1.0.0";
-        settings.StartupScene.clear();
+        settings.Title = projectDefaults.value("Title", settings.Title);
+        settings.Version = projectDefaults.value("Version", settings.Version);
+        settings.StartupScene = projectDefaults.value("StartupScene", settings.StartupScene);
         m_projectSettingsDirty = true;
     };
 
     // Reset window settings to defaults
     auto resetWindowDefaults = [&]() {
-        settings.WindowSettings.Width = 1600;
-        settings.WindowSettings.Height = 900;
-        settings.WindowSettings.Mode = "Fullscreen";
-        settings.WindowSettings.Fullscreen = true;
-        settings.WindowSettings.VSync = true;
+        settings.WindowSettings.Width = windowDefaults.value("Width", settings.WindowSettings.Width);
+        settings.WindowSettings.Height = windowDefaults.value("Height", settings.WindowSettings.Height);
+        settings.WindowSettings.Mode = windowDefaults.value("Mode", settings.WindowSettings.Mode);
+        settings.WindowSettings.Fullscreen = (settings.WindowSettings.Mode == "Fullscreen");
+        settings.WindowSettings.VSync = windowDefaults.value("VSync", settings.WindowSettings.VSync);
         m_projectSettingsDirty = true;
     };
 
     // Reset physics settings to defaults
     auto resetPhysicsDefaults = [&]() {
-        settings.Physics.Gravity = -9.81f;
-        settings.Physics.TimeStep = 0.016f;
+        settings.Physics.Gravity = physicsDefaults.value("Gravity", settings.Physics.Gravity);
+        settings.Physics.TimeStep = physicsDefaults.value("TimeStep", settings.Physics.TimeStep);
         m_projectSettingsDirty = true;
     };
 
@@ -366,6 +405,39 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         return clicked;
     };
 
+    auto renderRowActionButton = [&](const char* id, const char* label, const char* tooltip, int slot,
+                                     const ImVec4& textColor) -> bool {
+        const float buttonSize = ImGui::GetFrameHeight();
+        const float rightEdge = ImGui::GetWindowContentRegionMax().x;
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        const float buttonX = rightEdge - (buttonSize * (slot + 1))
+            - (spacing * slot) - ImGui::GetStyle().FramePadding.x;
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
+        ImGui::SetCursorPosX(buttonX);
+        ImGui::PushID(id);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+
+        if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+        const bool clicked = ImGui::SmallButton(label);
+        if (m_symbolsFont) ImGui::PopFont();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar(2);
+        ImGui::PopID();
+        return clicked;
+    };
+
     // Render a small help icon button for individual rows
     auto renderHelpIcon = [&](const char* id, const char* tooltip) {
         const float iconSize = ImGui::GetFrameHeight();
@@ -396,27 +468,27 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     };
 
     // Helper to render a collapsible section with a reset button in the header
-    auto renderSection = [&](const char* headerName, const std::function<void()>& renderBody,
+    auto renderSection = [&](const char* headerId, const char* headerLabel, const std::function<void()>& renderBody,
                              const std::function<void()>& onReset) {
         // Collapsing header with custom styling
         ImGui::SetNextItemAllowOverlap();
         const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen |
             ImGuiTreeNodeFlags_Framed;
-        const ImGuiID headerId = ImGui::GetID(headerName);
+        const ImGuiID headerStorageId = ImGui::GetID(headerId);
         const bool wasOpen = ImGui::GetStateStorage()->GetBool(
-            headerId, (headerFlags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
+            headerStorageId, (headerFlags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
         const float headerRounding = wasOpen ? 0.0f : ImGui::GetStyle().FrameRounding;
 
         // Render the collapsing header
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, headerRounding);
         if (m_boldFont) ImGui::PushFont(m_boldFont);
-        const bool nodeOpen = ImGui::CollapsingHeader(headerName, headerFlags);
+        const bool nodeOpen = ImGui::CollapsingHeader(headerLabel, headerFlags);
         if (m_boldFont) ImGui::PopFont();
         ImGui::PopStyleVar();
 
         const ImVec2 headerMin = ImGui::GetItemRectMin();
         const ImVec2 headerMax = ImGui::GetItemRectMax();
-        renderHeaderResetButton(headerName, headerMax.x, "Reset section to defaults", onReset);
+        renderHeaderResetButton(headerId, headerMax.x, "Reset section to defaults", onReset);
 
         // Render the body within a styled box if the section is open
         if (nodeOpen) {
@@ -489,27 +561,35 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         EditorUI::SetSymbolsFont(m_symbolsFont);
     }
 
+    bool startupSceneMissing = false;
+    if (!settings.StartupScene.empty()) {
+        std::filesystem::path scenePath = Engine::ProjectPaths::GetProjectRoot();
+        scenePath /= settings.StartupScene;
+        startupSceneMissing = !std::filesystem::exists(scenePath);
+    }
+
     // Render the modal window
     ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
     if (ImGui::Begin("Project Settings", &m_showProjectSettings, ImGuiWindowFlags_NoCollapse)) {
         ImGui::PopStyleVar();
+        const float warningHeight = (!settingsValid || startupSceneMissing)
+            ? (ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y)
+            : 0.0f;
         const float footerHeight = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y * 1.5f
-            + ImGui::GetStyle().WindowPadding.y;
+            + ImGui::GetStyle().WindowPadding.y + warningHeight;
         ImGui::BeginChild("ProjectSettingsBody", ImVec2(0.0f, -footerHeight), false);
         nlohmann::json projectData = {
             {"Title", settings.Title},
             {"Version", settings.Version},
             {"StartupScene", settings.StartupScene}
         };
-        const nlohmann::json projectDefaults = {
-            {"Title", "Game Project"},
-            {"Version", "1.0.0"},
-            {"StartupScene", ""}
-        };
+        const bool projectModified = (projectData != baselineProject);
+        const std::string projectHeaderLabel = std::string("Project Information") +
+            (projectModified ? " *" : "");
 
         // Render Project Information section
-        renderSection("Project Information", [&]() {
+        renderSection("Project Information", projectHeaderLabel.c_str(), [&]() {
             EditorUI::RegisterDefaultDataScope(projectData, projectDefaults);
             if (!titleValid) {
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
@@ -524,7 +604,74 @@ void EditorFileMenu::_renderProjectSettingsModal() {
                 }
             }
             EditorUI::RenderTextProperty("Version", projectData, "Version");
-            EditorUI::RenderTextProperty("Startup Scene", projectData, "StartupScene");
+            std::string startupScene = projectData.value("StartupScene", std::string());
+            char sceneBuf[512];
+            strncpy_s(sceneBuf, startupScene.c_str(), sizeof(sceneBuf) - 1);
+
+            ImGui::Text("Startup Scene");
+            ImGui::SameLine();
+            const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+            const float fieldStartX = EditorUI::GetContentStartX() + axisLabelWidth + 6.0f;
+            ImGui::SetCursorPosX(fieldStartX);
+            ImGui::SetNextItemWidth(280.0f);
+            if (ImGui::InputText("##StartupScene", sceneBuf, sizeof(sceneBuf))) {
+                projectData["StartupScene"] = std::string(sceneBuf);
+            }
+
+            const std::string defaultScene = projectDefaults.value("StartupScene", "");
+            if (projectData.value("StartupScene", std::string()) != defaultScene) {
+                if (renderRowResetButton("StartupScene", "Reset to default")) {
+                    projectData["StartupScene"] = defaultScene;
+                }
+            }
+
+            if (renderRowActionButton("StartupSceneCopy", "\xEE\x85\x8D", "Copy path", 1, EditorStyle::Text)) {
+                ImGui::SetClipboardText(projectData.value("StartupScene", "").c_str());
+            }
+
+#ifdef _WIN32
+            if (renderRowActionButton("StartupSceneBrowse", "\xEE\x8B\x88", "Browse...", 2, EditorStyle::Text)) {
+                OPENFILENAMEA ofn = {};
+                char szFile[260] = {};
+                ofn.lStructSize = sizeof(ofn);
+                auto* context = Engine::CORE->GetPlatformContext();
+                auto* mainWindow = context ? context->GetMainWindow() : nullptr;
+                if (mainWindow) {
+                    ofn.hwndOwner = glfwGetWin32Window(reinterpret_cast<GLFWwindow*>(mainWindow->GetNativeHandle()));
+                }
+                ofn.lpstrFile = szFile;
+                ofn.nMaxFile = sizeof(szFile);
+                ofn.lpstrFilter = "Scene Files (*.scn;*.scene)\0*.scn;*.scene\0All Files (*.*)\0*.*\0";
+                ofn.nFilterIndex = 1;
+                ofn.lpstrFileTitle = nullptr;
+                ofn.nMaxFileTitle = 0;
+                ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
+                ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+                if (GetOpenFileNameA(&ofn)) {
+                    std::filesystem::path selected = std::filesystem::path(szFile);
+                    std::filesystem::path root = std::filesystem::path(Engine::ProjectPaths::GetProjectRoot());
+                    std::error_code ec;
+                    std::filesystem::path rel = std::filesystem::relative(selected, root, ec);
+                    if (!ec && !rel.empty() && rel.native().find(L"..") == std::wstring::npos) {
+                        projectData["StartupScene"] = rel.generic_string();
+                    } else {
+                        projectData["StartupScene"] = selected.generic_string();
+                    }
+                }
+            }
+#endif
+
+            bool startupSceneMissing = false;
+            if (!projectData.value("StartupScene", std::string()).empty()) {
+                std::filesystem::path scenePath = Engine::ProjectPaths::GetProjectRoot();
+                scenePath /= projectData.value("StartupScene", std::string());
+                startupSceneMissing = !std::filesystem::exists(scenePath);
+            }
+            if (startupSceneMissing) {
+                renderRowActionButton("StartupSceneMissing", "!", "Startup scene not found", 3, EditorStyle::WarningText);
+            }
+
             EditorUI::ClearDefaultDataScope();
         }, resetProjectDefaults);
 
@@ -549,15 +696,12 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             {"Mode", settings.WindowSettings.Mode},
             {"VSync", settings.WindowSettings.VSync}
         };
-        const nlohmann::json windowDefaults = {
-            {"Width", 1600},
-            {"Height", 900},
-            {"Mode", "Fullscreen"},
-            {"VSync", true}
-        };
+        const bool windowModified = (windowData != baselineWindow);
+        const std::string windowHeaderLabel = std::string("Window Settings") +
+            (windowModified ? " *" : "");
 
         // Render Window Settings section
-        renderSection("Window Settings", [&]() {
+        renderSection("Window Settings", windowHeaderLabel.c_str(), [&]() {
             EditorUI::RegisterDefaultDataScope(windowData, windowDefaults);
 
             if (!widthValid) {
@@ -652,12 +796,11 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             {"Gravity", settings.Physics.Gravity},
             {"TimeStep", settings.Physics.TimeStep}
         };
-        const nlohmann::json physicsDefaults = {
-            {"Gravity", -9.81f},
-            {"TimeStep", 0.016f}
-        };
+        const bool physicsModified = (physicsData != baselinePhysics);
+        const std::string physicsHeaderLabel = std::string("Physics Settings") +
+            (physicsModified ? " *" : "");
 
-        renderSection("Physics Settings", [&]() {
+        renderSection("Physics Settings", physicsHeaderLabel.c_str(), [&]() {
             EditorUI::RegisterDefaultDataScope(physicsData, physicsDefaults);
             const float axisLabelWidth = ImGui::CalcTextSize("W").x;
             const float fieldStartX = EditorUI::GetContentStartX() + axisLabelWidth + 6.0f;
@@ -668,7 +811,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             ImGui::SetNextItemWidth(120.0f);
             {
                 float value = physicsData.value("Gravity", -9.81f);
-                if (ImGui::DragFloat("##Gravity", &value, 0.001f, 0.0f, 0.0f, "%.6f")) {
+                if (ImGui::InputFloat("##Gravity", &value, 0.0f, 0.0f, "%.9f")) {
                     physicsData["Gravity"] = value;
                 }
             }
@@ -685,7 +828,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             ImGui::SetNextItemWidth(120.0f);
             {
                 float value = physicsData.value("TimeStep", 0.016f);
-                if (ImGui::DragFloat("##TimeStep", &value, 0.0001f, 0.0f, 0.0f, "%.6f")) {
+                if (ImGui::InputFloat("##TimeStep", &value, 0.0f, 0.0f, "%.9f")) {
                     physicsData["TimeStep"] = value;
                 }
             }
@@ -710,6 +853,12 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         ImGui::EndChild();
 
         ImGui::Separator();
+        if (!settingsValid || startupSceneMissing) {
+            const char* message = startupSceneMissing
+                ? "Startup scene path is invalid."
+                : "Fix invalid settings to save.";
+            ImGui::TextColored(EditorStyle::WarningText, "%s", message);
+        }
         
         // Save/Cancel buttons
         if (!settingsValid) {
@@ -811,6 +960,10 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         ImGui::PopStyleVar();
     }
     ImGui::End();
+
+    if (!m_showProjectSettings) {
+        baselineValid = false;
+    }
 }
 
 // Creates a brand new scene and makes it the active one in the SceneManager

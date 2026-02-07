@@ -209,14 +209,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    LOG_INFO("Loading startup scene: " << startupScene);
+    std::filesystem::path startupScenePath = startupScene;
+    if (!startupScenePath.is_absolute()) {
+        startupScenePath = std::filesystem::path(projectRoot) / startupScenePath;
+    }
+
+    LOG_INFO("Loading startup scene: " << startupScenePath.string());
 
     auto& sceneManager = engine.GetSceneManager();
     auto* scene = new Scenes::Scene();
     size_t sceneIndex = sceneManager.AddScene(scene);
 
-    if (!sceneManager.LoadScene(sceneIndex, startupScene)) {
-        LOG_ERROR("Failed to load startup scene: " << startupScene);
+    if (!sceneManager.LoadScene(sceneIndex, startupScenePath.string())) {
+        LOG_ERROR("Failed to load startup scene: " << startupScenePath.string());
         engine.Shutdown();
         return 1;
     }
