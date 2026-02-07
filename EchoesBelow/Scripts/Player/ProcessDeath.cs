@@ -62,7 +62,7 @@ public class ProcessDeath : SystemBase
                     if (result.Entity.GetComponent<MatchSignifierComponent>().signifierID == coolDownSignifier)
                     {
                         //set start size
-                        result.Entity.GetComponent<GUIElement>().Size.X = 338 * percentage;
+                        result.Entity.GetComponent<GUIElement>().Size.X = 820 * percentage;
                     }
                 }
 
