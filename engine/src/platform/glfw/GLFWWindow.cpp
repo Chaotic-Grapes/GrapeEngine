@@ -45,8 +45,11 @@ namespace Platform {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
+        const bool wantsBorderless = HasFlag(mode, WindowMode::Borderless);
+        const bool wantsFullscreen = HasFlag(mode, WindowMode::Fullscreen);
+
         // Set decorations based on mode
-        if (HasFlag(mode, WindowMode::Borderless) || !decorated) {
+        if (wantsBorderless || !decorated) {
             glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
         }
         else {
@@ -57,12 +60,16 @@ namespace Platform {
         GLFWmonitor* monitor = nullptr;
         const int requestedWidth = width;
         const int requestedHeight = height;
-        if (HasFlag(mode, WindowMode::Fullscreen)) {
-            monitor = glfwGetPrimaryMonitor();
-            const GLFWvidmode* videoMode = glfwGetVideoMode(monitor);
+        if (wantsFullscreen) {
+            GLFWmonitor* primary = glfwGetPrimaryMonitor();
+            const GLFWvidmode* videoMode = glfwGetVideoMode(primary);
             if (videoMode) {
                 width = videoMode->width;
                 height = videoMode->height;
+            }
+
+            if (!wantsBorderless) {
+                monitor = primary;
             }
         }
 
@@ -109,6 +116,11 @@ namespace Platform {
 
         // Setup callbacks
         _setupCallbacks();
+
+        if (wantsFullscreen && wantsBorderless) {
+            _setBorderless(true);
+            m_mode = WindowMode::Borderless | WindowMode::Fullscreen;
+        }
 
         LOG_INFO("[GLFWWindow] Created successfully: " << width << "x" << height);
         return true;
@@ -243,12 +255,10 @@ namespace Platform {
                                  mode->width, mode->height, 0);
             m_width = mode->width;
             m_height = mode->height;
-            m_mode = WindowMode::Borderless;
             return true;
         }
 
         _restoreWindowedPlacement();
-        m_mode = WindowMode::Windowed;
         return true;
     }
 
@@ -384,6 +394,12 @@ namespace Platform {
             return;
         }
 
+        if (HasFlag(mode, WindowMode::Fullscreen) && HasFlag(mode, WindowMode::Borderless)) {
+            _setBorderless(true);
+            m_mode = WindowMode::Borderless | WindowMode::Fullscreen;
+            return;
+        }
+
         if (HasFlag(mode, WindowMode::Fullscreen)) {
             SetFullscreen(true);
             return;
@@ -391,10 +407,12 @@ namespace Platform {
 
         if (HasFlag(mode, WindowMode::Borderless)) {
             _setBorderless(true);
+            m_mode = WindowMode::Borderless;
             return;
         }
 
         _setBorderless(false);
+        m_mode = WindowMode::Windowed;
     }
 
     bool GLFWWindow::HasMode(WindowMode mode) const {
@@ -451,7 +469,7 @@ namespace Platform {
             return false;
         }
 
-        if (HasFlag(m_mode, WindowMode::Fullscreen)) {
+        if (HasFlag(m_mode, WindowMode::Fullscreen) && !HasFlag(m_mode, WindowMode::Borderless)) {
             GLFWmonitor* monitor = glfwGetWindowMonitor(m_windowHandle);
             if (!monitor) {
                 monitor = _getCurrentMonitor();

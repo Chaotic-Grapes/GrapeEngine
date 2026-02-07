@@ -144,6 +144,9 @@ int main(int argc, char** argv) {
         if (configuredMode == "Borderless") {
             windowMode = Platform::WindowMode::Borderless;
             fullscreen = false;
+        } else if (configuredMode == "BorderlessFullscreen") {
+            windowMode = Platform::WindowMode::Borderless | Platform::WindowMode::Fullscreen;
+            fullscreen = true;
         } else if (configuredMode == "Windowed") {
             windowMode = Platform::WindowMode::Windowed;
             fullscreen = false;
