@@ -97,7 +97,7 @@ namespace Platform {
 
         // Create GLFW window
         auto* window = GLFWWindow::Create(info.Title, info.Width, info.Height, 
-                                          info.VSync, mode);
+                                          info.VSync, mode, info.Resizable, info.Decorated);
         if (!window) {
             LOG_ERROR("Failed to create GLFW window");
             return nullptr;

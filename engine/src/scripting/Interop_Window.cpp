@@ -22,6 +22,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "platform/IPlatformContext.h"
 #include "platform/IWindow.h"
 #include "core/Logger.h"
+#include "platform/glfw/GLFWWindow.h"
+#include <algorithm>
 
 // Helper to get main window via platform context
 static Platform::IWindow* GetMainWindow() {
@@ -258,4 +260,151 @@ INTEROP_API void EngineInterop_Window_Resize(int width, int height) {
     }
     LOG_INFO("[ScriptAPI] Resize requested from script: " << width << "x" << height);
     window->Resize(width, height);
+}
+
+// ============================================================================
+// Window API - Title and VSync
+// ============================================================================
+
+/**
+ * @brief Get the window title as a UTF-8 string pointer
+ *
+ * @return const char* Pointer valid until the next call on this thread
+ */
+INTEROP_API const char* EngineInterop_Window_GetTitle() {
+    thread_local std::string cachedTitle;
+
+    auto* window = GetMainWindow();
+    if (!window) {
+        cachedTitle.clear();
+        return cachedTitle.c_str();
+    }
+
+    cachedTitle = window->GetTitle();
+    return cachedTitle.c_str();
+}
+
+/**
+ * @brief Set the window title
+ *
+ * @param title New title string
+ */
+INTEROP_API void EngineInterop_Window_SetTitle(const char* title) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        LOG_ERROR("[ScriptAPI] Main window not available");
+        return;
+    }
+    window->SetTitle(title ? title : "");
+}
+
+/**
+ * @brief Check if VSync is enabled
+ */
+INTEROP_API bool EngineInterop_Window_IsVSync() {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return false;
+    }
+    return window->IsVSync();
+}
+
+/**
+ * @brief Enable or disable VSync
+ */
+INTEROP_API void EngineInterop_Window_SetVSync(bool enabled) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        LOG_ERROR("[ScriptAPI] Main window not available");
+        return;
+    }
+    window->SetVSync(enabled);
+}
+
+// ============================================================================
+// Window API - Fullscreen and Display Modes
+// ============================================================================
+
+/**
+ * @brief Toggle fullscreen on the current monitor
+ */
+INTEROP_API bool EngineInterop_Window_SetFullscreen(bool fullscreen) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return false;
+    }
+    return window->SetFullscreen(fullscreen);
+}
+
+/**
+ * @brief Toggle fullscreen on a specific monitor index
+ */
+INTEROP_API bool EngineInterop_Window_SetFullscreenOnMonitor(int monitorIndex) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return false;
+    }
+
+    if (auto* glfwWindow = dynamic_cast<Platform::GLFWWindow*>(window)) {
+        return glfwWindow->SetFullscreenOnMonitor(monitorIndex);
+    }
+
+    if (monitorIndex >= 0) {
+        return window->SetFullscreen(true);
+    }
+
+    return window->SetFullscreen(false);
+}
+
+/**
+ * @brief Get the number of supported display modes for the current monitor
+ */
+INTEROP_API int EngineInterop_Window_GetSupportedDisplayModeCount() {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return 0;
+    }
+    return static_cast<int>(window->GetSupportedDisplayModes().size());
+}
+
+/**
+ * @brief Get a supported display mode by index
+ *
+ * @return true if index was valid and outputs were set
+ */
+INTEROP_API bool EngineInterop_Window_GetSupportedDisplayMode(int index, int* outWidth, int* outHeight,
+                                                              int* outRefreshRate, int* outBitsPerPixel) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return false;
+    }
+
+    const auto modes = window->GetSupportedDisplayModes();
+    if (index < 0 || index >= static_cast<int>(modes.size())) {
+        return false;
+    }
+
+    const auto& mode = modes[static_cast<size_t>(index)];
+    if (outWidth) *outWidth = mode.Width;
+    if (outHeight) *outHeight = mode.Height;
+    if (outRefreshRate) *outRefreshRate = mode.RefreshRate;
+    if (outBitsPerPixel) *outBitsPerPixel = mode.BitsPerPixel;
+    return true;
+}
+
+/**
+ * @brief Apply a display mode to the current window
+ */
+INTEROP_API bool EngineInterop_Window_SetDisplayMode(int width, int height, int refreshRate, int bitsPerPixel) {
+    auto* window = GetMainWindow();
+    if (!window) {
+        return false;
+    }
+
+    Engine::DisplayMode mode{};
+    mode.Width = width;
+    mode.Height = height;
+    mode.RefreshRate = refreshRate;
+    mode.BitsPerPixel = static_cast<uint8_t>(std::max(0, bitsPerPixel));
+    return window->SetDisplayMode(mode);
 }
