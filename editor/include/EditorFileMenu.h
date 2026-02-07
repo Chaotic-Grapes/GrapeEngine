@@ -48,6 +48,11 @@ public:
         m_mainFont = mainFont;
         m_boldFont = boldFont;
     }
+    
+    // Set symbols font for icon-only buttons.
+    void SetSymbolsFont(ImFont* symbolsFont) {
+        m_symbolsFont = symbolsFont;
+    }
 
     // Set hierarchy panel for entity order management during save/load
     void SetHierarchyPanel(HierarchyPanel* hierarchyPanel) {
@@ -155,6 +160,7 @@ private:
     bool m_hasUnsavedChanges = false;
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     // Project settings editor state
     bool m_showProjectSettings = false;

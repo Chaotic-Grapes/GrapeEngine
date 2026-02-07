@@ -387,8 +387,9 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
     m_fileMenu.Initialize(sm);
 
-    // Wire up fonts to file menu so it can render bold asterisk
+    // Wire up fonts to file menu so it can render bold asterisk and icons.
     m_fileMenu.SetFonts(m_mainFont, m_boldFont);
+    m_fileMenu.SetSymbolsFont(m_symbolsFont);
 
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);

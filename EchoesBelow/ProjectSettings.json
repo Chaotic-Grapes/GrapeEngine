@@ -7,9 +7,9 @@
     "Title": "Echoes Below",
     "Version": "1.0.0",
     "WindowSettings": {
-        "Fullscreen": true,
+        "Fullscreen": false,
         "Height": 900,
-        "Mode": "Fullscreen",
+        "Mode": "Borderless",
         "VSync": true,
         "Width": 1600
     }

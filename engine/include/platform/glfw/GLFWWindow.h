@@ -104,6 +104,7 @@ namespace Platform {
         void _storeWindowedPlacement();
         void _restoreWindowedPlacement();
         bool _setBorderless(bool borderless);
+        void _lockBorderlessToMonitor();
 
         GLFWwindow* m_windowHandle = nullptr;
         std::string m_title;
@@ -116,10 +117,12 @@ namespace Platform {
 
         int m_windowedX = 0;
         int m_windowedY = 0;
-        int m_windowedWidth = 0;
-        int m_windowedHeight = 0;
-        bool m_windowedValid = false;
-        int m_currentMonitorIndex = 0;
+        int m_windowedWidth = 0;           // Last windowed width for restore.
+        int m_windowedHeight = 0;          // Last windowed height for restore.
+        bool m_windowedValid = false;      // True once windowed placement is stored.
+        int m_currentMonitorIndex = 0;     // Monitor index for fullscreen transitions.
+        bool m_borderlessLockInProgress = false; // Prevent re-entrant lock callbacks.
+        int m_borderlessLockedMonitorIndex = -1; // Track monitor already snapped.
 
         void _setupCallbacks();
     };

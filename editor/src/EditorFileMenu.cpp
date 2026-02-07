@@ -39,11 +39,13 @@ centralized and consistent with the currently active scene.
 #include "scene/SceneManager.h"
 #include "scene/Scene.h"
 #include "platform/IPlatformContext.h"
+#include "ComponentWidgets.h"
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
 #include "serialization/ConfigurationSerializer.h"
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -241,14 +243,17 @@ void EditorFileMenu::RenderViewMenu(float& uiScale) {
 void EditorFileMenu::_renderProjectSettingsModal() {
     if (!Engine::CORE) return;
     
+    // Get a reference to the project settings for easy access
     ProjectSettings& settings = Engine::CORE->GetProjectSettings();
     static double lastSavedTime = -100.0;
     static bool showCloseConfirm = false;
 
+    // Helper to mark the settings as saved
     auto markSaved = []() {
         lastSavedTime = ImGui::GetTime();
     };
 
+    // Helper to save project settings to disk
     auto saveSettings = [&]() -> bool {
         std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
         if (Engine::CORE->SaveProjectSettings(projectRoot)) {
@@ -259,6 +264,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         return false;
     };
 
+    // Helper to revert settings from disk
     auto revertSettings = [&]() {
         std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
         if (Engine::CORE->LoadProjectSettings(projectRoot)) {
@@ -266,6 +272,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         }
     };
 
+    // Helpers to reset specific sections to defaults
     auto resetProjectDefaults = [&]() {
         settings.Title = "GrapeEngine Game Project";
         settings.Version = "1.0.0";
@@ -273,6 +280,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         m_projectSettingsDirty = true;
     };
 
+    // Reset window settings to defaults
     auto resetWindowDefaults = [&]() {
         settings.WindowSettings.Width = 1600;
         settings.WindowSettings.Height = 900;
@@ -282,39 +290,231 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         m_projectSettingsDirty = true;
     };
 
+    // Reset physics settings to defaults
     auto resetPhysicsDefaults = [&]() {
         settings.Physics.Gravity = -9.81f;
         settings.Physics.TimeStep = 0.016f;
         m_projectSettingsDirty = true;
     };
 
-    auto drawHelp = [](const char* text) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
+    // Render a reset button in the header of each section
+    auto renderHeaderResetButton = [&](const char* id, float rightEdge, const char* tooltip, const std::function<void()>& onReset) {
+        const float buttonSize = ImGui::GetFrameHeight();
+        const float buttonX = rightEdge - buttonSize - ImGui::GetStyle().FramePadding.x;
+
+        // Position the button on the same line as the header
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorPosX(buttonX);
+        ImGui::PushID(id);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        // Render the reset icon button
+        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+        if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+        const bool clicked = ImGui::Button(resetIcon, ImVec2(buttonSize, buttonSize));
+        if (m_symbolsFont) ImGui::PopFont();
+
         if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(text);
-            ImGui::EndTooltip();
+            ImGui::SetTooltip("%s", tooltip);
+        }
+
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar(2);
+        ImGui::PopID();
+
+        if (clicked) {
+            onReset();
         }
     };
 
+    // Render a small reset button for individual rows
+    auto renderRowResetButton = [&](const char* id, const char* tooltip) -> bool {
+        const float buttonSize = ImGui::GetFrameHeight();
+        const float rightEdge = ImGui::GetWindowContentRegionMax().x;
+        const float buttonX = rightEdge - buttonSize - ImGui::GetStyle().FramePadding.x;
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
+        ImGui::SetCursorPosX(buttonX);
+        ImGui::PushID(("Reset_" + std::string(id)).c_str());
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+        if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+        const bool clicked = ImGui::SmallButton(resetIcon);
+        if (m_symbolsFont) ImGui::PopFont();
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar(2);
+        ImGui::PopID();
+        return clicked;
+    };
+
+    // Render a small help icon button for individual rows
+    auto renderHelpIcon = [&](const char* id, const char* tooltip) {
+        const float iconSize = ImGui::GetFrameHeight();
+        const float rightEdge = ImGui::GetWindowContentRegionMax().x;
+        const float resetButtonSize = ImGui::GetFrameHeight();
+        const float iconX = rightEdge - resetButtonSize - ImGui::GetStyle().ItemSpacing.x - iconSize;
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
+        ImGui::SetCursorPosX(iconX);
+        ImGui::PushID(id);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Muted);
+
+        ImGui::SmallButton("?");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar(2);
+        ImGui::PopID();
+    };
+
+    // Helper to render a collapsible section with a reset button in the header
+    auto renderSection = [&](const char* headerName, const std::function<void()>& renderBody,
+                             const std::function<void()>& onReset) {
+        // Collapsing header with custom styling
+        ImGui::SetNextItemAllowOverlap();
+        const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen |
+            ImGuiTreeNodeFlags_Framed;
+        const ImGuiID headerId = ImGui::GetID(headerName);
+        const bool wasOpen = ImGui::GetStateStorage()->GetBool(
+            headerId, (headerFlags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
+        const float headerRounding = wasOpen ? 0.0f : ImGui::GetStyle().FrameRounding;
+
+        // Render the collapsing header
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, headerRounding);
+        if (m_boldFont) ImGui::PushFont(m_boldFont);
+        const bool nodeOpen = ImGui::CollapsingHeader(headerName, headerFlags);
+        if (m_boldFont) ImGui::PopFont();
+        ImGui::PopStyleVar();
+
+        const ImVec2 headerMin = ImGui::GetItemRectMin();
+        const ImVec2 headerMax = ImGui::GetItemRectMax();
+        renderHeaderResetButton(headerName, headerMax.x, "Reset section to defaults", onReset);
+
+        // Render the body within a styled box if the section is open
+        if (nodeOpen) {
+            // Draw a box around the section body
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const float boxPaddingX = 10.0f;
+            const float boxPaddingY = 6.0f;
+            const float boxRounding = 6.0f;
+            const float boxWidth = headerMax.x - headerMin.x;
+            const float gap = ImGui::GetStyle().ItemSpacing.y;
+
+            // Calculate box positions
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - gap * 2.f);
+            ImVec2 boxMinScreen = ImVec2(headerMin.x, ImGui::GetCursorScreenPos().y);
+
+            // Draw filled rect and border using ImGui channels to avoid interfering with other ImGui elements
+            drawList->ChannelsSplit(2);
+            drawList->ChannelsSetCurrent(1);
+
+            // Render the section body within the box
+            ImGui::BeginGroup();
+            ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+            ImGui::Indent(boxPaddingX);
+            EditorUI::BeginPropertySection({});
+            renderBody();
+            EditorUI::EndPropertySection();
+            ImGui::Unindent(boxPaddingX);
+            ImGui::Dummy(ImVec2(0.0f, boxPaddingY));
+            ImGui::EndGroup();
+
+            // Calculate box max position
+            ImVec2 boxMaxScreen = ImGui::GetItemRectMax();
+            boxMaxScreen.x = boxMinScreen.x + boxWidth;
+
+            // Draw the box
+            drawList->ChannelsSetCurrent(0);
+            drawList->AddRectFilled(
+                boxMinScreen,
+                boxMaxScreen,
+                ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 0.85f)),
+                boxRounding,
+                ImDrawFlags_RoundCornersBottom
+            );
+            drawList->AddRect(
+                boxMinScreen,
+                boxMaxScreen,
+                ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::Border, 0.85f)),
+                boxRounding,
+                ImDrawFlags_RoundCornersBottom
+            );
+            drawList->ChannelsMerge();
+            ImGui::SetCursorScreenPos(ImVec2(boxMinScreen.x, boxMaxScreen.y));
+            ImGui::Spacing();
+            ImGui::Spacing();
+        }
+    };
+
+    // Validate settings
     const bool titleValid = !settings.Title.empty();
     const bool widthValid = settings.WindowSettings.Width > 0;
     const bool heightValid = settings.WindowSettings.Height > 0;
     const bool settingsValid = titleValid && widthValid && heightValid;
 
-    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    // Ensure Window Mode is valid
+    if (settings.WindowSettings.Mode.empty()) {
+        settings.WindowSettings.Mode = settings.WindowSettings.Fullscreen ? "Fullscreen" : "Windowed";
+        m_projectSettingsDirty = true;
+    }
+    if (m_symbolsFont) {
+        EditorUI::SetSymbolsFont(m_symbolsFont);
+    }
+
+    // Render the modal window
+    ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
     if (ImGui::Begin("Project Settings", &m_showProjectSettings, ImGuiWindowFlags_NoCollapse)) {
-        if (ImGui::CollapsingHeader("Project Information", ImGuiTreeNodeFlags_DefaultOpen)) {
-            char titleBuf[256];
-            strncpy_s(titleBuf, settings.Title.c_str(), sizeof(titleBuf) - 1);
+        ImGui::PopStyleVar();
+        const float footerHeight = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y * 1.5f
+            + ImGui::GetStyle().WindowPadding.y;
+        ImGui::BeginChild("ProjectSettingsBody", ImVec2(0.0f, -footerHeight), false);
+        nlohmann::json projectData = {
+            {"Title", settings.Title},
+            {"Version", settings.Version},
+            {"StartupScene", settings.StartupScene}
+        };
+        const nlohmann::json projectDefaults = {
+            {"Title", "Game Project"},
+            {"Version", "1.0.0"},
+            {"StartupScene", ""}
+        };
+
+        // Render Project Information section
+        renderSection("Project Information", [&]() {
+            EditorUI::RegisterDefaultDataScope(projectData, projectDefaults);
             if (!titleValid) {
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
             }
-            if (ImGui::InputText("Title", titleBuf, sizeof(titleBuf))) {
-                settings.Title = titleBuf;
-                m_projectSettingsDirty = true;
-            }
+            EditorUI::RenderTextProperty("Title", projectData, "Title");
             if (!titleValid) {
                 ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) {
@@ -323,33 +523,47 @@ void EditorFileMenu::_renderProjectSettingsModal() {
                     ImGui::EndTooltip();
                 }
             }
-            
-            char versionBuf[64];
-            strncpy_s(versionBuf, settings.Version.c_str(), sizeof(versionBuf) - 1);
-            if (ImGui::InputText("Version", versionBuf, sizeof(versionBuf))) {
-                settings.Version = versionBuf;
-                m_projectSettingsDirty = true;
-            }
-            
-            char sceneBuf[512];
-            strncpy_s(sceneBuf, settings.StartupScene.c_str(), sizeof(sceneBuf) - 1);
-            if (ImGui::InputText("Startup Scene", sceneBuf, sizeof(sceneBuf))) {
-                settings.StartupScene = sceneBuf;
-                m_projectSettingsDirty = true;
-            }
+            EditorUI::RenderTextProperty("Version", projectData, "Version");
+            EditorUI::RenderTextProperty("Startup Scene", projectData, "StartupScene");
+            EditorUI::ClearDefaultDataScope();
+        }, resetProjectDefaults);
 
-            if (ImGui::Button("Reset Project")) {
-                resetProjectDefaults();
-            }
+        // Apply changes from Project Information section
+        if (settings.Title != projectData.value("Title", settings.Title)) {
+            settings.Title = projectData["Title"].get<std::string>();
+            m_projectSettingsDirty = true;
         }
-        
-        if (ImGui::CollapsingHeader("Window Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (settings.Version != projectData.value("Version", settings.Version)) {
+            settings.Version = projectData["Version"].get<std::string>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.StartupScene != projectData.value("StartupScene", settings.StartupScene)) {
+            settings.StartupScene = projectData["StartupScene"].get<std::string>();
+            m_projectSettingsDirty = true;
+        }
+
+        // Setup Window Settings section
+        nlohmann::json windowData = {
+            {"Width", settings.WindowSettings.Width},
+            {"Height", settings.WindowSettings.Height},
+            {"Mode", settings.WindowSettings.Mode},
+            {"VSync", settings.WindowSettings.VSync}
+        };
+        const nlohmann::json windowDefaults = {
+            {"Width", 1600},
+            {"Height", 900},
+            {"Mode", "Fullscreen"},
+            {"VSync", true}
+        };
+
+        // Render Window Settings section
+        renderSection("Window Settings", [&]() {
+            EditorUI::RegisterDefaultDataScope(windowData, windowDefaults);
+
             if (!widthValid) {
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
             }
-            if (ImGui::InputInt("Width", &settings.WindowSettings.Width)) {
-                m_projectSettingsDirty = true;
-            }
+            EditorUI::RenderIntProperty("Width", windowData, "Width");
             if (!widthValid) {
                 ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) {
@@ -362,9 +576,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
             if (!heightValid) {
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.2f, 0.2f, 0.5f));
             }
-            if (ImGui::InputInt("Height", &settings.WindowSettings.Height)) {
-                m_projectSettingsDirty = true;
-            }
+            EditorUI::RenderIntProperty("Height", windowData, "Height");
             if (!heightValid) {
                 ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered()) {
@@ -374,101 +586,173 @@ void EditorFileMenu::_renderProjectSettingsModal() {
                 }
             }
 
+            // Custom rendering for Window Mode combo box
+            ImGui::Text("Mode");
+            ImGui::SameLine();
+            const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+            const float fieldStartX = EditorUI::GetContentStartX() + axisLabelWidth + 6.0f;
+            ImGui::SetCursorPosX(fieldStartX);
+            ImGui::SetNextItemWidth(180.0f);
+
+            // Window Mode combo box
+            const char* modes[] = { "Windowed", "Fullscreen", "Borderless" };
+            std::string modeValue = windowData.value("Mode", std::string("Windowed"));
+            int modeIndex = 0;
+            if (modeValue == "Fullscreen") {
+                modeIndex = 1;
+            } else if (modeValue == "Borderless") {
+                modeIndex = 2;
+            }
+
+            // Render the combo box and handle selection
+            if (ImGui::Combo("##WindowMode", &modeIndex, modes, 3)) {
+                if (modeIndex == 0) {
+                    windowData["Mode"] = "Windowed";
+                } else if (modeIndex == 1) {
+                    windowData["Mode"] = "Fullscreen";
+                } else {
+                    windowData["Mode"] = "Borderless";
+                }
+            }
+
+            // Reset button for Window Mode
+            const std::string defaultMode = windowDefaults.value("Mode", "Fullscreen");
+            if (windowData.value("Mode", std::string()) != defaultMode) {
+                if (renderRowResetButton("Mode", "Reset to default")) {
+                    windowData["Mode"] = defaultMode;
+                }
+            }
+            renderHelpIcon("ModeHelp", "Fullscreen is exclusive. Borderless covers the monitor.");
+
+            EditorUI::RenderCheckboxProperty("VSync", windowData, "VSync");
+            renderHelpIcon("VSyncHelp", "Disables tearing but can add latency.");
+            EditorUI::ClearDefaultDataScope();
+        }, resetWindowDefaults);
+
+        // Apply changes from Window Settings section
+        if (settings.WindowSettings.Width != windowData.value("Width", settings.WindowSettings.Width)) {
+            settings.WindowSettings.Width = windowData["Width"].get<int>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.WindowSettings.Height != windowData.value("Height", settings.WindowSettings.Height)) {
+            settings.WindowSettings.Height = windowData["Height"].get<int>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.WindowSettings.Mode != windowData.value("Mode", settings.WindowSettings.Mode)) {
+            settings.WindowSettings.Mode = windowData["Mode"].get<std::string>();
+            settings.WindowSettings.Fullscreen = (settings.WindowSettings.Mode == "Fullscreen");
+            m_projectSettingsDirty = true;
+        }
+        if (settings.WindowSettings.VSync != windowData.value("VSync", settings.WindowSettings.VSync)) {
+            settings.WindowSettings.VSync = windowData["VSync"].get<bool>();
+            m_projectSettingsDirty = true;
+        }
+
+        nlohmann::json physicsData = {
+            {"Gravity", settings.Physics.Gravity},
+            {"TimeStep", settings.Physics.TimeStep}
+        };
+        const nlohmann::json physicsDefaults = {
+            {"Gravity", -9.81f},
+            {"TimeStep", 0.016f}
+        };
+
+        renderSection("Physics Settings", [&]() {
+            EditorUI::RegisterDefaultDataScope(physicsData, physicsDefaults);
+            const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+            const float fieldStartX = EditorUI::GetContentStartX() + axisLabelWidth + 6.0f;
+
+            ImGui::Text("Gravity");
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(fieldStartX);
+            ImGui::SetNextItemWidth(120.0f);
             {
-                const char* modes[] = { "Windowed", "Fullscreen", "Borderless Fullscreen", "Borderless" };
-                if (settings.WindowSettings.Mode.empty()) {
-                    settings.WindowSettings.Mode = settings.WindowSettings.Fullscreen ? "Fullscreen" : "Windowed";
-                    m_projectSettingsDirty = true;
+                float value = physicsData.value("Gravity", -9.81f);
+                if (ImGui::DragFloat("##Gravity", &value, 0.001f, 0.0f, 0.0f, "%.6f")) {
+                    physicsData["Gravity"] = value;
                 }
-
-                int modeIndex = 0;
-                if (settings.WindowSettings.Mode == "Fullscreen") {
-                    modeIndex = 1;
-                } else if (settings.WindowSettings.Mode == "BorderlessFullscreen") {
-                    modeIndex = 2;
-                } else if (settings.WindowSettings.Mode == "Borderless") {
-                    modeIndex = 3;
+            }
+            const float defaultGravity = physicsDefaults.value("Gravity", -9.81f);
+            if (physicsData.value("Gravity", defaultGravity) != defaultGravity) {
+                if (renderRowResetButton("Gravity", "Reset to default")) {
+                    physicsData["Gravity"] = defaultGravity;
                 }
+            }
 
-                if (ImGui::Combo("Mode", &modeIndex, modes, 4)) {
-                    if (modeIndex == 0) {
-                        settings.WindowSettings.Mode = "Windowed";
-                        settings.WindowSettings.Fullscreen = false;
-                    } else if (modeIndex == 1) {
-                        settings.WindowSettings.Mode = "Fullscreen";
-                        settings.WindowSettings.Fullscreen = true;
-                    } else if (modeIndex == 2) {
-                        settings.WindowSettings.Mode = "BorderlessFullscreen";
-                        settings.WindowSettings.Fullscreen = true;
-                    } else {
-                        settings.WindowSettings.Mode = "Borderless";
-                        settings.WindowSettings.Fullscreen = false;
-                    }
-                    m_projectSettingsDirty = true;
+            ImGui::Text("Time Step");
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(fieldStartX);
+            ImGui::SetNextItemWidth(120.0f);
+            {
+                float value = physicsData.value("TimeStep", 0.016f);
+                if (ImGui::DragFloat("##TimeStep", &value, 0.0001f, 0.0f, 0.0f, "%.6f")) {
+                    physicsData["TimeStep"] = value;
                 }
-                drawHelp("Fullscreen is exclusive. Borderless fullscreen is capture-friendly.");
             }
-            if (ImGui::Checkbox("VSync", &settings.WindowSettings.VSync)) {
-                m_projectSettingsDirty = true;
+            const float defaultTimeStep = physicsDefaults.value("TimeStep", 0.016f);
+            if (physicsData.value("TimeStep", defaultTimeStep) != defaultTimeStep) {
+                if (renderRowResetButton("TimeStep", "Reset to default")) {
+                    physicsData["TimeStep"] = defaultTimeStep;
+                }
             }
-            drawHelp("Disables tearing but can add latency.");
+            EditorUI::ClearDefaultDataScope();
+        }, resetPhysicsDefaults);
 
-            if (ImGui::Button("Reset Window")) {
-                resetWindowDefaults();
-            }
+        if (settings.Physics.Gravity != physicsData.value("Gravity", settings.Physics.Gravity)) {
+            settings.Physics.Gravity = physicsData["Gravity"].get<float>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.Physics.TimeStep != physicsData.value("TimeStep", settings.Physics.TimeStep)) {
+            settings.Physics.TimeStep = physicsData["TimeStep"].get<float>();
+            m_projectSettingsDirty = true;
         }
         
-        if (ImGui::CollapsingHeader("Physics Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-            if (ImGui::InputFloat("Gravity", &settings.Physics.Gravity)) {
-                m_projectSettingsDirty = true;
-            }
-            if (ImGui::InputFloat("Time Step", &settings.Physics.TimeStep, 0.001f, 0.01f, "%.4f")) {
-                m_projectSettingsDirty = true;
-            }
+        ImGui::EndChild();
 
-            if (ImGui::Button("Reset Physics")) {
-                resetPhysicsDefaults();
-            }
-        }
-        
-        ImGui::Spacing();
         ImGui::Separator();
         
         // Save/Cancel buttons
-        const bool pushedSaveStyle = m_projectSettingsDirty;
-        if (pushedSaveStyle) {
-            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SuccessButton);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SuccessButtonHover);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
-        }
-
         if (!settingsValid) {
             ImGui::BeginDisabled();
         }
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SuccessButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SuccessButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
         if (ImGui::Button(m_projectSettingsDirty ? "Save*" : "Save", ImVec2(120, 0))) {
             if (saveSettings()) {
                 m_showProjectSettings = false;
             }
         }
+        ImGui::PopStyleColor(3);
 
-        if (pushedSaveStyle) {
-            ImGui::PopStyleColor(3);
-        }
-
+        // Render Apply button
         ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::PrimaryButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::PrimaryButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::PrimaryButtonActive);
         if (ImGui::Button("Apply", ImVec2(120, 0))) {
             saveSettings();
         }
+        ImGui::PopStyleColor(3);
         if (!settingsValid) {
             ImGui::EndDisabled();
         }
 
+        // Render Revert button
         ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::WarningButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::WarningButton, 1.1f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::WarningButton, 0.9f));
         if (ImGui::Button("Revert", ImVec2(120, 0))) {
             revertSettings();
         }
+        ImGui::PopStyleColor(3);
 
+        // Render Close button
         ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
         if (ImGui::Button("Close", ImVec2(120, 0))) {
             if (m_projectSettingsDirty) {
                 showCloseConfirm = true;
@@ -477,15 +761,21 @@ void EditorFileMenu::_renderProjectSettingsModal() {
                 m_showProjectSettings = false;
             }
         }
+        ImGui::PopStyleColor(3);
 
+        // Show "Saved" confirmation text for 2 seconds after saving
         if (ImGui::GetTime() - lastSavedTime < 2.0) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.3f, 1.0f), "Saved");
         }
 
+        // Unsaved changes confirmation popup
         if (showCloseConfirm && ImGui::BeginPopupModal("Unsaved Project Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextWrapped("You have unsaved changes. Save before closing?");
             ImGui::Separator();
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SuccessButton);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SuccessButtonHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
             if (ImGui::Button("Save", ImVec2(120, 0))) {
                 if (settingsValid) {
                     saveSettings();
@@ -494,19 +784,31 @@ void EditorFileMenu::_renderProjectSettingsModal() {
                     ImGui::CloseCurrentPopup();
                 }
             }
+            ImGui::PopStyleColor(3);
             ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
             if (ImGui::Button("Discard", ImVec2(120, 0))) {
                 m_showProjectSettings = false;
                 showCloseConfirm = false;
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::PopStyleColor(3);
             ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
             if (ImGui::Button("Cancel", ImVec2(120, 0))) {
                 showCloseConfirm = false;
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::PopStyleColor(3);
             ImGui::EndPopup();
         }
+    }
+    else {
+        ImGui::PopStyleVar();
     }
     ImGui::End();
 }

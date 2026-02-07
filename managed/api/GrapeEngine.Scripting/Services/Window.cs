@@ -29,7 +29,7 @@ public enum WindowMode
 {
     Windowed = 1,
     Fullscreen = 2,
-    Borderless = 4
+    Borderless = 4 // Borderless windowed; engine snaps to monitor size.
 }
 
 /// <summary>

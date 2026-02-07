@@ -40,7 +40,7 @@ struct EditorSettings {
         int Height = 900;           // Window height in pixels
         bool Maximized = true;      // Whether to start maximized
         bool VSync = true;          // Whether to enable vertical sync
-        std::string Mode = "Windowed"; // Windowed, Fullscreen, Borderless, BorderlessFullscreen
+        std::string Mode = "Windowed"; // Windowed, Fullscreen, Borderless
     } WindowSettings;
 };
 
@@ -131,10 +131,8 @@ namespace Editor {
             if (lowered == "fullscreen" || lowered == "exclusive") {
                 return "Fullscreen";
             }
-            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen") {
-                return "BorderlessFullscreen";
-            }
-            if (lowered == "borderless") {
+            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen" ||
+                lowered == "borderless") {
                 return "Borderless";
             }
             if (lowered == "windowed" || lowered == "window") {

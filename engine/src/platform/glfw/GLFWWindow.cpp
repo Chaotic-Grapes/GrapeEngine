@@ -117,9 +117,10 @@ namespace Platform {
         // Setup callbacks
         _setupCallbacks();
 
-        if (wantsFullscreen && wantsBorderless) {
+        if (wantsBorderless) {
+            // Borderless should cover the current monitor on startup.
             _setBorderless(true);
-            m_mode = WindowMode::Borderless | WindowMode::Fullscreen;
+            m_mode = WindowMode::Borderless;
         }
 
         LOG_INFO("[GLFWWindow] Created successfully: " << width << "x" << height);
@@ -216,6 +217,72 @@ namespace Platform {
                              m_windowedWidth, m_windowedHeight, 0);
         m_width = m_windowedWidth;
         m_height = m_windowedHeight;
+        m_borderlessLockedMonitorIndex = -1;
+    }
+
+    void GLFWWindow::_lockBorderlessToMonitor() {
+        if (!m_windowHandle || m_borderlessLockInProgress) {
+            return;
+        }
+
+        GLFWmonitor* monitor = _getCurrentMonitor();
+        if (!monitor) {
+            return;
+        }
+
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        if (!mode) {
+            return;
+        }
+
+        int monX = 0;
+        int monY = 0;
+        glfwGetMonitorPos(monitor, &monX, &monY);
+
+        int monitorCount = 0;
+        GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+        int monitorIndex = -1;
+        for (int i = 0; i < monitorCount; ++i) {
+            if (monitors[i] == monitor) {
+                monitorIndex = i;
+                break;
+            }
+        }
+
+        if (monitorIndex == m_borderlessLockedMonitorIndex) {
+            // Already locked to this monitor; skip redundant snap.
+            return;
+        }
+
+        int winX = 0;
+        int winY = 0;
+        int winW = 0;
+        int winH = 0;
+        glfwGetWindowPos(m_windowHandle, &winX, &winY);
+        glfwGetWindowSize(m_windowHandle, &winW, &winH);
+
+        if (winX == monX && winY == monY && winW == mode->width && winH == mode->height) {
+            // Window already matches monitor bounds; avoid another resize.
+            if (monitorIndex >= 0) {
+                m_currentMonitorIndex = monitorIndex;
+                m_borderlessLockedMonitorIndex = monitorIndex;
+            }
+            return;
+        }
+
+        m_borderlessLockInProgress = true;
+        // Enforce borderless, monitor-sized window without switching to exclusive fullscreen.
+        glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
+        glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY,
+                             mode->width, mode->height, 0);
+        m_borderlessLockInProgress = false;
+
+        if (monitorIndex >= 0) {
+            m_currentMonitorIndex = monitorIndex;
+            m_borderlessLockedMonitorIndex = monitorIndex;
+        }
+        m_width = mode->width;
+        m_height = mode->height;
     }
 
     bool GLFWWindow::_setBorderless(bool borderless) {
@@ -227,34 +294,7 @@ namespace Platform {
             if (!HasFlag(m_mode, WindowMode::Borderless)) {
                 _storeWindowedPlacement();
             }
-
-            GLFWmonitor* monitor = _getCurrentMonitor();
-            if (!monitor) {
-                return false;
-            }
-
-            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-            if (!mode) {
-                return false;
-            }
-
-            int monX = 0;
-            int monY = 0;
-            glfwGetMonitorPos(monitor, &monX, &monY);
-            int monitorCount = 0;
-            GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-            for (int i = 0; i < monitorCount; ++i) {
-                if (monitors[i] == monitor) {
-                    m_currentMonitorIndex = i;
-                    break;
-                }
-            }
-
-            glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
-            glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY,
-                                 mode->width, mode->height, 0);
-            m_width = mode->width;
-            m_height = mode->height;
+            _lockBorderlessToMonitor();
             return true;
         }
 
@@ -279,6 +319,17 @@ namespace Platform {
         glfwSetWindowFocusCallback(m_windowHandle, [](GLFWwindow* w, int focused) {
             (void)w;
             Messaging::MessageSystem::Broadcast(Messaging::WindowFocusChanged{ focused != 0 });
+        });
+
+        glfwSetWindowPosCallback(m_windowHandle, [](GLFWwindow* w, int x, int y) {
+            (void)x;
+            (void)y;
+            if (auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(w))) {
+                if (self->HasMode(WindowMode::Borderless)) {
+                    // Keep borderless windows snapped to the monitor they are on.
+                    self->_lockBorderlessToMonitor();
+                }
+            }
         });
     }
 
@@ -391,12 +442,6 @@ namespace Platform {
 
     void GLFWWindow::SetMode(WindowMode mode) {
         if (!m_windowHandle) {
-            return;
-        }
-
-        if (HasFlag(mode, WindowMode::Fullscreen) && HasFlag(mode, WindowMode::Borderless)) {
-            _setBorderless(true);
-            m_mode = WindowMode::Borderless | WindowMode::Fullscreen;
             return;
         }
 

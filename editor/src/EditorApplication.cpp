@@ -213,10 +213,7 @@ void EditorApplication::_saveEditorSettings() {
             m_editorSettings.WindowSettings.Height = window->GetHeight();
             m_editorSettings.WindowSettings.Maximized = window->IsMaximized();
             m_editorSettings.WindowSettings.VSync = window->IsVSync();
-            if (window->HasMode(Platform::WindowMode::Fullscreen) &&
-                window->HasMode(Platform::WindowMode::Borderless)) {
-                m_editorSettings.WindowSettings.Mode = "BorderlessFullscreen";
-            } else if (window->HasMode(Platform::WindowMode::Fullscreen)) {
+            if (window->HasMode(Platform::WindowMode::Fullscreen)) {
                 m_editorSettings.WindowSettings.Mode = "Fullscreen";
             } else if (window->HasMode(Platform::WindowMode::Borderless)) {
                 m_editorSettings.WindowSettings.Mode = "Borderless";
@@ -252,8 +249,6 @@ void EditorApplication::_createMainWindow() {
 
     if (m_editorSettings.WindowSettings.Mode == "Fullscreen") {
         windowInfo.Mode = Platform::WindowMode::Fullscreen;
-    } else if (m_editorSettings.WindowSettings.Mode == "BorderlessFullscreen") {
-        windowInfo.Mode = Platform::WindowMode::Borderless | Platform::WindowMode::Fullscreen;
     } else if (m_editorSettings.WindowSettings.Mode == "Borderless") {
         windowInfo.Mode = Platform::WindowMode::Borderless;
     }

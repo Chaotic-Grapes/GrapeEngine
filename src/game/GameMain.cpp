@@ -139,14 +139,12 @@ int main(int argc, char** argv) {
     bool fullscreen = projectSettings.WindowSettings.Fullscreen;
     Platform::WindowMode windowMode = fullscreen ? Platform::WindowMode::Fullscreen
                                                  : Platform::WindowMode::Windowed;
+    // Prefer explicit mode if configured.
     const std::string& configuredMode = projectSettings.WindowSettings.Mode;
     if (!configuredMode.empty()) {
         if (configuredMode == "Borderless") {
             windowMode = Platform::WindowMode::Borderless;
             fullscreen = false;
-        } else if (configuredMode == "BorderlessFullscreen") {
-            windowMode = Platform::WindowMode::Borderless | Platform::WindowMode::Fullscreen;
-            fullscreen = true;
         } else if (configuredMode == "Windowed") {
             windowMode = Platform::WindowMode::Windowed;
             fullscreen = false;

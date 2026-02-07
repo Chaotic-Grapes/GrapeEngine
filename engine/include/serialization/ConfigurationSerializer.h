@@ -25,7 +25,7 @@ struct ProjectSettings {
         int Height = 900;           // Window height in pixels
         bool Fullscreen = true;     // Whether to start in fullscreen mode
         bool VSync = true;          // Whether to enable vertical sync
-        std::string Mode = "Fullscreen"; // Windowed, Fullscreen, Borderless
+        std::string Mode = "Fullscreen"; // Windowed, Fullscreen, Borderless (covers monitor).
     } WindowSettings;
 
     /**
@@ -110,6 +110,7 @@ namespace Serialization {
             
             settingsJson["WindowSettings"]["Width"] = settings.WindowSettings.Width;
             settingsJson["WindowSettings"]["Height"] = settings.WindowSettings.Height;
+            // Normalize to keep legacy Fullscreen in sync with Mode.
             const std::string mode = _normalizeWindowMode(settings.WindowSettings.Mode);
             settingsJson["WindowSettings"]["Mode"] = mode;
             settingsJson["WindowSettings"]["Fullscreen"] = (mode == "Fullscreen" || mode == "BorderlessFullscreen");
@@ -150,10 +151,8 @@ namespace Serialization {
             if (lowered == "fullscreen" || lowered == "exclusive") {
                 return "Fullscreen";
             }
-            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen") {
-                return "BorderlessFullscreen";
-            }
-            if (lowered == "borderless") {
+            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen" ||
+                lowered == "borderless") {
                 return "Borderless";
             }
             if (lowered == "windowed" || lowered == "window") {
@@ -171,8 +170,9 @@ namespace Serialization {
                 window.Height = configJson["Height"].get<int>();
             }
             if (configJson.contains("Mode")) {
+                // Prefer explicit Mode; fall back to legacy Fullscreen otherwise.
                 window.Mode = _normalizeWindowMode(configJson["Mode"].get<std::string>());
-                window.Fullscreen = (window.Mode == "Fullscreen" || window.Mode == "BorderlessFullscreen");
+                window.Fullscreen = (window.Mode == "Fullscreen");
             } else if (configJson.contains("Fullscreen")) {
                 window.Fullscreen = configJson["Fullscreen"].get<bool>();
                 window.Mode = window.Fullscreen ? "Fullscreen" : "Windowed";
