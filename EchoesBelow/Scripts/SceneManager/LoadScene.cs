@@ -14,7 +14,7 @@ public class LoadScene : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System LoadScene initialized");
+        //Log("System LoadScene initialized");
     }
 
     protected override void OnUpdate()
@@ -23,7 +23,7 @@ public class LoadScene : SystemBase
         {
             SceneManager sc = SceneManager.Instance;
 
-            //Log($"SceneCount: {sc.GetSceneCount()} / CurrentSceneIndex: {sc.GetActiveIndex()} // Current Active: {sc.GetActive()!.Name}");
+            ////Log($"SceneCount: {sc.GetSceneCount()} / CurrentSceneIndex: {sc.GetActiveIndex()} // Current Active: {sc.GetActive()!.Name}");
             //gameObject.Component1.timeAccumulator += Time.DeltaTime;
             //if (gameObject.Component1.timeAccumulator > 10)
             //{
@@ -32,14 +32,14 @@ public class LoadScene : SystemBase
             //    sc.LoadScene(sc.GetActiveIndex(), "M4.scn");
             //    sc.LoadScene(sc.GetActiveIndex(), "UntitledScene.scn");
             //    sc.LoadScene(sc.GetActiveIndex(), "Untitiled Scene.scn");
-            //    Log("Reload!");
+            //    //Log("Reload!");
             //}
-            Log("Hello");
+            //Log("Hello");
         }
     }
 
     protected override void OnDestroy()
     {
-        Log("System LoadScene destroyed");
+        //Log("System LoadScene destroyed");
     }
 }

@@ -15,7 +15,7 @@ public class MS_Decay : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System MS_Decay initialized");
+        //Log("System MS_Decay initialized");
     }
 
     protected override void OnUpdate()

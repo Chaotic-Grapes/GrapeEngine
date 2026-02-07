@@ -7,6 +7,7 @@ using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using System.Collections.Generic;
+using Scripts.Menu;
 
 namespace Scripts.Menu;
 
@@ -21,13 +22,13 @@ public class PauseMenu : SystemBase
     public bool isKeyPressed_vertical;
     bool isFirstSelected;
 
-    Color selectedCol = new Color(0.370f, 0.376f, 0.584f,1f);
-    Color unselectedCol = new Color(0.071f, 0.078f, 0.305f,1f);
+    Color selectedCol = new Color(0.370f, 0.376f, 0.584f, 1f);
+    Color unselectedCol = new Color(0.071f, 0.078f, 0.305f, 1f);
 
     public static List<ulong> pauseMenuElementObjIds = new List<ulong>();
     protected override void OnCreate()
     {
-        Log("System PauseMenu initialized");
+        //Log("System PauseMenu initialized");
     }
     private bool OnStart(ref bool startBool)
     {
@@ -41,6 +42,11 @@ public class PauseMenu : SystemBase
     //Pause Menu is off by default
     protected override void OnUpdate()
     {
+        bool isKeyPressed_Esc = Input.IsKeyPressed(KeyCode.P);
+        bool isKeyPressed_Space = Input.IsKeyPressed(KeyCode.Space);
+        
+        isKeyPressed_vertical = Input.IsKeyPressed(KeyCode.W) || Input.IsKeyPressed(KeyCode.A) || Input.IsKeyPressed(KeyCode.S) || Input.IsKeyPressed(KeyCode.D);
+
         foreach (var pauseController in World!.Query<PauseMenuComponent>())
         {
             bool start = pauseController.Component1.start;
@@ -55,49 +61,53 @@ public class PauseMenu : SystemBase
         //}
         SceneManager sceneManager = SceneManager.Instance;
 
-        if (Input.IsKeyPressed(KeyCode.Escape)==true && !isPaused)// && !isPaused)// && Input.IsKeyPressed(KeyCode.Escape))
+        if (isKeyPressed_Esc)// && !isPaused)// && Input.IsKeyPressed(KeyCode.Escape))
         {
-            Time.TimeScale = 0;
-            isPaused = true;
-            foreach (ulong ui_id in pauseMenuElementObjIds)
+            if (!isPaused)
             {
-                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = true;
+                Time.TimeScale = 0;
+                isPaused = true;
+                foreach (ulong ui_id in pauseMenuElementObjIds)
+                {
+                    Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = true;
+                }
+                //Launch Pause Menu
+                Log("Launch Pause Menu");
             }
-            //Launch Pause Menu
-            Log("1");
         }
-        else if(Input.IsKeyPressed(KeyCode.Escape)==true && isPaused)// && isPaused)
+        else if (isKeyPressed_Esc)// && isPaused)
         {
-            Time.TimeScale = 1;
-            isPaused = false;
-            foreach (ulong ui_id in pauseMenuElementObjIds)
+            if (isPaused)
             {
-                Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+                Time.TimeScale = 1;
+                isPaused = false;
+                foreach (ulong ui_id in pauseMenuElementObjIds)
+                {
+                    Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
+                }
+                //Close Pause Menu
+                Log("Paused Game from Esc Press");
             }
-            //Close Pause Menu
-            Log("2");
         }
 
         if (isPaused)
         {
-            isKeyPressed_vertical = Input.IsKeyPressed(KeyCode.W) || Input.IsKeyPressed(KeyCode.A) || Input.IsKeyPressed(KeyCode.S) || Input.IsKeyPressed(KeyCode.D);
             if (isKeyPressed_vertical)
             {
                 isFirstSelected = !isFirstSelected;
-                //Log("isLeftSelected: " + isFirstSelected);
+                ////Log("isLeftSelected: " + isFirstSelected);
                 foreach (var controller in World!.Query<PauseMenuComponent>())
                 {
                     foreach (var ui in World!.Query<GUIElement, MatchSignifierComponent>())
                     {
                         if (ui.Component2.signifierID == controller.Component1.resumeSiginifier || ui.Component2.signifierID == controller.Component1.exitSignifier)
                         {
-                            //ui.Entity.GetComponent<GUIElement>().Visible = !ui.Entity.GetComponent<GUIElement>().Visible;
                             ref GUIPanel panel = ref ui.Entity.GetComponent<GUIPanel>();
                             if (panel.Color.R == unselectedCol.R)
                             {
                                 panel.Color = selectedCol;
                             }
-                            else if(panel.Color.R == selectedCol.R)
+                            else if (panel.Color.R == selectedCol.R)
                             {
                                 panel.Color = unselectedCol;
                             }
@@ -106,9 +116,10 @@ public class PauseMenu : SystemBase
                 }
             }
         }
-
-        if (Input.IsKeyPressed(KeyCode.Space)==true && isFirstSelected)
+        //Temporary, turn this back on soon!
+        if (isPaused && isKeyPressed_Space && isFirstSelected)
         {
+           
             Time.TimeScale = 1;
             isPaused = false;
             foreach (ulong ui_id in pauseMenuElementObjIds)
@@ -116,12 +127,13 @@ public class PauseMenu : SystemBase
                 Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
             }
             //Close Pause Menu
-            Log("huh");
-
+            Log("Unpaused from Pressing Resume with Spacebar");
+            
         }
-        else if (!isFirstSelected && Input.IsKeyPressed(KeyCode.Space))
+        else if (isPaused && isKeyPressed_Space && !isFirstSelected)
         {
-            Log("QUitting . . . ");
+
+            Log("Quitting . . . ");
             sceneManager.SetNextAudioTransition(2.0f, true);
             //var scene = SceneManager.Instance.LoadScene(TargetScenePath);
             //Like creating a new scene / allocate a new scene in the registry
@@ -134,12 +146,13 @@ public class PauseMenu : SystemBase
             var sceneIndex = SceneManager.Instance.AddScene();
             var ss = SceneManager.Instance.LoadScene(sceneIndex, TargetScenePath);
             SceneManager.Instance.SetActive(sceneIndex);
-           Log("Quit to screen");
+
         }
 
     }
-
 }
+
+
 [Component] public record struct AddToPauseMenuListComponent(bool start);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class AddToPauseMenuList : SystemBase

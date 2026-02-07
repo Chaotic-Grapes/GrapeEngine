@@ -48,12 +48,12 @@ public class AutoSceneSwitch : SystemBase
 
         // Start audio transition and load target.
         sceneManager.SetNextAudioTransition(2.0f, true);
-        Log("Beginning scene switch with audio transition.");
+        //Log("Beginning scene switch with audio transition.");
         Scene? loaded = sceneManager.LoadScene(TargetScenePath);
-        Log("Switching");
+        //Log("Switching");
         if (loaded == null)
         {
-            Log($"AutoSceneSwitch: Failed to load target scene '{TargetScenePath}'.");
+            //Log($"AutoSceneSwitch: Failed to load target scene '{TargetScenePath}'.");
             _switched = true;
             return;
         }
@@ -62,7 +62,7 @@ public class AutoSceneSwitch : SystemBase
         ulong targetIndex = FindSceneIndex(sceneManager, TargetScenePath);
         if (targetIndex == ulong.MaxValue)
         {
-            Log($"AutoSceneSwitch: Could not resolve target scene index for '{TargetScenePath}'.");
+            //Log($"AutoSceneSwitch: Could not resolve target scene index for '{TargetScenePath}'.");
             _switched = true;
             return;
         }
@@ -70,7 +70,7 @@ public class AutoSceneSwitch : SystemBase
         // Activate target scene.
         sceneManager.SetActive(targetIndex);
         _switched = true;
-        Log("AutoSceneSwitch: Switched to target scene after delay.");
+        //Log("AutoSceneSwitch: Switched to target scene after delay.");
     }
 
     // Find scene index by path.

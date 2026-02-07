@@ -17,7 +17,7 @@ public class Spinner : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System Spinner initialized");
+        //Log("System Spinner initialized");
     }
     
     protected override void OnUpdate()
@@ -35,6 +35,6 @@ public class Spinner : SystemBase
 
     protected override void OnDestroy()
     {
-        Log("System Spinner destroyed");
+        //Log("System Spinner destroyed");
     }
 }

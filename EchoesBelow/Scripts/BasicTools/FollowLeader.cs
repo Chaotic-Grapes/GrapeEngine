@@ -14,7 +14,7 @@ public class FollowLeader : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System FollowLeader initialized");
+        //Log("System FollowLeader initialized");
     }
 
     protected override void OnUpdate()

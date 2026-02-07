@@ -52,7 +52,7 @@ public class Oscillator : SystemBase
 
     protected override void OnDestroy()
     {
-        Log("System Spinner destroyed");
+        //Log("System Spinner destroyed");
     }
 }
 

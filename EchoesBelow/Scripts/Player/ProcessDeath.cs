@@ -23,7 +23,7 @@ public class ProcessDeath : SystemBase
     protected override void OnCreate()
     {
         instance = this;
-        Log("System Death initialized", LogLevel.Debug);
+        //Log("System Death initialized", LogLevel.Debug);
     }
     private bool OnStart(ref bool startBool, int signifier)
     {
@@ -125,7 +125,7 @@ public class ProcessDeath : SystemBase
                     result.Entity.GetComponent<GUIElement>().Size.X = 338;
                 }
             }
-            Log("I'm hit");
+            //Log("I'm hit");
             isHit = true;
         }
         else
@@ -147,7 +147,7 @@ public class ProcessDeath : SystemBase
         }
         Entity.FromId(World!, playerId).GetComponent<Active>().Enabled = false;
         isDying = true;
-        Log("Death!!!!!!!!!!!!!");
+        //Log("Death!!!!!!!!!!!!!");
 
     }
 }

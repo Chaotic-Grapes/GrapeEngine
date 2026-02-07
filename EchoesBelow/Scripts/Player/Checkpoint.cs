@@ -20,7 +20,7 @@ public class Checkpoint : SystemBase
     protected override void OnCreate()
     {
         instance = this;
-        Log("System Checkpoint initialized", LogLevel.Debug);
+        //Log("System Checkpoint initialized", LogLevel.Debug);
     }
     private bool OnStart(ref bool startBool, ulong objId)
     {

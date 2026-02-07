@@ -17,7 +17,7 @@ public class GravSwitcher : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System GravSwitcher initialized");
+        //Log("System GravSwitcher initialized");
     }
 
     protected override void OnUpdate()
@@ -48,6 +48,6 @@ public class GravSwitcher : SystemBase
 
     protected override void OnDestroy()
     {
-        Log("System GravSwitcher destroyed");
+        //Log("System GravSwitcher destroyed");
     }
 }

@@ -63,115 +63,115 @@ public record struct BarnacleSnatcherComponent
     public BarnacleSnatcherComponent() { }
 }
 
-// Tracks collider overlap between the barnacle and squidward.
-public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
-{
-    private const string BarnacleName = "Barnacle Snatcher";
-    private const string SquidwardName = "NPCInteractor_squidward";
+//// Tracks collider overlap between the barnacle and squidward.
+//public sealed class BarnacleSnatcherTriggerSystem : CollisionSystemBase
+//{
+//    private const string BarnacleName = "Barnacle Snatcher";
+//    private const string SquidwardName = "NPCInteractor_squidward";
 
-    protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
-    {
-        return;
-        Log("SNATCH COLLISION entered");
-        LogCollision(World!, "Enter", self, evt.OtherEntityId);
-        if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
-            return;
+//    protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
+//    {
+//        return;
+//        //Log("SNATCH COLLISION entered");
+//        LogCollision(World!, "Enter", self, evt.OtherEntityId);
+//        if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
+//            return;
 
-        // Mark target in range.
-        ref var ai = ref barnacle.GetComponent<BarnacleSnatcherComponent>();
-        ai.OverlapCount++;
-        ai.IsInRange = ai.OverlapCount > 0;
-    }
+//        // Mark target in range.
+//        ref var ai = ref barnacle.GetComponent<BarnacleSnatcherComponent>();
+//        ai.OverlapCount++;
+//        ai.IsInRange = ai.OverlapCount > 0;
+//    }
 
-    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
-    {
-        return;
-        Log("SNATCH COLLISION exit");
-        LogCollision(World!, "Exit", self, evt.OtherEntityId);
-        if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
-            return;
+//    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
+//    {
+//        return;
+//        //Log("SNATCH COLLISION exit");
+//        LogCollision(World!, "Exit", self, evt.OtherEntityId);
+//        if (!TryResolveBarnacle(World!, self, evt.OtherEntityId, out var barnacle))
+//            return;
 
-        // Decrement overlap count on exit.
-        ref var ai = ref barnacle.GetComponent<BarnacleSnatcherComponent>();
-        if (ai.OverlapCount > 0)
-            ai.OverlapCount--;
-        ai.IsInRange = ai.OverlapCount > 0;
-    }
+//        // Decrement overlap count on exit.
+//        ref var ai = ref barnacle.GetComponent<BarnacleSnatcherComponent>();
+//        if (ai.OverlapCount > 0)
+//            ai.OverlapCount--;
+//        ai.IsInRange = ai.OverlapCount > 0;
+//    }
 
-    // Resolve which entity is the barnacle for a barnacle/squidward collision.
-    private static bool TryResolveBarnacle(World world, Entity self, ulong otherId, out Entity barnacle)
-    {
-        barnacle = default;
-        if (!self.IsAlive)
-            return false;
+//    // Resolve which entity is the barnacle for a barnacle/squidward collision.
+//    private static bool TryResolveBarnacle(World world, Entity self, ulong otherId, out Entity barnacle)
+//    {
+//        barnacle = default;
+//        if (!self.IsAlive)
+//            return false;
 
-        Entity other = Entity.FromId(world, otherId);
-        if (!other.IsAlive)
-            return false;
+//        Entity other = Entity.FromId(world, otherId);
+//        if (!other.IsAlive)
+//            return false;
 
-        string selfName = GetName(self);
-        string otherName = GetName(other);
+//        string selfName = GetName(self);
+//        string otherName = GetName(other);
 
-        bool selfIsBarnacle = IsName(selfName, BarnacleName);
-        bool otherIsBarnacle = IsName(otherName, BarnacleName);
-        bool selfIsSquidward = IsName(selfName, SquidwardName);
-        bool otherIsSquidward = IsName(otherName, SquidwardName);
+//        bool selfIsBarnacle = IsName(selfName, BarnacleName);
+//        bool otherIsBarnacle = IsName(otherName, BarnacleName);
+//        bool selfIsSquidward = IsName(selfName, SquidwardName);
+//        bool otherIsSquidward = IsName(otherName, SquidwardName);
 
-        if (!((selfIsBarnacle && otherIsSquidward) ||
-              (otherIsBarnacle && selfIsSquidward)))
-        {
-            return false;
-        }
+//        if (!((selfIsBarnacle && otherIsSquidward) ||
+//              (otherIsBarnacle && selfIsSquidward)))
+//        {
+//            return false;
+//        }
 
-        return TryFindBarnacle(world, out barnacle);
-    }
+//        return TryFindBarnacle(world, out barnacle);
+//    }
 
-    // Find the barnacle entity by name.
-    private static bool TryFindBarnacle(World world, out Entity barnacle)
-    {
-        barnacle = default;
-        foreach (var result in world.Query<Name>())
-        {
-            string name = Strings.Resolve(result.Component1.Value) ?? string.Empty;
-            if (IsName(name, BarnacleName))
-            {
-                barnacle = result.Entity;
-                return barnacle.IsAlive && barnacle.HasComponent<BarnacleSnatcherComponent>();
-            }
-        }
+//    // Find the barnacle entity by name.
+//    private static bool TryFindBarnacle(World world, out Entity barnacle)
+//    {
+//        barnacle = default;
+//        foreach (var result in world.Query<Name>())
+//        {
+//            string name = Strings.Resolve(result.Component1.Value) ?? string.Empty;
+//            if (IsName(name, BarnacleName))
+//            {
+//                barnacle = result.Entity;
+//                return barnacle.IsAlive && barnacle.HasComponent<BarnacleSnatcherComponent>();
+//            }
+//        }
 
-        return false;
-    }
+//        return false;
+//    }
 
-    // Get entity name if present.
-    private static string GetName(Entity entity)
-    {
-        if (!entity.TryGetComponent<Name>(out var name))
-            return string.Empty;
+//    // Get entity name if present.
+//    private static string GetName(Entity entity)
+//    {
+//        if (!entity.TryGetComponent<Name>(out var name))
+//            return string.Empty;
 
-        return Strings.Resolve(name.Value) ?? string.Empty;
-    }
+//        return Strings.Resolve(name.Value) ?? string.Empty;
+//    }
 
-    // Simple name matcher.
-    private static bool IsName(string actual, string expected)
-        => actual.Length != 0 && string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+//    // Simple name matcher.
+//    private static bool IsName(string actual, string expected)
+//        => actual.Length != 0 && string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
 
-    // Debug logger for collisions involving barnacle or squidward.
-    private static void LogCollision(World world, string kind, Entity self, ulong otherId)
-    {
-        Entity other = Entity.FromId(world, otherId);
-        string selfName = GetName(self);
-        string otherName = other.IsAlive ? GetName(other) : "<dead>";
-        bool involvesBarnacle = IsName(selfName, BarnacleName) || IsName(otherName, BarnacleName);
-        bool involvesSquidward = IsName(selfName, SquidwardName) || IsName(otherName, SquidwardName);
-        if (!involvesBarnacle && !involvesSquidward)
-        {
-            return;
-        }
-        System.Console.WriteLine(
-            $"[BarnacleSnatcher] Collision {kind}: self='{selfName}' other='{otherName}'");
-    }
-}
+//    // Debug logger for collisions involving barnacle or squidward.
+//    private static void LogCollision(World world, string kind, Entity self, ulong otherId)
+//    {
+//        Entity other = Entity.FromId(world, otherId);
+//        string selfName = GetName(self);
+//        string otherName = other.IsAlive ? GetName(other) : "<dead>";
+//        bool involvesBarnacle = IsName(selfName, BarnacleName) || IsName(otherName, BarnacleName);
+//        bool involvesSquidward = IsName(selfName, SquidwardName) || IsName(otherName, SquidwardName);
+//        if (!involvesBarnacle && !involvesSquidward)
+//        {
+//            return;
+//        }
+//        System.Console.WriteLine(
+//            $"[BarnacleSnatcher] Collision {kind}: self='{selfName}' other='{otherName}'");
+//    }
+//}
 
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 // Main barnacle AI/animation update system.
@@ -430,7 +430,7 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     // Apply attack animation settings.
     private static void SetAttack(ref BarnacleSnatcherComponent ai, ref SpriteSheetAnimation2D anim, ref AnimationState2D state)
     {
-        Log("SNATCH SNATCH SNATCH");
+        //Log("SNATCH SNATCH SNATCH");
         //It will eat both for now
         InventoryController.instance.DecrementInStackSlot(1);
         InventoryController.instance.DecrementInStackSlot(2);

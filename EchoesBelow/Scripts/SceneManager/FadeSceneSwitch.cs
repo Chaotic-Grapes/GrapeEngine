@@ -57,12 +57,12 @@ public class FadeSceneSwitch : SystemBase
 
         // Request audio fade/crossfade for the next scene switch.
         sceneManager.SetNextAudioTransition(FadeSeconds, AllowCrossfade);
-        Log("FadeSceneSwitch: Beginning scene switch with audio transition.");
+        //Log("FadeSceneSwitch: Beginning scene switch with audio transition.");
         // Load the target scene into the scene manager.
         Scene? loaded = sceneManager.LoadScene(TargetScenePath);
         if (loaded == null)
         {
-            Log($"FadeSceneSwitch: Failed to load target scene '{TargetScenePath}'.");
+            //Log($"FadeSceneSwitch: Failed to load target scene '{TargetScenePath}'.");
             _switched = true;
             return;
         }
@@ -71,7 +71,7 @@ public class FadeSceneSwitch : SystemBase
         ulong targetIndex = FindSceneIndex(sceneManager, TargetScenePath);
         if (targetIndex == ulong.MaxValue)
         {
-            Log($"FadeSceneSwitch: Could not resolve target scene index for '{TargetScenePath}'.");
+            //Log($"FadeSceneSwitch: Could not resolve target scene index for '{TargetScenePath}'.");
             _switched = true;
             return;
         }
@@ -79,7 +79,7 @@ public class FadeSceneSwitch : SystemBase
         // Activate the scene (switch occurs after fade logic in SceneManager).
         sceneManager.SetActive(targetIndex);
         _switched = true;
-        Log("FadeSceneSwitch: Switched to target scene after delay.");
+        //Log("FadeSceneSwitch: Switched to target scene after delay.");
     }
 
     // Find the index of a scene by matching its stored path.

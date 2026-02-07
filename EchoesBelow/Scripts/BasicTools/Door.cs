@@ -37,7 +37,7 @@ public class Door : SystemBase
             //{
 
             //} //tagmask2 == 4
-            Log("mask detected: " + gameObject.Entity.GetComponent<TagMask>().Mask);
+            //Log("mask detected: " + gameObject.Entity.GetComponent<TagMask>().Mask);
         }
     }
 

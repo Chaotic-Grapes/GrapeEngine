@@ -18,7 +18,7 @@ public class PlayerAnimManager : SystemBase
     protected override void OnCreate()
     {
         instance = this;
-        Log("System PlayerAnimManager initialized", LogLevel.Debug);
+        //Log("System PlayerAnimManager initialized", LogLevel.Debug);
     }
     //private bool OnStart(ref bool startBool, ulong objId)
     //{

@@ -14,7 +14,7 @@ public class CamFollow : SystemBase
     static Vector2 playerPos;
     protected override void OnCreate()
     {
-        Log("System CamFollow initialized");
+        //Log("System CamFollow initialized");
     }
 
     protected override void OnUpdate()

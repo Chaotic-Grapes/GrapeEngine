@@ -25,7 +25,7 @@ public class InventoryController : SystemBase
     protected override void OnCreate()
     {
         instance = this;
-        Log("System InventoryController initialized");
+        //Log("System InventoryController initialized");
     }
     private bool OnStart(ref bool startBool)
     {
@@ -107,8 +107,8 @@ public class InventoryController : SystemBase
                 }
                 break;
         }
-        //Log($"ms01 Slot: {ms01_Count}items");
-        //Log($"ms02 Slot: {ms02_Count}items");
+        ////Log($"ms01 Slot: {ms01_Count}items");
+        ////Log($"ms02 Slot: {ms02_Count}items");
 
     }
     public void DecrementInStackSlot(int msID)
@@ -144,8 +144,8 @@ public class InventoryController : SystemBase
                 }
                 break;
         }
-        Log($"ms01 Slot: {ms01_Count}items");
-        Log($"ms02 Slot: {ms02_Count}items");
+        ////Log($"ms01 Slot: {ms01_Count}items");
+        ////Log($"ms02 Slot: {ms02_Count}items");
     }
 
 }

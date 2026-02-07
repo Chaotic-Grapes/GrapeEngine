@@ -43,7 +43,7 @@ public class MS_Manager : SystemBase
         //This is only ever called once, so there is only one instance assignment
         //initialize
         instance = this;
-        Log("System MS_Manager initialized");
+        //Log("System MS_Manager initialized");
         
     }
     private bool OnStart(ref bool startBool, ulong objID, int msID)
@@ -58,7 +58,7 @@ public class MS_Manager : SystemBase
                 //For MS Manager instance
                 poolContainerId = objID;
 
-                Log("Initialize Pools ! poolContainerId: " + poolContainerId, LogLevel.Debug);
+                ////Log("Initialize Pools ! poolContainerId: " + poolContainerId, LogLevel.Debug);
 
                 ms01_ObjectPool = new List<ulong>();
                 ms02_ObjectPool = new List<ulong>();
@@ -120,11 +120,12 @@ public class MS_Manager : SystemBase
             if (Input.IsKeyPressed(KeyCode.Q))
             {
                 int i = 0;
-                Log("============================================");
+                Log("1++++++++++++++++++++++++++++++++++++++++");
                 foreach(List<ulong> objPool in objPools)
                 {
                     Log($"list 0{++i} count: {objPool.Count}");
                 }
+                Log("2++++++++++++++++++++++++++++++++++++++++");
             }
         }
     }
@@ -141,7 +142,7 @@ public class MS_Manager : SystemBase
 
                 InitPoolObj(newPos, pulledObjId, decayTime);
 
-                Log($"Taken from Pool {id_Iterator}!",LogLevel.Debug);
+                ////Log($"Taken from Pool {id_Iterator}!",LogLevel.Debug);
                 return pulledObjId;
             }
             id_Iterator++;
@@ -165,7 +166,7 @@ public class MS_Manager : SystemBase
 
                 //returningEntity.GetComponent<Active>().Enabled = false;
 
-                Log($"Sent ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!", LogLevel.Debug);
+                ////Log($"Sent ms0{Entity.FromId(World!, returningObjId).GetComponent<MS_ManagerComponent>().msID} to Pool {id_Iterator}!", LogLevel.Debug);
                 return;
             }
             id_Iterator++;

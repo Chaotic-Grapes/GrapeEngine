@@ -70,7 +70,7 @@ public class StartMenuController : SystemBase
         Scene? active = sceneManager.GetActive();
         if (active == null || !string.Equals(active.Name, SourceSceneName, StringComparison.Ordinal))
         {
-            //Log($"StartMenuController: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
+            ////Log($"StartMenuController: Active scene is not the source scene: '{active?.Name ?? "null"}'; aborting switch.");
             return;
         }
 
@@ -85,7 +85,7 @@ public class StartMenuController : SystemBase
         if (isKeyPressed_horizontal)
         {
             isLeftSelected = !isLeftSelected;
-            Log("isLeftSelected: " + isLeftSelected);
+            ////Log("isLeftSelected: " + isLeftSelected);
             foreach(var controller in World!.Query<StartMenuControllerComponent>())
             {
                 foreach(var ui in World!.Query<GUIElement, MatchSignifierComponent>())
@@ -101,9 +101,9 @@ public class StartMenuController : SystemBase
         if (isLeftSelected && Input.IsKeyPressed(KeyCode.Space))
         {
             //Load Scene
-            //Log("Start");
+            ////Log("Start");
             //SceneManager.Instance.LoadScene(TargetScenePath);
-            //Log("Loaded");
+            ////Log("Loaded");
             try
             {
                 //Fade out music
@@ -113,16 +113,16 @@ public class StartMenuController : SystemBase
                 var sceneIndex = SceneManager.Instance.AddScene();
                 var ss = SceneManager.Instance.LoadScene(sceneIndex, TargetScenePath);
                 SceneManager.Instance.SetActive(sceneIndex);
-                Log("Loaded");
+                ////Log("Loaded");
             }
             catch (Exception ex)
             {
-                Log($"{ex.Message}");
+                ////Log($"{ex.Message}");
             }
         }
         else if(!isLeftSelected && Input.IsKeyPressed(KeyCode.Space))
         {
-            Log("Quit");
+            ////Log("Quit");
             Application.Quit();
         }
     }

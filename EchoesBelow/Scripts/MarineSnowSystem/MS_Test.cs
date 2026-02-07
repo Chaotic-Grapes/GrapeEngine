@@ -17,7 +17,7 @@ public class MS_Test : SystemBase
 
     protected override void OnCreate()
     {
-        Log("System MS_Test initialized", LogLevel.Debug);
+        //Log("System MS_Test initialized", LogLevel.Debug);
     }
     //Purely to test out obj pool
     protected override void OnUpdate()
@@ -39,19 +39,19 @@ public class MS_Test : SystemBase
                 Entity child = Entity.FromId(World!,(ulong)result.Component1.child);
                 Entity parent = Entity.FromId(World!, (ulong)result.Component1.parent);
 
-                Log("parent . . . ");
+                //Log("parent . . . ");
                 
                 child.AttachTo(parent);
                 //child.GetParent();
-                Log("Attempted parenting: " + child.GetParent()!.GetComponent<Name>().ToString());
+                //Log("Attempted parenting: " + child.GetParent()!.GetComponent<Name>().ToString());
             }
             if (Input.IsKeyPressed(KeyCode.K))
             {
                 Entity child = Entity.FromId(World!, (ulong)result.Component1.child);
                 Entity parent = Entity.FromId(World!, (ulong)result.Component1.parent);
-                Log("child . . . ");
+                //Log("child . . . ");
                 child.Detach();
-                Log("I wanna live on my own!");
+                //Log("I wanna live on my own!");
             }
         }
 
