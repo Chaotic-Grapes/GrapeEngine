@@ -1,3 +1,17 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Physics.h
+\author Dalton Koh Shi Hao (100%)
+\par    d.koh@digipen.edu
+
+\brief
+Declaration of the Physics class for 2D physics simulation. Provides methods for
+gravity management, force application, collision resolution, and world boundary
+constraints. Includes utilities for computing world-space shapes from entity
+components.
+*/
+/* End Header *******************************************************************/
+
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
@@ -42,7 +56,9 @@ namespace Engine {
         // World boundary management
         static void SetWorldBounds(float minX, float maxX, float minY, float maxY, bool killVelocity = false, float restitution = 0.8f);
         static void EnableWorldBounds(bool enable) { m_worldBoundsEnabled = enable; }
+        // Check whether world bounds enabled.
         static bool IsWorldBoundsEnabled() { return m_worldBoundsEnabled; }
+        // Return the current world bounds configuration.
         static const BoundaryConstraint& GetWorldBounds() { return m_worldBounds; }
 
         // Utility methods

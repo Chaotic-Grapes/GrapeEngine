@@ -1,3 +1,28 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileMapRenderer.cpp
+\author Choi Meng Yew
+\date   31st October 2025
+\brief
+Implementation of the TileMapRenderer, responsible for submitting tilemap
+geometry to the renderer.
+
+Details:
+This file implements the logic that translates TileMap and Tileset data into
+renderable quad submissions. It iterates over tile layers, resolves packed
+TileID data (base ID, rotation, tileset index), computes world-space positions,
+and submits textured quads with appropriate UVs and rotation.
+
+The TileMapRenderer performs no rendering itself and maintains no persistent
+state; it acts purely as a bridge between tile-based world data and the
+rendering backend.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "graphics/renderer.hpp"
 #include "graphics/TileMapRenderer.hpp"
 #include "../include/core/World/TileLayer.hpp"

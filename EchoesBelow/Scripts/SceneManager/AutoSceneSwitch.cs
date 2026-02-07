@@ -25,7 +25,7 @@ public class AutoSceneSwitch : SystemBase
 
     protected override void OnUpdate()
     {
-        return;
+        // Only switch once.
         if (_switched)
         {
             return;

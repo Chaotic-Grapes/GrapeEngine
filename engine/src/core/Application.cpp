@@ -37,6 +37,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <thread>
 #include <filesystem>
 #include "platform/glfw/GLFWPlatformContext.h"
+#include "platform/glfw/GLFWWindow.h"
 
 // Undefine potential Windows macros that conflict with enum names
 #ifdef ERROR
@@ -458,7 +459,12 @@ namespace Engine {
         }
 
         // Use platform implementation to switch fullscreen mode
-        if (mainWindow->SetFullscreen(fullscreen)) {
+        if (auto* glfwWindow = dynamic_cast<Platform::GLFWWindow*>(mainWindow)) {
+            if (glfwWindow->SetFullscreenOnMonitor(fullscreen ? monitorIndex : -1)) {
+                LOG_INFO("Fullscreen mode switched to " << (fullscreen ? "on" : "off"));
+                return true;
+            }
+        } else if (mainWindow->SetFullscreen(fullscreen)) {
             LOG_INFO("Fullscreen mode switched to " << (fullscreen ? "on" : "off"));
             return true;
         }

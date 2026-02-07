@@ -1,3 +1,34 @@
+/* Start Header *****************************************************************/
+/*!
+\file   LightManager.cpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Implementation of the LightManager, responsible for uploading and binding
+dynamic lighting data to the GPU for forward rendering.
+
+Details:
+This file implements the CPU-side logic for managing scene lighting each frame.
+The LightManager collects directional and point light data, converts it into
+GPU-compatible layouts, uploads it to Shader Storage Buffer Objects (SSBOs),
+and binds the required buffers and uniforms to active shaders.
+
+Specifically, this implementation handles:
+- Creation and destruction of GPU buffers for point lights
+- Per-frame light collection, clearing, and dirty-state tracking
+- Upload of point light data to SSBOs using memcpy-safe POD structures
+- Binding of SSBOs and small lighting uniforms (counts, flags, directional light)
+  to shaders prior to rendering
+
+The LightManager contains no shading logic itself; it serves purely as the data
+bridge between ECS light components and the GPU lighting stage.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "graphics/LightManager.hpp"
 #include "graphics/Shader.hpp"
 

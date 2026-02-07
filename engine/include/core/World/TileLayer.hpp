@@ -1,3 +1,27 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TileLayer.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Defines a single tile layer represented as a fixed-size 2D grid of TileID values.
+
+Details:
+The TileLayer class encapsulates a row-major, linear storage of tiles with
+explicit width and height. It provides safe read and write access with
+bounds checking, returning EMPTY_TILE for out-of-range reads and ignoring
+out-of-range writes.
+
+This class is a lightweight data container with no rendering or engine logic
+and is intended to be used by higher-level tilemap systems for world
+representation and editing.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <vector>

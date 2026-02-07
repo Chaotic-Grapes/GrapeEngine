@@ -1,3 +1,33 @@
+/* Start Header *****************************************************************/
+/*!
+\file   LightingTypes.hpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+GPU-facing lighting data definitions and configuration constants used by the
+renderer for forward, physically based lighting.
+
+Details:
+This file defines plain-old-data (POD) structures that describe how lighting
+information is laid out in GPU memory. These structures are shared between
+C++ and GLSL to ensure consistent memory layouts when uploading light data
+via SSBOs or UBOs.
+
+Specifically, this file provides:
+- GPUPointLight and GPUDirectionalLight layouts used by the PBR fragment shader
+- Explicit packing and semantics for position, range, color, and intensity
+- Scene-level lighting limits used for buffer allocation and validation
+
+These types are rendering-backend agnostic and contain no engine logic;
+they exist solely to define stable, memcpy-safe interfaces between the CPU
+and GPU lighting systems.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <cstdint>

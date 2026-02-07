@@ -2,7 +2,7 @@
 /*!
 \file   RendererSystem.cpp
 \author Choi Meng Yew
-\date   31st October 2025
+\date   31st January 2026
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline
 for the ECS. Manages shader programs, framebuffers, and the RenderGraph
@@ -109,6 +109,47 @@ namespace ECS {
         m_guiViewport.Active = true;
     }
 
+    // Convert world coordinates to screen space.
+    bool RendererSystem::WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
+        const Vector2D& viewportSize, Vector2D& outScreen) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::vec4 clip = projection * view * glm::vec4(worldPos.X, worldPos.Y, worldPos.Z, 1.0f);
+        if (std::abs(clip.w) < 1e-6f) {
+            return false;
+        }
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        if (ndc.z < -1.0f || ndc.z > 1.0f) {
+            return false;
+        }
+
+        const float screenX = viewportOrigin.X + (ndc.x * 0.5f + 0.5f) * viewportSize.X;
+        const float screenY = viewportOrigin.Y + (1.0f - (ndc.y * 0.5f + 0.5f)) * viewportSize.Y;
+        outScreen = { screenX, screenY };
+        return true;
+    }
+
+    // Return camera basis.
+    bool RendererSystem::GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::mat4 invView = glm::inverse(view);
+        outRight = glm::normalize(glm::vec3(invView[0]));
+        outUp = glm::normalize(glm::vec3(invView[1]));
+        return true;
+    }
+
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
     static void GetRenderTransform(World& world, const Entity entity,
@@ -149,9 +190,11 @@ namespace ECS {
         glm::mat4 invViewProj = glm::inverse(projection * view);
         glm::vec4 worldPos = invViewProj * ndc;
 
+        // Convert to a 2D vector.
         return glm::vec2(worldPos.x, worldPos.y);
     }
 
+    // Return metadata.
     SystemMetadata RendererSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Renderer");
         // Note: RendererSystem reads many components (SpriteRenderer2D, WorldTransform, etc.)
@@ -164,6 +207,7 @@ namespace ECS {
         return builder.Build();
     }
 
+    // Initialize system state.
     void RendererSystem::OnCreate(World& world) {
         if (m_initialized)
             return;
@@ -274,10 +318,12 @@ namespace ECS {
         m_lightManager.Initialize();
     }
 
+    // Bind world.
     void RendererSystem::BindWorld(World& world) {
         (void)world; // Currently unused
     }
 
+    // Return camera matrices.
     bool RendererSystem::GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize) {
         // Default fallback
         outView = glm::mat4(1.0f);
@@ -319,6 +365,7 @@ namespace ECS {
                     }
                     if (useWorld) {
                         Vector3D scale;
+                        // Decompose transform matrix into TRS components.
                         TransformUtils::DecomposeTRS(wt.Matrix, position, rotation, scale);
                     } else {
                         position = transform.Position;
@@ -377,6 +424,7 @@ namespace ECS {
         return false;
     }
 
+    // Update system state for this frame.
     void RendererSystem::OnUpdate(World& world) {
         if (!m_renderer)
             return;
@@ -387,6 +435,7 @@ namespace ECS {
 
         if (m_windowAspectDirty && m_viewports.empty() && !m_activeCamera) {
             const float aspect = (m_windowAspectRatio > 0.0f) ? m_windowAspectRatio : 1.0f;
+            // Render 3D camera passes.
             world.Each<ECS::Components::Camera3D>([&](ECS::Entity /*e*/, ECS::Components::Camera3D& camera)
                 {
                     camera.AspectRatio = aspect;
@@ -435,6 +484,7 @@ namespace ECS {
             m_guiImageQueue.clear();
             m_guiTextQueue.clear();
 
+            // Unbind the current render target.
             Framebuffer::Unbind();
             return;  // EXIT HERE - skip RenderGraph path
         }
@@ -539,8 +589,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
@@ -619,8 +668,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles here (already drawn by SDF pass)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -658,10 +706,12 @@ namespace ECS {
                                     transformedCorners.push_back(ToGlm(Vector2D{ hc.X, hc.Y }) + ToGlm(sb.Offset));
                                 }
                                 if (sb.Filled) {
+                                    // Submit polygon geometry.
                                     DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                                 }
                                 else {
                                     for (int i = 0; i < 4; ++i)
+                                        // Submit line geometry.
                                         DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                                 }
                             }
@@ -678,6 +728,7 @@ namespace ECS {
                             const Vector4D worldA = m * Vector4D{sl.A.X, sl.A.Y, 0.0f, 1.0f};
                             const Vector4D worldB = m * Vector4D{sl.B.X, sl.B.Y, 0.0f, 1.0f};
                             
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer,
                                 ToGlm(Vector2D{worldA.X, worldA.Y}),
                                 ToGlm(Vector2D{worldB.X, worldB.Y}),
@@ -746,6 +797,7 @@ namespace ECS {
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
                 }
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -783,6 +835,7 @@ namespace ECS {
                 glm::vec2 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
                 glm::dvec2 mousePos;
+                // Return mouse position.
                 Input::GetMousePosition(mousePos.x, mousePos.y);
 
                 // If there is a current async pick request being processed, 
@@ -855,8 +908,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Only render circles in this pass
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -877,6 +929,7 @@ namespace ECS {
                         GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                         const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                        // Submit circle geometry.
                         DebugDraw2D::Circle(
                             *m_renderer,
                             ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
@@ -905,8 +958,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles (already rendered above)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -1041,6 +1093,7 @@ namespace ECS {
                 // Restore blending state
                 if (blendWasEnabled) glEnable(GL_BLEND);
 
+                // Unbind the current render target.
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
@@ -1061,6 +1114,7 @@ namespace ECS {
                     m_bloomExtractShader->setUniform("uScene", 0);
                     hdrFbo->BindColorTexture(0);                            // texture unit 0 in shader
                     m_renderer->drawFullscreenQuad();
+                    // Unbind the current render target.
                     Framebuffer::Unbind();
                 });
 
@@ -1080,6 +1134,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1100,6 +1155,7 @@ namespace ECS {
 
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1125,6 +1181,7 @@ namespace ECS {
                 bloom->BindColorTexture(0, 1);
 
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1180,6 +1237,7 @@ namespace ECS {
                         m_sdfCircleShader->setUniform("uPicking", 0);
                         m_renderer->beginFrame();
 
+                        // Submit circle geometry.
                         DebugDraw2D::Circle(*m_renderer,
                             sub.center,
                             sub.radius,
@@ -1202,12 +1260,14 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.filled && sub.vertices.size() >= 3) {
+                            // Submit polygon geometry.
                             DebugDraw2D::Polygon(*m_renderer, sub.vertices, sub.color, 0);
                         }
                         else if (sub.vertices.size() >= 2) {
                             for (size_t i = 0; i < sub.vertices.size(); ++i) {
                                 size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                                 if (next < sub.vertices.size()) {
+                                    // Submit line geometry.
                                     DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
                                         sub.thickness, sub.color, 0);
                                 }
@@ -1227,6 +1287,7 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.vertices.size() == 2) {
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
                                 sub.thickness, sub.color, 0);
                         }
@@ -1250,6 +1311,7 @@ namespace ECS {
                                     uint32_t idx0 = sub.indices[i];
                                     uint32_t idx1 = sub.indices[i + 1];
                                     if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
+                                        // Submit line geometry.
                                         DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
                                             sub.thickness, sub.color, 0);
                                     }
@@ -1281,9 +1343,11 @@ namespace ECS {
                             const auto& min = sub.vertices[0];
                             const auto& max = sub.vertices[2];
                             if (sub.filled) {
+                                // Submit filled rectangle geometry.
                                 DebugDraw2D::RectFill(*m_renderer, min, max, sub.color, 0);
                             }
                             else {
+                                // Submit rectangle outline geometry.
                                 DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
                             }
                         }
@@ -1302,6 +1366,7 @@ namespace ECS {
                 // Restore blend state
                 if (!blendWasEnabled) glDisable(GL_BLEND);
 
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1411,7 +1476,7 @@ namespace ECS {
 
                         // Load font (fallback to default if path is empty).
                         const std::string fontPath = text.fontPath.empty()
-                            ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
+                            ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                             : text.fontPath;
                         const int pixelSize = std::max(1, static_cast<int>(std::round(text.pixelSize)));
                         auto font = RM.GetFont(fontPath, pixelSize);
@@ -1440,6 +1505,7 @@ namespace ECS {
                 m_guiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1450,6 +1516,7 @@ namespace ECS {
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
 
+                // Bind default.
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
@@ -1484,6 +1551,7 @@ namespace ECS {
         }
     }
 
+    // Tear down system state.
     void RendererSystem::OnDestroy(World& world) {
         (void)world;
         // Cleanup rendering resources
@@ -1543,8 +1611,10 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Created '" << name << "' (" << w << "x" << h << ")");
     }
 
+    // Remove viewport.
     void RendererSystem::RemoveViewport(const std::string& name) {
         m_viewports.erase(
+            // Remove items that no longer match filters.
             std::remove_if(m_viewports.begin(), m_viewports.end(),
                 [&](const Viewport& vp) { return vp.Name == name; }),
             m_viewports.end());
@@ -1552,6 +1622,7 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Removed '" << name << "'");
     }
 
+    // Resize viewport.
     void RendererSystem::ResizeViewport(const std::string& name, int w, int h) {
         Viewport* vp = GetViewport(name);
         if (!vp) return;
@@ -1572,17 +1643,20 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Resized '" << name << "' to " << w << "x" << h);
     }
 
+    // Set viewport camera.
     void RendererSystem::SetViewportCamera(const std::string& name, Engine::Camera* camera) {
         if (Viewport* vp = GetViewport(name))
             vp->Camera = camera;
     }
 
+    // Return viewport.
     RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
         for (auto& vp : m_viewports)
             if (vp.Name == name) return &vp;
         return nullptr;
     }
 
+    // Return viewport texture.
     GLuint RendererSystem::GetViewportTexture(const std::string& name) const {
         for (const auto& vp : m_viewports)
             if (vp.Name == name && vp.LDR)
@@ -1599,8 +1673,7 @@ namespace ECS {
 
         world.Each<Components::LocalTransform, Components::Light2D>(
             [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
-                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
-                    return;
+                if (!world.IsActiveInHierarchy(e)) return;
 
                 Vector3D position, scale;
                 Quaternion rotation;
@@ -1624,10 +1697,12 @@ namespace ECS {
         m_lightManager.Upload();
     }
 
+    // Bucket entities for ordered rendering.
     void RendererSystem::BucketEntities(World& world,
         std::vector<std::vector<Entity>>& buckets,
         int& maxLayerId) {
         maxLayerId = -1;
+        // Render per-layer passes.
         world.Each<Components::Layer>([&](Entity, const Components::Layer& ly) {
             maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
             });
@@ -1642,6 +1717,7 @@ namespace ECS {
             });
     }
 
+    // Render bloom.
     void RendererSystem::RenderBloom(Viewport& vp, float bloomRadius) {
         // Extract
         vp.BloomExtract->BindAndClear(0, 0, 0, 1);
@@ -1670,9 +1746,11 @@ namespace ECS {
         vp.BloomBlur->BindColorTexture(0);
         m_renderer->drawFullscreenQuad();
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Tone map.
     void RendererSystem::ToneMap(Viewport& vp) {
         vp.LDR->BindAndClear(0, 0, 0, 1);
         glViewport(0, 0, vp.Size.x, vp.Size.y);
@@ -1688,9 +1766,11 @@ namespace ECS {
         vp.BloomExtract->BindColorTexture(0, 1);
         m_renderer->drawFullscreenQuad();
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render scene to hdr.
     void RendererSystem::RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets,
         int maxLayerId) {
@@ -1719,6 +1799,7 @@ namespace ECS {
             if (layer >= static_cast<int>(buckets.size())) continue;
 
             auto list = buckets[layer];
+            // Finalize rendering pass state.
             std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
                 int za = 0, zb = 0;
                 if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
@@ -1735,7 +1816,7 @@ namespace ECS {
             m_renderer->beginFrame();
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 const auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -1743,6 +1824,7 @@ namespace ECS {
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                 const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                // Submit circle geometry.
                 DebugDraw2D::Circle(*m_renderer,
                     ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
                     sc.Radius * ((scale.X + scale.Y) * 0.5f),
@@ -1785,7 +1867,7 @@ namespace ECS {
             }
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -1817,6 +1899,7 @@ namespace ECS {
                         }
                         if (sb.Filled) DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                         else for (int i = 0; i < 4; ++i)
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                     }
                 }
@@ -1827,6 +1910,7 @@ namespace ECS {
                     const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
                     const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
                     const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
+                    // Submit line geometry.
                     DebugDraw2D::Line(*m_renderer, ToGlm(Vector2D{ worldA.X, worldA.Y }), ToGlm(Vector2D{ worldB.X, worldB.Y }), sl.Thickness, ToGlm(sl.Color), 0);
                 }
 
@@ -1868,9 +1952,11 @@ namespace ECS {
             m_renderer->endFrame();
         }
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render wireframes.
     void RendererSystem::RenderWireframes(Viewport& vp, const glm::mat4& viewProj) {
         if (m_wireframeQueue.empty()) return;
 
@@ -1885,6 +1971,7 @@ namespace ECS {
                 m_sdfCircleShader->setMat4("uViewProj", viewProj);
                 m_sdfCircleShader->setUniform("uPicking", 0);
                 m_renderer->beginFrame();
+                // Submit circle geometry.
                 DebugDraw2D::Circle(*m_renderer, sub.center, sub.radius, sub.color, sub.filled ? 0.0f : sub.thickness, 0);
                 m_renderer->endFrame();
             }
@@ -1900,6 +1987,7 @@ namespace ECS {
                     else DebugDraw2D::RectStroke(*m_renderer, sub.vertices[0], sub.vertices[2], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Line && sub.vertices.size() == 2) {
+                    // Submit line geometry.
                     DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Polygon && sub.vertices.size() >= 2) {
@@ -1907,6 +1995,7 @@ namespace ECS {
                     else for (size_t i = 0; i < sub.vertices.size(); ++i) {
                         size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                         if (next < sub.vertices.size())
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next], sub.thickness, sub.color, 0);
                     }
                 }
@@ -1914,9 +2003,11 @@ namespace ECS {
             }
         }
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render overlay quads.
     void RendererSystem::RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj) {
         if (m_overlayQuadQueue.empty()) return;
 
@@ -1954,9 +2045,11 @@ namespace ECS {
 
         if (!blendWasEnabled) glDisable(GL_BLEND);
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render gui.
     void RendererSystem::RenderGUI(Viewport& vp) {
         if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
 
@@ -2015,7 +2108,7 @@ namespace ECS {
             guiRenderer->beginFrame();
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
-                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
+                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
                 if (!font) continue;
                 const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
@@ -2027,9 +2120,11 @@ namespace ECS {
             guiRenderer->endFrame();
         }
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render picking.
     void RendererSystem::RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets) {
         // Only run if there are pending pick requests
@@ -2077,7 +2172,7 @@ namespace ECS {
         m_renderer->beginFrame();
         for (const auto& bucket : buckets) {
             for (Entity entity : bucket) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 uint32_t id = entity.Index + 1;
@@ -2093,6 +2188,7 @@ namespace ECS {
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                 const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                // Submit circle geometry.
                 DebugDraw2D::Circle(
                     *m_renderer,
                     ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
@@ -2114,7 +2210,7 @@ namespace ECS {
 
         for (const auto& bucket : buckets) {
             for (Entity entity : bucket) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
 
                 uint32_t id = entity.Index + 1;
                 glm::vec4 idColor(((id >> 0) & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f);
@@ -2141,6 +2237,7 @@ namespace ECS {
                     const auto& sb = world.Get<Components::ShapeBox2D>(entity);
                     glm::vec2 he = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
                     glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
+                    // Submit filled rectangle geometry.
                     DebugDraw2D::RectFill(*m_renderer, center - he, center + he, idColor, static_cast<GLuint>(-1));
                 }
             }
@@ -2162,9 +2259,11 @@ namespace ECS {
         m_currentPBO = 1 - m_currentPBO;
 
         glEnable(GL_BLEND);
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Request pick.
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
         // Check if within viewport bounds
         if (screenX < viewportPos.x || screenX >= (viewportPos.x + viewportSize.x) ||
@@ -2187,6 +2286,7 @@ namespace ECS {
         return id;
     }
 
+    // Try to get pick result.
     bool RendererSystem::TryGetPickResult(uint32_t requestId, uint32_t& outEntityId) {
         auto it = m_completedPickResults.find(requestId);
         if (it == m_completedPickResults.end()) return false;
@@ -2218,6 +2318,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a filled quad for debug rendering.
     void RendererSystem::SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
                                           const glm::vec4& color) {
         if (!m_renderer) return;
@@ -2237,6 +2338,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe circle for debug rendering.
     void RendererSystem::SubmitWireframeCircle(const glm::vec2& center, float radius,
                                                 const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -2252,6 +2354,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe polygon for debug rendering.
     void RendererSystem::SubmitWireframePolygon(const glm::vec2* vertices, size_t vertexCount,
                                                  const glm::vec4& color, float thickness, bool closed) {
         if (!m_renderer || !vertices || vertexCount < 2) return;
@@ -2266,6 +2369,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe line for debug rendering.
     void RendererSystem::SubmitWireframeLine(const glm::vec2& p1, const glm::vec2& p2,
                                               const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -2280,6 +2384,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe mesh for debug rendering.
     void RendererSystem::SubmitWireframeMesh(const glm::vec2* vertices, size_t vertexCount,
                                               const uint32_t* indices, size_t indexCount,
                                               const glm::vec4& color, float thickness) {
@@ -2298,6 +2403,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit an overlay quad.
     void RendererSystem::SubmitOverlayQuad(const glm::vec2& center,
                                            const glm::vec2& size,
                                            GLuint textureId,
@@ -2316,6 +2422,7 @@ namespace ECS {
         m_overlayQuadQueue.push_back(sub);
     }
 
+    // Submit a GUI panel draw call.
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                                         const Color& color, float cornerRadius) {
         (void)cornerRadius;
@@ -2330,6 +2437,7 @@ namespace ECS {
         m_guiPanelQueue.push_back(submission);
     }
 
+    // Submit a GUI image draw call.
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
                                          uint32_t textureId, const Vector4D& uvRect, const Color& color,
                                          Graphics::TextureFilter textureFilter) {
@@ -2346,6 +2454,7 @@ namespace ECS {
         m_guiImageQueue.push_back(submission);
     }
 
+    // Submit a GUI text draw call.
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
                                        const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
@@ -2360,6 +2469,7 @@ namespace ECS {
         m_guiTextQueue.push_back(std::move(submission));
     }
 
+    // Submit collider debug draw geometry.
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
         const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
@@ -2388,6 +2498,7 @@ namespace ECS {
         auto rotate2D = [](const glm::vec2& v, float radians) {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
+            // Convert to a 2D vector.
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
             };
 
@@ -2447,6 +2558,7 @@ namespace ECS {
         }
     }
 
+    // Set debug tile map.
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset)
     {
         m_debugTileMap = map;
@@ -2454,11 +2566,13 @@ namespace ECS {
         m_debugTileMapOffset = worldOffset;
     }
 
+    // Set debug tile maps.
     void RendererSystem::SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps)
     {
         m_debugTileMaps = maps; // Store references to editor-owned tilemaps for this frame.
     }
 
+    // Clear debug tile map.
     void RendererSystem::ClearDebugTileMap()
     {
         m_debugTileMap.reset();
@@ -2466,6 +2580,7 @@ namespace ECS {
         m_debugTileMapOffset = glm::vec2(0.0f, 0.0f);
     }
 
+    // Clear debug tile maps.
     void RendererSystem::ClearDebugTileMaps()
     {
         m_debugTileMaps.clear(); // Clear multi-tilemap debug rendering state.

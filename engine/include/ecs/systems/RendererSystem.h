@@ -99,6 +99,9 @@ namespace ECS {
         GUIViewport GetGUIViewport() const { return m_guiViewport; }
         void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
         void ResetGUIViewport();
+        bool WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
+            const Vector2D& viewportSize, Vector2D& outScreen);
+        bool GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp);
 
         // ====================================================================
         // Viewport Management
