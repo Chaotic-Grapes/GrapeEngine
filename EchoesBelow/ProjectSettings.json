@@ -3,13 +3,13 @@
         "Gravity": -9.8100004196167,
         "TimeStep": 0.01600000075995922
     },
-    "StartupScene": "EchoesBelow/Scenes/M4.scn",
+    "StartupScene": "EchoesBelow/Scenes/M4StartScene.scn",
     "Title": "Echoes Below",
     "Version": "1.0.0",
     "WindowSettings": {
-        "Fullscreen": true,
+        "Fullscreen": false,
         "Height": 900,
-        "Mode": "Fullscreen",
+        "Mode": "Borderless",
         "VSync": true,
         "Width": 1600
     }
