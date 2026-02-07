@@ -72,7 +72,7 @@ public class PauseMenu : SystemBase
                     Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = true;
                 }
                 //Launch Pause Menu
-                //Log("Launch Pause Menu");
+                Log("Launch Pause Menu");
             }
         }
         else if (isKeyPressed_Esc)// && isPaused)
@@ -86,7 +86,7 @@ public class PauseMenu : SystemBase
                     Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
                 }
                 //Close Pause Menu
-                //Log("Paused Game from Esc Press");
+                Log("Paused Game from Esc Press");
             }
         }
 
@@ -127,7 +127,7 @@ public class PauseMenu : SystemBase
                 Entity.FromId(World!, ui_id).GetComponent<GUIElement>().Visible = false;
             }
             //Close Pause Menu
-            //Log("Unpaused from Pressing Resume with Spacebar");
+            Log("Unpaused from Pressing Resume with Spacebar");
             
         }
         else if (isPaused && isKeyPressed_Space && !isFirstSelected)
