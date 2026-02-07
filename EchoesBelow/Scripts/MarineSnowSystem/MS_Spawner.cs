@@ -17,7 +17,7 @@ namespace EchoesBelow.Scripts.MarineSnowSystem;
 public class MS_Spawner : SystemBase
 {
     const int toSpawnMin = 1;
-    const int toSpawnMax = 1;
+    const int toSpawnMax = 6;
     float spawnInterval = 0;
     //toSpawn is formatted as 10000000, the 7 0's after 1 represent the different MS particles
     protected override void OnCreate()

@@ -1,0 +1,230 @@
+{
+    "Entity": {
+        "Children": [
+            {
+                "Components": [
+                    {
+                        "Data": {
+                            "Position": {
+                                "X": 0.015352651476860046,
+                                "Y": -0.4453583061695099,
+                                "Z": 0.0
+                            },
+                            "Rotation": {
+                                "W": 1.0,
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "Scale": {
+                                "X": 1.0,
+                                "Y": 1.0,
+                                "Z": 1.0
+                            }
+                        },
+                        "TypeName": "LocalTransform"
+                    },
+                    {
+                        "Data": {
+                            "Value": "SmokeLight"
+                        },
+                        "TypeName": "Name"
+                    },
+                    {
+                        "Data": {
+                            "Id": 0
+                        },
+                        "TypeName": "Layer"
+                    },
+                    {
+                        "Data": {
+                            "CastsShadows": false,
+                            "Color": {
+                                "A": 1.0,
+                                "B": 1.0,
+                                "G": 0.9145843982696533,
+                                "R": 0.7523642182350159
+                            },
+                            "Direction": {
+                                "X": 0.0,
+                                "Y": -1.0,
+                                "Z": 0.0
+                            },
+                            "Intensity": 22.5,
+                            "LightType": 1,
+                            "Position": {
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 8.399999618530273
+                            },
+                            "Range": 10.5
+                        },
+                        "TypeName": "Light2D"
+                    },
+                    {
+                        "Data": {
+                            "Dirty": false,
+                            "Matrix": {
+                                "m00": 5.0,
+                                "m01": 0.0,
+                                "m02": 0.0,
+                                "m03": -1.204803705215454,
+                                "m10": 0.0,
+                                "m11": 5.0,
+                                "m12": 0.0,
+                                "m13": -1.9593852758407593,
+                                "m20": 0.0,
+                                "m21": 0.0,
+                                "m22": 5.0,
+                                "m23": 0.0,
+                                "m30": 0.0,
+                                "m31": 0.0,
+                                "m32": 0.0,
+                                "m33": 1.0
+                            }
+                        },
+                        "TypeName": "WorldTransform"
+                    }
+                ]
+            }
+        ],
+        "Components": [
+            {
+                "Data": {
+                    "Position": {
+                        "X": 0.0,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    },
+                    "Rotation": {
+                        "W": 1.0,
+                        "X": 0.0,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    },
+                    "Scale": {
+                        "X": 5.0,
+                        "Y": 5.0,
+                        "Z": 5.0
+                    }
+                },
+                "TypeName": "LocalTransform"
+            },
+            {
+                "Data": {
+                    "Value": "Smoke"
+                },
+                "TypeName": "Name"
+            },
+            {
+                "Data": {
+                    "CurrentFrame": 0,
+                    "Finished": false,
+                    "TimeAccumulator": 0.0
+                },
+                "TypeName": "AnimationState2D"
+            },
+            {
+                "Data": {
+                    "Id": 0
+                },
+                "TypeName": "Layer"
+            },
+            {
+                "Data": {
+                    "AOStrength": 1.0,
+                    "AlphaCutoff": 0.5,
+                    "Flags": 32,
+                    "MRA_TextureId": 0,
+                    "MRA_TexturePath": "",
+                    "Metallic": 0.0,
+                    "NormalStrength": 1.4800000190734863,
+                    "NormalTextureId": 0,
+                    "NormalTexturePath": "",
+                    "Smoothness": 0.7300000190734863
+                },
+                "TypeName": "Material2D"
+            },
+            {
+                "Data": {
+                    "Color": {
+                        "A": 1.0,
+                        "B": 1.0,
+                        "G": 1.0,
+                        "R": 1.0
+                    },
+                    "EmissiveStrength": 5.0,
+                    "EmissiveTextureId": 0,
+                    "EmissiveTexturePath": "",
+                    "NormalTextureId": 40,
+                    "NormalTexturePath": "",
+                    "Offset": {
+                        "X": 0.6666666865348816,
+                        "Y": 0.0
+                    },
+                    "TextureFilter": 0,
+                    "TextureId": 39,
+                    "TexturePath": "",
+                    "Tiling": {
+                        "X": 0.004273474216461182,
+                        "Y": 1.0
+                    }
+                },
+                "TypeName": "SpriteRenderer2D"
+            },
+            {
+                "Data": {
+                    "FrameCount": 1,
+                    "FrameHeight": 253,
+                    "FrameLength": 234,
+                    "FrameOffset": 156,
+                    "FrameWidth": 136,
+                    "FramesPerSecond": 20.0,
+                    "Loop": true,
+                    "NormalTextureId": 40,
+                    "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3_n.png",
+                    "Playing": true,
+                    "Row": 0,
+                    "SheetHeight": 253,
+                    "SheetWidth": 31824,
+                    "StartFrame": 0,
+                    "TextureFilter": 0,
+                    "TextureId": 39,
+                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3.png",
+                    "UseRow": true
+                },
+                "TypeName": "SpriteSheetAnimation2D"
+            },
+            {
+                "Data": {
+                    "Dirty": false,
+                    "Matrix": {
+                        "m00": 5.0,
+                        "m01": 0.0,
+                        "m02": 0.0,
+                        "m03": -1.2815669775009155,
+                        "m10": 0.0,
+                        "m11": 5.0,
+                        "m12": 0.0,
+                        "m13": 0.2674063444137573,
+                        "m20": 0.0,
+                        "m21": 0.0,
+                        "m22": 5.0,
+                        "m23": 0.0,
+                        "m30": 0.0,
+                        "m31": 0.0,
+                        "m32": 0.0,
+                        "m33": 1.0
+                    }
+                },
+                "TypeName": "WorldTransform"
+            },
+            {
+                "Data": {
+                    "ZOrder": -5
+                },
+                "TypeName": "ZIndex2D"
+            }
+        ]
+    }
+}

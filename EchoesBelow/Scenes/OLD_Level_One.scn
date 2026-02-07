@@ -18817,7 +18817,7 @@
                     "Data": {
                         "AOStrength": 1.0,
                         "AlphaCutoff": 0.5,
-                        "Flags": 32,
+                        "Flags": 0,
                         "MRA_TextureId": 0,
                         "MRA_TexturePath": "",
                         "Metallic": 0.0,
@@ -18853,7 +18853,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 32,
+                        "TextureId": 40,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18869,11 +18869,11 @@
                             "m00": 0.2458726316690445,
                             "m01": 0.17189139127731323,
                             "m02": 0.0,
-                            "m03": 10.757662773132324,
+                            "m03": -1.350888967514038,
                             "m10": -0.17189139127731323,
                             "m11": 0.2458726316690445,
                             "m12": 0.0,
-                            "m13": 13.218534469604492,
+                            "m13": 1.5080358982086182,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -18919,7 +18919,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "ChaosLight (Clone)"
+                        "Value": "ChaosLight"
                     },
                     "TypeName": "Name"
                 },
@@ -18958,7 +18958,7 @@
                     "Data": {
                         "AOStrength": 1.0,
                         "AlphaCutoff": 0.5,
-                        "Flags": 32,
+                        "Flags": 0,
                         "MRA_TextureId": 0,
                         "MRA_TexturePath": "",
                         "Metallic": 0.0,
@@ -18994,7 +18994,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 32,
+                        "TextureId": 40,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19010,11 +19010,11 @@
                             "m00": 0.2458726316690445,
                             "m01": 0.17189139127731323,
                             "m02": 0.0,
-                            "m03": -5.4155683517456055,
+                            "m03": -1.350888967514038,
                             "m10": -0.17189139127731323,
                             "m11": 0.2458726316690445,
                             "m12": 0.0,
-                            "m13": 8.322298049926758,
+                            "m13": 1.5080358982086182,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -19060,7 +19060,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "ChaosLight (Clone)"
+                        "Value": "ChaosLight"
                     },
                     "TypeName": "Name"
                 },
@@ -19099,7 +19099,7 @@
                     "Data": {
                         "AOStrength": 1.0,
                         "AlphaCutoff": 0.5,
-                        "Flags": 32,
+                        "Flags": 0,
                         "MRA_TextureId": 0,
                         "MRA_TexturePath": "",
                         "Metallic": 0.0,
@@ -19135,7 +19135,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 32,
+                        "TextureId": 40,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19151,11 +19151,11 @@
                             "m00": 0.2458726316690445,
                             "m01": 0.17189139127731323,
                             "m02": 0.0,
-                            "m03": -0.8260281682014465,
+                            "m03": -1.350888967514038,
                             "m10": -0.17189139127731323,
                             "m11": 0.2458726316690445,
                             "m12": 0.0,
-                            "m13": 15.562982559204102,
+                            "m13": 1.5080358982086182,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -19201,7 +19201,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "ChaosLight (Clone)"
+                        "Value": "ChaosLight"
                     },
                     "TypeName": "Name"
                 },
@@ -19240,7 +19240,7 @@
                     "Data": {
                         "AOStrength": 1.0,
                         "AlphaCutoff": 0.5,
-                        "Flags": 32,
+                        "Flags": 0,
                         "MRA_TextureId": 0,
                         "MRA_TexturePath": "",
                         "Metallic": 0.0,
@@ -19276,7 +19276,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 32,
+                        "TextureId": 40,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19292,11 +19292,11 @@
                             "m00": 0.2458726316690445,
                             "m01": 0.17189139127731323,
                             "m02": 0.0,
-                            "m03": 13.84372615814209,
+                            "m03": -1.350888967514038,
                             "m10": -0.17189139127731323,
                             "m11": 0.2458726316690445,
                             "m12": 0.0,
-                            "m13": 12.685683250427246,
+                            "m13": 1.5080358982086182,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,

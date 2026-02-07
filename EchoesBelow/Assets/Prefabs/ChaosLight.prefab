@@ -62,7 +62,7 @@
             "Data": {
                 "AOStrength": 1.0,
                 "AlphaCutoff": 0.5,
-                "Flags": 32,
+                "Flags": 0,
                 "MRA_TextureId": 0,
                 "MRA_TexturePath": "",
                 "Metallic": 0.0,
