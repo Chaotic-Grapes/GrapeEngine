@@ -78,8 +78,8 @@ public class ProcessDeath : SystemBase
             if (isDying)
             {
                 ref LocalTransform transform = ref gameObject.Entity.GetComponent<LocalTransform>();
-                transform.Position = new Vector3(GMath.Lerp(transform.Position.X, Checkpoint.checkPointPos.X, 0.1f),
-                                                 GMath.Lerp(transform.Position.Y, Checkpoint.checkPointPos.Y, 0.1f), 0f);
+                transform.Position = new Vector3(GMath.Lerp(transform.Position.X, Checkpoint.checkPointPos.X, 0.04f),
+                                                 GMath.Lerp(transform.Position.Y, Checkpoint.checkPointPos.Y, 0.04f), 0f);
 
                 //If my speed is near 0, means Im close to the checkpoint
                 //RESPAWN
