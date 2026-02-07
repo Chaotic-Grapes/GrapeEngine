@@ -280,75 +280,53 @@ public class PlayerCollisionHandler : CollisionSystemBase
     //int i = 0;
     protected override void OnCollisionEnter(Entity self, CollisionEvent evt)
     {
-        Log($"CHECK : self: {self.GetComponent<Name>().ToString()} = objid {self.Id}/ other: {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} = objid {evt.OtherEntityId} Collision at {evt.ContactPoint}", LogLevel.Warning);
-        Log("Entering self into HasComponentCheck . . .");
-        return;
-        if (!Entity.FromId(World!, self.Id).HasComponent<PlayerComponent>())
+        //Log($"Entering self: {self.GetComponent<Name>().ToString()} into TryGetComponent<PlayerComponent> Check . . . . . . . . . . . . . . . . . . . . . .");
+        if (Entity.FromId(World!, self.Id).TryGetComponent<PlayerComponent>(out PlayerComponent plc))
         {
-            Log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-            Log("No player Component");
+            Log("I have a Player Component!");
+        }
+        else
+        {
             return;
         }
-        Log($"self PASSED the check with HasComponent<PlayerComponent>() : {Entity.FromId(World!, self.Id).HasComponent<PlayerComponent>()}");
-        Entity.FromId(World!, self.Id).GetComponent<PlayerComponent>();
-        Log("I survived the player component get");
-        Log("==^===================================================================================================");
-        Log("1: Collision Detected");
-        //base.OnCollisionEnter(self, evt);
         
-        if (self.HasComponent<PlayerComponent>()&& Entity.FromId(World!,evt.OtherEntityId).HasComponent<MS_ManagerComponent>()) CollisionEntered(self, evt);
+        PlayerCollisionEvents(self, evt);
     }
 
-    private void CollisionEntered(Entity self, CollisionEvent evt)
+    private void PlayerCollisionEvents(Entity self, CollisionEvent evt)
     {
-        Log("other: checking MS_Manager / self: checking PlayerComponent");
+        Log("PlayerCollisionEvents Start >>>");
         Entity other = Entity.FromId(World!, evt.OtherEntityId);
 
-        if (other.HasComponent<TagMask>() && self.HasComponent<PlayerComponent>())
+        Log("1");
+        //Find Tag Mask, Then take damage and open doors 
+        if (Entity.FromId(World!, other.Id).TryGetComponent<TagMask>(out TagMask tg))
         {
-            Log("4: This obj has PlayerComponent AND TagMask");
-            Log($"4a : self: {self.GetComponent<Name>().ToString()} = objid {self.Id}/ other: {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} = objid {evt.OtherEntityId} Collision at {evt.ContactPoint}", LogLevel.Warning);
-            Log("other: checking TagMask");
 
-            //if (other.GetComponent<TagMask>().Mask == 32)
-            //{
-            //    Log("5: Called TakeHit( ) to inflict dmg");
-            //    //Take damage
-            //    ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
-            //}
-            
-            if (other.GetComponent<TagMask>().Mask == 4)
+            if (tg.Mask == 32)
             {
-                Log("6: Door detected");
+                //Take damage
+                ProcessDeath.instance.TakeHit(evt.OtherEntityId, self.Id);
+                Log("Take Damage!");
+            }
+            Log("2");
+            if (tg.Mask == 4)
+            {
                 //door detected
                 other.GetComponent<Active>().Enabled = false;
+                Log("Door Detected!");
             }
-            Log("Wrapping up...");
         }
-        
-        if (other.HasComponent<MS_ManagerComponent>() && self.HasComponent<PlayerComponent>())
+        Log("3");
+        //if I detect a marine snow obj, send it back to whence it came!
+        if (Entity.FromId(World!, other.Id).TryGetComponent<MS_ManagerComponent>(out MS_ManagerComponent msM))
         {
-            Log($"1a : self: {self.GetComponent<Name>().ToString()} = objid {self.Id}/ other: {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} = objid {evt.OtherEntityId} Collision at {evt.ContactPoint}", LogLevel.Warning);
-            Log($"2: Sending other: {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} to Pool");
             MS_Manager.instance.SendToPool(other.Id);
             InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
         }
-        Log("3: Space to Breathe");
-        Log("other: checking TagMask / self: checking PlayerComponent");
-        Log($"3a : self: {self.GetComponent<Name>().ToString()} = objid {self.Id}/ other: {Entity.FromId(World!, evt.OtherEntityId).GetComponent<Name>().ToString()} = objid {evt.OtherEntityId} Collision at {evt.ContactPoint}", LogLevel.Warning);
+        Log("4");
+    
 
-        Log("7: And thus we end");
-        Log(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
-
-    }
-
-    protected override void OnCollisionExit(Entity self, CollisionExitEvent evt)
-    {
-        //base.OnCollisionExit(self, evt);
-        //foreach (var gameObject in World!.Query<CollisionTestComponent>())
-        //{
-        //    //Log("Hello I Exited");
-        //}
     }
 }
 

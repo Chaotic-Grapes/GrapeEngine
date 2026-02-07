@@ -3613,7 +3613,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3653,7 +3653,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3733,7 +3733,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3773,7 +3773,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3853,7 +3853,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -3893,7 +3893,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3973,7 +3973,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4013,7 +4013,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4093,7 +4093,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4133,7 +4133,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4213,7 +4213,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4253,7 +4253,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4333,7 +4333,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4373,7 +4373,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4453,7 +4453,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4493,7 +4493,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4573,7 +4573,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4613,7 +4613,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4693,7 +4693,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4733,7 +4733,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4813,7 +4813,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4853,7 +4853,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -4933,7 +4933,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -4973,7 +4973,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5053,7 +5053,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -5093,7 +5093,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5173,7 +5173,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -5213,7 +5213,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5293,7 +5293,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -5333,7 +5333,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6613,7 +6613,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -6653,7 +6653,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6853,7 +6853,7 @@
                 {
                     "Data": {
                         "Flags": 0,
-                        "LayerMask": 4294967294,
+                        "LayerMask": 4,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
@@ -6893,7 +6893,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 23,
+                        "TextureId": 21,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,

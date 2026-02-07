@@ -12,23 +12,25 @@ using System.Collections.Generic;
 
 namespace EchoesBelow.Scripts.MarineSnowSystem;
 
-[Component] public record struct MS_SpawnerComponent(bool start, float spawnInterval, int toSpawn, float timer,float decayTime);
+[Component] public record struct MS_SpawnerComponent(bool start, float spawnIntervalinMilliseconds, int toSpawn, float timer,float decayTime);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class MS_Spawner : SystemBase
 {
-    
+    const int toSpawnMin = 1;
+    const int toSpawnMax = 1;
+    float spawnInterval = 0;
     //toSpawn is formatted as 10000000, the 7 0's after 1 represent the different MS particles
     protected override void OnCreate()
     {
         //Log("System MS_Spawner initialized");
     }
-    private bool OnStart(ref bool startBool)
+    private bool OnStart(ref bool startBool, ulong objId)
     {
         if (startBool == true) return true;
         startBool = true;
         //Todo
 
-
+        spawnInterval = Entity.FromId(World!, objId).GetComponent<MS_SpawnerComponent>().spawnIntervalinMilliseconds / 1000f;
 
         //End of Start
         return true;
@@ -40,15 +42,15 @@ public class MS_Spawner : SystemBase
             //A Pseudo Start function, called once per obj at runtime
             //This allows onStart to work
             bool start = gameObject.Component1.start;
-            gameObject.Component1.start = OnStart(ref start);
+            gameObject.Component1.start = OnStart(ref start, gameObject.Entity.Id);
 
             gameObject.Component1.timer += Time.DeltaTime;
 
             Entity entity = Entity.FromId(World!, gameObject.Entity.Id);
 
             //If we exceed the spawn interval
-          
-            if(gameObject.Component1.timer >= gameObject.Component1.spawnInterval)
+            spawnInterval = gameObject.Component1.spawnIntervalinMilliseconds / 1000f;
+            if(gameObject.Component1.timer >= spawnInterval)
             {
                
                 //Reset the timer, prime it for the next interval
@@ -75,7 +77,7 @@ public class MS_Spawner : SystemBase
                 int msID = msID_selected[(GMath.Random(0, msID_selected.Count-1))];
 
                 //How many to spawn
-                int spawnCount = GMath.Random(2, 5);
+                int spawnCount = GMath.Random(toSpawnMin, toSpawnMax);
                 //Spawner
                 for (int i = 0; i < spawnCount; i++)
                 {
