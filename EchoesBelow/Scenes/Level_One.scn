@@ -181,7 +181,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 18,
+                        "TextureId": 16,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\WinConText.png",
                         "Tiling": {
                             "X": 1.0,
@@ -416,7 +416,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 19,
+                        "TextureId": 18,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\OceanBG_01@8x.png",
                         "Tiling": {
                             "X": 1.0,
@@ -489,7 +489,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.9459999799728394,
+                        "AspectRatio": 2.115217447280884,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -774,7 +774,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 20,
+                        "TextureId": 19,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.011764705181121826,
@@ -800,7 +800,7 @@
                         "SheetWidth": 11900,
                         "StartFrame": 16,
                         "TextureFilter": 0,
-                        "TextureId": 20,
+                        "TextureId": 19,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheet_IdleDash_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -1057,7 +1057,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5623,7 +5623,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5749,7 +5749,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -5875,7 +5875,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6001,7 +6001,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6127,7 +6127,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6253,7 +6253,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 27,
+                        "TextureId": 20,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -6917,6 +6917,223 @@
                         "start": false
                     },
                     "TypeName": "Inventory Controller"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -2.814275026321411,
+                            "Y": 13.778756141662598,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS_Spawner 2"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.3306484818458557,
+                            "G": 1.0,
+                            "R": 0.191048264503479
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": -1.0,
+                            "Y": 0.10000000149011612
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.10000000149011612
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -2.814275026321411,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 13.778756141662598,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "decayTime": 8,
+                        "spawnIntervalinMilliseconds": 2501,
+                        "start": false,
+                        "timer": 5,
+                        "toSpawn": 10100000
+                    },
+                    "TypeName": "MS_Spawner"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS_Test"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "child": 0,
+                        "parent": 0,
+                        "pullThis": 0,
+                        "returnThis": 0
+                    },
+                    "TypeName": "MS_Test"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.43541258573532104,
+                            "Y": 3.3796327114105225,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "SceneManager"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.43541258573532104,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 3.3796327114105225,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -7633,98 +7850,6 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -2.814275026321411,
-                            "Y": 13.778756141662598,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "MS_Spawner 2"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.3306484818458557,
-                            "G": 1.0,
-                            "R": 0.191048264503479
-                        },
-                        "Filled": false,
-                        "HalfExtents": {
-                            "X": -1.0,
-                            "Y": 0.10000000149011612
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -2.814275026321411,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 13.778756141662598,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "decayTime": 8,
-                        "spawnIntervalinMilliseconds": 2501,
-                        "start": false,
-                        "timer": 5,
-                        "toSpawn": 10100000
-                    },
-                    "TypeName": "MS_Spawner"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
                             "X": 0.0,
                             "Y": 0.0,
                             "Z": 0.0
@@ -7745,9 +7870,26 @@
                 },
                 {
                     "Data": {
-                        "Value": "MS_Test"
+                        "Value": "SFX08"
                     },
                     "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Bus": 2,
+                        "CuePath": "EchoesBelow/Assets/Audio/unused/Zooming thru Grapevine.wav",
+                        "EnableFadeIn": false,
+                        "EnableFadeOut": false,
+                        "FadeInDuration": 1.0,
+                        "FadeOutDuration": 1.0,
+                        "Loop": false,
+                        "Pan": 0.0,
+                        "Pitch": 1.0,
+                        "PlayOnStart": false,
+                        "Spatial3D": false,
+                        "Volume": 1.0
+                    },
+                    "TypeName": "AudioSource"
                 },
                 {
                     "Data": {
@@ -7767,70 +7909,6 @@
                             "m11": 1.0,
                             "m12": 0.0,
                             "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "child": 0,
-                        "parent": 0,
-                        "pullThis": 0,
-                        "returnThis": 0
-                    },
-                    "TypeName": "MS_Test"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.43541258573532104,
-                            "Y": 3.3796327114105225,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "SceneManager"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.43541258573532104,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 3.3796327114105225,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -8015,7 +8093,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8041,7 +8119,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -8186,7 +8264,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8212,7 +8290,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -8357,7 +8435,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8383,7 +8461,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -8528,7 +8606,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8554,7 +8632,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -8699,7 +8777,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8725,7 +8803,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -8870,7 +8948,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -8896,7 +8974,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -9041,7 +9119,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -9067,7 +9145,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -9212,7 +9290,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -9238,7 +9316,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -9383,7 +9461,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -9409,7 +9487,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -9554,7 +9632,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -9580,7 +9658,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -9725,7 +9803,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0476190485060215,
@@ -9751,7 +9829,7 @@
                         "SheetWidth": 18900,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 28,
+                        "TextureId": 27,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\BarnacleSnatcher_SpriteSheet_Snatch_FullHorizontal.png",
                         "UseRow": true
                     },
@@ -11145,1022 +11223,6 @@
                         "signifierID": 96355538
                     },
                     "TypeName": "Match Signifier"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Deco"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -1.0003185272216797,
-                            "Y": 10.668514251708984,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Jelly (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 1,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.38999998569488525,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1589361896
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 34,
-                        "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 33,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -1.0003185272216797,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 10.668514251708984,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                },
-                {
-                    "Data": {
-                        "height": 1,
-                        "period": 7,
-                        "start": false,
-                        "timer": 0
-                    },
-                    "TypeName": "Oscillator"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 5.200077533721924,
-                            "Y": 11.663640022277832,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Jelly"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 1,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.38999998569488525,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1589361896
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 34,
-                        "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 33,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 5.200077533721924,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 11.663640022277832,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                },
-                {
-                    "Data": {
-                        "height": 1,
-                        "period": 7,
-                        "start": false,
-                        "timer": 0
-                    },
-                    "TypeName": "Oscillator"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 13.84372615814209,
-                            "Y": 12.685683250427246,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 0.9538279175758362,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": -0.30035358667373657
-                        },
-                        "Scale": {
-                            "X": 0.30000001192092896,
-                            "Y": 0.30000001192092896,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ChaosLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9540849924087524,
-                            "G": 0.17155712842941284,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": 0.0
-                        },
-                        "Intensity": 23.5,
-                        "LightType": 1,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 8.399999618530273
-                        },
-                        "Range": 11.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 0,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1594213436
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9998999834060669,
-                            "R": 0.9999030232429504
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 32,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 0.2458726316690445,
-                            "m01": 0.17189139127731323,
-                            "m02": 0.0,
-                            "m03": 13.84372615814209,
-                            "m10": -0.17189139127731323,
-                            "m11": 0.2458726316690445,
-                            "m12": 0.0,
-                            "m13": 12.685683250427246,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 4.71822452545166,
-                            "Y": 11.201151847839355,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 0.9538279175758362,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": -0.30035358667373657
-                        },
-                        "Scale": {
-                            "X": 0.30000001192092896,
-                            "Y": 0.30000001192092896,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ChaosLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9540849924087524,
-                            "G": 0.17155712842941284,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": 0.0
-                        },
-                        "Intensity": 23.5,
-                        "LightType": 1,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 8.399999618530273
-                        },
-                        "Range": 11.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 0,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1594213436
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9998999834060669,
-                            "R": 0.9999030232429504
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 32,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 0.2458726316690445,
-                            "m01": 0.17189139127731323,
-                            "m02": 0.0,
-                            "m03": 4.71822452545166,
-                            "m10": -0.17189139127731323,
-                            "m11": 0.2458726316690445,
-                            "m12": 0.0,
-                            "m13": 11.201151847839355,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -3.708674430847168,
-                            "Y": 8.0574369430542,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 0.9538279175758362,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": -0.30035358667373657
-                        },
-                        "Scale": {
-                            "X": 0.30000001192092896,
-                            "Y": 0.30000001192092896,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ChaosLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9540849924087524,
-                            "G": 0.17155712842941284,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": 0.0
-                        },
-                        "Intensity": 23.5,
-                        "LightType": 1,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 8.399999618530273
-                        },
-                        "Range": 11.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 0,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1594213436
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9998999834060669,
-                            "R": 0.9999030232429504
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 32,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 0.2458726316690445,
-                            "m01": 0.17189139127731323,
-                            "m02": 0.0,
-                            "m03": -3.708674430847168,
-                            "m10": -0.17189139127731323,
-                            "m11": 0.2458726316690445,
-                            "m12": 0.0,
-                            "m13": 8.0574369430542,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 5.198538780212402,
-                            "Y": 10.474629402160645,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 0.9538279175758362,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": -0.30035358667373657
-                        },
-                        "Scale": {
-                            "X": 0.30000001192092896,
-                            "Y": 0.30000001192092896,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ChaosLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9540849924087524,
-                            "G": 0.17155712842941284,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": 0.0
-                        },
-                        "Intensity": 23.5,
-                        "LightType": 1,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 8.399999618530273
-                        },
-                        "Range": 11.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 0,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1594213436
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9998999834060669,
-                            "R": 0.9999030232429504
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 32,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 0.2458726316690445,
-                            "m01": 0.17189139127731323,
-                            "m02": 0.0,
-                            "m03": 5.198538780212402,
-                            "m10": -0.17189139127731323,
-                            "m11": 0.2458726316690445,
-                            "m12": 0.0,
-                            "m13": 10.474629402160645,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 8.997167587280273,
-                            "Y": 4.389774799346924,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 0.9538279175758362,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": -0.30035358667373657
-                        },
-                        "Scale": {
-                            "X": 0.30000001192092896,
-                            "Y": 0.30000001192092896,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "ChaosLight"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "CastsShadows": false,
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.9540849924087524,
-                            "G": 0.17155712842941284,
-                            "R": 1.0
-                        },
-                        "Direction": {
-                            "X": 0.0,
-                            "Y": -1.0,
-                            "Z": 0.0
-                        },
-                        "Intensity": 23.5,
-                        "LightType": 1,
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 8.399999618530273
-                        },
-                        "Range": 11.0
-                    },
-                    "TypeName": "Light2D"
-                },
-                {
-                    "Data": {
-                        "AOStrength": 1.0,
-                        "AlphaCutoff": 0.5,
-                        "Flags": 0,
-                        "MRA_TextureId": 0,
-                        "MRA_TexturePath": "",
-                        "Metallic": 0.0,
-                        "NormalStrength": 1.0,
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Smoothness": 0.5
-                    },
-                    "TypeName": "Material2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "PrefabHash": 1594213436
-                    },
-                    "TypeName": "PrefabInstanceMetadata"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.9998999834060669,
-                            "R": 0.9999030232429504
-                        },
-                        "EmissiveStrength": 5.0,
-                        "EmissiveTextureId": 0,
-                        "EmissiveTexturePath": "",
-                        "NormalTextureId": 0,
-                        "NormalTexturePath": "",
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureFilter": 0,
-                        "TextureId": 32,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 0.2458726316690445,
-                            "m01": 0.17189139127731323,
-                            "m02": 0.0,
-                            "m03": 8.997167587280273,
-                            "m10": -0.17189139127731323,
-                            "m11": 0.2458726316690445,
-                            "m12": 0.0,
-                            "m13": 4.389774799346924,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                },
-                {
-                    "Data": {
-                        "ZOrder": -3
-                    },
-                    "TypeName": "ZIndex2D"
                 }
             ]
         },
@@ -14949,7 +14011,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15057,7 +14119,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15145,7 +14207,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15233,7 +14295,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15321,7 +14383,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15409,7 +14471,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15497,7 +14559,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15640,7 +14702,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15748,7 +14810,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15836,7 +14898,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -15924,7 +14986,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16012,7 +15074,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16100,7 +15162,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16188,7 +15250,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16331,7 +15393,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16439,7 +15501,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16527,7 +15589,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16615,7 +15677,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16703,7 +15765,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16791,7 +15853,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -16879,7 +15941,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17022,7 +16084,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17130,7 +16192,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17218,7 +16280,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17306,7 +16368,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17394,7 +16456,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17482,7 +16544,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17570,7 +16632,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17784,7 +16846,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 29,
+                        "TextureId": 30,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17872,7 +16934,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -17960,7 +17022,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18048,7 +17110,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18136,7 +17198,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18243,7 +17305,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18356,7 +17418,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18469,7 +17531,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18582,7 +17644,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18695,7 +17757,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18808,7 +17870,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -18921,7 +17983,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19034,7 +18096,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19147,7 +18209,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19260,7 +18322,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19373,7 +18435,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19486,7 +18548,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19599,7 +18661,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 30,
+                        "TextureId": 29,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\Spike01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -19637,6 +18699,1022 @@
                         }
                     },
                     "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Deco"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -1.0003185272216797,
+                            "Y": 10.668514251708984,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Jelly (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 1,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.38999998569488525,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1589361896
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 32,
+                        "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 31,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -1.0003185272216797,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 10.668514251708984,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                },
+                {
+                    "Data": {
+                        "height": 1,
+                        "period": 7,
+                        "start": false,
+                        "timer": 0
+                    },
+                    "TypeName": "Oscillator"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 5.200077533721924,
+                            "Y": 11.663640022277832,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Jelly"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 1,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.38999998569488525,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1589361896
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 32,
+                        "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 31,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 5.200077533721924,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 11.663640022277832,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                },
+                {
+                    "Data": {
+                        "height": 1,
+                        "period": 7,
+                        "start": false,
+                        "timer": 0
+                    },
+                    "TypeName": "Oscillator"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 13.84372615814209,
+                            "Y": 12.685683250427246,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.9538279175758362,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.30035358667373657
+                        },
+                        "Scale": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ChaosLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9540849924087524,
+                            "G": 0.17155712842941284,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": 0.0
+                        },
+                        "Intensity": 23.5,
+                        "LightType": 1,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 8.399999618530273
+                        },
+                        "Range": 11.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 0,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1594213436
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9998999834060669,
+                            "R": 0.9999030232429504
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 33,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.2458726316690445,
+                            "m01": 0.17189139127731323,
+                            "m02": 0.0,
+                            "m03": 13.84372615814209,
+                            "m10": -0.17189139127731323,
+                            "m11": 0.2458726316690445,
+                            "m12": 0.0,
+                            "m13": 12.685683250427246,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 4.71822452545166,
+                            "Y": 11.201151847839355,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.9538279175758362,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.30035358667373657
+                        },
+                        "Scale": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ChaosLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9540849924087524,
+                            "G": 0.17155712842941284,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": 0.0
+                        },
+                        "Intensity": 23.5,
+                        "LightType": 1,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 8.399999618530273
+                        },
+                        "Range": 11.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 0,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1594213436
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9998999834060669,
+                            "R": 0.9999030232429504
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 33,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.2458726316690445,
+                            "m01": 0.17189139127731323,
+                            "m02": 0.0,
+                            "m03": 4.71822452545166,
+                            "m10": -0.17189139127731323,
+                            "m11": 0.2458726316690445,
+                            "m12": 0.0,
+                            "m13": 11.201151847839355,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -3.708674430847168,
+                            "Y": 8.0574369430542,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.9538279175758362,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.30035358667373657
+                        },
+                        "Scale": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ChaosLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9540849924087524,
+                            "G": 0.17155712842941284,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": 0.0
+                        },
+                        "Intensity": 23.5,
+                        "LightType": 1,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 8.399999618530273
+                        },
+                        "Range": 11.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 0,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1594213436
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9998999834060669,
+                            "R": 0.9999030232429504
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 33,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.2458726316690445,
+                            "m01": 0.17189139127731323,
+                            "m02": 0.0,
+                            "m03": -3.708674430847168,
+                            "m10": -0.17189139127731323,
+                            "m11": 0.2458726316690445,
+                            "m12": 0.0,
+                            "m13": 8.0574369430542,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 5.198538780212402,
+                            "Y": 10.474629402160645,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.9538279175758362,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.30035358667373657
+                        },
+                        "Scale": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ChaosLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9540849924087524,
+                            "G": 0.17155712842941284,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": 0.0
+                        },
+                        "Intensity": 23.5,
+                        "LightType": 1,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 8.399999618530273
+                        },
+                        "Range": 11.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 0,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1594213436
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9998999834060669,
+                            "R": 0.9999030232429504
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 33,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.2458726316690445,
+                            "m01": 0.17189139127731323,
+                            "m02": 0.0,
+                            "m03": 5.198538780212402,
+                            "m10": -0.17189139127731323,
+                            "m11": 0.2458726316690445,
+                            "m12": 0.0,
+                            "m13": 10.474629402160645,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.997167587280273,
+                            "Y": 4.389774799346924,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.9538279175758362,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.30035358667373657
+                        },
+                        "Scale": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ChaosLight"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "CastsShadows": false,
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9540849924087524,
+                            "G": 0.17155712842941284,
+                            "R": 1.0
+                        },
+                        "Direction": {
+                            "X": 0.0,
+                            "Y": -1.0,
+                            "Z": 0.0
+                        },
+                        "Intensity": 23.5,
+                        "LightType": 1,
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 8.399999618530273
+                        },
+                        "Range": 11.0
+                    },
+                    "TypeName": "Light2D"
+                },
+                {
+                    "Data": {
+                        "AOStrength": 1.0,
+                        "AlphaCutoff": 0.5,
+                        "Flags": 0,
+                        "MRA_TextureId": 0,
+                        "MRA_TexturePath": "",
+                        "Metallic": 0.0,
+                        "NormalStrength": 1.0,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Smoothness": 0.5
+                    },
+                    "TypeName": "Material2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 1594213436
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.9998999834060669,
+                            "R": 0.9999030232429504
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 33,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.2458726316690445,
+                            "m01": 0.17189139127731323,
+                            "m02": 0.0,
+                            "m03": 8.997167587280273,
+                            "m10": -0.17189139127731323,
+                            "m11": 0.2458726316690445,
+                            "m12": 0.0,
+                            "m13": 4.389774799346924,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "ZOrder": -3
+                    },
+                    "TypeName": "ZIndex2D"
                 }
             ]
         },
@@ -19866,7 +19944,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20004,7 +20082,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20142,7 +20220,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20280,7 +20358,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20418,7 +20496,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20556,7 +20634,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 31,
+                        "TextureId": 28,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\CraftDoor_Yellow.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20690,7 +20768,7 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 35,
+                        "TextureId": 34,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\SpawnGrape_Bulb.png",
                         "Tiling": {
                             "X": 1.0,
@@ -20806,14 +20884,14 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "",
                         "Offset": {
                             "X": 0.6666666865348816,
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.004273474216461182,
@@ -20831,7 +20909,7 @@
                         "FrameWidth": 136,
                         "FramesPerSecond": 20.0,
                         "Loop": true,
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3_n.png",
                         "Playing": true,
                         "Row": 0,
@@ -20839,7 +20917,7 @@
                         "SheetWidth": 31824,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3.png",
                         "UseRow": true
                     },
@@ -21119,14 +21197,14 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "",
                         "Offset": {
                             "X": 0.6666666865348816,
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.004273474216461182,
@@ -21144,7 +21222,7 @@
                         "FrameWidth": 136,
                         "FramesPerSecond": 20.0,
                         "Loop": true,
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3_n.png",
                         "Playing": true,
                         "Row": 0,
@@ -21152,7 +21230,7 @@
                         "SheetWidth": 31824,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3.png",
                         "UseRow": true
                     },
@@ -21352,14 +21430,14 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "",
                         "Offset": {
                             "X": 0.6666666865348816,
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.004273474216461182,
@@ -21377,7 +21455,7 @@
                         "FrameWidth": 136,
                         "FramesPerSecond": 20.0,
                         "Loop": true,
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3_n.png",
                         "Playing": true,
                         "Row": 0,
@@ -21385,7 +21463,7 @@
                         "SheetWidth": 31824,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3.png",
                         "UseRow": true
                     },
@@ -21585,14 +21663,14 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "",
                         "Offset": {
                             "X": 0.6666666865348816,
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.004273474216461182,
@@ -21610,7 +21688,7 @@
                         "FrameWidth": 136,
                         "FramesPerSecond": 20.0,
                         "Loop": true,
-                        "NormalTextureId": 43,
+                        "NormalTextureId": 36,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3_n.png",
                         "Playing": true,
                         "Row": 0,
@@ -21618,7 +21696,7 @@
                         "SheetWidth": 31824,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 36,
+                        "TextureId": 35,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\VFX\\SmokeVFX_V3.png",
                         "UseRow": true
                     },
@@ -21743,287 +21821,35 @@
             ]
         }
     ],
-    "EntityCount": 192,
+    "EntityCount": 193,
     "Hierarchy": [
         {
-            "child": 85,
-            "parent": 84
-        },
-        {
-            "child": 156,
-            "parent": 155
-        },
-        {
-            "child": 157,
-            "parent": 155
-        },
-        {
-            "child": 158,
-            "parent": 155
-        },
-        {
-            "child": 159,
-            "parent": 155
-        },
-        {
-            "child": 160,
-            "parent": 155
-        },
-        {
-            "child": 149,
-            "parent": 148
-        },
-        {
-            "child": 150,
-            "parent": 148
-        },
-        {
-            "child": 151,
-            "parent": 148
-        },
-        {
-            "child": 152,
-            "parent": 148
-        },
-        {
-            "child": 153,
-            "parent": 148
-        },
-        {
-            "child": 128,
-            "parent": 127
-        },
-        {
-            "child": 129,
-            "parent": 127
-        },
-        {
-            "child": 130,
-            "parent": 127
-        },
-        {
-            "child": 131,
-            "parent": 127
-        },
-        {
-            "child": 132,
-            "parent": 127
-        },
-        {
-            "child": 133,
-            "parent": 127
-        },
-        {
-            "child": 135,
-            "parent": 134
-        },
-        {
-            "child": 136,
-            "parent": 134
-        },
-        {
-            "child": 137,
-            "parent": 134
-        },
-        {
-            "child": 138,
-            "parent": 134
-        },
-        {
-            "child": 139,
-            "parent": 134
-        },
-        {
-            "child": 140,
-            "parent": 134
-        },
-        {
-            "child": 142,
-            "parent": 141
-        },
-        {
-            "child": 143,
-            "parent": 141
-        },
-        {
-            "child": 144,
-            "parent": 141
-        },
-        {
-            "child": 145,
-            "parent": 141
-        },
-        {
-            "child": 146,
-            "parent": 141
-        },
-        {
-            "child": 147,
-            "parent": 141
-        },
-        {
-            "child": 154,
-            "parent": 148
-        },
-        {
-            "child": 187,
-            "parent": 186
-        },
-        {
-            "child": 189,
-            "parent": 188
-        },
-        {
-            "child": 191,
-            "parent": 190
-        },
-        {
-            "child": 184,
-            "parent": 183
-        },
-        {
-            "child": 4,
-            "parent": 3
-        },
-        {
-            "child": 86,
-            "parent": 85
-        },
-        {
-            "child": 9,
-            "parent": 8
-        },
-        {
-            "child": 87,
-            "parent": 85
-        },
-        {
-            "child": 61,
-            "parent": 60
-        },
-        {
-            "child": 62,
-            "parent": 60
-        },
-        {
-            "child": 63,
-            "parent": 60
-        },
-        {
-            "child": 64,
-            "parent": 60
-        },
-        {
-            "child": 65,
-            "parent": 60
-        },
-        {
-            "child": 66,
-            "parent": 60
-        },
-        {
-            "child": 67,
-            "parent": 60
-        },
-        {
-            "child": 68,
-            "parent": 60
-        },
-        {
-            "child": 88,
-            "parent": 85
-        },
-        {
             "child": 89,
-            "parent": 85
+            "parent": 86
         },
         {
-            "child": 127,
-            "parent": 126
+            "child": 90,
+            "parent": 86
         },
         {
-            "child": 134,
-            "parent": 126
+            "child": 170,
+            "parent": 167
         },
         {
-            "child": 141,
-            "parent": 126
+            "child": 171,
+            "parent": 167
         },
         {
-            "child": 148,
-            "parent": 126
+            "child": 172,
+            "parent": 167
         },
         {
-            "child": 106,
-            "parent": 105
+            "child": 173,
+            "parent": 167
         },
         {
-            "child": 176,
-            "parent": 175
-        },
-        {
-            "child": 177,
-            "parent": 175
-        },
-        {
-            "child": 178,
-            "parent": 175
-        },
-        {
-            "child": 179,
-            "parent": 175
-        },
-        {
-            "child": 180,
-            "parent": 175
-        },
-        {
-            "child": 181,
-            "parent": 175
-        },
-        {
-            "child": 10,
-            "parent": 9
-        },
-        {
-            "child": 92,
-            "parent": 91
-        },
-        {
-            "child": 93,
-            "parent": 91
-        },
-        {
-            "child": 98,
-            "parent": 97
-        },
-        {
-            "child": 99,
-            "parent": 97
-        },
-        {
-            "child": 1,
-            "parent": 0
-        },
-        {
-            "child": 100,
-            "parent": 97
-        },
-        {
-            "child": 101,
-            "parent": 97
-        },
-        {
-            "child": 102,
-            "parent": 97
-        },
-        {
-            "child": 103,
-            "parent": 97
-        },
-        {
-            "child": 104,
-            "parent": 97
+            "child": 174,
+            "parent": 167
         },
         {
             "child": 11,
@@ -22174,68 +22000,140 @@
             "parent": 9
         },
         {
+            "child": 100,
+            "parent": 98
+        },
+        {
+            "child": 101,
+            "parent": 98
+        },
+        {
+            "child": 148,
+            "parent": 119
+        },
+        {
+            "child": 102,
+            "parent": 98
+        },
+        {
+            "child": 103,
+            "parent": 98
+        },
+        {
+            "child": 104,
+            "parent": 98
+        },
+        {
+            "child": 105,
+            "parent": 98
+        },
+        {
+            "child": 106,
+            "parent": 98
+        },
+        {
             "child": 107,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 108,
-            "parent": 105
-        },
-        {
-            "child": 155,
-            "parent": 126
+            "parent": 98
         },
         {
             "child": 109,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 110,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 111,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 112,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 113,
-            "parent": 105
-        },
-        {
-            "child": 114,
-            "parent": 105
-        },
-        {
-            "child": 115,
-            "parent": 105
-        },
-        {
-            "child": 116,
-            "parent": 105
-        },
-        {
-            "child": 117,
-            "parent": 105
-        },
-        {
-            "child": 118,
-            "parent": 105
-        },
-        {
-            "child": 119,
-            "parent": 105
+            "parent": 98
         },
         {
             "child": 120,
-            "parent": 105
+            "parent": 119
+        },
+        {
+            "child": 127,
+            "parent": 119
+        },
+        {
+            "child": 134,
+            "parent": 119
+        },
+        {
+            "child": 141,
+            "parent": 119
+        },
+        {
+            "child": 114,
+            "parent": 98
+        },
+        {
+            "child": 115,
+            "parent": 98
+        },
+        {
+            "child": 116,
+            "parent": 98
+        },
+        {
+            "child": 117,
+            "parent": 98
+        },
+        {
+            "child": 118,
+            "parent": 98
+        },
+        {
+            "child": 3,
+            "parent": 2
         },
         {
             "child": 59,
             "parent": 8
+        },
+        {
+            "child": 5,
+            "parent": 3
+        },
+        {
+            "child": 99,
+            "parent": 98
+        },
+        {
+            "child": 183,
+            "parent": 176
+        },
+        {
+            "child": 9,
+            "parent": 8
+        },
+        {
+            "child": 54,
+            "parent": 9
+        },
+        {
+            "child": 55,
+            "parent": 9
+        },
+        {
+            "child": 56,
+            "parent": 9
+        },
+        {
+            "child": 57,
+            "parent": 9
         },
         {
             "child": 48,
@@ -22262,31 +22160,359 @@
             "parent": 9
         },
         {
+            "child": 188,
+            "parent": 187
+        },
+        {
+            "child": 190,
+            "parent": 189
+        },
+        {
+            "child": 192,
+            "parent": 191
+        },
+        {
+            "child": 185,
+            "parent": 184
+        },
+        {
             "child": 58,
             "parent": 8
         },
         {
+            "child": 4,
+            "parent": 3
+        },
+        {
+            "child": 92,
+            "parent": 85
+        },
+        {
+            "child": 149,
+            "parent": 148
+        },
+        {
+            "child": 150,
+            "parent": 148
+        },
+        {
+            "child": 151,
+            "parent": 148
+        },
+        {
+            "child": 152,
+            "parent": 148
+        },
+        {
+            "child": 153,
+            "parent": 148
+        },
+        {
+            "child": 142,
+            "parent": 141
+        },
+        {
+            "child": 143,
+            "parent": 141
+        },
+        {
+            "child": 144,
+            "parent": 141
+        },
+        {
+            "child": 145,
+            "parent": 141
+        },
+        {
+            "child": 146,
+            "parent": 141
+        },
+        {
             "child": 121,
-            "parent": 105
+            "parent": 120
         },
         {
             "child": 122,
-            "parent": 105
+            "parent": 120
         },
         {
             "child": 123,
-            "parent": 105
+            "parent": 120
         },
         {
             "child": 124,
-            "parent": 105
+            "parent": 120
         },
         {
             "child": 125,
-            "parent": 105
+            "parent": 120
         },
         {
-            "child": 3,
+            "child": 126,
+            "parent": 120
+        },
+        {
+            "child": 128,
+            "parent": 127
+        },
+        {
+            "child": 129,
+            "parent": 127
+        },
+        {
+            "child": 130,
+            "parent": 127
+        },
+        {
+            "child": 131,
+            "parent": 127
+        },
+        {
+            "child": 132,
+            "parent": 127
+        },
+        {
+            "child": 133,
+            "parent": 127
+        },
+        {
+            "child": 135,
+            "parent": 134
+        },
+        {
+            "child": 136,
+            "parent": 134
+        },
+        {
+            "child": 137,
+            "parent": 134
+        },
+        {
+            "child": 138,
+            "parent": 134
+        },
+        {
+            "child": 139,
+            "parent": 134
+        },
+        {
+            "child": 140,
+            "parent": 134
+        },
+        {
+            "child": 147,
+            "parent": 141
+        },
+        {
+            "child": 154,
+            "parent": 119
+        },
+        {
+            "child": 155,
+            "parent": 119
+        },
+        {
+            "child": 156,
+            "parent": 119
+        },
+        {
+            "child": 157,
+            "parent": 119
+        },
+        {
+            "child": 158,
+            "parent": 119
+        },
+        {
+            "child": 159,
+            "parent": 119
+        },
+        {
+            "child": 160,
+            "parent": 119
+        },
+        {
+            "child": 161,
+            "parent": 119
+        },
+        {
+            "child": 162,
+            "parent": 119
+        },
+        {
+            "child": 163,
+            "parent": 119
+        },
+        {
+            "child": 164,
+            "parent": 119
+        },
+        {
+            "child": 165,
+            "parent": 119
+        },
+        {
+            "child": 166,
+            "parent": 119
+        },
+        {
+            "child": 168,
+            "parent": 167
+        },
+        {
+            "child": 169,
+            "parent": 167
+        },
+        {
+            "child": 177,
+            "parent": 176
+        },
+        {
+            "child": 178,
+            "parent": 176
+        },
+        {
+            "child": 179,
+            "parent": 176
+        },
+        {
+            "child": 180,
+            "parent": 176
+        },
+        {
+            "child": 181,
+            "parent": 176
+        },
+        {
+            "child": 182,
+            "parent": 176
+        },
+        {
+            "child": 10,
+            "parent": 9
+        },
+        {
+            "child": 64,
+            "parent": 63
+        },
+        {
+            "child": 65,
+            "parent": 63
+        },
+        {
+            "child": 66,
+            "parent": 63
+        },
+        {
+            "child": 67,
+            "parent": 63
+        },
+        {
+            "child": 68,
+            "parent": 63
+        },
+        {
+            "child": 69,
+            "parent": 63
+        },
+        {
+            "child": 70,
+            "parent": 63
+        },
+        {
+            "child": 71,
+            "parent": 63
+        },
+        {
+            "child": 72,
+            "parent": 63
+        },
+        {
+            "child": 74,
+            "parent": 73
+        },
+        {
+            "child": 75,
+            "parent": 73
+        },
+        {
+            "child": 76,
+            "parent": 73
+        },
+        {
+            "child": 77,
+            "parent": 73
+        },
+        {
+            "child": 78,
+            "parent": 73
+        },
+        {
+            "child": 79,
+            "parent": 73
+        },
+        {
+            "child": 80,
+            "parent": 73
+        },
+        {
+            "child": 81,
+            "parent": 73
+        },
+        {
+            "child": 82,
+            "parent": 73
+        },
+        {
+            "child": 83,
+            "parent": 73
+        },
+        {
+            "child": 84,
+            "parent": 73
+        },
+        {
+            "child": 93,
+            "parent": 92
+        },
+        {
+            "child": 94,
+            "parent": 92
+        },
+        {
+            "child": 95,
+            "parent": 92
+        },
+        {
+            "child": 96,
+            "parent": 92
+        },
+        {
+            "child": 86,
+            "parent": 85
+        },
+        {
+            "child": 87,
+            "parent": 86
+        },
+        {
+            "child": 88,
+            "parent": 86
+        },
+        {
+            "child": 1,
+            "parent": 0
+        },
+        {
+            "child": 63,
+            "parent": 8
+        },
+        {
+            "child": 91,
+            "parent": 86
+        },
+        {
+            "child": 6,
             "parent": 2
         },
         {
@@ -22294,163 +22520,19 @@
             "parent": 8
         },
         {
-            "child": 182,
-            "parent": 175
-        },
-        {
-            "child": 54,
-            "parent": 9
-        },
-        {
-            "child": 55,
-            "parent": 9
-        },
-        {
-            "child": 56,
-            "parent": 9
-        },
-        {
-            "child": 57,
-            "parent": 9
-        },
-        {
-            "child": 5,
-            "parent": 3
-        },
-        {
-            "child": 91,
-            "parent": 84
-        },
-        {
-            "child": 90,
-            "parent": 85
-        },
-        {
-            "child": 161,
-            "parent": 126
-        },
-        {
-            "child": 162,
-            "parent": 126
-        },
-        {
-            "child": 163,
-            "parent": 126
-        },
-        {
-            "child": 164,
-            "parent": 126
-        },
-        {
-            "child": 165,
-            "parent": 126
-        },
-        {
-            "child": 166,
-            "parent": 126
-        },
-        {
-            "child": 167,
-            "parent": 126
-        },
-        {
-            "child": 168,
-            "parent": 126
-        },
-        {
-            "child": 169,
-            "parent": 126
-        },
-        {
-            "child": 170,
-            "parent": 126
-        },
-        {
-            "child": 171,
-            "parent": 126
-        },
-        {
-            "child": 172,
-            "parent": 126
-        },
-        {
-            "child": 173,
-            "parent": 126
-        },
-        {
-            "child": 73,
-            "parent": 72
-        },
-        {
-            "child": 74,
-            "parent": 72
-        },
-        {
-            "child": 75,
-            "parent": 72
-        },
-        {
-            "child": 76,
-            "parent": 72
-        },
-        {
-            "child": 77,
-            "parent": 72
-        },
-        {
-            "child": 78,
-            "parent": 72
-        },
-        {
-            "child": 79,
-            "parent": 72
-        },
-        {
-            "child": 80,
-            "parent": 72
-        },
-        {
-            "child": 81,
-            "parent": 72
-        },
-        {
-            "child": 82,
-            "parent": 72
-        },
-        {
-            "child": 83,
-            "parent": 72
-        },
-        {
-            "child": 94,
-            "parent": 91
-        },
-        {
-            "child": 95,
-            "parent": 91
-        },
-        {
-            "child": 6,
-            "parent": 2
-        },
-        {
-            "child": 69,
-            "parent": 8
-        },
-        {
-            "child": 96,
-            "parent": 91
+            "child": 97,
+            "parent": 92
         },
         {
             "child": 7,
             "parent": 2
         },
         {
-            "child": 70,
+            "child": 61,
             "parent": 8
         },
         {
-            "child": 71,
+            "child": 62,
             "parent": 8
         }
     ],

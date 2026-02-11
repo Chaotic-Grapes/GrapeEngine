@@ -135,6 +135,7 @@ public class ProcessDeath : SystemBase
         {
             isHit = false;
             Death(playerId);
+            AudioManager.instance.PlaySFX("SFX08");
         }
     }
     private void Death(ulong playerId)
