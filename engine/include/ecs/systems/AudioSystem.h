@@ -102,6 +102,8 @@ namespace ECS {
 
         // Map entity -> playing audio handle
         std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
+        // Track PlayOnStart cues that have already fired (entity -> cue id).
+        std::unordered_map<Entity, uint32_t, EntityHash> m_playOnStartPlayedCue;
 
         // Cached world pointer for fade-outs during scene transitions
         World* m_world = nullptr;

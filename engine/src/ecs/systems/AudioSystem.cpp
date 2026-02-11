@@ -141,6 +141,7 @@ namespace ECS {
                 // Handle CueId = 0 (no audio assigned)
                 // ----------------------------------------------------------------
                 if (src.CueId == 0) {
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -171,6 +172,7 @@ namespace ECS {
                             << " (audio file not found in assets/Audio)");
                         s_warnedCues.insert(src.CueId);
                     }
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -212,11 +214,20 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 bool shouldPlay = false;
 
+                if (!src.PlayOnStart || src.Loop) {
+                    m_playOnStartPlayedCue.erase(e);
+                }
+
                 if (src.PlayOnStart) {
                     // PlayOnStart sounds only play when:
                     // 1. Game is in play mode
                     // 2. System has started (prevents playing during entity creation in editor)
-                    shouldPlay = isPlaying && m_hasStarted;
+                    bool playOnStartEligible = true;
+                    auto playedIt = m_playOnStartPlayedCue.find(e);
+                    if (playedIt != m_playOnStartPlayedCue.end() && playedIt->second == src.CueId) {
+                        playOnStartEligible = false;
+                    }
+                    shouldPlay = isPlaying && m_hasStarted && (src.Loop || playOnStartEligible || hasInstance);
                 }
                 else {
                     // Non-PlayOnStart sounds can be controlled manually
@@ -259,6 +270,9 @@ namespace ECS {
                     Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
                     if (handle) {
                         m_activeSounds[e] = handle;
+                        if (src.PlayOnStart && !src.Loop) {
+                            m_playOnStartPlayedCue[e] = src.CueId;
+                        }
 
                         // Check if fadein is enabled
                         if (doFadeIn && fadeInDuration > 0.0f) {
@@ -323,6 +337,7 @@ namespace ECS {
 
         for (auto entity : toRemove) {
             _stopSound(entity, world);
+            m_playOnStartPlayedCue.erase(entity);
         }
     }
 
@@ -354,6 +369,7 @@ namespace ECS {
         m_crossfadeInDuration = 0.0f;
         m_crossfadeInRemaining = 0.0f;
         m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
@@ -365,6 +381,7 @@ namespace ECS {
         m_crossfadeInDuration = 0.0f;
         m_crossfadeInRemaining = 0.0f;
         m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
