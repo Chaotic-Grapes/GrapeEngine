@@ -204,6 +204,9 @@ namespace ECS {
                 if (hasInstance && !engine->IsHandleActive(it->second)) {
                     m_activeSounds.erase(it);
                     hasInstance = false;
+                    if (src.PlayOnStart && !src.Loop) {
+                        src.PlayOnStart = false;
+                    }
                 }
                 if (m_sceneUnloadInProgress && !hasInstance) {
                     return;
