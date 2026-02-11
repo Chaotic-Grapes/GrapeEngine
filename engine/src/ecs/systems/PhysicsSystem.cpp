@@ -461,6 +461,8 @@ namespace ECS {
         int triggerEnterCount = 0;
         int triggerExitCount = 0;
         int triggerStayCount = 0;
+        bool loggedMissingLayer = false;
+        bool loggedMissingPhysicsPair = false;
 
         // =====================
         // Simulation Settings
@@ -727,7 +729,14 @@ namespace ECS {
                     // If either entity is missing a Layer component, skip collision
                     // (Entities must be explicitly assigned to a layer to participate in layer-based collision)
                     if (!la || !lb)
+                    {
+                        if (!loggedMissingLayer)
+                        {
+                            loggedMissingLayer = true;
+                            LOG_WARNING("PhysicsSystem: Skipping collision event (missing Layer component on one or both entities).");
+                        }
                         continue;
+                    }
                     
                     uint16_t layerAId = la->Id;
                     uint16_t layerBId = lb->Id;
@@ -846,7 +855,15 @@ namespace ECS {
                     // Require at least one side to be physically simulated (has rb + velocity).
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                     const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
-                    if (!hasPhysA && !hasPhysB) continue;
+                    if (!hasPhysA && !hasPhysB)
+                    {
+                        if (!loggedMissingPhysicsPair)
+                        {
+                            loggedMissingPhysicsPair = true;
+                            LOG_WARNING("PhysicsSystem: Skipping collision event (no Rigidbody2D+LinearVelocity2D pair found).");
+                        }
+                        continue;
+                    }
 
                     const PackedEntityPair pairID = MakeCollisionPair(
                         ECS::EntityUtils::Pack(A),
