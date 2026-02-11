@@ -34,7 +34,7 @@ public class Oscillator : SystemBase
 
         foreach(var result in World!.Query<OscillatorComponent, LocalTransform>())
         {
-            Log("StartPos1: " + startPos);
+            //Log("StartPos1: " + startPos);
             bool start = result.Component1.start;
             result.Component1.start = OnStart(ref start, result.Component2.Position);
             if (!result.Component1.start) return;
@@ -49,7 +49,7 @@ public class Oscillator : SystemBase
             result.Entity.GetComponent<LocalTransform>().Position
             = new Vector3(result.Entity.GetComponent<LocalTransform>().Position.X,
                           startPos.Y + (result.Component1.height * oscillateFac),0);
-            Log("StartPos2: " + startPos);
+            //Log("StartPos2: " + startPos);
         }
     }
 

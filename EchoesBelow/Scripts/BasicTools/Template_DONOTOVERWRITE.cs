@@ -1,27 +1,44 @@
+using EchoesBelow.Scripts.Audio;
+using EchoesBelow.Scripts.MarineSnowSystem;
+using GrapeEngine.Math;
+using GrapeEngine.Scripting.Components;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 
-namespace Scripts.BasicTools;
+namespace EchoesBelow.Scripts.BasicTools;
 
-/// <summary>
-/// System that processes entities with specific components.
-/// This is a pure ECS system: it queries entities and updates their components.
-/// </summary>
+//[Component] public record struct Template_DONOTOVERWRITEComponent(bool start);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Template_DONOTOVERWRITE : SystemBase
 {
     protected override void OnCreate()
     {
-        Log("System Template_DONOTOVERWRITE initialized");
+        //Log("System Template_DONOTOVERWRITE initialized");
     }
+    private bool OnStart(ref bool startBool)
+    {
+        if (startBool == true) return true;
+        startBool = true;
+        //Todo
 
+
+
+        //End of Start
+        return true;
+    }
     protected override void OnUpdate()
     {
-        
-    }
+        //Use this
+        //foreach(var gameObject in World!.Query<Template_DONOTOVERWRITEComponent>())
+        //{
+        //    bool start = gameObject.Component1.start;
+        //    gameObject.Component1.start = OnStart(ref start);
 
-    protected override void OnDestroy()
-    {
-        Log("System Template_DONOTOVERWRITE destroyed");
+        //    //Do everyth else
+            
+
+        //}
     }
 }

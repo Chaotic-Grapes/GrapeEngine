@@ -7,6 +7,7 @@ using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
 using EchoesBelow.Scripts.MarineSnowSystem;
 using System;
+using EchoesBelow.Scripts.Audio;
 
 namespace EchoesBelow.Scripts;
 
@@ -209,6 +210,7 @@ public class Player : SystemBase
             timer_forPeriodicForce = 0;
             lv.Value.X += playerDir.X * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
             lv.Value.Y += playerDir.Y * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
+            AudioManager.instance.PlaySFX("SFX01");
         }
     }
     private void RotationPolarityHandler(LocalTransform transform)
