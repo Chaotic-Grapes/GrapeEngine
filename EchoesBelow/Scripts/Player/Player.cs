@@ -14,7 +14,7 @@ namespace EchoesBelow.Scripts;
 [Component] public record struct PlayerComponent(
     //[Pseudo-SerializeField]
     float driftSpeed,
-    float periodicForceInterval,
+    float periodicForceIntervalinMS,
     float moveSpeed,
     float angularVelocity,
     bool start // required for start function
@@ -83,6 +83,7 @@ public class Player : SystemBase
             else
             {
                 PlayerAnimManager.instance.SetAnimState(idleState);
+                timer_forPeriodicForce = 0;
             }
 
 
@@ -98,7 +99,7 @@ public class Player : SystemBase
             float moveSpeed = gameObject.Component1.moveSpeed * 0.01f; //this allows floating point decimal values
             float driftSpeed = gameObject.Component1.driftSpeed * 0.01f; //this allows floating point decimal values
             float angularVelocity = gameObject.Component1.angularVelocity * 0.01f; //100 == 1
-            float periodicForceInterval = gameObject.Component1.periodicForceInterval;
+            float periodicForceInterval = gameObject.Component1.periodicForceIntervalinMS/1000;
 
             moveDir = ProcessInput(moveDir, lerpFac);
 
@@ -189,6 +190,7 @@ public class Player : SystemBase
     }
     private void AddRelativeForce(ref LinearVelocity2D lv, Vector2 playerDir, float moveSpeed)
     {
+        AudioManager.instance.PlaySFX("SFX05");
         lv.Value.X += playerDir.X * moveSpeed * 2 * GMath.Clamp(lv.Value.X, 1, 10);
         lv.Value.Y += playerDir.Y * moveSpeed * 2 *  GMath.Clamp(lv.Value.X, 1, 10);
     }
@@ -210,7 +212,15 @@ public class Player : SystemBase
             timer_forPeriodicForce = 0;
             lv.Value.X += playerDir.X * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
             lv.Value.Y += playerDir.Y * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
-            AudioManager.instance.PlaySFX("SFX01");
+
+            if (!AudioManager.sfxEntityDictionary["SFX01"].GetComponent<AudioSource>().PlayOnStart)
+            {
+                AudioManager.instance.PlaySFX("SFX01");
+            }
+            else
+            {
+                AudioManager.instance.PlaySFX("SFX01_alt");
+            }
         }
     }
     private void RotationPolarityHandler(LocalTransform transform)
@@ -314,6 +324,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
             Log("2");
             if (tg.Mask == 4)
             {
+                AudioManager.instance.PlaySFX("SFX06");
                 //door detected
                 other.GetComponent<Active>().Enabled = false;
                 Log("Door Detected!");
@@ -323,6 +334,7 @@ public class PlayerCollisionHandler : CollisionSystemBase
         //if I detect a marine snow obj, send it back to whence it came!
         if (Entity.FromId(World!, other.Id).TryGetComponent<MS_ManagerComponent>(out MS_ManagerComponent msM))
         {
+            AudioManager.instance.PlaySFX("SFX03");
             MS_Manager.instance.SendToPool(other.Id);
             InventoryController.instance.IncrementInStackSlot(other.GetComponent<MS_ManagerComponent>().msID);
         }

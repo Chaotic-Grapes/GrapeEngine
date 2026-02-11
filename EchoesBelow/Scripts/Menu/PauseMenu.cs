@@ -1,4 +1,5 @@
 using EchoesBelow.Scripts;
+using EchoesBelow.Scripts.Audio;
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Core;
@@ -6,8 +7,8 @@ using GrapeEngine.Scripting.Events;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
-using System.Collections.Generic;
 using Scripts.Menu;
+using System.Collections.Generic;
 
 namespace Scripts.Menu;
 
@@ -63,6 +64,7 @@ public class PauseMenu : SystemBase
 
         if (isKeyPressed_Esc)// && !isPaused)// && Input.IsKeyPressed(KeyCode.Escape))
         {
+            AudioManager.instance.PlaySFX("SFX07");
             if (!isPaused)
             {
                 Time.TimeScale = 0;
@@ -77,6 +79,7 @@ public class PauseMenu : SystemBase
         }
         else if (isKeyPressed_Esc)// && isPaused)
         {
+            AudioManager.instance.PlaySFX("SFX07");
             if (isPaused)
             {
                 Time.TimeScale = 1;
@@ -94,6 +97,7 @@ public class PauseMenu : SystemBase
         {
             if (isKeyPressed_vertical)
             {
+                AudioManager.instance.PlaySFX("SFX07");
                 isFirstSelected = !isFirstSelected;
                 ////Log("isLeftSelected: " + isFirstSelected);
                 foreach (var controller in World!.Query<PauseMenuComponent>())
@@ -119,7 +123,7 @@ public class PauseMenu : SystemBase
         //Temporary, turn this back on soon!
         if (isPaused && isKeyPressed_Space && isFirstSelected)
         {
-           
+            AudioManager.instance.PlaySFX("SFX07");
             Time.TimeScale = 1;
             isPaused = false;
             foreach (ulong ui_id in pauseMenuElementObjIds)
@@ -132,7 +136,7 @@ public class PauseMenu : SystemBase
         }
         else if (isPaused && isKeyPressed_Space && !isFirstSelected)
         {
-
+            AudioManager.instance.PlaySFX("SFX07");
             //Log("Quitting . . . ");
             sceneManager.SetNextAudioTransition(2.0f, true);
             //var scene = SceneManager.Instance.LoadScene(TargetScenePath);

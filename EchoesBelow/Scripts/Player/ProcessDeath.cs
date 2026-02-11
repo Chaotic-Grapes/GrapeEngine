@@ -1,10 +1,11 @@
+using EchoesBelow.Scripts.Audio;
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Events;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
-using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Events;
 using System.Collections.Generic;
 
 
@@ -106,6 +107,8 @@ public class ProcessDeath : SystemBase
     }
     public void TakeHit(ulong otherId, ulong playerId)
     {
+        AudioManager.instance.PlaySFX("SFX04");
+
         Entity other = Entity.FromId(World!, otherId);
         Entity player = Entity.FromId(World!, playerId);
 

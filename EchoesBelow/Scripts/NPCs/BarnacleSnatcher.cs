@@ -6,7 +6,7 @@
  * @brief   Barnacle snatcher AI, animation, and collision handling.
  */
 
-using System;
+using EchoesBelow.Scripts.Audio;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Events;
@@ -14,6 +14,7 @@ using GrapeEngine.Scripting.Gameplay;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
+using System;
 
 namespace EchoesBelow.Scripts;
 
@@ -432,6 +433,9 @@ public sealed class BarnacleSnatcherStateSystem : SystemBase
     {
         //Log("SNATCH SNATCH SNATCH");
         //It will eat both for now
+
+        AudioManager.instance.PlaySFX("SFX02");
+
         InventoryController.instance.DecrementInStackSlot(1);
         InventoryController.instance.DecrementInStackSlot(2);
 
