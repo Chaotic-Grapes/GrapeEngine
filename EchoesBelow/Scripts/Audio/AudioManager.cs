@@ -68,6 +68,14 @@ public class AudioManager : SystemBase
     {
         Entity chosenSfx = Entity.FromId(World!, sfxEntityDictionary[sfxName].Id);
         ref AudioSource audsrc = ref chosenSfx.GetComponent<AudioSource>();
+        
         audsrc.PlayOnStart = true;
+    }
+    public void StopSFX(string sfxName)
+    {
+        Entity chosenSfx = Entity.FromId(World!, sfxEntityDictionary[sfxName].Id);
+        ref AudioSource audsrc = ref chosenSfx.GetComponent<AudioSource>();
+     
+        audsrc.PlayOnStart = false;
     }
 }
