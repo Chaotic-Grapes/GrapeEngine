@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "SystemsPanel.h"
+#include "EditorIcons.h"
 #include "ecs/SystemManager.h"
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
@@ -30,9 +31,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Lifecycle Management
 // -------------------------------------------------------------------------
 
-void SystemsPanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
+void SystemsPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
+    m_symbolsFont = symbolsFont;
 }
 
 void SystemsPanel::Shutdown() {
@@ -53,6 +55,7 @@ void SystemsPanel::Render(ECS::SystemManager* systemManager) {
         ImGui::End();
         return;
     }
+
 
     // Update system list each frame (small overhead, ensures accurate display)
     // Cache the pointer for use in private rendering functions

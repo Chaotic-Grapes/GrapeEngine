@@ -38,7 +38,7 @@ namespace Platform {
 
         // Factory method for creating GLFW windows
         static GLFWWindow* Create(const std::string& title, int width, int height,
-                                  bool vsync, WindowMode mode);
+                                  bool vsync, WindowMode mode, bool resizable, bool decorated);
 
         // ==================== IWindow Implementation ====================
         
@@ -77,6 +77,9 @@ namespace Platform {
 
         void* GetNativeHandle() const override;
 
+        // GLFW-specific fullscreen selection
+        bool SetFullscreenOnMonitor(int monitorIndex);
+
         // ==================== GLFW-Specific Methods ====================
         
         /**
@@ -89,7 +92,7 @@ namespace Platform {
          * @brief Initialize the window (called by factory)
          */
         bool Initialize(const std::string& title, int width, int height,
-                       bool vsync, WindowMode mode);
+                       bool vsync, WindowMode mode, bool resizable, bool decorated);
 
         /**
          * @brief Destroy the window and free resources
@@ -97,11 +100,29 @@ namespace Platform {
         void Destroy();
 
     private:
+        GLFWmonitor* _getCurrentMonitor() const;
+        void _storeWindowedPlacement();
+        void _restoreWindowedPlacement();
+        bool _setBorderless(bool borderless);
+        void _lockBorderlessToMonitor();
+
         GLFWwindow* m_windowHandle = nullptr;
         std::string m_title;
         int m_width = 0;
         int m_height = 0;
         bool m_vsync = true;
+        bool m_resizable = true;
+        bool m_decorated = true;
+        WindowMode m_mode = WindowMode::Windowed;
+
+        int m_windowedX = 0;
+        int m_windowedY = 0;
+        int m_windowedWidth = 0;           // Last windowed width for restore.
+        int m_windowedHeight = 0;          // Last windowed height for restore.
+        bool m_windowedValid = false;      // True once windowed placement is stored.
+        int m_currentMonitorIndex = 0;     // Monitor index for fullscreen transitions.
+        bool m_borderlessLockInProgress = false; // Prevent re-entrant lock callbacks.
+        int m_borderlessLockedMonitorIndex = -1; // Track monitor already snapped.
 
         void _setupCallbacks();
     };

@@ -37,6 +37,7 @@ Reference:
 #include "helpers/EntityUtils.h"
 #include "EditorECSUtils.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
@@ -273,7 +274,7 @@ void Playback::Render() {
         const bool isPaused = (m_editorState == EditorState::Paused);
 
         // Determine icon, tooltip, and color based on state
-        const char* playIcon = isPlaying ? "\xEE\x80\xB4" : "\xEE\x80\xB7";
+        const char* playIcon = isPlaying ? EditorIcons::Pause : EditorIcons::Play;
         const char* playTooltip = isPlaying ? "Pause (Ctrl+Shift+P)" : (m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         const ImVec4 playColor = isPlaying ? EditorStyle::WarningButton : EditorStyle::SuccessButton;
         const bool playActive = isPlaying || isPaused;
@@ -310,7 +311,7 @@ void Playback::Render() {
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
 
         // Draw Stop button
-        drawIconButton("\xEE\x81\x87", m_editorState != EditorState::Edit, mainBtnSize,
+        drawIconButton(EditorIcons::Stop, m_editorState != EditorState::Edit, mainBtnSize,
             "Stop (Ctrl+P)", false, EditorStyle::DangerButton,
             [this]() {
                 _restoreWorldState();
@@ -325,7 +326,7 @@ void Playback::Render() {
         ImGui::PushID("StepPrimary");
 
         // Draw Step button
-        drawIconButton("\xEE\x81\x84", canStep, mainBtnSize, "Step (Alt+P)",
+        drawIconButton(EditorIcons::Step, canStep, mainBtnSize, "Step (Alt+P)",
             m_editorState == EditorState::Step, EditorStyle::Accent,
             [this]() {
                 _changeState(EditorState::Step);

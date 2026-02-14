@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <windows.h>
 #include "HierarchyPanel.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include "EditorECSUtils.h"
@@ -731,7 +732,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Calculate icon sizes to reserve space on the right BEFORE creating the tree node.
         const float iconPadding = 6.0f; // space between icons and edge
         float prefabIconWidth = 0.0f;
-        const char* prefabIcon = "\xEE\xA6\xA4";
+        const char* prefabIcon = EditorIcons::Prefab;
 
         if (m_symbolsFont && isPrefabInstance) {
             // Push the font for this section.

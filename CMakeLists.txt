@@ -533,36 +533,39 @@ if(BUILD_GAME AND TARGET GrapeRuntime)
         endif()
     endif()
 
-    if(EXPORT_PROJECT_NAME)
-        set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
-        set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
+      if(EXPORT_PROJECT_NAME)
+          set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
+          set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
+          set(EXPORT_ENGINE_DLL_COMMAND "")
+          set(EXPORT_ENGINE_DLL_DEPENDENCY "")
 
-        add_custom_target(ExportGame
-            COMMAND ${CMAKE_COMMAND} -E echo "Exporting game to ${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E remove_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "$<TARGET_FILE_DIR:GrapeRuntime>"
-                "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${EXPORT_PROJECT_DIR}"
-                "${EXPORT_OUTPUT_DIR}/$<CONFIG>/${EXPORT_PROJECT_NAME}"
-            DEPENDS GrapeRuntime
-            COMMENT "Staging standalone game export"
-        )
+          if(BUILD_ENGINE_SHARED)
+              set(EXPORT_ENGINE_DLL_COMMAND
+                  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                      "$<TARGET_FILE:GrapeEngineLib>"
+                      "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              )
+              set(EXPORT_ENGINE_DLL_DEPENDENCY GrapeEngineLib)
+          endif()
 
-        if(BUILD_ENGINE_SHARED)
-            add_custom_command(TARGET ExportGame POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:GrapeEngineLib>"
-                    "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-                COMMENT "Copying engine DLL to export output"
-            )
-        endif()
+          add_custom_target(ExportGame
+              COMMAND ${CMAKE_COMMAND} -E echo "Exporting game to ${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E remove_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E copy_directory
+                  "$<TARGET_FILE_DIR:GrapeRuntime>"
+                  "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              ${EXPORT_ENGINE_DLL_COMMAND}
+              COMMAND ${CMAKE_COMMAND} -E copy_directory
+                  "${EXPORT_PROJECT_DIR}"
+                  "${EXPORT_OUTPUT_DIR}/$<CONFIG>/${EXPORT_PROJECT_NAME}"
+              DEPENDS GrapeRuntime ${EXPORT_ENGINE_DLL_DEPENDENCY}
+              COMMENT "Staging standalone game export"
+          )
 
-        if(TARGET Copy_Assets_Runtime)
-            add_dependencies(ExportGame Copy_Assets_Runtime)
-        endif()
+          if(TARGET Copy_Assets_Runtime)
+              add_dependencies(ExportGame Copy_Assets_Runtime)
+          endif()
         if(TARGET Copy_FMOD_Runtime)
             add_dependencies(ExportGame Copy_FMOD_Runtime)
         endif()

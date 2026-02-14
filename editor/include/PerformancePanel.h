@@ -32,7 +32,7 @@ namespace ECS {
 
 class PerformancePanel {
 public:
-    void Initialize(ImFont* mainFont, ImFont* boldFont);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
     void Shutdown();
 
     // Render accepts whether the editor is currently playing; monitoring is paused when not playing
@@ -56,6 +56,7 @@ public:
 private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
     bool m_initialized = false;
     bool m_hasCollectedData = false;  // Track if we've collected data at least once
     ECS::SystemManager* m_systemManager = nullptr;

@@ -24,6 +24,7 @@ prefab assets use the same UI path.
 #include <imgui.h>
 #include <cmath>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <filesystem>
 #include "ecs/Components.h"
 #include "serialization/EntitySerializer.h"
@@ -214,7 +215,7 @@ namespace {
 
         // Render the clear trash button with optional symbols font
         if (symbolsFont) ImGui::PushFont(symbolsFont);
-        const char* icon = symbolsFont ? "\xEE\xA1\xB2" : "X";
+        const char* icon = symbolsFont ? EditorIcons::Delete : "X";
         const bool clicked = ImGui::SmallButton(icon);
         if (symbolsFont) ImGui::PopFont();
         if (ImGui::IsItemHovered()) {

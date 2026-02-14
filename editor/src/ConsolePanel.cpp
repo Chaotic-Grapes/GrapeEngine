@@ -21,6 +21,7 @@ color-coded severity levels.
 #include <sstream>
 #include <cctype>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 
 #ifdef max
 #undef max
@@ -111,7 +112,8 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
     ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
-    if (ImGui::Button(paused ? "Resume" : "Pause")) {
+    const char* pauseText = paused ? "Resume" : "Pause";
+    if (ImGui::Button(pauseText)) {
         m_paused.store(!paused);  // Atomic write
         if (paused) {
             _flushPendingMessages();  // When resuming, add queued messages

@@ -40,6 +40,7 @@ through a unified system shared by both entities and prefab templates.
 #include <algorithm>
 #include <unordered_set>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "core/Application.h"
 #include "scene/SceneManager.h"
 
@@ -495,7 +496,8 @@ void InspectorPanel::Render() {
     ImGui::PushFont(m_mainFont);
 
     // Window name changes depending on what we are editing
-    const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
+    const bool isPrefab = (m_mode == InspectionMode::Prefab);
+    const char* windowTitle = isPrefab ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
 
     // Keyboard shortcuts for common inspector actions
@@ -915,9 +917,13 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
 
     // Button to save this entity and its components as a prefab
     ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
     if (ImGui::Button("Save as Prefab")) {
         _saveEntityAsPrefab(entity);
     }
+    ImGui::PopStyleColor(3);
 
     // Popup menu listing all available components from the registry
     if (m_openAddComponentPopup) {

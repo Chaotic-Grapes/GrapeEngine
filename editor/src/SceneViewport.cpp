@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "SelectionOutlineRenderer.h"
 #include "EditorCamera.hpp"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -210,20 +211,20 @@ void SceneViewport::_renderViewport() {
     };
 
     // Taken from Google Material Design Icons
-    static const char* ICON_CAMERA_3D   = "\xEE\xB4\xB8";   // 3d
-    static const char* ICON_CAMERA_2D   = "\xEE\xBC\xB7";   // 2d
-    static const char* ICON_MOVE        = "\xEE\xA2\x9F";   // open_with
-    static const char* ICON_ROTATE      = "\xEE\x90\x9D";   // rotate_right
-    static const char* ICON_SCALE       = "\xEE\x8F\x82";   // crop_free
-    static const char* ICON_LOCAL       = "\xEE\x95\x9C";   // my_location
-    static const char* ICON_WORLD       = "\xEE\xA0\x8B";   // public
-    static const char* ICON_OVERLAYS    = "\xEE\x94\xBB";   // layers
-    static const char* ICON_DEBUG       = "\xEE\x90\xA9";   // tune
-    static const char* ICON_LAYOUT_1    = "\xEE\x8F\x86";   // crop_square
-    static const char* ICON_LAYOUT_2    = "\xEE\xA3\xB2";   // view_column
-    static const char* ICON_LAYOUT_4    = "\xEE\xA6\xA9";   // grid_view
-    static const char* ICON_MAX         = "\xEE\x97\x90";   // fullscreen
-    static const char* ICON_RESTORE     = "\xEE\x97\x91";   // fullscreen_exit
+    static const char* ICON_CAMERA_3D   = EditorIcons::Camera3D;
+    static const char* ICON_CAMERA_2D   = EditorIcons::Camera2D;
+    static const char* ICON_MOVE        = EditorIcons::Move;
+    static const char* ICON_ROTATE      = EditorIcons::Rotate;
+    static const char* ICON_SCALE       = EditorIcons::Scale;
+    static const char* ICON_LOCAL       = EditorIcons::Local;
+    static const char* ICON_WORLD       = EditorIcons::World;
+    static const char* ICON_OVERLAYS    = EditorIcons::Overlays;
+    static const char* ICON_DEBUG       = EditorIcons::Debug;
+    static const char* ICON_LAYOUT_1    = EditorIcons::Layout1;
+    static const char* ICON_LAYOUT_2    = EditorIcons::Layout2;
+    static const char* ICON_LAYOUT_4    = EditorIcons::Layout4;
+    static const char* ICON_MAX         = EditorIcons::Maximize;
+    static const char* ICON_RESTORE     = EditorIcons::Restore;
 
     // Per-group tints to visually separate control clusters.
     const ImVec4 cameraTint = ImVec4(0.20f, 0.38f, 0.66f, 1.0f);

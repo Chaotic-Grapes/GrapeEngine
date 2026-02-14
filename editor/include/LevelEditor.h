@@ -77,6 +77,7 @@ public:
     void ClearStepRequest();
     EditorState GetEditorState() const;
     bool HasValidWorld() const { return m_world != nullptr; }
+    void SetProjectBrowserRequestCallback(std::function<void()> callback) { m_projectBrowserRequest = std::move(callback); }
 
 private:
     // Panel registration system
@@ -178,6 +179,8 @@ private:
 
     // Undo System
     Editor::UndoSystem m_undoSystem;
+
+    std::function<void()> m_projectBrowserRequest;
 
     // Message system subscriptions for engine events
     Messaging::SubscriptionHandle m_entityCreatedSubscription;
