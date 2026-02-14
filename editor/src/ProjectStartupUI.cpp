@@ -361,7 +361,7 @@ namespace Editor {
                 ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
-                if (ImGui::Button("Remove") && !m_projectSelectionLocked) {
+                if (ImGui::Button("Remove")) {
                     m_deleteTargetPath = m_selectedProjectPath;  // Mark for deletion
                     m_openDeleteConfirm = true;  // Trigger confirmation dialog
                     ImGui::OpenPopup("Remove Project?");  // Open the modal
@@ -386,8 +386,9 @@ namespace Editor {
             ImGui::EndChild();  // End details panel
 
             // Modal popup for confirming project deletion from the list
-            if (m_openDeleteConfirm) {
-                if (ImGui::BeginPopupModal("Remove Project?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+              if (m_openDeleteConfirm) {
+                  ImGui::OpenPopup("Remove Project?");
+                  if (ImGui::BeginPopupModal("Remove Project?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                     ImGui::TextWrapped("Remove this project from the list? This will not delete the folder.");
                     ImGui::Separator();
                     // Show which project will be removed
@@ -418,19 +419,20 @@ namespace Editor {
                     ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::PrimaryButton);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::PrimaryButtonHover);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::PrimaryButtonActive);
-                    if (ImGui::Button("Remove", ImVec2(buttonWidth, 0))) {
+                      if (ImGui::Button("Remove", ImVec2(buttonWidth, 0))) {
+                          // Remove from recent projects list (normalize for reliable match)
+                          if (m_settings) {
+                              const std::string targetKey = NormalizePathKey(m_deleteTargetPath);
+                              auto& recents = m_settings->RecentProjects;
+                              recents.erase(std::remove_if(recents.begin(), recents.end(),
+                                  [&](const std::string& path) {
+                                      return NormalizePathKey(path) == targetKey;
+                                  }), recents.end());
 
-                        // Remove from recent projects list
-                        if (m_settings) {
-                            auto& recents = m_settings->RecentProjects;
-                            // Erase all occurrences of this path from the list
-                            recents.erase(std::remove(recents.begin(), recents.end(), m_deleteTargetPath), recents.end());
-
-                            // If this was the last opened project, clear that too
-                            if (m_settings->LastProject == m_deleteTargetPath) {
-                                m_settings->LastProject.clear();
-                            }
-                        }
+                              if (NormalizePathKey(m_settings->LastProject) == targetKey) {
+                                  m_settings->LastProject.clear();
+                              }
+                          }
 
                         // Deselect if this was the selected project
                         if (m_selectedProjectPath == m_deleteTargetPath) {
@@ -453,7 +455,7 @@ namespace Editor {
                     ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
-                    if (ImGui::Button("Delete", ImVec2(buttonWidth, 0))) {
+                      if (ImGui::Button("Delete", ImVec2(buttonWidth, 0))) {
 
                         // Actually delete the folder from disk
                         if (!m_deleteTargetPath.empty() && std::filesystem::exists(m_deleteTargetPath)
@@ -467,14 +469,18 @@ namespace Editor {
                         }
 
                         // Also remove from settings lists
-                        if (m_settings) {
-                            auto& recents = m_settings->RecentProjects;
-                            recents.erase(std::remove(recents.begin(), recents.end(), m_deleteTargetPath), recents.end());
+                          if (m_settings) {
+                              const std::string targetKey = NormalizePathKey(m_deleteTargetPath);
+                              auto& recents = m_settings->RecentProjects;
+                              recents.erase(std::remove_if(recents.begin(), recents.end(),
+                                  [&](const std::string& path) {
+                                      return NormalizePathKey(path) == targetKey;
+                                  }), recents.end());
 
-                            if (m_settings->LastProject == m_deleteTargetPath) {
-                                m_settings->LastProject.clear();
-                            }
-                        }
+                              if (NormalizePathKey(m_settings->LastProject) == targetKey) {
+                                  m_settings->LastProject.clear();
+                              }
+                          }
 
                         // Deselect if this was the selected project
                         if (m_selectedProjectPath == m_deleteTargetPath) {
