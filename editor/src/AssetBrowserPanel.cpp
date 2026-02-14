@@ -33,6 +33,7 @@ Provides:
 #include <fstream>
 #include <cstring>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 
 
 // -------------------------------------------------------------------------
@@ -144,11 +145,23 @@ void AssetBrowserPanel::Render() {
 // Render the breadcrumb navigation bar at the top
 void AssetBrowserPanel::_renderNavigationBar() {
     // Display clickable breadcrumb navigation with drop target support
-    const std::filesystem::path pathObj(m_currentPath);
+    const std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    std::filesystem::path pathObj(m_currentPath);
     std::vector<std::filesystem::path> pathParts;
+    std::string projectName = projectRoot.filename().string();
+    if (projectName.empty()) {
+        projectName = "Project";
+    }
 
-    // Build path parts from root to current
-    for (const auto& part : pathObj) {
+    std::error_code ec;
+    std::filesystem::path rel = std::filesystem::relative(pathObj, projectRoot, ec);
+    if (ec || rel.empty() || rel.string().rfind("..", 0) == 0) {
+        pathObj = projectRoot;
+        rel = std::filesystem::path();
+    }
+
+    pathParts.emplace_back(projectName);
+    for (const auto& part : rel) {
         std::string partStr = part.string();
         if (!partStr.empty() && partStr != "." && partStr != ".." && partStr != "/" && partStr != "\\") {
             pathParts.emplace_back(partStr);
@@ -156,11 +169,13 @@ void AssetBrowserPanel::_renderNavigationBar() {
     }
 
     // Display each part as clickable button with separators and drop targets
-    std::string accumulatedPath;
+    std::filesystem::path accumulatedPath = projectRoot;
     for (size_t i = 0; i < pathParts.size(); i++) {
-        // Build accumulated path up to this part
-        if (i > 0) accumulatedPath += "\\";
-        accumulatedPath += pathParts[i].string();
+        if (i == 0) {
+            accumulatedPath = projectRoot;
+        } else {
+            accumulatedPath /= pathParts[i].string();
+        }
 
         // Add ">" separator between breadcrumb parts
         if (i > 0) {
@@ -176,7 +191,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // Make current directory text a drop target
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
-                _handleFolderDropTarget(m_currentPath);
+                _handleFolderDropTarget(accumulatedPath.string());
             }
         }
         else {
@@ -190,7 +205,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
-                m_currentPath = accumulatedPath;
+                m_currentPath = accumulatedPath.string();
                 m_selectedAssets.clear();
                 m_selectedAsset.clear();
             }
@@ -199,7 +214,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // Make breadcrumb button a drop target
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
-                _handleFolderDropTarget(accumulatedPath);
+                _handleFolderDropTarget(accumulatedPath.string());
             }
 
             ImGui::PopID();
@@ -216,7 +231,7 @@ void AssetBrowserPanel::_renderActionButtons() {
     // Import button (upload icon)
     // Push symbols font so the button renders an icon glyph
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEF\x82\x9B")) {
+    if (ImGui::Button(EditorIcons::Import)) {
         m_assetLibrary._importAsset(m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
     }
     ImGui::PopFont();
@@ -248,7 +263,7 @@ void AssetBrowserPanel::_renderActionButtons() {
 
     // Use symbols font for the replace icon button
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEE\xA3\x94")) {
+    if (ImGui::Button(EditorIcons::Replace)) {
         m_assetLibrary._replaceTexture(m_selectedAsset, m_statusMessage, m_statusTimer);
     }
 
@@ -278,7 +293,7 @@ void AssetBrowserPanel::_renderActionButtons() {
 void AssetBrowserPanel::_renderPrefabButton() {
     // Plus button - always enabled now (for Create + Prefab management)
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
+    if (ImGui::Button(EditorIcons::NewFolder)) {
         ImGui::OpenPopup("CreateAndPrefabs");
     }
 
@@ -374,10 +389,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
             // Render icon
             ImGui::PushFont(m_symbolsFont);
             if (entry.is_directory()) {
-                ImGui::Text("\xEE\x8B\x87"); // Folder icon
+                ImGui::Text(EditorIcons::Folder); // Folder icon
             }
             else {
-                ImGui::Text("\xEE\xA1\xB3"); // File icon
+                ImGui::Text(EditorIcons::File); // File icon
             }
             ImGui::PopFont();
 
@@ -605,7 +620,7 @@ void AssetBrowserPanel::_renderDeleteButton() {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
         // Render delete icon button
-        if (ImGui::SmallButton("\xEE\xA1\xB2\\##Delete2")) {
+        if (ImGui::SmallButton((std::string(EditorIcons::Delete) + "##Delete2").c_str())) {
             _deleteSelectedAssets();
         }
         ImGui::PopFont();
@@ -624,7 +639,7 @@ void AssetBrowserPanel::_renderDeleteButton() {
             ImGui::PushFont(m_symbolsFont);
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
-            if (ImGui::SmallButton("\xEE\x8B\x88\\##RevealInExplorer")) {
+            if (ImGui::SmallButton((std::string(EditorIcons::Browse) + "##RevealInExplorer").c_str())) {
                 _openInExplorer(*m_selectedAssets.begin());
             }
             ImGui::PopFont();
@@ -1259,7 +1274,7 @@ void AssetBrowserPanel::_handleAssetDragDrop(const std::string& assetPath) {
 
         // Drag preview
         ImGui::PushFont(m_symbolsFont);
-        ImGui::Text("\xEF\x8E\xB2");
+        ImGui::Text(EditorIcons::Drag);
         ImGui::PopFont();
         ImGui::SameLine();
         if (draggedAssets.size() == 1) {

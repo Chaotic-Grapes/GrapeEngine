@@ -27,6 +27,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "ecs/PrefabManager.h"
 #include <imgui.h>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -292,7 +293,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(resetX);
 
-        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+        const char* resetIcon = EditorIcons::Reset;
 
         // Reset component data back to its default JSON payload
         ImGui::SetCursorPosY(ImGui::GetCursorPosY());
@@ -332,7 +333,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(buttonX);
 
-        const char *trashIcon = "\xEE\xA1\xB2"; // Trash icon (material: delete)
+        const char* trashIcon = EditorIcons::Delete;
 
         // Match the reset icon's vertical alignment so header actions line up
         ImGui::SetCursorPosY(ImGui::GetCursorPosY());

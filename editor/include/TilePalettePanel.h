@@ -43,6 +43,7 @@ Dependencies:
 #include "core/World/Tileset.hpp"
 #include "ecs/Entity.h"
 
+struct ImFont;
 namespace ECS { class World; }
 namespace Editor { class UndoSystem; }
 
@@ -78,7 +79,8 @@ public:
     \param tileset Initial tileset reference
     \param world ECS world pointer for physics syncing
     */
-    void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world);
+    void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset,
+        ECS::World* world, ImFont* symbolsFont);
      /*------------------------------------------------------------------*/
     /*!
     \brief Assigns ECS world for physics entity management.
@@ -248,6 +250,7 @@ private:
     //! External systems
     ECS::World* m_world = nullptr;
     Editor::UndoSystem* m_undoSystem = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     //! Tilemap UI state
     std::vector<TileMapListEntry> m_tileMapList;

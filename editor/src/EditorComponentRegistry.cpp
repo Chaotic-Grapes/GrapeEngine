@@ -1272,7 +1272,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         if (!nativeName.empty()) {
             // Use the actual component name if available
             displayName = nativeName;
-            // Extract just the class name from the full type name (e.g., "EchoesBelow.Scripts.Health" -> "Health")
+            // Extract just the class name from the full type name (e.g., "Project.Scripts.Health" -> "Health")
             size_t lastDot = nativeName.rfind('.');
             if (lastDot != std::string::npos) {
                 displayName = nativeName.substr(lastDot + 1);

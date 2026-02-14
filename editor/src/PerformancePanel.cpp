@@ -18,6 +18,8 @@ polling system counters while the game is not running.
 /* End Header *******************************************************************/
 
 #include "PerformancePanel.h"
+#include "EditorIcons.h"
+#include "EditorStyle.h"
 #include "services/TimeSystem.h"
 #include "ecs/SystemManager.h"
 #include "services/MemoryManager.h"
@@ -27,9 +29,10 @@ polling system counters while the game is not running.
 #include <algorithm>
 #include <deque>
 
-void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
+void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
+    m_symbolsFont = symbolsFont;
     m_initialized = true;
 }
 
@@ -57,6 +60,7 @@ void PerformancePanel::Render(bool /*isPlaying*/) {
         ImGui::End();
         return;
     }
+
 
     // Update cached data each frame (continuous monitoring)
     _updateCachedData();

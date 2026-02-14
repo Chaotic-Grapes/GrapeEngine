@@ -142,7 +142,7 @@ internal static class ComponentDiscovery
 
         foreach (var attr in type.GetCustomAttributes())
         {
-            //if (string.IsNullOrWhiteSpace(type.FullName) || !type.FullName.StartsWith("EchoesBelow"))
+            //if (string.IsNullOrWhiteSpace(type.FullName) || !type.FullName.StartsWith("Project"))
             //    continue;
 
             Logging.LogInternal($"[ComponentDiscovery] {type.FullName} has attribute: {attr.GetType().FullName}", LogLevel.Debug);
@@ -263,7 +263,7 @@ internal static class ComponentDiscovery
         if (assemblyName.StartsWith("GrapeEngine"))
             return true;
 
-        // Include user script assemblies (GameScripts, EchoesBelow, etc.)
+        // Include user script assemblies (GameScripts, Project, etc.)
         // Exclude System, Microsoft, and other framework assemblies
         if (assemblyName.StartsWith("System") || 
             assemblyName.StartsWith("Microsoft") ||

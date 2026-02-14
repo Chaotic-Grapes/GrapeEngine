@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <vector>
 #include "core/Logger.h"
 #include "serialization/Serializer.h"
 
@@ -42,6 +43,10 @@ struct EditorSettings {
         bool VSync = true;          // Whether to enable vertical sync
         std::string Mode = "Windowed"; // Windowed, Fullscreen, Borderless
     } WindowSettings;
+
+    float UiScale = 1.0f;
+    std::vector<std::string> RecentProjects;
+    std::string LastProject;
 };
 
 namespace Editor {
@@ -74,6 +79,21 @@ namespace Editor {
                 _parseWindowConfig(configJson["WindowSettings"], config.WindowSettings);
             }
 
+            if (configJson.contains("RecentProjects") && configJson["RecentProjects"].is_array()) {
+                config.RecentProjects.clear();
+                for (const auto& entry : configJson["RecentProjects"]) {
+                    if (entry.is_string()) {
+                        config.RecentProjects.push_back(entry.get<std::string>());
+                    }
+                }
+            }
+            if (configJson.contains("UiScale") && configJson["UiScale"].is_number()) {
+                config.UiScale = configJson["UiScale"].get<float>();
+            }
+            if (configJson.contains("LastProject") && configJson["LastProject"].is_string()) {
+                config.LastProject = configJson["LastProject"].get<std::string>();
+            }
+
             LOG_DEBUG("Editor configuration loaded successfully from: " << configPath << '\n');
             return true;
         }
@@ -92,6 +112,9 @@ namespace Editor {
             configJson["WindowSettings"]["Maximized"] = config.WindowSettings.Maximized;
             configJson["WindowSettings"]["VSync"] = config.WindowSettings.VSync;
             configJson["WindowSettings"]["Mode"] = _normalizeWindowMode(config.WindowSettings.Mode);
+            configJson["UiScale"] = config.UiScale;
+            configJson["RecentProjects"] = config.RecentProjects;
+            configJson["LastProject"] = config.LastProject;
 
             return Serialization::Serializer::SaveJson(configPath, "json", configJson);
         }

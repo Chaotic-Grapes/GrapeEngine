@@ -22,6 +22,9 @@ active scene.
 
 #include <string>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
 #include <imgui.h>
 #include "serialization/ConfigurationSerializer.h"
 #include "EditorState.h"
@@ -79,6 +82,11 @@ public:
         m_preSaveCallback = std::move(callback);
     }
 
+    // Request opening the project browser (project selection UI).
+    void SetProjectBrowserRequestCallback(std::function<void()> callback) {
+        m_requestProjectBrowser = std::move(callback);
+    }
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -128,6 +136,13 @@ public:
     void HandleShortcuts(float& uiScale);
 
 private:
+    struct ExportStepResult {
+        std::string Name;
+        bool Success = false;
+        std::string Message;
+        std::string Output;
+    };
+
     // -------------------------------------------------------------------------
     // Internal Helpers
     // -------------------------------------------------------------------------
@@ -137,6 +152,12 @@ private:
 
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
+    void _exportProject();
+    void _renderExportSummaryPopup();
+#ifdef _WIN32
+    std::string _pickExportFolder();
+#endif
+    void _finalizeExportIfDone();
 
     // -------------------------------------------------------------------------
     // State
@@ -154,6 +175,8 @@ private:
     std::function<void()> m_clearPlaybackSnapshot;
     // Optional callback to sync external assets before scene serialization.
     std::function<void(const std::string&)> m_preSaveCallback;
+    // Optional callback to open the project browser.
+    std::function<void()> m_requestProjectBrowser;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes
@@ -167,6 +190,18 @@ private:
     bool m_projectSettingsDirty = false;
     // Helper to render project settings modal
     void _renderProjectSettingsModal();
+
+    // Export state
+    bool m_exportRequested = false;
+    bool m_openExportSummary = false;
+    std::string m_exportDestination;
+    std::vector<ExportStepResult> m_exportResults;
+    std::thread m_exportThread;
+    std::mutex m_exportMutex;
+    std::atomic<bool> m_exportInProgress{ false };
+    std::atomic<bool> m_exportDone{ false };
+    std::atomic<int> m_exportCurrentStep{ -1 };
+    std::vector<std::string> m_exportStepNames;
     
 };
 

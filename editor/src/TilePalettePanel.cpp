@@ -26,6 +26,8 @@ and tilemap/tileset asset management.
 
 
 #include "TilePalettePanel.h"
+#include "EditorIcons.h"
+#include "EditorStyle.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -88,9 +90,11 @@ to ensure consistent state resets and avoid duplicated logic.
 \param tileset  Initial tileset used for palette display
 \param world    ECS world used for spawning/removing physics entities
 */
-void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world)
+void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset,
+    ECS::World* world, ImFont* symbolsFont)
 {
     m_world = world; // Store world pointer for physics syncing.
+    m_symbolsFont = symbolsFont;
     // Initialize editing context in one place so state resets stay consistent.
     const std::vector<std::shared_ptr<Tileset>> tilesets = tileset ? std::vector<std::shared_ptr<Tileset>>{ tileset } : std::vector<std::shared_ptr<Tileset>>{};
     const std::vector<std::string> paths;

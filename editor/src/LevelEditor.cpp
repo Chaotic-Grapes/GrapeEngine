@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "graphics/graphicsConfig.hpp"
 #include "LevelEditor.h"
 #include "services/TimeSystem.h"
@@ -376,6 +377,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     if (!pWin) return;
 
     ImGuiStyle& style = ImGui::GetStyle();
+    m_uiScale = EditorStyle::FontScale;
+    ImGui::GetIO().FontGlobalScale = m_uiScale;
 
     // Initialize audio asset library:
     // this will scan for audio anywhere under the project root
@@ -402,6 +405,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_fileMenu.SetPlaybackSnapshotClearCallback([this]() { m_playback.ClearSavedState(); });
     // Ensure tilemaps are flushed to disk before the scene serializer runs.
     m_fileMenu.SetPreSaveCallback([this](const std::string& scenePath) { _saveActiveTileMapAsset(scenePath); });
+    m_fileMenu.SetProjectBrowserRequestCallback([this]() {
+        if (m_projectBrowserRequest) {
+            m_projectBrowserRequest();
+        }
+    });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -547,7 +555,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     _registerPanel("Tile Palette",
         [this]() {
-            m_tilePalette.Initialize(nullptr, nullptr, m_world);
+            m_tilePalette.Initialize(nullptr, nullptr, m_world, m_symbolsFont);
             m_tilePalette.SetAssetDropCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
             m_tilePalette.SetUndoSystem(&m_undoSystem);
         },
@@ -595,7 +603,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Register Performance panel (monitoring)
     _registerPanel("Performance",
         [this]() {
-            m_performancePanel.Initialize(m_mainFont, m_boldFont);
+            m_performancePanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
         },
         [this]() { 
             // Get SystemManager from engine
@@ -613,7 +621,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Register Systems panel (shows registered C# and C++ systems)
     _registerPanel("Systems",
         [this]() {
-            m_systemsPanel.Initialize(m_mainFont, m_boldFont);
+            m_systemsPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
         },
         [this]() { 
             // Get SystemManager from engine
@@ -710,10 +718,11 @@ void LevelEditor::_loadFonts() {
             strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
             return io.Fonts->AddFontFromMemoryTTF(raw->Data.data(), (int)raw->Data.size(), size, &cfg, ranges);
         }
-        else {
-            LOG_ERROR("Failed to load font via RM: " << path);
-            return nullptr;
-        }
+
+        LOG_WARNING("Failed to load font via RM, falling back to file: " << path);
+        ImFontConfig cfg = config ? *config : ImFontConfig();
+        strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
+        return io.Fonts->AddFontFromFileTTF(path.c_str(), size, &cfg, ranges);
     };
 
 	// Load main text font (caching handled by RM)
@@ -756,6 +765,21 @@ void LevelEditor::_loadFonts() {
     iconsConfig.OversampleH = 3;
     iconsConfig.OversampleV = 3;
 
+    // Merge icon glyphs into the main font for tab labels and mixed text.
+    static ImFontAtlas* s_mergedAtlas = nullptr;
+    if (m_mainFont && s_mergedAtlas != io.Fonts) {
+        ImFontConfig mergeConfig = iconsConfig;
+        mergeConfig.MergeMode = true;
+        loadFont(
+            "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
+            textFontSize,
+            &mergeConfig,
+            iconRanges
+        );
+        s_mergedAtlas = io.Fonts;
+    }
+
+
 	// Load icon font (Material Symbols); AGAIN, caching via RM
     if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
         m_symbolsFont = loadFont(
@@ -773,9 +797,7 @@ void LevelEditor::_loadFonts() {
         m_symbolsFont = io.Fonts->Fonts[2];
     }
 
-    if (!io.Fonts->Fonts.empty() && !io.Fonts->IsBuilt()) {
-        io.Fonts->Build();
-    }
+    (void)io;
 }
 
 // -------------------------------------------------------------------------
