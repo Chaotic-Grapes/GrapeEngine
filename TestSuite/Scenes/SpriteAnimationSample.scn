@@ -1,0 +1,272 @@
+{
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 5.0,
+                            "Y": 5.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Fishfolk Animation"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "CurrentFrame": 0,
+                        "Finished": false,
+                        "TimeAccumulator": 0.0
+                    },
+                    "TypeName": "AnimationState2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 16,
+                        "TexturePath": "",
+                        "Tiling": {
+                            "X": 0.0625,
+                            "Y": 0.10000000149011612
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "FrameCount": 16,
+                        "FrameHeight": 16,
+                        "FrameLength": 16,
+                        "FrameOffset": 0,
+                        "FrameWidth": 32,
+                        "FramesPerSecond": 6.0,
+                        "Loop": true,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Playing": true,
+                        "Row": 0,
+                        "SheetHeight": 160,
+                        "SheetWidth": 512,
+                        "StartFrame": 0,
+                        "TextureId": 16,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "UseRow": true
+                    },
+                    "TypeName": "SpriteSheetAnimation2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 5.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 5.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Main Camera"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Active": true,
+                        "AspectRatio": 1.3412127494812012,
+                        "FOV": 45.0,
+                        "FarPlane": 100.0,
+                        "NearPlane": 0.10000000149011612,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": true
+                    },
+                    "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        }
+    ],
+    "EntityCount": 2,
+    "Hierarchy": [],
+    "Layers": [
+        {
+            "id": 0,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Background",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 1,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "World",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 2,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Gameplay",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 3,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Foreground",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 98,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "UI",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 99,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Debug",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        }
+    ],
+    "SceneName": "SpriteAnimationSample",
+    "Version": "1.0"
+}

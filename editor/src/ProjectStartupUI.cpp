@@ -113,6 +113,15 @@ namespace Editor {
             return value;  // On non-Windows, returns normalized path as-is
         }
 
+#ifdef _WIN32
+        int CALLBACK BrowseFolderCallbackProc(HWND hwnd, UINT uMsg, LPARAM /* lParam */, LPARAM lpData) {
+            if (uMsg == BFFM_INITIALIZED && lpData) {
+                SendMessageA(hwnd, BFFM_SETSELECTION, TRUE, lpData);
+            }
+            return 0;
+        }
+#endif
+
     }
 
     // Main render function: Displays appropriate startup UI screen based on current editor stage
@@ -741,11 +750,18 @@ namespace Editor {
     // Returns the selected folder path, or empty string if user cancels
     std::string ProjectStartupUI::_pickFolder() {
 #ifdef _WIN32
+        char currentDir[MAX_PATH] = {};
+        const DWORD currentDirLen = GetCurrentDirectoryA(MAX_PATH, currentDir);
+
         // Configure the folder picker dialog
         BROWSEINFOA bi = {};  // Initialize all fields to zero
         bi.lpszTitle = "Select Project Folder";  // Dialog title
         // Flags: only show folders, use newer dialog style
         bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+        if (currentDirLen > 0 && currentDirLen < MAX_PATH) {
+            bi.lpfn = BrowseFolderCallbackProc;
+            bi.lParam = reinterpret_cast<LPARAM>(currentDir);
+        }
 
         // Show the dialog and get the result (pidl = pointer to item ID list)
         LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);

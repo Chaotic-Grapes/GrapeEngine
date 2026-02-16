@@ -264,6 +264,13 @@ namespace ECS {
                             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
         void SubmitGUIText(const Vector2D& position, const std::string& text,
                            const std::string& fontPath, float pixelSize, const Color& color);
+        void SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+                                 const Color& color, float cornerRadius = 0.0f);
+        void SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+                                 uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+        void SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+                                const std::string& fontPath, float pixelSize, const Color& color);
 
         // Call from editor when a tilemap should be rendered
         struct DebugTileMapEntry {
@@ -404,6 +411,33 @@ namespace ECS {
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
 
+        struct WorldGUIPanelSubmission {
+            Vector2D position;
+            Vector2D size;
+            Color color;
+            float cornerRadius = 0.0f;
+        };
+        std::vector<WorldGUIPanelSubmission> m_worldGuiPanelQueue;
+
+        struct WorldGUITextSubmission {
+            Vector2D position;
+            std::string text;
+            std::string fontPath;
+            float pixelSize = 24.0f;
+            Color color;
+        };
+        std::vector<WorldGUITextSubmission> m_worldGuiTextQueue;
+
+        struct WorldGUIImageSubmission {
+            Vector2D position;
+            Vector2D size;
+            uint32_t textureId = 0;
+            Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+            Color color;
+            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+        };
+        std::vector<WorldGUIImageSubmission> m_worldGuiImageQueue;
+
         Graphics::LightManager m_lightManager;
 
         // ====================================================================
@@ -487,6 +521,7 @@ namespace ECS {
         void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
         void RenderGUI(Viewport& vp);
+        void RenderWorldGUI(const glm::mat4& viewProj);
         void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
             const std::vector<std::vector<Entity>>& buckets);
 

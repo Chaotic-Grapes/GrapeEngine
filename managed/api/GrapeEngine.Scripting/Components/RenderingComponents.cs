@@ -170,20 +170,22 @@ public enum GUIAlignment : byte
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public record struct GUIElement
-{
-    public Vector2 Position;
-    public Vector2 Size;
-    public bool Visible;
-    public GUIAlignment Alignment;
-    public short ZOrder;
-    public Vector4 Margin;
-    public Vector4 Padding;
-    public Vector2 ResolvedPosition;
-    public Vector2 ResolvedSize;
-    public Vector2 ContentPosition;
-    public Vector2 ContentSize;
-}
+    public record struct GUIElement
+    {
+        public Vector2 Position;
+        public Vector2 Size;
+        public bool Visible;
+        public GUIAlignment Alignment;
+        public short ZOrder;
+        public Vector4 Margin;
+        public Vector4 Padding;
+        public Vector2 ResolvedPosition;
+        public Vector2 ResolvedSize;
+        public Vector2 ContentPosition;
+        public Vector2 ContentSize;
+        public Vector2 ScreenPosition;
+        public Vector2 ScreenSize;
+    }
 
 [StructLayout(LayoutKind.Sequential)]
 public record struct GUIPanel

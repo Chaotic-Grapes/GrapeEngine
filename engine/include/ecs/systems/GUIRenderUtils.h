@@ -41,7 +41,7 @@ namespace ECS {
             // Get parent and continue
             const auto& parent = world.Get<Components::Parent>(current);
             current = parent.ParentEntity;
-            if (current.IsNull() || !world.IsAlive(current) || !world.Has<Components::GUIElement>(current)) {
+            if (current.IsNull() || !world.IsAlive(current)) {
                 break;
             }
             // Prevent potential infinite loops by limiting depth

@@ -345,7 +345,7 @@ namespace ECS {
                 const ECS::Components::LocalTransform& transform,
                 const ECS::Components::Camera3D& camera)
             {
-                if (foundActive || !camera.Active) return;
+                if (foundActive || !camera.Active || !world.IsActiveInHierarchy(e)) return;
 
                 Vector3D position{};
                 Quaternion rotation{};
@@ -483,6 +483,9 @@ namespace ECS {
             m_guiPanelQueue.clear();
             m_guiImageQueue.clear();
             m_guiTextQueue.clear();
+            m_worldGuiPanelQueue.clear();
+            m_worldGuiImageQueue.clear();
+            m_worldGuiTextQueue.clear();
 
             // Unbind the current render target.
             Framebuffer::Unbind();
@@ -1101,10 +1104,26 @@ namespace ECS {
             });
 
 
+        m_renderGraph->AddPass("WorldGUI", { "HDR" }, { "HDR" },
+            [this, &viewProj](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
+                if (!hdrFbo) return;
+
+                hdrFbo->Bind();
+                glViewport(0, 0, hdrFbo->Width(), hdrFbo->Height());
+                RenderWorldGUI(viewProj);
+                Framebuffer::Unbind();
+
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
+            });
+
         m_renderGraph->AddPass("BloomExtract", { "HDR" }, { "BloomExtract" },
-                [this](ResourceAccessor& res)
-                {
-                    auto* hdrFbo = res.GetFramebuffer("HDR");
+            [this](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
                     auto* extractFbo = res.GetFramebuffer("BloomExtract");
                     if (!hdrFbo || !extractFbo) return;
 
@@ -1503,6 +1522,9 @@ namespace ECS {
                 m_guiPanelQueue.clear();
                 m_guiImageQueue.clear();
                 m_guiTextQueue.clear();
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
                 // Unbind the current render target.
@@ -1949,12 +1971,14 @@ namespace ECS {
                         });
                 }
             }
-            m_renderer->endFrame();
-        }
+              m_renderer->endFrame();
+          }
 
-        // Unbind the current render target.
-        Framebuffer::Unbind();
-    }
+          RenderWorldGUI(viewProj);
+
+          // Unbind the current render target.
+          Framebuffer::Unbind();
+      }
 
     // Render wireframes.
     void RendererSystem::RenderWireframes(Viewport& vp, const glm::mat4& viewProj) {
@@ -2122,6 +2146,81 @@ namespace ECS {
 
         // Unbind the current render target.
         Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderWorldGUI(const glm::mat4& viewProj) {
+        if (m_worldGuiPanelQueue.empty() && m_worldGuiTextQueue.empty() && m_worldGuiImageQueue.empty()) return;
+        if (!m_renderer) return;
+
+        GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Panels
+        if (!m_worldGuiPanelQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& panel : m_worldGuiPanelQueue) {
+                const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
+                                       panel.position.Y + panel.size.Y * 0.5f);
+                const glm::vec2 size(panel.size.X, panel.size.Y);
+                const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                m_renderer->submitQuad(center, size, 0, { 0.0f, 0.0f, 1.0f, 1.0f }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Images
+        if (!m_worldGuiImageQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& image : m_worldGuiImageQueue) {
+                const glm::vec2 center(image.position.X + image.size.X * 0.5f,
+                                       image.position.Y + image.size.Y * 0.5f);
+                const glm::vec2 size(image.size.X, image.size.Y);
+                const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
+                const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Text
+        if (!m_worldGuiTextQueue.empty()) {
+            if (m_textShader) {
+                m_textShader->use();
+                m_textShader->setMat4("uProjection", viewProj);
+            }
+            m_renderer->beginFrame();
+            for (const auto& text : m_worldGuiTextQueue) {
+                if (text.text.empty()) continue;
+                const std::string fontPath = text.fontPath.empty()
+                    ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
+                    : text.fontPath;
+                const float fontPixelSize = UnitsToPixels(text.pixelSize);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(std::round(fontPixelSize))));
+                if (!font) continue;
+                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float ascent = font->getAscent() * scale;
+                const glm::vec2 textPos(text.position.X, text.position.Y - ascent);
+                const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+            }
+            m_renderer->endFrame();
+        }
+
+        if (!blendWasEnabled) glDisable(GL_BLEND);
     }
 
     // Render picking.
@@ -2456,7 +2555,7 @@ namespace ECS {
 
     // Submit a GUI text draw call.
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
-                                       const std::string& fontPath, float pixelSize, const Color& color) {
+        const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
 
         // Queue GUI text draw for the GUI pass.
@@ -2467,6 +2566,49 @@ namespace ECS {
         submission.pixelSize = pixelSize;
         submission.color = color;
         m_guiTextQueue.push_back(std::move(submission));
+    }
+
+    // Submit a world-space GUI panel draw call.
+    void RendererSystem::SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+        const Color& color, float cornerRadius) {
+        (void)cornerRadius;
+        if (!m_renderer) return;
+
+        WorldGUIPanelSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.color = color;
+        submission.cornerRadius = cornerRadius;
+        m_worldGuiPanelQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI image draw call.
+    void RendererSystem::SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+        uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter) {
+        if (!m_renderer) return;
+
+        WorldGUIImageSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.textureId = textureId;
+        submission.uvRect = uvRect;
+        submission.color = color;
+        submission.textureFilter = textureFilter;
+        m_worldGuiImageQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI text draw call.
+    void RendererSystem::SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+        const std::string& fontPath, float pixelSize, const Color& color) {
+        if (!m_renderer) return;
+
+        WorldGUITextSubmission submission;
+        submission.position = position;
+        submission.text = text;
+        submission.fontPath = fontPath;
+        submission.pixelSize = pixelSize;
+        submission.color = color;
+        m_worldGuiTextQueue.push_back(std::move(submission));
     }
 
     // Submit collider debug draw geometry.
