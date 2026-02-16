@@ -389,7 +389,11 @@ void EditorService::Update() {
     SetWorld(activeWorld);
 
     if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
-        DisableLevelEditor();
+        // Follow the newly activated scene instead of hiding the editor UI.
+        m_levelEditorForScene = activeScene;
+        if (!m_levelEditorForScene) {
+            m_levelEditorForScene = nullptr;
+        }
     }
 
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));

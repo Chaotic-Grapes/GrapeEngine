@@ -66,7 +66,8 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 16,
+                        "TextureFilter": 0,
+                        "TextureId": 20,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0625,
@@ -82,7 +83,7 @@
                         "FrameLength": 16,
                         "FrameOffset": 0,
                         "FrameWidth": 32,
-                        "FramesPerSecond": 6.0,
+                        "FramesPerSecond": 16.0,
                         "Loop": true,
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
@@ -91,8 +92,9 @@
                         "SheetHeight": 160,
                         "SheetWidth": 512,
                         "StartFrame": 0,
-                        "TextureId": 16,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "TextureFilter": 0,
+                        "TextureId": 20,
+                        "TexturePath": "C:/Users/kille/source/repos/GrapeEngine/TestSuite\\Assets\\Sprites\\FishfolkSheet.png",
                         "UseRow": true
                     },
                     "TypeName": "SpriteSheetAnimation2D"
@@ -201,9 +203,121 @@
                     "TypeName": "WorldTransform"
                 }
             ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -2.0024423599243164,
+                            "Y": 2.4617180824279785,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Text"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Alignment": 0,
+                        "Margin": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Padding": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Size": {
+                            "X": 100.0,
+                            "Y": 100.0
+                        },
+                        "Visible": true,
+                        "ZOrder": 0
+                    },
+                    "TypeName": "GUIElement"
+                },
+                {
+                    "Data": {
+                        "Space": 1
+                    },
+                    "TypeName": "GUIRenderMode"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "FontPath": "",
+                        "FontSize": 50.0,
+                        "HAlign": 0,
+                        "Text": "Wow an animation!",
+                        "VAlign": 0,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -2.0024423599243164,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 2.4617180824279785,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
         }
     ],
-    "EntityCount": 2,
+    "EntityCount": 3,
     "Hierarchy": [],
     "Layers": [
         {
