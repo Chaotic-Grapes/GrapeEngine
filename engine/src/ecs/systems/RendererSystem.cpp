@@ -2091,6 +2091,23 @@ namespace ECS {
         const float h = static_cast<float>(vp.Size.y);
         glm::mat4 screenOrtho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
 
+        // Layout is produced once before render; remap it into the current viewport size so
+        // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
+        GUIViewport layoutViewport = m_guiViewport;
+        if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
+            layoutViewport.Size = m_renderTargetSize;
+        }
+        const float layoutW = std::max(1.0f, layoutViewport.Size.X);
+        const float layoutH = std::max(1.0f, layoutViewport.Size.Y);
+        const float guiScaleX = w / layoutW;
+        const float guiScaleY = h / layoutH;
+        auto scalePos = [&](const Vector2D& p) {
+            return Vector2D{ p.X * guiScaleX, p.Y * guiScaleY };
+        };
+        auto scaleSize = [&](const Vector2D& s) {
+            return Vector2D{ s.X * guiScaleX, s.Y * guiScaleY };
+        };
+
         // Panels
         if (!m_guiPanelQueue.empty()) {
             m_shader->use();
@@ -2098,8 +2115,10 @@ namespace ECS {
             m_shader->setUniform("uLightingEnabled", 0);
             guiRenderer->beginFrame();
             for (const auto& panel : m_guiPanelQueue) {
-                glm::vec2 center(panel.position.X + panel.size.X * 0.5f, panel.position.Y + panel.size.Y * 0.5f);
-                glm::vec2 size(panel.size.X, panel.size.Y);
+                const Vector2D panelPos = scalePos(panel.position);
+                const Vector2D panelSize = scaleSize(panel.size);
+                glm::vec2 center(panelPos.X + panelSize.X * 0.5f, panelPos.Y + panelSize.Y * 0.5f);
+                glm::vec2 size(panelSize.X, panelSize.Y);
                 glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
                 guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
             }
@@ -2113,8 +2132,10 @@ namespace ECS {
             m_shader->setUniform("uLightingEnabled", 0);
             guiRenderer->beginFrame();
             for (const auto& image : m_guiImageQueue) {
-                glm::vec2 center(image.position.X + image.size.X * 0.5f, image.position.Y + image.size.Y * 0.5f);
-                glm::vec2 size(image.size.X, image.size.Y);
+                const Vector2D imagePos = scalePos(image.position);
+                const Vector2D imageSize = scaleSize(image.size);
+                glm::vec2 center(imagePos.X + imageSize.X * 0.5f, imagePos.Y + imageSize.Y * 0.5f);
+                glm::vec2 size(imageSize.X, imageSize.Y);
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
                 // GUI projection uses Y-down; flip V to keep textures upright.
                 glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
@@ -2133,13 +2154,15 @@ namespace ECS {
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
-                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
+                const Vector2D textPosScaled = scalePos(text.position);
+                const float textPixelSize = text.pixelSize * std::min(guiScaleX, guiScaleY);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(textPixelSize)));
                 if (!font) continue;
-                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float scale = textPixelSize / static_cast<float>(font->getPixelSize());
                 const float ascent = font->getAscent() * scale;
-                glm::vec2 pos(text.position.X, h - text.position.Y - ascent);
+                glm::vec2 pos(textPosScaled.X, h - textPosScaled.Y - ascent);
                 glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                guiRenderer->submitText(*font, text.text, pos, color, text.pixelSize);
+                guiRenderer->submitText(*font, text.text, pos, color, textPixelSize);
             }
             guiRenderer->endFrame();
         }
