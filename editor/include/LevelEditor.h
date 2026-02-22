@@ -171,11 +171,15 @@ private:
     ImGuiID m_dockspaceId = 0;
     bool m_dockLayoutBuilt = false;
     ImVec2 m_lastViewportSize = ImVec2(0, 0);
-    // Tracks the active scene/game viewport layout preset (1/2/4).
+
+    // Tracks the active scene/game viewport layout preset (1/2/4)
     int m_viewportLayoutPreset = 1;
 
     // Playback state tracking
     EditorState m_lastEditorState = EditorState::Edit;
+
+	// Focus request flags for panels that can't immediately focus when requested (e.g. due to tab closing)
+    bool m_focusTilePaletteNextFrame = false;
 
     // Undo System
     Editor::UndoSystem m_undoSystem;

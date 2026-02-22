@@ -540,8 +540,14 @@ void SceneViewport::_renderViewport() {
                         glm::vec4 world4 = invViewProj * ndc;
                         glm::vec2 worldPos = { world4.x, world4.y };
 
-                        // Let tile palette panel handle hover and clicks
-                        m_tilePalettePanel->OnViewportHover(worldPos);
+						// Check if tile palette is in collision edit mode to determine hover vs paint behavior
+                        const bool collisionEditActive = m_tilePalettePanel->IsCollisionEditActive();
+
+						// When collision edit mode is active, we want to allow hover feedback but only handle clicks if 
+                        // painting collision to avoid interfering with regular tile painting
+                        if (!collisionEditActive) {
+                            m_tilePalettePanel->OnViewportHover(worldPos);
+                        }
 
                         // Draw tilemap bounds/grid when tile palette is active.
                         if (rendererSystem) {
@@ -592,17 +598,38 @@ void SceneViewport::_renderViewport() {
                                 rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
                             }
                         }
-                        const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
+                        
+						// When tile palette is active, prioritize it handling clicks for painting over regular picking/selection 
+                        // to avoid interference
                         bool left = Input::IsMouseDown(MOUSE_LEFT);
-                        if (left) {
-                            if (canPaint) {
-                                // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
-                                m_tilePalettePanel->OnViewportClick(worldPos, false);
-                                tilePaletteHandledClick = true;
+                        if (collisionEditActive) {
+                            const bool canPaintCollision = m_tilePalettePanel->CanHandleViewportCollisionPaint();
+							// Begin collision paint mode on mouse down
+                            if (left) {
+                                if (canPaintCollision) {
+									// Always treat clicks as handled when tile palette is active to avoid deselecting entities
+                                    m_tilePalettePanel->OnViewportCollisionClick(worldPos);
+                                    tilePaletteHandledClick = true;
+                                }
+                            } 
+							// End collision paint mode on mouse release 
+                            else {
+                                m_tilePalettePanel->EndViewportCollisionPaint();
                             }
                         } 
+						// When not in collision edit mode, use clicks for regular tile painting if the palette can handle it
                         else {
-                            m_tilePalettePanel->EndViewportPaint();
+                            const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
+                            if (left) {
+                                if (canPaint) {
+                                    // Always treat clicks as handled when tile palette is active to avoid deselecting entities
+                                    m_tilePalettePanel->OnViewportClick(worldPos, false);
+                                    tilePaletteHandledClick = true;
+                                }
+                            } 
+                            else {
+                                m_tilePalettePanel->EndViewportPaint();
+                            }
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {

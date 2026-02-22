@@ -38,6 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "core/Application.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/Components.h"
 #include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
@@ -868,6 +869,14 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         if (m_viewport) { 
             // Focus on entity
             m_viewport->FocusOnEntity(entityId);  
+        }
+		// Also set focus to the hierarchy window so user can continue interacting with it after double-clicking
+        if (m_world) {
+            const ECS::Entity entity = m_world->Resolve(entityId);
+			// If this is a tilemap entity, also focus the tile palette so user can edit tiles immediately after double-clicking
+            if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+                ImGui::SetWindowFocus("Tile Palette");
+            }
         }
         // Update click tracking
         m_lastClickedEntity = entityId;

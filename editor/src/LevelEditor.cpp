@@ -468,6 +468,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 			// Set the active tilemap in the palette and switch to collision edit mode
             _setActiveTileMap(evt.EntityId);
             m_tilePalette.SetCollisionEditActive(true);
+            m_focusTilePaletteNextFrame = true;
         }
     );
 
@@ -574,7 +575,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     _registerPanel("Tile Palette",
         [this]() {
-            m_tilePalette.Initialize(nullptr, nullptr, m_world, m_symbolsFont);
+            m_tilePalette.Initialize(nullptr, nullptr, m_world, m_symbolsFont, m_boldFont);
             m_tilePalette.SetAssetDropCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
             m_tilePalette.SetUndoSystem(&m_undoSystem);
         },
@@ -1460,6 +1461,12 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         // End.
         ImGui::End();
+    }
+
+	// Set focus to tile palette if requested (e.g. after selecting a tilemap entity)
+    if (m_focusTilePaletteNextFrame) {
+        ImGui::SetWindowFocus("Tile Palette");
+        m_focusTilePaletteNextFrame = false;
     }
 }
 
