@@ -82,6 +82,10 @@ public:
     TileID GetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY) const;
     void SetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY, TileID id);
 
+    // Collision mask helpers (4-bit mask per tile, 2x2 subcells).
+    uint8_t GetCollisionMaskSigned(int32_t tileX, int32_t tileY) const;
+    void SetCollisionMaskSigned(int32_t tileX, int32_t tileY, uint8_t mask);
+
     // Tileset list stored in the tilemap asset.
     uint8_t AddTilesetPath(const std::string& path);
     int32_t FindTilesetPath(const std::string& path) const;
@@ -109,6 +113,10 @@ private:
     int32_t m_originX = 0;           // Signed tile coordinate of layer index 0.
     int32_t m_originY = 0;           // Signed tile coordinate of layer index 0.
     std::vector<std::string> m_tilesetPaths;
+    std::vector<uint8_t> m_collisionMasks; // 4-bit mask per tile (layer 0 only).
+    uint32_t m_collisionWidth = 0;
+    uint32_t m_collisionHeight = 0;
 
     bool IsValidLayer(uint32_t layerIndex) const;
+    void ResizeCollisionGrid(uint32_t newWidth, uint32_t newHeight, int32_t offsetX, int32_t offsetY);
 };

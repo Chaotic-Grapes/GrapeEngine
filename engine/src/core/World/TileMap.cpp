@@ -52,6 +52,13 @@ uint32_t TileMap::LayerCount() const
 uint32_t TileMap::AddLayer(uint32_t width, uint32_t height)
 {
     m_layers.emplace_back(width, height);
+
+	// Initialize collision grid if this is the first layer, using the same dimensions
+    if (m_layers.size() == 1) {
+        m_collisionWidth = width;
+        m_collisionHeight = height;
+        m_collisionMasks.assign(static_cast<size_t>(width) * static_cast<size_t>(height), 0);  // Initialize all masks to 0 (no collision)
+    }
     return static_cast<uint32_t>(m_layers.size() - 1);
 }
 
@@ -100,6 +107,9 @@ void TileMap::ResizeLayer(uint32_t layerIndex, uint32_t newWidth, uint32_t newHe
     }
 
     layer = std::move(resized);
+
+	// If resizing the first layer, we also need to resize the collision grid to match the new dimensions
+    if (layerIndex == 0) ResizeCollisionGrid(newWidth, newHeight, 0, 0);
 }
 
 int32_t TileMap::OriginX() const
@@ -194,6 +204,9 @@ void TileMap::ExpandLayerToFit(uint32_t layerIndex, int32_t tileX, int32_t tileY
     layer = std::move(resized);
     m_originX = newOriginX;
     m_originY = newOriginY;
+
+	// Same thing; resize to match the new layer dimensions and shift existing masks if the origin moved
+    if (layerIndex == 0) ResizeCollisionGrid(newWidth, newHeight, offsetX, offsetY);
 }
 
 // world -> tile (floor avoids off-by-one at boundaries)
@@ -266,6 +279,44 @@ void TileMap::SetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY, T
     layer.Set(static_cast<uint32_t>(ix), static_cast<uint32_t>(iy), id);
 }
 
+// Collision masks are stored in a separate grid aligned with the first layer, 
+// indexed by signed tile coordinates relative to the origin
+// Each mask is 4 bits representing collision in 2x2 subcells of the tile
+uint8_t TileMap::GetCollisionMaskSigned(int32_t tileX, int32_t tileY) const
+{
+	// If there are no collision masks, treat as empty (0)
+    if (m_collisionMasks.empty()) return 0;
+
+	// Calculate the index in the collision mask grid based on the signed tile coordinates and origin offset
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+
+	// If the coordinates are out of bounds of the collision mask grid, treat as empty
+    if (ix < 0 || iy < 0) return 0;
+    if (ix >= static_cast<int32_t>(m_collisionWidth) || iy >= static_cast<int32_t>(m_collisionHeight)) return 0;
+
+	// Calculate the linear index into the collision mask vector and return the mask value
+    const size_t index = static_cast<size_t>(iy) * m_collisionWidth + static_cast<size_t>(ix);
+    return m_collisionMasks[index];
+}
+
+// Sets the collision mask for the tile at the given signed coordinates, if within bounds
+void TileMap::SetCollisionMaskSigned(int32_t tileX, int32_t tileY, uint8_t mask)
+{
+    // Usual checks
+    if (m_collisionMasks.empty()) return;
+
+	// Same as above
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+    if (ix < 0 || iy < 0) return;
+    if (ix >= static_cast<int32_t>(m_collisionWidth) || iy >= static_cast<int32_t>(m_collisionHeight)) return;
+
+	// Store only the lower 4 bits of the mask, since each tile has a 4-bit collision mask for its 2x2 subcells
+    const size_t index = static_cast<size_t>(iy) * m_collisionWidth + static_cast<size_t>(ix);
+    m_collisionMasks[index] = static_cast<uint8_t>(mask & 0x0F);
+}
+
 uint8_t TileMap::AddTilesetPath(const std::string& path)
 {
     if (path.empty()) {
@@ -310,6 +361,44 @@ void TileMap::SetTilesetPaths(const std::vector<std::string>& paths)
 bool TileMap::IsValidLayer(uint32_t layerIndex) const
 {
     return layerIndex < m_layers.size();
+}
+
+// If the layer is resized to be smaller, we can just discard the out-of-bounds collision masks
+// If larger, we need to create new collision masks for the new area
+void TileMap::ResizeCollisionGrid(uint32_t newWidth, uint32_t newHeight, int32_t offsetX, int32_t offsetY)
+{
+	// If there are no collision masks yet, initialize to the new size with empty masks
+    if (newWidth == 0 || newHeight == 0) return;
+
+	// Create a new collision mask grid with the new dimensions, initialized to 0 (no collision)
+    std::vector<uint8_t> resized(static_cast<size_t>(newWidth) * static_cast<size_t>(newHeight), 0);
+    const uint32_t copyWidth = std::min(m_collisionWidth, newWidth);
+    const uint32_t copyHeight = std::min(m_collisionHeight, newHeight);
+
+	// Copy existing collision masks to the new grid with the appropriate offset, if they fall within the new bounds
+    for (uint32_t y = 0; y < copyHeight; y++) {
+        for (uint32_t x = 0; x < copyWidth; x++) {
+			// Calculate the new coordinates with the offset applied
+            const int32_t newX = static_cast<int32_t>(x) + offsetX;
+            const int32_t newY = static_cast<int32_t>(y) + offsetY;
+
+			// Skip if the new coordinates are out of bounds of the resized grid
+            if (newX < 0 || newY < 0) continue;
+            if (newX >= static_cast<int32_t>(newWidth) || newY >= static_cast<int32_t>(newHeight)) continue;
+
+			// Copy the collision mask from the old grid to the new grid at the new coordinates
+            const size_t oldIndex = static_cast<size_t>(y) * m_collisionWidth + static_cast<size_t>(x);
+            const size_t newIndex = static_cast<size_t>(newY) * newWidth + static_cast<size_t>(newX);
+
+			// If the old index is out of bounds of the existing collision masks, treat it as 0 
+            resized[newIndex] = m_collisionMasks.empty() ? 0 : m_collisionMasks[oldIndex];
+        }
+    }
+
+	// Replace the old collision masks with the resized version and update dimensions
+    m_collisionMasks = std::move(resized);
+    m_collisionWidth = newWidth;
+    m_collisionHeight = newHeight;
 }
 
 bool TileMap::SaveMap(const std::string& filepath) const
