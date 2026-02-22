@@ -685,6 +685,12 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         const ECS::Entity e = m_world->Resolve(id);
         if (m_world->IsAlive(e)) {
             m_inspector.InspectEntity(id); // Inspect when valid
+
+			// If the inspector is already in entity mode, focus it to ensure it's visible
+            if (m_inspector.GetMode() == InspectorPanel::InspectionMode::Entity) {
+                m_inspector.RequestFocus();
+            }
+
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(id);
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(id);
             _syncTilePaletteToSelection(id); // Sync tile palette to the newly selected entity.
@@ -698,7 +704,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         });
 }
 
-// Load editor fonts and icon sets.
+// Load editor fonts and icon sets
 void LevelEditor::_loadFonts() {
     auto& io = ImGui::GetIO();
     float textFontSize = m_config.TextFontSize;

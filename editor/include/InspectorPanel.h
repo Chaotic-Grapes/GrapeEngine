@@ -80,6 +80,9 @@ public:
     // Clears the current selection and resets the inspector state
     void ClearSelection();
 
+    // Request focus for the inspector window on the next render pass
+    void RequestFocus();
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -242,6 +245,7 @@ private:
     bool m_focusComponentFilter = false;           // Keyboard focus request for the filter input
     bool m_focusAddComponentSearch = false;        // Keyboard focus request for Add Component search
     bool m_openAddComponentPopup = false;          // Deferred popup open flag for keyboard shortcuts
+    bool m_focusOnNextRender = false;              // Window focus request for the inspector panel
 
     // Undo - edit tracking
     struct EditState {

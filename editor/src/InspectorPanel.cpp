@@ -486,6 +486,11 @@ void InspectorPanel::ClearSelection() {
     m_componentsToDelete.clear();
 }
 
+// Request that the inspector window gets focused on the next render pass
+void InspectorPanel::RequestFocus() {
+    m_focusOnNextRender = true;
+}
+
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
@@ -498,6 +503,12 @@ void InspectorPanel::Render() {
     // Window name changes depending on what we are editing
     const bool isPrefab = (m_mode == InspectionMode::Prefab);
     const char* windowTitle = isPrefab ? "Prefab Editor" : "Property Editor";
+
+	// Focus the window if requested (e.g. after clicking on an entity in the hierarchy)
+    if (m_focusOnNextRender) {
+        ImGui::SetNextWindowFocus();
+        m_focusOnNextRender = false;
+    }
     ImGui::Begin(windowTitle);
 
     // Keyboard shortcuts for common inspector actions
