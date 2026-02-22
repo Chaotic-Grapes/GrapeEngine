@@ -140,6 +140,18 @@ public:
 
     /*------------------------------------------------------------------*/
     /*!
+    \brief Enables or disables collision edit mode.
+    */
+    void SetCollisionEditActive(bool active) { m_collisionEditActive = active; }
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Returns whether collision edit mode is active.
+    */
+    bool IsCollisionEditActive() const { return m_collisionEditActive; }
+
+    /*------------------------------------------------------------------*/
+    /*!
     \brief Enables or disables palette interaction.
     */
     void SetActive(bool active) { m_active = active; }
@@ -229,6 +241,7 @@ public:
 private:
     bool m_active = true;           //!< Palette enabled state
     bool m_paintMode = true;        //!< Viewport painting enabled
+    bool m_collisionEditActive = false; //!< Collision edit mode enabled
     
         //! Active tilemap and tilesets
     std::shared_ptr<TileMap> m_tileMap;

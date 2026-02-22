@@ -141,6 +141,7 @@ LevelEditor::~LevelEditor() {
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityCreated>(m_entityCreatedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityDestroyed>(m_entityDestroyedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::TileMapCollisionEditRequested>(m_tileMapCollisionEditSubscription);
     
     // Clear file menu state getter to avoid calling back into this object during member teardown
     m_fileMenu.SetEditorStateGetter(nullptr);
@@ -449,6 +450,24 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
                 LOG_DEBUG("[LevelEditor] Scene modified: " << evt.Reason);
                 m_fileMenu.MarkSceneDirty();
             }
+        }
+    );
+
+    // Subscribe to tilemap collision edit requests from the inspector
+    m_tileMapCollisionEditSubscription = Messaging::MessageSystem::Subscribe<Messaging::TileMapCollisionEditRequested>(
+        [this](const Messaging::TileMapCollisionEditRequested& evt) {
+            if (!m_world) return;
+            const ECS::Entity entity = m_world->Resolve(evt.EntityId);
+
+			// Validate that the entity is alive and has a TileMapComponent before proceeding
+            if (!m_world->IsAlive(entity) || !m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+                LOG_WARNING("[LevelEditor] Collision edit requested for invalid tilemap entity " << evt.EntityId);
+                return;
+            }
+
+			// Set the active tilemap in the palette and switch to collision edit mode
+            _setActiveTileMap(evt.EntityId);
+            m_tilePalette.SetCollisionEditActive(true);
         }
     );
 

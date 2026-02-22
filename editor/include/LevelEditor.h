@@ -186,6 +186,7 @@ private:
     Messaging::SubscriptionHandle m_entityCreatedSubscription;
     Messaging::SubscriptionHandle m_entityDestroyedSubscription;
     Messaging::SubscriptionHandle m_sceneModifiedSubscription;
+    Messaging::SubscriptionHandle m_tileMapCollisionEditSubscription;
     // Listens for viewport layout changes requested by the header controls.
     Messaging::SubscriptionHandle m_viewportLayoutSubscription;
 };
