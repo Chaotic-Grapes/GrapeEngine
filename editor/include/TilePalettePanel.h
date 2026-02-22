@@ -127,6 +127,13 @@ public:
     void OnViewportHover(const glm::vec2& worldPos);
     /*------------------------------------------------------------------*/
     /*!
+    \brief Draws collision brush hover preview inside the viewport.
+
+    \param worldPos Cursor position in world space
+    */
+    void OnViewportCollisionHover(const glm::vec2& worldPos);
+    /*------------------------------------------------------------------*/
+    /*!
     \brief Applies tile paint or erase action.
 
     \param worldPos Cursor position

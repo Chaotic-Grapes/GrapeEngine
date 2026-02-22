@@ -611,6 +611,76 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
 
 /*------------------------------------------------------------------*/
 /*!
+\brief Draws collision brush hover preview inside the viewport.
+
+\param worldPos Cursor position in world space
+*/
+void TilePalettePanel::OnViewportCollisionHover(const glm::vec2& worldPos)
+{
+	// Only draw collision preview if we're in collision edit mode and have a valid tilemap and tileset
+    if (!m_collisionEditActive || !m_tileMap || !m_tileset) return;
+
+	// Convert world position to tilemap-local coordinates to determine which tile we're hovering over
+    ECS::RendererSystem* rs = ECS::RendererSystem::GetInstance();
+    if (!rs) return;
+
+	// Calculates which tile the mouse is currently hovering over
+    const glm::vec2 localPos = worldPos - m_worldOrigin;
+    const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x);
+    const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y);
+
+    // Check if it's a valid tile
+    if (m_tileMap->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
+        return;
+    }
+
+    // Draw a preview of the collision brush on that tile
+    const float tileSize = m_tileMap->TileSize();
+    if (tileSize <= 0.0f) return;
+
+	// Calculate the world-space position of the tile's bottom-left corner for rendering the preview
+    const glm::vec2 tileWorld(m_worldOrigin.x + m_tileMap->TileToWorldSigned(tx), 
+        m_worldOrigin.y + m_tileMap->TileToWorldSigned(ty));
+
+	// We divide the tile into 4 quadrants for the 4 corners of collision
+    // The brush mask determines which corners are active
+    const float subSize = tileSize * 0.5f;
+
+	// If the collision eraser is active, we draw a red translucent overlay over the entire tile to 
+    // indicate that we're erasing collision from this tile
+    if (m_collisionEraser) {
+        const glm::vec4 eraseColor(0.9f, 0.2f, 0.2f, 0.25f);
+        rs->SubmitFilledQuad(tileWorld, tileWorld + glm::vec2(tileSize, tileSize), eraseColor);
+        return;
+    }
+
+	// The collision brush mask uses the lower 4 bits to represent which corners of the tile will have 
+    // collision painted
+    const uint8_t mask = static_cast<uint8_t>(m_collisionBrushMask & 0x0F);
+    if (mask == 0) return;
+
+	// For each corner of the tile, if the corresponding bit in the brush mask is set, we draw a green translucent 
+    // quad over that quadrant to preview the collision that will be painted
+    const glm::vec4 previewColor(0.2f, 0.85f, 0.35f, 0.28f);
+    if (mask & kCollisionMaskBottomLeft) {
+        rs->SubmitFilledQuad(tileWorld, tileWorld + glm::vec2(subSize, subSize), previewColor);
+    }
+    if (mask & kCollisionMaskBottomRight) {
+        rs->SubmitFilledQuad(tileWorld + glm::vec2(subSize, 0.0f),
+            tileWorld + glm::vec2(tileSize, subSize), previewColor);
+    }
+    if (mask & kCollisionMaskTopLeft) {
+        rs->SubmitFilledQuad(tileWorld + glm::vec2(0.0f, subSize),
+            tileWorld + glm::vec2(subSize, tileSize), previewColor);
+    }
+    if (mask & kCollisionMaskTopRight) {
+        rs->SubmitFilledQuad(tileWorld + glm::vec2(subSize, subSize),
+            tileWorld + glm::vec2(tileSize, tileSize), previewColor);
+    }
+}
+
+/*------------------------------------------------------------------*/
+/*!
 \brief Applies tile paint or erase operation.
 
 Handles coordinate conversion, map expansion, undo integration,
@@ -628,7 +698,7 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     const int32_t tx = m_tileMap->WorldToTileSigned(localPos.x); // Signed tile coordinate in map space.
     const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y); // Signed tile coordinate in map space.
     const int64_t key = PackCoord(tx, ty);
-    
+
     // Check bounds? TileMap expands? TileMap has fixed size layers.
     // Assuming layer 0.
     if (m_tileMap->LayerCount() == 0) return false;
@@ -719,11 +789,16 @@ bool TilePalettePanel::OnViewportCollisionClick(const glm::vec2& worldPos)
     const int32_t ty = m_tileMap->WorldToTileSigned(localPos.y);
     const int64_t key = PackCoord(tx, ty);
 
+	// Only allow collision painting on tiles that exist
+    if (m_tileMap->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
+        return false;
+    }
+
 	// Collision editing only modifies the collision mask, so we don't need to worry about tile changes here
     const uint32_t kExpandMargin = 2;  // Expand when painting within N tiles of the edge
     const uint32_t kExpandStep = 16;   // Grow by this many tiles per expansion
 
-	// Ensure the tile coordinates are within bounds, expanding the layer if necessary to accommodate edits 
+    // Ensure the tile coordinates are within bounds, expanding the layer if necessary to accommodate edits 
     // in negative space or near edges
     m_tileMap->ExpandLayerToFit(0, tx, ty, kExpandMargin, kExpandStep);
     if (!m_tileMap->IsTileInBounds(tx, ty)) return false;
