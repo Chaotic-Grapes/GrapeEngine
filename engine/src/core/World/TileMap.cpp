@@ -408,7 +408,7 @@ bool TileMap::SaveMap(const std::string& filepath) const
 
     // Header: Magic, Version, Tile Size, Layer Count
     static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
-    static constexpr uint32_t kTileMapVersion = 2; // Version with tileset list + origin.
+    static constexpr uint32_t kTileMapVersion = 3; // Version with tileset list + origin + collision masks.
 
     out.write(reinterpret_cast<const char*>(&kTileMapMagic), sizeof(uint32_t));
     out.write(reinterpret_cast<const char*>(&kTileMapVersion), sizeof(uint32_t));
@@ -447,6 +447,20 @@ bool TileMap::SaveMap(const std::string& filepath) const
             out.write(path.data(), len);
         }
     }
+
+    // Append collision masks (width, height, then 1 byte per tile).
+    const uint32_t collisionWidth = m_collisionWidth;
+    const uint32_t collisionHeight = m_collisionHeight;
+
+	// If there are no collision masks, we still write the dimensions as 0 and skip writing any mask data.
+    out.write(reinterpret_cast<const char*>(&collisionWidth), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char*>(&collisionHeight), sizeof(uint32_t));
+
+	// Only write mask data if we have a non-empty collision grid
+    // This allows older files to omit this section entirely
+    if (!m_collisionMasks.empty()) {
+        out.write(reinterpret_cast<const char*>(m_collisionMasks.data()), static_cast<std::streamsize>(m_collisionMasks.size()));
+    }
     
     const bool ok = out.good();
     if (!ok) {
@@ -465,6 +479,7 @@ bool TileMap::LoadMap(const std::string& filepath)
 
     static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
     static constexpr uint32_t kTileMapVersionWithTilesets = 2;
+    static constexpr uint32_t kTileMapVersionWithCollision = 3;
 
     uint32_t header = 0;
     in.read(reinterpret_cast<char*>(&header), sizeof(uint32_t));
@@ -554,6 +569,52 @@ bool TileMap::LoadMap(const std::string& filepath)
                 }
             }
         }
+    }
+
+    // Read optional collision data if present.
+    m_collisionMasks.clear();
+    m_collisionWidth = 0;
+    m_collisionHeight = 0;
+
+    if (isNewFormat && version >= kTileMapVersionWithCollision && in.peek() != EOF) {
+		// We expect the collision data to be at the end of the file, 
+        // so we can read it after all the layers and tilesets
+        uint32_t collisionWidth = 0;
+        uint32_t collisionHeight = 0;
+
+		// Read the dimensions of the collision grid
+        // If they are valid, read the mask data
+        in.read(reinterpret_cast<char*>(&collisionWidth), sizeof(uint32_t));
+        in.read(reinterpret_cast<char*>(&collisionHeight), sizeof(uint32_t));
+
+		// Only attempt to read the mask data if the dimensions are valid and we are still in a good state
+        if (in.good() && collisionWidth > 0 && collisionHeight > 0) {
+			// 1 byte per tile for the collision mask, stored in row-major order
+            const size_t count = static_cast<size_t>(collisionWidth) * static_cast<size_t>(collisionHeight);
+
+			// We can read directly into m_collisionMasks after resizing it to the correct size
+            m_collisionMasks.resize(count, 0);
+            in.read(reinterpret_cast<char*>(m_collisionMasks.data()), static_cast<std::streamsize>(count));
+
+			// If we successfully read the mask data, store the dimensions
+            if (in.good()) {
+                m_collisionWidth = collisionWidth;
+                m_collisionHeight = collisionHeight;
+            } 
+            // Otherwise, clear the masks to indicate no collision data
+            else {
+                m_collisionMasks.clear();
+            }
+        }
+    }
+
+	// If the file didn't have collision data, we can initialize an empty collision grid that matches 
+    // the first layer's dimensions (if it exists)
+    if (m_collisionMasks.empty() && !m_layers.empty()) {
+        const TileLayer& layer = m_layers[0];
+        m_collisionWidth = layer.Width();
+        m_collisionHeight = layer.Height();
+        m_collisionMasks.assign(static_cast<size_t>(m_collisionWidth) * static_cast<size_t>(m_collisionHeight), 0);
     }
 
     const bool ok = in.good();
