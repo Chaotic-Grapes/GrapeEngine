@@ -144,11 +144,13 @@ namespace EditorUI {
 
     // Ends a property section
     // Inserts small spacing to ensure blocks of properties don't collapse into each other visually
-    void EndPropertySection() {
-        // Dummy creates invisible spacing (width = available content width)
-        ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));
-        // Additional vertical spacing between sections
-        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    void EndPropertySection(bool addSpacing) {
+        if (addSpacing) {
+            // Dummy creates invisible spacing (width = available content width)
+            ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));
+            // Additional vertical spacing between sections
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        }
         valueStartOffset = 0.0f;
     }
 

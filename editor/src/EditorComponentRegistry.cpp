@@ -198,8 +198,7 @@ Without these, the macro would end early and break the expansion
         }
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
-            // Use the generic JSON renderer for now (tilemap UI can be specialized later).
-            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); };
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTileMapComponent(d, e, w); };
         }
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"); id != ECS::NULL_COMPONENT_ID) {
@@ -794,7 +793,7 @@ static void _initializeDefaultRegistry() {
         {
             "Tile Map", "TileMapComponent", "ECS::Components::TileMapComponent",
             GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"), kHashTileMapComponent, true, true,
-            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTileMapComponent(d, e, w); }),
             // Serialize component JSON.
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TileMapPath", ""},

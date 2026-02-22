@@ -29,6 +29,8 @@ prefab assets use the same UI path.
 #include "ecs/Components.h"
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 #include <algorithm>
 #include <functional>
 #include <unordered_set>
@@ -2028,7 +2030,7 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
 
 // Generic renderer for C# / unknown components. Uses EditorUI helpers where possible
 // so the look & feel matches other component UIs.
-void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world, bool addSpacing) {
     (void)entity; (void)world;
     ImGuiIdScope id("GenericComponent");
 
@@ -2089,7 +2091,7 @@ void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entit
     }
 
     // End property section.
-    EditorUI::EndPropertySection();
+    EditorUI::EndPropertySection(addSpacing);
 }
 
 // Renders the AudioSource component Properties
@@ -2254,6 +2256,25 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     // Fallback: render raw integer if no scene or layers available
     EditorUI::RenderIntProperty("Id", data, "Id");
+    EditorUI::EndPropertySection();
+}
+
+// Renders TileMap component properties, including a button to open the collision editor for the tilemap
+void ComponentUI::RenderTileMapComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    RenderGenericComponent(data, entity, world, false);
+
+    EditorUI::BeginPropertySection({ "Collision" });
+    ImGui::Text("Collision");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+
+	// Button to open tilemap collision editor
+    if (ImGui::Button("Edit Collision")) {
+		// Ensure the entity is still valid before broadcasting the event (in case it was deleted while the UI was open)
+        if (world && world->IsAlive(entity)) {
+            Messaging::MessageSystem::Broadcast(Messaging::TileMapCollisionEditRequested(entity.Index));
+        }
+    }
     EditorUI::EndPropertySection();
 }
 
