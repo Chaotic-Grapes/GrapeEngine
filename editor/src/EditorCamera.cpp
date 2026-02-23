@@ -71,7 +71,10 @@ namespace Editor {
         );
     }
 
-    EditorCamera::~EditorCamera() { } // RAII unsubscription assumed
+    EditorCamera::~EditorCamera() {
+        Messaging::MessageSystem::Unsubscribe<Messaging::WindowResized>(m_windowResizedSub);
+        Messaging::MessageSystem::Unsubscribe<Messaging::ViewportResized>(m_viewportResizedSub);
+    }
 
     void EditorCamera::BeginFrame() {
         // Reset frame input flag at the start of frame
