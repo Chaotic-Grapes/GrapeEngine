@@ -40,8 +40,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "audio/AudioCueRegistry.h"
 #include "services/ResourceManager.h"  // For texture loading during deserialization
 #include "core/Logger.h"
-#include "core/ProjectPaths.h"
-#include <filesystem>
 
 // Forward declarations for managed serialization interop (defined in Interop_World.cpp)
 extern "C" const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash);
@@ -94,118 +92,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Matrix4x4, m00, m01, m02, m03, m10, m11, m12,
 // --- ECS Component Serialization Definitions ---
 namespace ECS {
 	namespace Components {
-		/** 
-		 * @brief Normalizes a serialized file path by converting absolute paths to project-relative paths when possible, 
-		 * and ensuring consistent path formatting. This helps maintain portability of serialized data across different machines and project locations.
-		 * 
-		 * @param inputPath The original file path read from JSON, which may be absolute or relative.
-		 * @return A normalized path string that is relative to the project root if it was originally an absolute path within the project, or a cleaned-up 
-		 * version of the original path. If the input is empty, returns an empty string.
-		 * 
-		 * @note This function performs the following steps:
-		 * 1. If the input path is empty, it returns an empty string immediately.
-		 * 2. It creates a std::filesystem::path object from the input string for easier manipulation.
-		 * 3. If the project paths system is initialized, it checks if the input path is absolute and resides within the project directory. If so, it 
-		 * converts it to a relative path from the project root.
-		 * 4. It also checks if the path starts with the project name as the first segment, and if so, it trims that segment to make it relative.
-		 * 5. Finally, it normalizes the path to remove any redundant components (like "." or "..") and converts it back to a generic string format with forward slashes.
-		 */
-		inline std::string NormalizeSerializedPath(const std::string& inputPath) {
-			if (inputPath.empty()) {
-				return std::string();
-			}
-
-			// Use std::filesystem to handle path normalization and manipulation
-			std::filesystem::path normalizedPath(inputPath);
-
-			// If the path is absolute and within the project, convert it to a relative path
-			if (Engine::ProjectPaths::IsInitialized()) {
-				if (normalizedPath.is_absolute() && Engine::ProjectPaths::IsInProject(inputPath)) {
-					const std::string relativePath = Engine::ProjectPaths::ToRelativePath(inputPath);
-
-					// Only update normalizedPath if the relative path is valid (non-empty)
-					if (!relativePath.empty()) {
-						normalizedPath = relativePath;
-					}
-				}
-
-				// Additionally, handle the case where the path starts with the project name as the first segment
-				// (common if absolute paths were serialized on a different machine)
-				const std::filesystem::path projectRoot(Engine::ProjectPaths::GetProjectRoot());
-				const std::string projectName = projectRoot.filename().string();
-
-				// Check if the first segment of the path matches the project name, and if so, trim it to make the path relative
-				if (!projectName.empty() && !normalizedPath.is_absolute()) {
-					auto segment = normalizedPath.begin();
-
-					// If the first segment matches the project name, trim it off
-					if (segment != normalizedPath.end() && segment->string() == projectName) {
-						std::filesystem::path trimmed;
-
-						// Reconstruct the path without the first segment
-						for (++segment; segment != normalizedPath.end(); ++segment) {
-							trimmed /= *segment;
-						}
-						normalizedPath = trimmed;
-					}
-				}
-			}
-
-			// Normalize the path to remove any redundant components and convert to generic format (forward slashes)
-			normalizedPath = normalizedPath.lexically_normal();
-			if (normalizedPath == ".") { // If the path is reduced to the current directory, treat it as empty
-				return std::string();
-			}
-
-			// Convert to generic string format with forward slashes for consistency across platforms
-			return normalizedPath.generic_string();
-		}
-
-		/**
-		 * @brief Resolves a StringId that represents a file path back to the actual path string, and normalizes it for consistency. 
-		 * If the ID is 0, returns an empty string.
-		 * 
-		 * @param id The StringId (uint32_t) that was serialized, which may represent a file path. 
-		 * An ID of 0 is considered invalid and will return an empty string.
-		 * 
-		 * @return The resolved and normalized path string corresponding to the given StringId. If the ID is 0 or cannot be resolved, returns an empty string. 
-		 * The returned path is normalized to ensure consistency across different machines and project locations.
-		 */
-		inline std::string ResolvePathStringId(uint32_t id) {
-			return id ? NormalizeSerializedPath(ECS::StringTable::Resolve(id)) : std::string();
-		}
-
-		/**
-		 * @brief Reads a file path from a JSON object, which can be either a string (representing the path) or an unsigned integer (representing a StringId).
-		 * The function normalizes the path if it's a string, and interns it to get the corresponding StringId. If it's already a number, it returns it 
-		 * directly. If the key is missing or the value is invalid, it returns a default ID (0 by default).
-		 * 
-		 * @param j The JSON object to read from.
-		 * @param key The key in the JSON object that contains the path information.
-		 * @param defaultId The default StringId to return if the key is missing or the value is invalid. Defaults to 0, which typically represents an empty or invalid path.
-		 * @return The StringId corresponding to the path read from the JSON. If the key is missing, or if the value is invalid (neither a string nor an unsigned integer), returns defaultId.
-		 */
-		inline uint32_t ReadPathStringId(const nlohmann::json& j, const char* key, uint32_t defaultId = 0) {
-			// Check if the key exists in the JSON object
-			if (!j.contains(key)) {
-				return defaultId;
-			}
-
-			// Read the value and determine if it's a string (path) or an unsigned integer (StringId)
-			const auto& value = j.at(key);
-			if (value.is_string()) {
-				const std::string str = NormalizeSerializedPath(value.get<std::string>());
-				return str.empty() ? 0 : ECS::StringTable::Intern(str);
-			}
-
-			// If it's not a string, check if it's an unsigned integer (StringId)
-			if (value.is_number_unsigned()) {
-				return value.get<uint32_t>();
-			}
-
-			return defaultId;
-		}
-
 		// Place component-specific NLOHMANN macros inside the component namespace so ADL
 		// can locate the generated to_json/from_json overloads for these types.
 
@@ -254,9 +140,9 @@ namespace ECS {
 
 		// Custom serialization for SpriteRenderer2D (StringId paths need special handling)
 		inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
-			std::string texturePath = ResolvePathStringId(sprite.TexturePath);
-			std::string normalTexturePath = ResolvePathStringId(sprite.NormalTexturePath);
-			std::string emissiveTexturePath = ResolvePathStringId(sprite.EmissiveTexturePath);
+			std::string texturePath = ECS::StringTable::Resolve(sprite.TexturePath);
+			std::string normalTexturePath = ECS::StringTable::Resolve(sprite.NormalTexturePath);
+			std::string emissiveTexturePath = ECS::StringTable::Resolve(sprite.EmissiveTexturePath);
 			j = nlohmann::json{
 				{"TextureId", sprite.TextureId},
 				{"TexturePath", texturePath},
@@ -274,7 +160,7 @@ namespace ECS {
 
 		inline void from_json(const nlohmann::json& j, SpriteRenderer2D& sprite) {
 			// Handle TexturePath (StringId) first
-			std::string texPath = NormalizeSerializedPath(j.value("TexturePath", std::string()));
+			std::string texPath = j.value("TexturePath", std::string());
 			sprite.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
@@ -296,7 +182,7 @@ namespace ECS {
 			}
 
 			// Normal map path (optional)
-			std::string normalPath = NormalizeSerializedPath(j.value("NormalTexturePath", std::string()));
+			std::string normalPath = j.value("NormalTexturePath", std::string());
 			sprite.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
@@ -314,7 +200,7 @@ namespace ECS {
 			}
 
 			// Emissive map path (optional)
-			std::string emissivePath = NormalizeSerializedPath(j.value("EmissiveTexturePath", std::string()));
+			std::string emissivePath = j.value("EmissiveTexturePath", std::string());
 			sprite.EmissiveTexturePath = emissivePath.empty() ? 0 : ECS::StringTable::Intern(emissivePath);
 
 			if (!emissivePath.empty()) {
@@ -343,8 +229,8 @@ namespace ECS {
 
 		// Custom serialization for SpriteSheetAnimation2D (StringId paths need special handling)
 		inline void to_json(nlohmann::json& j, const SpriteSheetAnimation2D& anim) {
-			std::string texturePath = ResolvePathStringId(anim.TexturePath);
-			std::string normalTexturePath = ResolvePathStringId(anim.NormalTexturePath);
+			std::string texturePath = ECS::StringTable::Resolve(anim.TexturePath);
+			std::string normalTexturePath = ECS::StringTable::Resolve(anim.NormalTexturePath);
 			j = nlohmann::json{
 				{"TextureId", anim.TextureId},
 				{"TexturePath", texturePath},
@@ -369,7 +255,7 @@ namespace ECS {
 
 		inline void from_json(const nlohmann::json& j, SpriteSheetAnimation2D& anim) {
 			// Handle TexturePath (StringId) first
-			std::string texPath = NormalizeSerializedPath(j.value("TexturePath", std::string()));
+			std::string texPath = j.value("TexturePath", std::string());
 			anim.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
@@ -396,7 +282,7 @@ namespace ECS {
 			}
 
 			// Normal map path (optional)
-			std::string normalPath = NormalizeSerializedPath(j.value("NormalTexturePath", std::string()));
+			std::string normalPath = j.value("NormalTexturePath", std::string());
 			anim.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
@@ -432,8 +318,8 @@ namespace ECS {
 
 		// Custom serialization for TileMapComponent (StringId paths need special handling).
 		inline void to_json(nlohmann::json& j, const TileMapComponent& tilemap) {
-			std::string mapPath = ResolvePathStringId(tilemap.TileMapPath); // Resolve StringId -> path string.
-			std::string tilesetPath = ResolvePathStringId(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
+			std::string mapPath = ECS::StringTable::Resolve(tilemap.TileMapPath); // Resolve StringId -> path string.
+			std::string tilesetPath = ECS::StringTable::Resolve(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
 			j = nlohmann::json{
 				{"TileMapPath", mapPath},
 				{"TilesetTexturePath", tilesetPath},
@@ -447,8 +333,8 @@ namespace ECS {
 		}
 
 		inline void from_json(const nlohmann::json& j, TileMapComponent& tilemap) {
-			std::string mapPath = NormalizeSerializedPath(j.value("TileMapPath", std::string())); // Read map path from JSON.
-			std::string tilesetPath = NormalizeSerializedPath(j.value("TilesetTexturePath", std::string())); // Read tileset path from JSON.
+			std::string mapPath = j.value("TileMapPath", std::string()); // Read map path from JSON.
+			std::string tilesetPath = j.value("TilesetTexturePath", std::string()); // Read tileset path from JSON.
 			tilemap.TileMapPath = mapPath.empty() ? 0 : ECS::StringTable::Intern(mapPath); // Store as StringId.
 			tilemap.TilesetTexturePath = tilesetPath.empty() ? 0 : ECS::StringTable::Intern(tilesetPath); // Store as StringId.
 			tilemap.TileWorldSize = j.value("TileWorldSize", 1.0f); // Default to 1.0 if missing.
@@ -472,12 +358,12 @@ namespace ECS {
 		// Custom serialization for PrefabLink component (StringId path needs special handling)
 		// [DEPRECATED] Kept for backward compatibility during migration to PrefabInstanceMetadata
 		inline void to_json(nlohmann::json& j, const PrefabLink& link) {
-			std::string prefabPath = ResolvePathStringId(link.PrefabPath);
+			std::string prefabPath = ECS::StringTable::Resolve(link.PrefabPath);
 			j = nlohmann::json{ {"prefabPath", prefabPath} };
 		}
 
 		inline void from_json(const nlohmann::json& j, PrefabLink& link) {
-			std::string path = NormalizeSerializedPath(j.at("prefabPath").get<std::string>());
+			std::string path = j.at("prefabPath").get<std::string>();
 			link.PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
 		}
 
@@ -507,7 +393,7 @@ namespace ECS {
 
 		// Custom serialization for AudioSource to handle backward-compatible defaults
 		inline void to_json(nlohmann::json& j, const AudioSource& src) {
-			std::string cuePath = ResolvePathStringId(src.CuePathId);
+			std::string cuePath = ECS::StringTable::Resolve(src.CuePathId);
 			j = nlohmann::json{
 				{"CuePath", cuePath},
 				{"Volume", src.Volume},
@@ -528,7 +414,7 @@ namespace ECS {
 		}
 
 		inline void from_json(const nlohmann::json& j, AudioSource& src) {
-			std::string cuePath = NormalizeSerializedPath(j.value("CuePath", std::string()));
+			std::string cuePath = j.value("CuePath", std::string());
 			if (!cuePath.empty()) {
 				const std::string norm = Audio::AudioCueRegistry::NormalizePath(cuePath);
 				src.CuePathId = ECS::StringTable::Intern(norm);
@@ -552,8 +438,8 @@ namespace ECS {
 	
 		// Custom serialization for Material2D
 		inline void to_json(nlohmann::json& j, const Material2D& mat) {
-			std::string normalTexturePath = ResolvePathStringId(mat.NormalTexturePath);
-			std::string mraTexturePath = ResolvePathStringId(mat.MRA_TexturePath);
+			std::string normalTexturePath = ECS::StringTable::Resolve(mat.NormalTexturePath);
+			std::string mraTexturePath = ECS::StringTable::Resolve(mat.MRA_TexturePath);
 			j = nlohmann::json{
 				{"NormalTextureId", mat.NormalTextureId},
 				{"MRA_TextureId", mat.MRA_TextureId},
@@ -570,7 +456,7 @@ namespace ECS {
 
 		inline void from_json(const nlohmann::json& j, Material2D& mat) {
 			// 1. Handle Normal Map
-			std::string normPath = NormalizeSerializedPath(j.value("NormalTexturePath", std::string()));
+			std::string normPath = j.value("NormalTexturePath", std::string());
 			mat.NormalTexturePath = normPath.empty() ? 0 : ECS::StringTable::Intern(normPath);
 
 			if (!normPath.empty()) {
@@ -582,7 +468,7 @@ namespace ECS {
 			}
 
 			// 2. Handle MRA Map
-			std::string mraPath = NormalizeSerializedPath(j.value("MRA_TexturePath", std::string()));
+			std::string mraPath = j.value("MRA_TexturePath", std::string());
 			mat.MRA_TexturePath = mraPath.empty() ? 0 : ECS::StringTable::Intern(mraPath);
 
 			if (!mraPath.empty()) {
@@ -659,7 +545,7 @@ namespace ECS {
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
 	inline void to_json(nlohmann::json& j, const GUIText& text) {
 		const std::string value = ECS::StringTable::Resolve(text.TextId);
-		const std::string fontPath = ResolvePathStringId(text.FontPathId);
+		const std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
 		j = nlohmann::json{
 			{"Text", value},
 			{"FontPath", fontPath},
@@ -673,7 +559,7 @@ namespace ECS {
 
 	inline void from_json(const nlohmann::json& j, GUIText& text) {
 		const std::string value = j.value("Text", "");
-		const std::string fontPath = NormalizeSerializedPath(j.value("FontPath", ""));
+		const std::string fontPath = j.value("FontPath", "");
 		text.TextId = value.empty() ? 0 : ECS::StringTable::Intern(value);
 		text.FontPathId = fontPath.empty() ? 0 : ECS::StringTable::Intern(fontPath);
 		if (j.contains("Color")) {
@@ -691,7 +577,7 @@ namespace ECS {
 
 		inline void to_json(nlohmann::json& j, const GUIImage& image) {
 			j = nlohmann::json{
-				{"TexturePath", ResolvePathStringId(image.TexturePathId)},
+				{"TexturePath", ResolveStringId(image.TexturePathId)},
 				{"Color", image.Color},
 				{"UVRect", image.UVRect},
 				{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
@@ -702,7 +588,7 @@ namespace ECS {
 		}
 
 	inline void from_json(const nlohmann::json& j, GUIImage& image) {
-		image.TexturePathId = ReadPathStringId(j, "TexturePath", 0);
+		image.TexturePathId = ReadStringId(j, "TexturePath", 0);
 		if (j.contains("Color")) {
 			image.Color = j.at("Color").get<::Color>();
 		}
@@ -757,8 +643,8 @@ namespace ECS {
 	inline void to_json(nlohmann::json& j, const GUIButton& button) {
 		j = nlohmann::json{
 			{"Text", ResolveStringId(button.TextId)},
-			{"FontPath", ResolvePathStringId(button.FontPathId)},
-			{"IconPath", ResolvePathStringId(button.IconPathId)},
+			{"FontPath", ResolveStringId(button.FontPathId)},
+			{"IconPath", ResolveStringId(button.IconPathId)},
 			{"TextColor", button.TextColor},
 			{"IconColor", button.IconColor},
 			{"FontSize", button.FontSize},
@@ -774,8 +660,8 @@ namespace ECS {
 
 	inline void from_json(const nlohmann::json& j, GUIButton& button) {
 		button.TextId = ReadStringId(j, "Text", 0);
-		button.FontPathId = ReadPathStringId(j, "FontPath", 0);
-		button.IconPathId = ReadPathStringId(j, "IconPath", 0);
+		button.FontPathId = ReadStringId(j, "FontPath", 0);
+		button.IconPathId = ReadStringId(j, "IconPath", 0);
 		if (j.contains("TextColor")) button.TextColor = j.at("TextColor").get<::Color>();
 		if (j.contains("IconColor")) button.IconColor = j.at("IconColor").get<::Color>();
 		button.FontSize = j.value("FontSize", 24.0f);
