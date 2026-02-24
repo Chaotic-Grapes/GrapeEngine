@@ -874,8 +874,8 @@ void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity enti
     // Single row section for angular velocity
     EditorUI::BeginPropertySection({ "Angular Velocity" });
 
-    // Value represents speed in degrees per second
-    EditorUI::RenderFloatRow("Angular Velocity##Angular", "deg/s", data, "Value", 0.5f);
+    // Value represents speed in radians per second
+    EditorUI::RenderFloatRow("Angular Velocity##Angular", "rad/s", data, "Value", 0.5f);
     EditorUI::EndPropertySection();
 }
 
