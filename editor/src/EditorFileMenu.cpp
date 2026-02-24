@@ -408,16 +408,47 @@ void EditorFileMenu::_exportProject() {
                 return;
             }
 
-            const std::filesystem::path scriptsOutput = exportRoot / "GameScripts.dll";
-            const std::filesystem::path scriptProject = repoRoot / "managed" / "tools" / "ScriptCompiler" / "ScriptCompiler.csproj";
-            const std::string scriptCmd =
-                "dotnet run --project \"" + scriptProject.string() + "\" --configuration Release -- "
-                "\"" + projectRoot.string() + "\" \"" + scriptsOutput.string() + "\"";
+            bool shouldCompileScripts = true;
+            bool foundCsScript = false;
+            std::error_code scriptScanEc;
 
-            if (!runCommand(scriptCmd, "Compile scripts")) {
-                m_exportDone = true;
-                m_exportInProgress = false;
-                return;
+            // Scan the project directory for any .cs scripts.
+            // If we find any, we will attempt to compile them into a GameScripts.dll in the export output.
+            for (std::filesystem::recursive_directory_iterator it(projectRoot, std::filesystem::directory_options::skip_permission_denied, scriptScanEc),
+                 end; !scriptScanEc && it != end;
+                 it.increment(scriptScanEc)) {
+                if (it->is_regular_file(scriptScanEc) && it->path().extension() == ".cs") {
+                    foundCsScript = true;
+                    break;
+                }
+            }
+
+            // If there was an error during the script scan, log a warning but continue with the export since scripts are optional 
+            // and we don't want to fail the entire export just because of an issue scanning for scripts. If we found .cs scripts, 
+            // we will attempt to compile them, but if we didn't find any then we can skip the compile step entirely.
+            if (scriptScanEc) {
+                LOG_WARNING("Failed to fully scan project scripts for export; attempting compile anyway. Error: " << scriptScanEc.message());
+            } else if (!foundCsScript) {
+                shouldCompileScripts = false;
+                m_exportCurrentStep = 4;
+                pushResult({ "Compile scripts", true, "Skipped: no .cs scripts found in project.", "" });
+            }
+
+            // If we found .cs scripts, attempt to compile them. 
+            // If the compile fails, we will fail the export since scripts are likely a critical part of the game project, 
+            // but if we didn't find any then we can skip this step entirely and still produce a valid export.
+            if (shouldCompileScripts) {
+                const std::filesystem::path scriptsOutput = exportRoot / "GameScripts.dll";
+                const std::filesystem::path scriptProject = repoRoot / "managed" / "tools" / "ScriptCompiler" / "ScriptCompiler.csproj";
+                const std::string scriptCmd =
+                    "dotnet run --project \"" + scriptProject.string() + "\" --configuration Release -- "
+                    "\"" + projectRoot.string() + "\" \"" + scriptsOutput.string() + "\"";
+
+                if (!runCommand(scriptCmd, "Compile scripts")) {
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
             }
 
             std::error_code removeDestEc;

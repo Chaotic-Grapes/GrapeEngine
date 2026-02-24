@@ -45,7 +45,7 @@ class EditorFileMenu;
 
 class BaseViewport {
 public:
-    virtual ~BaseViewport() = default;
+    virtual ~BaseViewport();
 
     enum class ViewportType {
         Scene,

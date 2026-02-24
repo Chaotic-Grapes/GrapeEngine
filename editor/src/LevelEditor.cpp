@@ -142,6 +142,7 @@ LevelEditor::~LevelEditor() {
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityDestroyed>(m_entityDestroyedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::TileMapCollisionEditRequested>(m_tileMapCollisionEditSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::EditorViewportLayoutRequested>(m_viewportLayoutSubscription);
     
     // Clear file menu state getter to avoid calling back into this object during member teardown
     m_fileMenu.SetEditorStateGetter(nullptr);
