@@ -19,6 +19,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "EditorConfiguration.h"
 #include "EditorState.h"
+#include "EditorStartupStage.h"
+#include <string>
 
 // Forward declarations
 namespace Services {
@@ -87,11 +89,27 @@ public:
      */
     void InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world);
 
+    EditorStartupStage GetStartupStage() const { return m_startupStage; }
+    bool IsProjectInitialized() const { return m_projectInitialized; }
+    const std::string& GetProjectRoot() const { return m_projectRoot; }
+
+    void RequestProjectSelection();
+    void HandleProjectSelected(const std::string& projectRoot);
+    void HandleSceneSelected(const std::string& scenePath);
+    void HandleContinueWithoutScene();
+
 private:
     Engine::Application* m_engine;
     Services::EditorService* m_editorService;
     EditorSettings m_editorSettings;
     bool m_initialized = false;
+    bool m_projectInitialized = false;
+    bool m_projectLoadInProgress = false;
+    bool m_waitForScripts = false;
+    bool m_sawCompileStart = false;
+    int m_compileIdleFrames = 0;
+    EditorStartupStage m_startupStage = EditorStartupStage::SelectProject;
+    std::string m_projectRoot;
     
     // Global pointers for script callbacks
     static Engine::Application* s_editorApplication;
@@ -101,6 +119,9 @@ private:
     void _saveEditorSettings();
     void _createMainWindow();
     void _initializeEditorService();
+    void _applyProjectSettings();
+    void _clearScenes();
+    bool _loadSceneFromPath(const std::string& scenePath);
 };
 
 #endif

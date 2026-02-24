@@ -39,6 +39,10 @@ endif()
 # ======================= Auto-detect Game Project Name =========================
 # Try to find a game project folder containing ProjectSettings.json
 set(GAME_OUTPUT_NAME "" CACHE STRING "Name for the game executable (auto-detected if empty)")
+set(GAME_OUTPUT_NAME_EXPLICIT OFF)
+if(NOT GAME_OUTPUT_NAME STREQUAL "")
+    set(GAME_OUTPUT_NAME_EXPLICIT ON)
+endif()
 
 if(GAME_OUTPUT_NAME STREQUAL "")
     file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/../*/ProjectSettings.json")
@@ -86,22 +90,26 @@ if(GAME_OUTPUT_NAME STREQUAL "")
     message(STATUS "Runtime: Auto-detected game project: ${GAME_OUTPUT_NAME}")
 endif()
 
-# Append "Game" suffix if not already present
+# Append "Game" suffix only for auto-detected names.
 set(_GAME_NAME_BASE "${GAME_OUTPUT_NAME}")
-string(TOLOWER "${_GAME_NAME_BASE}" _GAME_NAME_LOWER)
-string(LENGTH "${_GAME_NAME_LOWER}" _game_name_len)
-
-if(_game_name_len GREATER_EQUAL 4)
-    math(EXPR _start_idx "${_game_name_len} - 4")
-    string(SUBSTRING "${_GAME_NAME_LOWER}" ${_start_idx} 4 _GAME_NAME_TAIL)
-else()
-    set(_GAME_NAME_TAIL "")
-endif()
-
-if(NOT _GAME_NAME_TAIL STREQUAL "game")
-    set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}Game")
-else()
+if(GAME_OUTPUT_NAME_EXPLICIT)
     set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}")
+else()
+    string(TOLOWER "${_GAME_NAME_BASE}" _GAME_NAME_LOWER)
+    string(LENGTH "${_GAME_NAME_LOWER}" _game_name_len)
+
+    if(_game_name_len GREATER_EQUAL 4)
+        math(EXPR _start_idx "${_game_name_len} - 4")
+        string(SUBSTRING "${_GAME_NAME_LOWER}" ${_start_idx} 4 _GAME_NAME_TAIL)
+    else()
+        set(_GAME_NAME_TAIL "")
+    endif()
+
+    if(NOT _GAME_NAME_TAIL STREQUAL "game")
+        set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}Game")
+    else()
+        set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}")
+    endif()
 endif()
 
 # Apply the chosen name
@@ -151,15 +159,7 @@ if(MSVC)
         COMMENT "Normalize game executable name"
     )
     
-    # Provide GrapeEngine.exe alias for P/Invoke compatibility
-    add_custom_command(TARGET GrapeRuntime POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "Providing GrapeEngine.exe alias for scripting interop"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-            "$<TARGET_FILE_DIR:GrapeRuntime>/${GAME_FINAL_OUTPUT_NAME}.exe" 
-            "$<TARGET_FILE_DIR:GrapeRuntime>/GrapeEngine.exe"
-        COMMENT "Create GrapeEngine.exe alias"
-    )
-endif()
+  endif()
 
 # ======================= Compiler Definitions =========================
 # NO USE_IMGUI - runtime has no editor UI

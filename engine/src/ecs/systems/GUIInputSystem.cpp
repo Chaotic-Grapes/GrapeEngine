@@ -1,7 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GUIInputSystem.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+
+\brief
+Definition of the GUIInputSystem class for processing input interactions with GUI
+elements. Provides functionality for handling mouse events, hover states, and
+pointer capture within the GUI system.
+*/
+/* End Header *******************************************************************/
+
 #include <algorithm>
 #include <cmath>
 #include "ecs/Components.h"
 #include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 #include "services/Input.h"
 
@@ -10,6 +24,7 @@ namespace ECS {
         Entity s_captureEntity = NULL_ENTITY; // Tracks the element that owns pointer capture.
     }
 
+    // Initialize GUI input system state for the world.
     void GUIInputSystem::OnCreate(World& world) {
         (void)world;
     }
@@ -19,13 +34,13 @@ namespace ECS {
         return p.X >= pos.X && p.Y >= pos.Y && p.X <= (pos.X + size.X) && p.Y <= (pos.Y + size.Y);
     }
 
+    // Update GUI hover/press state from the current input.
     void GUIInputSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
             return;
         }
 
-        // Release capture if the captured entity no longer exists.
         if (!s_captureEntity.IsNull() && !world.IsAlive(s_captureEntity)) {
             s_captureEntity = NULL_ENTITY;
         }
@@ -53,12 +68,23 @@ namespace ECS {
         const bool mousePressed = Input::IsMousePressed(MOUSE_LEFT);
         const bool mouseReleased = Input::IsMouseUp(MOUSE_LEFT);
 
+        // Iterate GUI elements and update per-entity input state.
         world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput& input) {
             // Clear one-frame flags before recomputing state.
             input.Clicked = false;
             input.Released = false;
             input.Entered = false;
             input.Exited = false;
+
+            if (!world.IsActiveInHierarchy(entity)) {
+                if (s_captureEntity == entity) {
+                    s_captureEntity = NULL_ENTITY;
+                }
+                input.Hovered = false;
+                input.Pressed = false;
+                input.Dragging = false;
+                return;
+            }
 
             if (!element.Visible) {
                 input.Hovered = false;
@@ -68,8 +94,9 @@ namespace ECS {
             }
 
             // Use resolved layout rects for hit testing.
-            const Vector2D pos = element.ResolvedPosition;
-            const Vector2D size = element.ResolvedSize;
+            const bool isWorldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
+            const Vector2D pos = isWorldSpace ? element.ScreenPosition : element.ResolvedPosition;
+            const Vector2D size = isWorldSpace ? element.ScreenSize : element.ResolvedSize;
             const bool hovered = PointInRect(mouse, pos, size);
             const bool wasHovered = input.Hovered;
             input.Hovered = hovered;
@@ -85,7 +112,6 @@ namespace ECS {
             input.Pressed = captured && mouseDown;
             input.Dragging = captured && mouseDown;
 
-            // Release capture when the button is released.
             if (captured && mouseReleased) {
                 input.Pressed = false;
                 input.Dragging = false;
@@ -127,24 +153,52 @@ namespace ECS {
 
                 slider.ValueChanged = false;
 
-                // Scale padding based on resolved size so layout and input stay in sync.
-                const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
-                const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
-                const Vector4D padding = {
-                    slider.Padding.X * scaleX,
-                    slider.Padding.Y * scaleY,
-                    slider.Padding.Z * scaleX,
-                    slider.Padding.W * scaleY
-                };
-                // Track rect is the interactive area of the slider.
-                Vector2D trackPos = {
-                    element.ContentPosition.X + padding.X,
-                    element.ContentPosition.Y + padding.Y
-                };
-                Vector2D trackSize = {
-                    std::max(0.0f, element.ContentSize.X - padding.X - padding.Z),
-                    std::max(0.0f, element.ContentSize.Y - padding.Y - padding.W)
-                };
+                // Calculate the slider track rect (interactive area) by applying padding to the element rect.
+                Vector2D trackPos{};
+                Vector2D trackSize{};
+
+                // For world-space sliders, we need to scale padding based on the ratio between screen size and resolved size to keep input aligned with rendering.
+                if (isWorldSpace) {
+                    const float screenScaleX = element.ResolvedSize.X > 0.0f
+                        ? (element.ScreenSize.X / element.ResolvedSize.X)
+                        : 1.0f;
+                    const float screenScaleY = element.ResolvedSize.Y > 0.0f
+                        ? (element.ScreenSize.Y / element.ResolvedSize.Y)
+                        : 1.0f;
+                    const Vector4D padding = { // Scale padding from element space to screen space for hit testing.
+                        slider.Padding.X * screenScaleX,
+                        slider.Padding.Y * screenScaleY,
+                        slider.Padding.Z * screenScaleX,
+                        slider.Padding.W * screenScaleY
+                    };
+                    trackPos = { // Screen-space position of the track rect, accounting for padding.
+                        element.ScreenPosition.X + padding.X,
+                        element.ScreenPosition.Y + padding.Y
+                    };
+                    trackSize = { // Screen-space size of the track rect, accounting for padding.
+                        std::max(0.0f, element.ScreenSize.X - padding.X - padding.Z),
+                        std::max(0.0f, element.ScreenSize.Y - padding.Y - padding.W)
+                    };
+                } else {
+                    // Scale padding based on resolved size so layout and input stay in sync.
+                    const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+                    const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+                    const Vector4D padding = {
+                        slider.Padding.X * scaleX,
+                        slider.Padding.Y * scaleY,
+                        slider.Padding.Z * scaleX,
+                        slider.Padding.W * scaleY
+                    };
+                    // Track rect is the interactive area of the slider.
+                    trackPos = {
+                        element.ContentPosition.X + padding.X,
+                        element.ContentPosition.Y + padding.Y
+                    };
+                    trackSize = {
+                        std::max(0.0f, element.ContentSize.X - padding.X - padding.Z),
+                        std::max(0.0f, element.ContentSize.Y - padding.Y - padding.W)
+                    };
+                }
 
                 // Update slider while dragging or on initial press.
                 const bool active = captured || (hovered && mousePressed);
@@ -176,14 +230,18 @@ namespace ECS {
         });
     }
 
+    // Tear down GUI input system state.
     void GUIInputSystem::OnDestroy(World& world) {
         (void)world;
     }
 
+    // Return metadata used for system registration.
     SystemMetadata GUIInputSystem::GetMetadata() const {
         ComponentAccessBuilder builder("GUIInputSystem");
         builder.SetExecutionOrder(-15);
         return builder
+            .ReadComponent<Components::Active>()
+            .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUIElement>()
             .WriteComponent<Components::GUIInput>()
             .WriteComponent<Components::GUIButton>()

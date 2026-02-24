@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   GizmoInteractionController.cpp
-\author Samanta Leong (50%)
+\author Samantha Leong (50%)
         Muhammad Nur Fadzly Bin Zulkifli (50%)
 \par    s.leong@digipen.edu
         muhammadnurfadzly.b@digipen.edu

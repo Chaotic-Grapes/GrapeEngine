@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GUIRenderSystem.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+
+\brief
+Definition of the GUIRenderSystem class for rendering GUI elements. Provides
+functionality for translating ECS GUI components into draw calls.
+*/
+/* End Header *******************************************************************/
+
 #include "ecs/systems/GUIRenderSystem.h"
 
 #include <algorithm>
@@ -7,13 +19,19 @@
 #include <string>
 #include <vector>
 #include "ecs/Components.h"
+#include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 #include "graphics/font.hpp"
+#include "graphics/renderer.hpp"
 #include "graphics/texture.hpp"
 #include "services/ResourceManager.h"
 
 namespace ECS {
     namespace {
+
+        /**
+         * @brief GUI interaction states.
+         */
         enum class GUIState {
             Normal,
             Hovered,
@@ -21,7 +39,12 @@ namespace ECS {
             Disabled
         };
 
-        // Resolve interaction state from input + disabled flag.
+        /**
+         * @brief Determine the GUI state based on input and disabled status.
+         * @param input Pointer to GUIInput component (may be nullptr).
+         * @param disabled Whether the element is disabled.
+         * @return The resolved GUIState.
+         */
         GUIState ResolveState(const Components::GUIInput* input, bool disabled) {
             if (disabled) {
                 return GUIState::Disabled;
@@ -35,7 +58,13 @@ namespace ECS {
             return GUIState::Normal;
         }
 
-        // Pick a style color for the given GUI state (or fallback if no style component).
+        /**
+         * @brief Resolve the color for a GUI element based on its style and state.
+         * @param style Pointer to GUIStateStyle component (may be nullptr).
+         * @param fallback The fallback color if no style is provided.
+         * @param state The current GUIState.
+         * @return The resolved Color.
+         */
         Color ResolveStyleColor(const Components::GUIStateStyle* style, const Color& fallback, GUIState state) {
             if (!style) {
                 return fallback;
@@ -54,7 +83,13 @@ namespace ECS {
             }
         }
 
-        // Approximate line width using glyph advances and tracking.
+        /**
+         * @brief Measure the width of a single line of text using the specified font and pixel size.
+         * @param font The Font object to use for measurement.
+         * @param line The line of text to measure.
+         * @param pixelSize The desired pixel size for the font.
+         * @return The measured width in pixels.
+         */
         float MeasureLineWidth(const Font& font, std::string_view line, float pixelSize) {
             const float scale = pixelSize / static_cast<float>(font.getPixelSize());
             const float tracking = 1.05f;
@@ -66,7 +101,15 @@ namespace ECS {
             return width;
         }
 
-        // Split text into lines, optionally wrapping to maxWidth.
+        /**
+         * @brief Wrap text into multiple lines based on maximum width and wrapping settings.
+         * @param font The Font object to use for measurement.
+         * @param text The input text to wrap.
+         * @param pixelSize The desired pixel size for the font.
+         * @param maxWidth The maximum width in pixels for each line.
+         * @param wrap Whether to enable wrapping.
+         * @return A vector of strings representing the wrapped lines.
+         */
         std::vector<std::string> WrapText(const Font& font, const std::string& text, float pixelSize, float maxWidth, bool wrap) {
             std::vector<std::string> lines;
             if (text.empty()) {
@@ -96,6 +139,7 @@ namespace ECS {
                     return;
                 }
 
+                // Check for wrapping.
                 const float tokenW = tokenWidth(token);
                 const bool canWrap = wrap && maxWidth > 0.0f;
                 if (canWrap && !line.empty() && (lineWidth + tokenW) > maxWidth && !forceNewLine) {
@@ -120,6 +164,7 @@ namespace ECS {
                     continue;
                 }
 
+                // Whitespace: flush current token and handle space separately.
                 if (std::isspace(static_cast<unsigned char>(c))) {
                     flushToken(false);
                     const std::string space(1, c);
@@ -148,12 +193,21 @@ namespace ECS {
 
             return lines;
         }
+
     }
 
+    /**
+     * @brief Initialize GUI render system state for the world.
+     * @param world The ECS world to initialize.
+     */
     void GUIRenderSystem::OnCreate(World& world) {
         (void)world;
     }
 
+    /**
+     * @brief Update and render all GUI elements in the world.
+     * @param world The ECS world containing GUI components.
+     */
     void GUIRenderSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
@@ -167,8 +221,12 @@ namespace ECS {
             enum class Type { Panel, Text, Image, Button, Slider } type;
         };
 
+        // Collect all GUI elements with their Z order.
         std::vector<RenderItem> items;
         auto pushItem = [&](Entity entity, const Components::GUIElement& element, RenderItem::Type type) {
+            if (!world.IsActiveInHierarchy(entity)) {
+                return;
+            }
             if (!element.Visible) {
                 return;
             }
@@ -211,8 +269,14 @@ namespace ECS {
             }
 
             // Use resolved size to compute per-element scale for padding, icons, and fonts.
-            const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
-            const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+            const bool isWorldSpace = (ResolveGUIRenderSpace(world, item.entity) == Components::GUIRenderSpace::World);
+            float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+            float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+            const float ySign = isWorldSpace ? -1.0f : 1.0f;
+            if (isWorldSpace) {
+                scaleX = 1.0f;
+                scaleY = 1.0f;
+            }
 
             // Cache common optional components for styling decisions.
             const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
@@ -235,7 +299,11 @@ namespace ECS {
             case RenderItem::Type::Panel: {
                 const auto& panel = world.Get<Components::GUIPanel>(item.entity);
                 const Color panelColor = ResolveStyleColor(style, panel.Color, state);
-                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                }
                 break;
             }
             case RenderItem::Type::Text: {
@@ -246,13 +314,16 @@ namespace ECS {
                 }
 
                 // Load the font to measure text for wrapping/alignment.
-                const std::string fontPath = text.GetFontPath();
-                const float pixelSize = text.FontSize * scaleX;
-                const int fontSize = std::max(1, static_cast<int>(std::round(pixelSize)));
-                auto font = RM.GetFont(fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : fontPath, fontSize);
-                if (!font) {
-                    break;
-                }
+                auto textFontPath = text.GetFontPath();
+                const std::string fontPath = textFontPath.empty()
+                                                ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
+                                                : textFontPath;
+                const float pixelSize = isWorldSpace ? PixelsToUnits(text.FontSize) : (text.FontSize * scaleX);
+                const float fontPixelSize = isWorldSpace ? text.FontSize : pixelSize;
+                const int fontSize = std::max(1, static_cast<int>(std::round(fontPixelSize)));
+                auto font = RM.GetFont(fontPath, fontSize);
+
+                if (!font) break;
 
                 // Build wrapped lines and compute total height for vertical alignment.
                 const float maxWidth = text.Wrap ? element.ContentSize.X : 0.0f;
@@ -263,26 +334,31 @@ namespace ECS {
                 // Adjust start Y based on vertical alignment inside the content rect.
                 float startY = element.ContentPosition.Y;
                 if (text.VAlign == Components::GUIText::VerticalAlign::Middle) {
-                    startY += (element.ContentSize.Y - totalHeight) * 0.5f;
+                    startY += ySign * (element.ContentSize.Y - totalHeight) * 0.5f;
                 } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
-                    startY += (element.ContentSize.Y - totalHeight);
+                    startY += ySign * (element.ContentSize.Y - totalHeight);
                 }
 
                 const Color textColor = ResolveStyleColor(style, text.Color, state);
                 for (size_t i = 0; i < lines.size(); ++i) {
                     const std::string& line = lines[i];
                     const float lineWidth = MeasureLineWidth(*font, line, pixelSize);
+
                     // Adjust start X based on horizontal alignment.
                     float startX = element.ContentPosition.X;
                     if (text.HAlign == Components::GUIText::HorizontalAlign::Center) {
                         startX += (element.ContentSize.X - lineWidth) * 0.5f;
-                    } else if (text.HAlign == Components::GUIText::HorizontalAlign::Right) {
-                        startX += (element.ContentSize.X - lineWidth);
+                } else if (text.HAlign == Components::GUIText::HorizontalAlign::Right) {
+                    startX += (element.ContentSize.X - lineWidth);
                     }
 
                     // Submit each line as its own text draw.
-                    const Vector2D linePos = { startX, startY + static_cast<float>(i) * lineHeight };
-                    renderer->SubmitGUIText(linePos, line, fontPath, pixelSize, textColor);
+                    const Vector2D linePos = { startX, startY + ySign * static_cast<float>(i) * lineHeight };
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIText(linePos, line, fontPath, pixelSize, textColor);
+                    } else {
+                        renderer->SubmitGUIText(linePos, line, fontPath, pixelSize, textColor);
+                    }
                 }
                 break;
             }
@@ -307,8 +383,12 @@ namespace ECS {
                 Vector4D uv = image.UVRect;
 
                 if (texture && (image.ScaleMode != Components::GUIImageScaleMode::Stretch)) {
-                    const float texW = static_cast<float>(texture->Width());
-                    const float texH = static_cast<float>(texture->Height());
+                    float texW = static_cast<float>(texture->Width());
+                    float texH = static_cast<float>(texture->Height());
+                    if (isWorldSpace) {
+                        texW = PixelsToUnits(texW);
+                        texH = PixelsToUnits(texH);
+                    }
                     if (texW > 0.0f && texH > 0.0f) {
                         const float scale = (image.ScaleMode == Components::GUIImageScaleMode::Fit)
                             ? std::min(size.X / texW, size.Y / texH)
@@ -326,17 +406,25 @@ namespace ECS {
                     const float texW = static_cast<float>(texture->Width());
                     const float texH = static_cast<float>(texture->Height());
                     Vector4D border = image.SliceBorder;
-                    Vector4D borderScaled = {
-                        border.X * scaleX,
-                        border.Y * scaleY,
-                        border.Z * scaleX,
-                        border.W * scaleY
-                    };
+                    Vector4D borderScaled = isWorldSpace
+                        ? Vector4D{
+                            PixelsToUnits(border.X),
+                            PixelsToUnits(border.Y),
+                            PixelsToUnits(border.Z),
+                            PixelsToUnits(border.W)
+                        }
+                        : Vector4D{
+                            border.X * scaleX,
+                            border.Y * scaleY,
+                            border.Z * scaleX,
+                            border.W * scaleY
+                        };
                     const float left = std::min(borderScaled.X, size.X * 0.5f);
                     const float right = std::min(borderScaled.Z, size.X * 0.5f);
                     const float top = std::min(borderScaled.Y, size.Y * 0.5f);
                     const float bottom = std::min(borderScaled.W, size.Y * 0.5f);
 
+                    // Compute adjusted UVs based on border sizes.
                     const float u0 = uv.X;
                     const float v0 = uv.Y;
                     const float u1 = uv.Z;
@@ -346,6 +434,7 @@ namespace ECS {
                     const float vTop = texH > 0.0f ? (v0 + (border.Y / texH) * (v1 - v0)) : v0;
                     const float vBottom = texH > 0.0f ? (v1 - (border.W / texH) * (v1 - v0)) : v1;
 
+                    // Compute slice positions.
                     const float x0 = pos.X;
                     const float x1 = pos.X + left;
                     const float x2 = pos.X + size.X - right;
@@ -361,52 +450,88 @@ namespace ECS {
                         Vector2D size;
                         Vector4D uv;
                     } slices[] = {
-                        { {x0, y0}, {x1 - x0, y1 - y0}, {u0, v0, uLeft, vTop} },
-                        { {x1, y0}, {x2 - x1, y1 - y0}, {uLeft, v0, uRight, vTop} },
-                        { {x2, y0}, {x3 - x2, y1 - y0}, {uRight, v0, u1, vTop} },
-                        { {x0, y1}, {x1 - x0, y2 - y1}, {u0, vTop, uLeft, vBottom} },
-                        { {x1, y1}, {x2 - x1, y2 - y1}, {uLeft, vTop, uRight, vBottom} },
-                        { {x2, y1}, {x3 - x2, y2 - y1}, {uRight, vTop, u1, vBottom} },
-                        { {x0, y2}, {x1 - x0, y3 - y2}, {u0, vBottom, uLeft, v1} },
-                        { {x1, y2}, {x2 - x1, y3 - y2}, {uLeft, vBottom, uRight, v1} },
-                        { {x2, y2}, {x3 - x2, y3 - y2}, {uRight, vBottom, u1, v1} }
+                        // {Position}, {Size}, {UV}
+                        { {x0, y0}, {x1 - x0, y1 - y0}, {u0, v0, uLeft, vTop} },            // Top-left
+                        { {x1, y0}, {x2 - x1, y1 - y0}, {uLeft, v0, uRight, vTop} },        // Top-center
+                        { {x2, y0}, {x3 - x2, y1 - y0}, {uRight, v0, u1, vTop} },           // Top-right
+                        { {x0, y1}, {x1 - x0, y2 - y1}, {u0, vTop, uLeft, vBottom} },       // Middle-left
+                        { {x1, y1}, {x2 - x1, y2 - y1}, {uLeft, vTop, uRight, vBottom} },   // Middle-center
+                        { {x2, y1}, {x3 - x2, y2 - y1}, {uRight, vTop, u1, vBottom} },      // Middle-right
+                        { {x0, y2}, {x1 - x0, y3 - y2}, {u0, vBottom, uLeft, v1} },         // Bottom-left
+                        { {x1, y2}, {x2 - x1, y3 - y2}, {uLeft, vBottom, uRight, v1} },     // Bottom-center
+                        { {x2, y2}, {x3 - x2, y3 - y2}, {uRight, vBottom, u1, v1} }         // Bottom-right
                     };
 
+                    // Submit each slice as its own quad.
                     for (const auto& slice : slices) {
                         if (slice.size.X <= 0.0f || slice.size.Y <= 0.0f) {
                             continue;
                         }
-                        renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor);
+                        if (isWorldSpace) {
+                            renderer->SubmitWorldGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
+                                image.TextureFilter);
+                        } else {
+                            renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
+                                image.TextureFilter);
+                        }
                     }
                 } else {
                     // Non-sliced image uses a single quad.
-                    renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor);
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIImage(pos, size, textureId, uv, imageColor,
+                            image.TextureFilter);
+                    } else {
+                        renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor,
+                            image.TextureFilter);
+                    }
                 }
                 break;
             }
             case RenderItem::Type::Button: {
                 const auto& button = world.Get<Components::GUIButton>(item.entity);
-                // Pick background color based on state (or override with GUIStateStyle if present).
-                Color bgColor = ResolveStyleColor(style, button.NormalColor, state);
-                if (!style) {
-                    if (button.Disabled) {
-                        bgColor = button.DisabledColor;
-                    } else if (button.Toggle && button.Toggled) {
-                        bgColor = button.PressedColor;
-                    } else if (input && input->Pressed) {
-                        bgColor = button.PressedColor;
-                    } else if (input && input->Hovered) {
-                        bgColor = button.HoverColor;
+                // Pick background color based on GUIStateStyle with sensible fallback palette.
+                const Color fallbackNormal{ 0.25f, 0.25f, 0.25f, 1.0f };
+                const Color fallbackHover{ 0.35f, 0.35f, 0.35f, 1.0f };
+                const Color fallbackPressed{ 0.15f, 0.15f, 0.15f, 1.0f };
+                const Color fallbackDisabled{ 0.2f, 0.2f, 0.2f, 0.6f };
+
+                GUIState effectiveState = state;
+                if (button.Toggle && button.Toggled && effectiveState != GUIState::Disabled) {
+                    effectiveState = GUIState::Pressed;
+                }
+
+                Color bgColor = fallbackNormal;
+                if (style) {
+                    bgColor = ResolveStyleColor(style, fallbackNormal, effectiveState);
+                } else {
+                    switch (effectiveState) {
+                    case GUIState::Hovered:
+                        bgColor = fallbackHover;
+                        break;
+                    case GUIState::Pressed:
+                        bgColor = fallbackPressed;
+                        break;
+                    case GUIState::Disabled:
+                        bgColor = fallbackDisabled;
+                        break;
+                    case GUIState::Normal:
+                    default:
+                        bgColor = fallbackNormal;
+                        break;
                     }
                 }
 
                 // Background panel (button body).
-                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                }
 
                 // Offset content by button padding to keep labels/icons aligned.
                 const Vector2D innerPos = {
                     element.ContentPosition.X + button.Padding.X * scaleX,
-                    element.ContentPosition.Y + button.Padding.Y * scaleY
+                    element.ContentPosition.Y + button.Padding.Y * scaleY * ySign
                 };
                 const Vector2D innerSize = {
                     std::max(0.0f, element.ContentSize.X - (button.Padding.X + button.Padding.Z) * scaleX),
@@ -416,8 +541,14 @@ namespace ECS {
                 const std::string label = button.TextId ? ECS::StringTable::Resolve(button.TextId) : std::string();
                 if (!label.empty()) {
                     // Label text is anchored at the inner content origin.
-                    renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
-                        button.FontSize * scaleX, button.TextColor);
+                    const float labelSize = isWorldSpace ? PixelsToUnits(button.FontSize) : (button.FontSize * scaleX);
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
+                            labelSize, button.TextColor);
+                    } else {
+                        renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
+                            labelSize, button.TextColor);
+                    }
                 }
 
                 if (button.IconPathId != 0) {
@@ -428,11 +559,16 @@ namespace ECS {
                             const Vector2D iconSize = { button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
                             const Vector2D iconPos = {
                                 innerPos.X + button.IconOffset.X * scaleX,
-                                innerPos.Y + button.IconOffset.Y * scaleY
+                                innerPos.Y + button.IconOffset.Y * scaleY * ySign
                             };
                             // Icons are drawn as a tinted image over the button.
-                            renderer->SubmitGUIImage(iconPos, iconSize, iconTex->ID(),
-                                Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            if (isWorldSpace) {
+                                renderer->SubmitWorldGUIImage(iconPos, iconSize, iconTex->ID(),
+                                    Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            } else {
+                                renderer->SubmitGUIImage(iconPos, iconSize, iconTex->ID(),
+                                    Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            }
                         }
                     }
                 }
@@ -451,7 +587,7 @@ namespace ECS {
                 };
                 Vector2D trackPos = {
                     element.ContentPosition.X + padding.X,
-                    element.ContentPosition.Y + padding.Y
+                    element.ContentPosition.Y + padding.Y * ySign
                 };
                 Vector2D trackSize = {
                     std::max(0.0f, element.ContentSize.X - padding.X - paddingOpposite.X),
@@ -459,7 +595,11 @@ namespace ECS {
                 };
 
                 const Color trackColor = ResolveStyleColor(style, slider.TrackColor, state);
-                renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                }
 
                 // Fill length is derived from the normalized slider value.
                 const float range = std::max(0.0001f, slider.Max - slider.Min);
@@ -471,7 +611,11 @@ namespace ECS {
                 } else {
                     fillSize.Y = trackSize.Y * t;
                 }
-                renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                }
 
                 // Knob is centered at the end of the fill for consistent dragging.
                 Vector2D knobSize = { slider.KnobSize.X * scaleX, slider.KnobSize.Y * scaleY };
@@ -483,21 +627,29 @@ namespace ECS {
                     knobPos.X = trackPos.X + (trackSize.X - knobSize.X) * 0.5f;
                     knobPos.Y = trackPos.Y + trackSize.Y * t - knobSize.Y * 0.5f;
                 }
-                renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                }
                 break;
             }
             }
         }
     }
 
+    // Tear down GUI render system state.
     void GUIRenderSystem::OnDestroy(World& world) {
         (void)world;
     }
 
+    // Return metadata used for system registration.
     SystemMetadata GUIRenderSystem::GetMetadata() const {
         ComponentAccessBuilder builder("GUIRenderSystem");
         builder.SetExecutionOrder(-10);
         return builder
+            .ReadComponent<Components::Active>()
+            .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUICanvas>()
             .ReadComponent<Components::GUIElement>()
             .ReadComponent<Components::GUIPanel>()

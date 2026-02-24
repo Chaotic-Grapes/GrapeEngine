@@ -182,6 +182,7 @@ namespace ECS {
         builder.ReadComponent<Components::BoxCollider2D>();
         builder.ReadComponent<Components::Rigidbody2D>();
         builder.ReadComponent<Components::Active>();
+        builder.ReadComponent<Components::Parent>();
         // Write accesses
         builder.WriteComponent<Components::LocalTransform>();
         builder.WriteComponent<Components::Rigidbody2D>();
@@ -431,13 +432,15 @@ namespace ECS {
         return TestCircleBox(wc, obb, outNormal, outDepth, outContact);
     }
 
-    // Helper to create unique collision pair ID
-    static uint64_t MakeCollisionPairID(Entity a, Entity b) {
-        uint32_t idA = a.Index;
-        uint32_t idB = b.Index;
-        // Ensure consistent ordering (smaller ID first)
-        if (idA > idB) std::swap(idA, idB);
-        return (static_cast<uint64_t>(idA) << 32) | idB;
+    // Helper to create unique collision pair key (order-independent)
+    static PackedEntityPair MakeCollisionPair(PackedEntityId a, PackedEntityId b) {
+        if (a > b) std::swap(a, b);
+        return PackedEntityPair{ a, b };
+    }
+
+    // Helper to create trigger pair key (order-dependent)
+    static PackedEntityPair MakeTriggerPair(PackedEntityId triggerId, PackedEntityId otherId) {
+        return PackedEntityPair{ triggerId, otherId };
     }
 
     // =====================================================================
@@ -458,6 +461,8 @@ namespace ECS {
         int triggerEnterCount = 0;
         int triggerExitCount = 0;
         int triggerStayCount = 0;
+        bool loggedMissingLayer = false;
+        bool loggedMissingPhysicsPair = false;
 
         // =====================
         // Simulation Settings
@@ -470,8 +475,8 @@ namespace ECS {
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
         // Track collisions and trigger overlaps for the whole frame (across substeps).
-        std::unordered_set<uint64_t> frameCollisions;
-        std::unordered_set<uint64_t> currentTriggerOverlaps;
+        std::unordered_set<PackedEntityPair, PackedEntityPairHash> frameCollisions;
+        std::unordered_set<PackedEntityPair, PackedEntityPairHash> currentTriggerOverlaps;
 
         // Running frame counter to reset per-frame SFX dedupe
         static uint64_t s_frameCounter = 0;
@@ -495,9 +500,8 @@ namespace ECS {
                 const Components::Rigidbody2D& rb,
                 Components::LinearVelocity2D&,
                 Components::LocalTransform&) {
-                    // Check if entity is active (optional component)
-                    if (const auto* a = world.TryGet<Components::Active>(e)) {
-                        if (!a->Enabled) return;
+                    if (!world.IsActiveInHierarchy(e)) {
+                        return;
                     }
                     
                     if (rb.Mass <= 0.0f) return; // only dynamics here
@@ -523,7 +527,9 @@ namespace ECS {
         world.Each<Components::Rigidbody2D, Components::LocalTransform>(
             [&](const Entity e, const Components::Rigidbody2D& rb, const Components::LocalTransform&) {
                 if (rb.Mass > 0.0f) return; // only statics here
-                if (const auto* a = world.TryGet<Components::Active>(e)) if (!a->Enabled) return;
+                if (!world.IsActiveInHierarchy(e)) {
+                    return;
+                }
                 
                 // === Layer-wide physics gating for static entities ===
                 if (layerManager) {
@@ -548,8 +554,8 @@ namespace ECS {
             if (broadphaseIds.find(e.Index) != broadphaseIds.end())
                 return;
 
-            if (const auto* a = world.TryGet<Components::Active>(e)) {
-                if (!a->Enabled) return;
+            if (!world.IsActiveInHierarchy(e)) {
+                return;
             }
 
             if (layerManager) {
@@ -580,8 +586,8 @@ namespace ECS {
                         Components::LinearVelocity2D& linVel,
                         Components::LocalTransform& xf)
                     {
-                        if (const auto* a = world.TryGet<Components::Active>(e)) {
-                            if (!a->Enabled) return;
+                        if (!world.IsActiveInHierarchy(e)) {
+                            return;
                         }
                         if (rb.Mass <= 0.0f) return; // only dynamic bodies integrate
 
@@ -662,15 +668,11 @@ namespace ECS {
             // =====================
             // Candidate pairs deduped per substep.
             std::vector<std::pair<Entity, Entity>> pairs;
-            std::unordered_set<uint64_t>           seen;
+            std::unordered_set<PackedEntityPair, PackedEntityPairHash> seen;
             pairs.reserve(dynamicEntities.size() * 4);
             seen.reserve(dynamicEntities.size() * 4);
 
             // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells.
-            auto pairKey = [](uint64_t a, uint64_t b) -> uint64_t { 
-                if (a > b) std::swap(a, b); return (a << 32) | (b & 0xffffffffull); 
-            };
-
             // Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell.
             for (const auto& cell : grid.Grid()) {
                 const auto& ents = cell.second;
@@ -678,7 +680,9 @@ namespace ECS {
                 for (size_t i = 0; i + 1 < ents.size(); ++i) {
                     for (size_t j = i + 1; j < ents.size(); ++j) {
                         //Packs the pair (ents[i], ents[j]) into the 64-bit canonical key using pairKey
-                        const uint64_t key = pairKey(ECS::EntityUtils::Pack(ents[i]), ECS::EntityUtils::Pack(ents[j]));
+                        const PackedEntityPair key = MakeCollisionPair(
+                            ECS::EntityUtils::Pack(ents[i]),
+                            ECS::EntityUtils::Pack(ents[j]));
                         if (seen.insert(key).second) pairs.emplace_back(ents[i], ents[j]);
                     }
                 }
@@ -703,9 +707,9 @@ namespace ECS {
                     auto* tB = world.TryGet<Components::LocalTransform>(B);
                     // cannot resolve without positions
                     if (!tA || !tB) continue;
-                    // Honor Active flags: if present and disabled, skip.
-                    if (const auto* aA = world.TryGet<Components::Active>(A); aA && !aA->Enabled) continue;
-                    if (const auto* aB = world.TryGet<Components::Active>(B); aB && !aB->Enabled) continue;
+                    // Honor Active flags (including parents): if disabled, skip.
+                    if (!world.IsActiveInHierarchy(A)) continue;
+                    if (!world.IsActiveInHierarchy(B)) continue;
 
                     // Query collider shapes present on each entity.
                     const auto* circA = world.TryGet<Components::CircleCollider2D>(A);
@@ -725,7 +729,14 @@ namespace ECS {
                     // If either entity is missing a Layer component, skip collision
                     // (Entities must be explicitly assigned to a layer to participate in layer-based collision)
                     if (!la || !lb)
+                    {
+                        if (!loggedMissingLayer)
+                        {
+                            loggedMissingLayer = true;
+                            LOG_WARNING("PhysicsSystem: Skipping collision event (missing Layer component on one or both entities).");
+                        }
                         continue;
+                    }
                     
                     uint16_t layerAId = la->Id;
                     uint16_t layerBId = lb->Id;
@@ -748,14 +759,14 @@ namespace ECS {
                         // Circle-circle: single contact point (keep old method for now)
                         Vector2D n;
                         float depth;
-                        if (TestCircleCircle(*circA, *tA, *circB, *tB, n, depth)) {
+                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, *tA);
+                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, *tB);
+                        if (TestCircleCircle(wcA, wcB, n, depth)) {
                             manifold.normal = n;
                             manifold.penetration = depth;
-                            // Calculate contact point (between centers)
-                            manifold.points[0] = Vector2D(
-                                (tA->Position.X + tB->Position.X) * 0.5f,
-                                (tA->Position.Y + tB->Position.Y) * 0.5f
-                            );
+                            const Vector2D pA = wcA.Center + (n * wcA.Radius);
+                            const Vector2D pB = wcB.Center - (n * wcB.Radius);
+                            manifold.points[0] = (pA + pB) * 0.5f;
                             manifold.pointCount = 1;
                             hasCollision = true;
                         }
@@ -823,12 +834,16 @@ namespace ECS {
                     if (isTriggerA || isTriggerB) {
                         if (isTriggerA) {
                             // Store trigger overlap pair (A is trigger)
-                            const uint64_t key = (static_cast<uint64_t>(A.Index) << 32) | B.Index;
+                            const PackedEntityPair key = MakeTriggerPair(
+                                ECS::EntityUtils::Pack(A),
+                                ECS::EntityUtils::Pack(B));
                             currentTriggerOverlaps.insert(key);
                         }
                         if (isTriggerB) {
                             // Store trigger overlap pair (B is trigger)
-                            const uint64_t key = (static_cast<uint64_t>(B.Index) << 32) | A.Index;
+                            const PackedEntityPair key = MakeTriggerPair(
+                                ECS::EntityUtils::Pack(B),
+                                ECS::EntityUtils::Pack(A));
                             currentTriggerOverlaps.insert(key);
                         }
                         continue;
@@ -840,9 +855,19 @@ namespace ECS {
                     // Require at least one side to be physically simulated (has rb + velocity).
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                     const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
-                    if (!hasPhysA && !hasPhysB) continue;
+                    if (!hasPhysA && !hasPhysB)
+                    {
+                        if (!loggedMissingPhysicsPair)
+                        {
+                            loggedMissingPhysicsPair = true;
+                            LOG_WARNING("PhysicsSystem: Skipping collision event (no Rigidbody2D+LinearVelocity2D pair found).");
+                        }
+                        continue;
+                    }
 
-                    uint64_t pairID = MakeCollisionPairID(A, B);
+                    const PackedEntityPair pairID = MakeCollisionPair(
+                        ECS::EntityUtils::Pack(A),
+                        ECS::EntityUtils::Pack(B));
                     const bool firstSeenThisFrame = frameCollisions.insert(pairID).second;
                     const bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
 
@@ -906,11 +931,13 @@ namespace ECS {
                         if (impactSpeed >= kImpactThreshold) {
                             // Per-frame dedupe for this pair
                             static uint64_t s_lastFrameSeen = 0;
-                            static std::unordered_set<uint64_t> sfxPlayedThisFrame;
+                            static std::unordered_set<PackedEntityPair, PackedEntityPairHash> sfxPlayedThisFrame;
                             if (s_lastFrameSeen != s_frameCounter) {
                                 sfxPlayedThisFrame.clear(); s_lastFrameSeen = s_frameCounter;
                             }
-                            const uint64_t pk = pairKey(ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B));
+                            const PackedEntityPair pk = MakeCollisionPair(
+                                ECS::EntityUtils::Pack(A),
+                                ECS::EntityUtils::Pack(B));
                             if (sfxPlayedThisFrame.insert(pk).second) {
                                 if (auto* audio = PHYSICS_AUDIO_DEVICE) {
                                     const std::string cue = "sfx_collide";
@@ -939,13 +966,10 @@ namespace ECS {
         }
 
         // Emit collision exits once per frame (after all substeps).
-        for (uint64_t pairID : m_previousCollisions) {
+        for (const PackedEntityPair& pairID : m_previousCollisions) {
             if (frameCollisions.find(pairID) == frameCollisions.end()) {
-                uint32_t idA = (pairID >> 32);
-                uint32_t idB = (pairID & 0xFFFFFFFF);
-
-                Entity entityA = world.Resolve(idA);
-                Entity entityB = world.Resolve(idB);
+                Entity entityA = ECS::EntityUtils::Unpack(pairID.A);
+                Entity entityB = ECS::EntityUtils::Unpack(pairID.B);
 
                 if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
                     eventDispatcher.FireCollisionExitEvent(
@@ -960,15 +984,15 @@ namespace ECS {
         m_previousCollisions = std::move(frameCollisions);
 
         // Handle trigger events
-        for (uint64_t pairID : currentTriggerOverlaps) {
+        for (const PackedEntityPair& pairID : currentTriggerOverlaps) {
             // Check if was overlapping last frame
             const bool wasOverlapping = (m_previousTriggerOverlaps.find(pairID) != m_previousTriggerOverlaps.end());
-            const uint32_t triggerId = static_cast<uint32_t>(pairID >> 32);
-            const uint32_t otherId = static_cast<uint32_t>(pairID & 0xFFFFFFFFu);
+            const PackedEntityId triggerId = pairID.A;
+            const PackedEntityId otherId = pairID.B;
 
             // Resolve entities
-            Entity triggerEntity = world.Resolve(triggerId);
-            Entity otherEntity = world.Resolve(otherId);
+            Entity triggerEntity = ECS::EntityUtils::Unpack(triggerId);
+            Entity otherEntity = ECS::EntityUtils::Unpack(otherId);
 
             // Check if both entities are still alive
             if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
@@ -984,13 +1008,13 @@ namespace ECS {
         }
 
         // Check for ended trigger overlaps
-        for (uint64_t pairID : m_previousTriggerOverlaps) {
+        for (const PackedEntityPair& pairID : m_previousTriggerOverlaps) {
             if (currentTriggerOverlaps.find(pairID) == currentTriggerOverlaps.end()) {
-                const uint32_t triggerId = static_cast<uint32_t>(pairID >> 32);
-                const uint32_t otherId = static_cast<uint32_t>(pairID & 0xFFFFFFFFu);
+                const PackedEntityId triggerId = pairID.A;
+                const PackedEntityId otherId = pairID.B;
 
-                Entity triggerEntity = world.Resolve(triggerId);
-                Entity otherEntity = world.Resolve(otherId);
+                Entity triggerEntity = ECS::EntityUtils::Unpack(triggerId);
+                Entity otherEntity = ECS::EntityUtils::Unpack(otherId);
 
                 if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
                     eventDispatcher.FireTriggerExitEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));

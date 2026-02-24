@@ -16,13 +16,74 @@ public abstract class TriggerSystemBase : SystemBase
     private readonly Dictionary<ulong, Dictionary<ulong, TriggerEvent>> _active = [];
     private int _lastProcessedFrame = -1;
     private IntPtr _lastWorldPtr = IntPtr.Zero;
+    private const bool ClearBuffersAfterCache = true;
+    private static int s_cachedFrame = -1;
+    private static IntPtr s_cachedWorldPtr = IntPtr.Zero;
+    private static readonly Dictionary<ulong, List<TriggerEvent>> s_cachedEnterEvents = [];
+    private static readonly Dictionary<ulong, List<TriggerExitEvent>> s_cachedExitEvents = [];
+
+    private static void RefreshFrameCache(World world, IntPtr worldPtr, int frame)
+    {
+        if (s_cachedFrame == frame && s_cachedWorldPtr == worldPtr)
+            return;
+
+        s_cachedFrame = frame;
+        s_cachedWorldPtr = worldPtr;
+        s_cachedEnterEvents.Clear();
+        s_cachedExitEvents.Clear();
+
+        foreach (var (entity, buffer) in world.Query<TriggerEventBuffer>())
+        {
+            if (buffer.Count <= 0)
+                continue;
+
+            var events = new List<TriggerEvent>(buffer.Count);
+            for (var i = 0; i < buffer.Count; ++i)
+            {
+                events.Add(buffer.GetEvent(i));
+            }
+            s_cachedEnterEvents[entity.Id] = events;
+        }
+
+        foreach (var (entity, buffer) in world.Query<TriggerExitEventBuffer>())
+        {
+            if (buffer.Count <= 0)
+                continue;
+
+            var events = new List<TriggerExitEvent>(buffer.Count);
+            for (var i = 0; i < buffer.Count; ++i)
+            {
+                events.Add(buffer.GetEvent(i));
+            }
+            s_cachedExitEvents[entity.Id] = events;
+        }
+
+        if (ClearBuffersAfterCache)
+        {
+            foreach (var (entity, _) in world.Query<TriggerEventBuffer>())
+            {
+                if (entity.IsAlive && entity.HasComponent<TriggerEventBuffer>())
+                {
+                    entity.RemoveComponent<TriggerEventBuffer>();
+                }
+            }
+            foreach (var (entity, _) in world.Query<TriggerExitEventBuffer>())
+            {
+                if (entity.IsAlive && entity.HasComponent<TriggerExitEventBuffer>())
+                {
+                    entity.RemoveComponent<TriggerExitEventBuffer>();
+                }
+            }
+        }
+    }
 
     protected sealed override void OnUpdate()
     {
         var world = World!;
+        IntPtr worldPtr;
         unsafe
         {
-            var worldPtr = (IntPtr)world.NativePtr;
+            worldPtr = (IntPtr)world.NativePtr;
             if (worldPtr != _lastWorldPtr)
             {
                 _active.Clear();
@@ -39,21 +100,24 @@ public abstract class TriggerSystemBase : SystemBase
         var exitCount = 0;
         var stayCount = 0;
 
+        RefreshFrameCache(world, worldPtr, frame);
+
         // Enter: TriggerEventBuffer contains enter events for the frame.
-        foreach (var (entity, buffer) in world.Query<TriggerEventBuffer>())
+        foreach (var (entityId, events) in s_cachedEnterEvents)
         {
+            var entity = Entity.FromId(world, entityId);
+            if (!entity.IsAlive)
+                continue;
+
             if (!_active.TryGetValue(entity.Id, out var map))
             {
                 map = [];
                 _active[entity.Id] = map;
             }
 
-            // Process enter events
-            for (var i = 0; i < buffer.Count; ++i)
+            for (var i = 0; i < events.Count; ++i)
             {
-                var evt = buffer.GetEvent(i);
-
-                // Only process enter events
+                var evt = events[i];
                 if (evt.IsEnter && !map.ContainsKey(evt.OtherEntityId))
                 {
                     map[evt.OtherEntityId] = evt;
@@ -64,15 +128,18 @@ public abstract class TriggerSystemBase : SystemBase
         }
 
         // Exit: remove and notify.
-        foreach (var (entity, buffer) in world.Query<TriggerExitEventBuffer>())
+        foreach (var (entityId, events) in s_cachedExitEvents)
         {
+            var entity = Entity.FromId(world, entityId);
+            if (!entity.IsAlive)
+                continue;
+
             if (!_active.TryGetValue(entity.Id, out var map))
                 continue;
 
-            // Process exit events
-            for (var i = 0; i < buffer.Count; ++i)
+            for (var i = 0; i < events.Count; ++i)
             {
-                var evt = buffer.GetEvent(i);
+                var evt = events[i];
                 if (map.Remove(evt.OtherEntityId))
                 {
                     OnTriggerExit(entity, evt);

@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Matrix4x4.h"
 #include "ecs/StringTable.h"
 #include "audio/SoundTypes.h"
+#include "graphics/TextureFilter.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
 #include <string>
@@ -322,6 +323,9 @@ namespace ECS {
             uint32_t TexturePath = 0;
             uint32_t NormalTexturePath = 0;
             uint32_t EmissiveTexturePath = 0;
+
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
+            uint8_t _paddingFilter[3] = { 0, 0, 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -382,6 +386,9 @@ namespace ECS {
             // Persistent texture path IDs (StringTable). 0 = invalid.
             uint32_t TexturePath = 0;
             uint32_t NormalTexturePath = 0;
+
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
+            uint8_t _paddingFilter[3] = { 0, 0, 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
@@ -497,6 +504,8 @@ namespace ECS {
 
             // Basics
             uint32_t CueId = 0;
+            // Persistent cue path ID (StringTable). 0 = invalid.
+            uint32_t CuePathId = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
@@ -562,6 +571,16 @@ namespace ECS {
             MatchHeight = 3
         };
 
+        enum class GUIRenderSpace : uint8_t {
+            Screen = 0,
+            World = 1
+        };
+
+        struct GUIRenderMode {
+            GUIRenderSpace Space = GUIRenderSpace::Screen; // Screen = pixels, World = world units
+        };
+        static_assert(std::is_trivially_copyable_v<GUIRenderMode>, "GUIRenderMode must be trivially copyable");
+
         struct GUICanvas {
             Vector2D ReferenceSize{ 1920.0f, 1080.0f }; // logical design size used for scaling
             Vector2D Offset{ 0.0f, 0.0f };              // pixel offset applied after scaling
@@ -595,6 +614,8 @@ namespace ECS {
             Vector2D ResolvedSize{ 0.0f, 0.0f };     // size after scale/margins
             Vector2D ContentPosition{ 0.0f, 0.0f };  // top-left after padding
             Vector2D ContentSize{ 0.0f, 0.0f };      // size after padding
+            Vector2D ScreenPosition{ 0.0f, 0.0f };   // top-left in screen space (world GUI input)
+            Vector2D ScreenSize{ 0.0f, 0.0f };       // size in screen space (world GUI input)
         };
         static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
@@ -657,7 +678,9 @@ namespace ECS {
             Color Color{ 1.0f, 1.0f, 1.0f, 1.0f }; // tint color
             Vector4D UVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
             GUIImageScaleMode ScaleMode = GUIImageScaleMode::Stretch; // fit/fill/none
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
             bool UseSlicing = false;     // enable 9-slice layout
+            uint8_t _paddingFilter = 0;
             Vector4D SliceBorder{ 0.0f, 0.0f, 0.0f, 0.0f }; // border in pixels
         };
         static_assert(std::is_trivially_copyable_v<GUIImage>, "GUIImage must be trivially copyable");
@@ -685,10 +708,6 @@ namespace ECS {
             uint32_t TextId = 0;
             uint32_t FontPathId = 0;
             uint32_t IconPathId = 0;
-            Color NormalColor{ 0.25f, 0.25f, 0.25f, 1.0f };   // idle background
-            Color HoverColor{ 0.35f, 0.35f, 0.35f, 1.0f };    // hover background
-            Color PressedColor{ 0.15f, 0.15f, 0.15f, 1.0f };  // pressed background
-            Color DisabledColor{ 0.2f, 0.2f, 0.2f, 0.6f };    // disabled background
             Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // label color
             Color IconColor{ 1.0f, 1.0f, 1.0f, 1.0f };        // icon tint
             float FontSize = 24.0f;       // label size

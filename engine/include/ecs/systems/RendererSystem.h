@@ -100,6 +100,9 @@ namespace ECS {
         GUIViewport GetGUIViewport() const { return m_guiViewport; }
         void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
         void ResetGUIViewport();
+        bool WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
+            const Vector2D& viewportSize, Vector2D& outScreen);
+        bool GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp);
 
         // ====================================================================
         // Viewport Management
@@ -258,14 +261,28 @@ namespace ECS {
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                             const Color& color, float cornerRadius = 0.0f);
         void SubmitGUIImage(const Vector2D& position, const Vector2D& size,
-                            uint32_t textureId, const Vector4D& uvRect, const Color& color);
+                            uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
         void SubmitGUIText(const Vector2D& position, const std::string& text,
                            const std::string& fontPath, float pixelSize, const Color& color);
+        void SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+                                 const Color& color, float cornerRadius = 0.0f);
+        void SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+                                 uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+        void SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+                                const std::string& fontPath, float pixelSize, const Color& color);
 
         // Call from editor when a tilemap should be rendered
         struct DebugTileMapEntry {
             std::reference_wrapper<const TileMap> Map;
-            std::vector<const Tileset*> Tilesets;
+            
+            // Shared pointer is required here to extend the lifetime of the Tileset
+            // In the editor, a user might hot-swap a tileset (e.g. drag-and-drop) which could destroy the old Tileset 
+            // while the RendererSystem is still processing the current frame
+            // Holding a shared_ptr prevents use-after-free
+            std::vector<std::shared_ptr<const Tileset>> Tilesets;
+            
             glm::vec2 Offset;
         };
 
@@ -329,6 +346,7 @@ namespace ECS {
         // ====================================================================
 
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
+        std::unique_ptr<Renderer> m_guiRenderer;                ///< Dedicated GUI batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
@@ -390,8 +408,36 @@ namespace ECS {
             uint32_t textureId = 0;
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
+            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
+
+        struct WorldGUIPanelSubmission {
+            Vector2D position;
+            Vector2D size;
+            Color color;
+            float cornerRadius = 0.0f;
+        };
+        std::vector<WorldGUIPanelSubmission> m_worldGuiPanelQueue;
+
+        struct WorldGUITextSubmission {
+            Vector2D position;
+            std::string text;
+            std::string fontPath;
+            float pixelSize = 24.0f;
+            Color color;
+        };
+        std::vector<WorldGUITextSubmission> m_worldGuiTextQueue;
+
+        struct WorldGUIImageSubmission {
+            Vector2D position;
+            Vector2D size;
+            uint32_t textureId = 0;
+            Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+            Color color;
+            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+        };
+        std::vector<WorldGUIImageSubmission> m_worldGuiImageQueue;
 
         Graphics::LightManager m_lightManager;
 
@@ -442,6 +488,8 @@ namespace ECS {
 
         Vector2D m_renderTargetSize{ 0.0f, 0.0f };
         GUIViewport m_guiViewport{};
+        float m_windowAspectRatio = 0.0f;
+        bool m_windowAspectDirty = false;
 
         // ====================================================================
         // Helper Methods - Camera
@@ -471,8 +519,10 @@ namespace ECS {
             const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
         void RenderBloom(Viewport& vp, float bloomRadius);
         void ToneMap(Viewport& vp);
+        void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
         void RenderGUI(Viewport& vp);
+        void RenderWorldGUI(const glm::mat4& viewProj);
         void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
             const std::vector<std::vector<Entity>>& buckets);
 

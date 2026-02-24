@@ -144,6 +144,18 @@ public enum GUIScaleMode : byte
     MatchHeight = 3
 }
 
+public enum GUIRenderSpace : byte
+{
+    Screen = 0,
+    World = 1
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct GUIRenderMode
+{
+    public GUIRenderSpace Space;
+}
+
 public enum GUIAlignment : byte
 {
     TopLeft = 0,
@@ -158,20 +170,22 @@ public enum GUIAlignment : byte
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public record struct GUIElement
-{
-    public Vector2 Position;
-    public Vector2 Size;
-    public bool Visible;
-    public GUIAlignment Alignment;
-    public short ZOrder;
-    public Vector4 Margin;
-    public Vector4 Padding;
-    public Vector2 ResolvedPosition;
-    public Vector2 ResolvedSize;
-    public Vector2 ContentPosition;
-    public Vector2 ContentSize;
-}
+    public record struct GUIElement
+    {
+        public Vector2 Position;
+        public Vector2 Size;
+        public bool Visible;
+        public GUIAlignment Alignment;
+        public short ZOrder;
+        public Vector4 Margin;
+        public Vector4 Padding;
+        public Vector2 ResolvedPosition;
+        public Vector2 ResolvedSize;
+        public Vector2 ContentPosition;
+        public Vector2 ContentSize;
+        public Vector2 ScreenPosition;
+        public Vector2 ScreenSize;
+    }
 
 [StructLayout(LayoutKind.Sequential)]
 public record struct GUIPanel
@@ -252,10 +266,6 @@ public record struct GUIButton
     public StringId TextId;
     public StringId FontPathId;
     public StringId IconPathId;
-    public Color NormalColor;
-    public Color HoverColor;
-    public Color PressedColor;
-    public Color DisabledColor;
     public Color TextColor;
     public Color IconColor;
     public float FontSize;

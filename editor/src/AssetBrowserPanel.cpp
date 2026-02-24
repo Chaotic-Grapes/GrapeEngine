@@ -33,6 +33,7 @@ Provides:
 #include <fstream>
 #include <cstring>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 
 
 // -------------------------------------------------------------------------
@@ -91,6 +92,7 @@ void AssetBrowserPanel::Render() {
     _renderNavigationBar();
     _renderActionButtons();
     _renderContentArea();
+    _renderCreateDialog();
 
     // Handle keyboard shortcuts - ONLY when Asset Browser window is focused
     // This prevents conflicts with other panels (e.g., Hierarchy) that also use DELETE key
@@ -143,11 +145,23 @@ void AssetBrowserPanel::Render() {
 // Render the breadcrumb navigation bar at the top
 void AssetBrowserPanel::_renderNavigationBar() {
     // Display clickable breadcrumb navigation with drop target support
-    const std::filesystem::path pathObj(m_currentPath);
+    const std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    std::filesystem::path pathObj(m_currentPath);
     std::vector<std::filesystem::path> pathParts;
+    std::string projectName = projectRoot.filename().string();
+    if (projectName.empty()) {
+        projectName = "Project";
+    }
 
-    // Build path parts from root to current
-    for (const auto& part : pathObj) {
+    std::error_code ec;
+    std::filesystem::path rel = std::filesystem::relative(pathObj, projectRoot, ec);
+    if (ec || rel.empty() || rel.string().rfind("..", 0) == 0) {
+        pathObj = projectRoot;
+        rel = std::filesystem::path();
+    }
+
+    pathParts.emplace_back(projectName);
+    for (const auto& part : rel) {
         std::string partStr = part.string();
         if (!partStr.empty() && partStr != "." && partStr != ".." && partStr != "/" && partStr != "\\") {
             pathParts.emplace_back(partStr);
@@ -155,11 +169,13 @@ void AssetBrowserPanel::_renderNavigationBar() {
     }
 
     // Display each part as clickable button with separators and drop targets
-    std::string accumulatedPath;
+    std::filesystem::path accumulatedPath = projectRoot;
     for (size_t i = 0; i < pathParts.size(); i++) {
-        // Build accumulated path up to this part
-        if (i > 0) accumulatedPath += "\\";
-        accumulatedPath += pathParts[i].string();
+        if (i == 0) {
+            accumulatedPath = projectRoot;
+        } else {
+            accumulatedPath /= pathParts[i].string();
+        }
 
         // Add ">" separator between breadcrumb parts
         if (i > 0) {
@@ -175,7 +191,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // Make current directory text a drop target
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
-                _handleFolderDropTarget(m_currentPath);
+                _handleFolderDropTarget(accumulatedPath.string());
             }
         }
         else {
@@ -189,7 +205,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
-                m_currentPath = accumulatedPath;
+                m_currentPath = accumulatedPath.string();
                 m_selectedAssets.clear();
                 m_selectedAsset.clear();
             }
@@ -198,7 +214,7 @@ void AssetBrowserPanel::_renderNavigationBar() {
 
             // Make breadcrumb button a drop target
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
-                _handleFolderDropTarget(accumulatedPath);
+                _handleFolderDropTarget(accumulatedPath.string());
             }
 
             ImGui::PopID();
@@ -215,7 +231,7 @@ void AssetBrowserPanel::_renderActionButtons() {
     // Import button (upload icon)
     // Push symbols font so the button renders an icon glyph
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEF\x82\x9B")) {
+    if (ImGui::Button(EditorIcons::Import)) {
         m_assetLibrary._importAsset(m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
     }
     ImGui::PopFont();
@@ -247,7 +263,7 @@ void AssetBrowserPanel::_renderActionButtons() {
 
     // Use symbols font for the replace icon button
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEE\xA3\x94")) {
+    if (ImGui::Button(EditorIcons::Replace)) {
         m_assetLibrary._replaceTexture(m_selectedAsset, m_statusMessage, m_statusTimer);
     }
 
@@ -277,7 +293,7 @@ void AssetBrowserPanel::_renderActionButtons() {
 void AssetBrowserPanel::_renderPrefabButton() {
     // Plus button - always enabled now (for Create + Prefab management)
     ImGui::PushFont(m_symbolsFont);
-    if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
+    if (ImGui::Button(EditorIcons::NewFolder)) {
         ImGui::OpenPopup("CreateAndPrefabs");
     }
 
@@ -329,107 +345,7 @@ void AssetBrowserPanel::_renderPrefabPopup() {
         ImGui::EndPopup();
     }
 
-    // Open create dialog if flagged
-    if (m_openCreateDialog) {
-        ImGui::OpenPopup("CreateAssetDialog");
-        m_openCreateDialog = false;
-    }
-
-    // Asset creation dialog (modal) - shared with context menu
-    if (ImGui::BeginPopupModal("CreateAssetDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::PushFont(m_mainFont);
-
-        const char* dialogTitle = "Create Asset";
-        if (m_creationType == AssetCreationType::SCRIPT) dialogTitle = "Create Script";
-        else if (m_creationType == AssetCreationType::SCENE) dialogTitle = "Create Scene";
-        else if (m_creationType == AssetCreationType::FOLDER) dialogTitle = "Create Folder";
-        ImGui::Text("%s", dialogTitle);
-        ImGui::Separator();
-        ImGui::Dummy(ImVec2(0, 5));
-
-        // Show script template selector when creating a script
-        if (m_creationType == AssetCreationType::SCRIPT) {
-            ImGui::Text("Template:");
-            ImGui::SameLine();
-
-            // Get template names
-            int templateCount = 0;
-            const char* const* templateNames = Editor::Templates::ScriptTemplates::GetTemplateNames(templateCount);
-
-            // Show combo for template selection
-            const char* currentTemplateName = nullptr;
-            switch (m_selectedScriptTemplate) {
-            case Editor::Templates::ScriptTemplateType::BasicSystem:
-                currentTemplateName = "BasicSystem";
-                break;
-            case Editor::Templates::ScriptTemplateType::EditModeSystem:
-                currentTemplateName = "EditModeSystem";
-                break;
-            case Editor::Templates::ScriptTemplateType::HotReloadSystem:
-                currentTemplateName = "HotReloadSystem";
-                break;
-            case Editor::Templates::ScriptTemplateType::MetadataSystem:
-                currentTemplateName = "MetadataSystem";
-                break;
-            }
-
-            if (ImGui::BeginCombo("##ScriptTemplate", currentTemplateName)) {
-                for (int i = 0; i < templateCount; i++) {
-                    bool isSelected = (currentTemplateName && strcmp(templateNames[i], currentTemplateName) == 0);
-                    if (ImGui::Selectable(templateNames[i], isSelected)) {
-                        m_selectedScriptTemplate = Editor::Templates::ScriptTemplates::GetTemplateTypeFromName(templateNames[i]);
-                    }
-                    if (isSelected) {
-                        ImGui::SetItemDefaultFocus();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-
-            // Show description of selected template
-            std::string description = Editor::Templates::ScriptTemplates::GetTemplateDescription(m_selectedScriptTemplate);
-            ImGui::TextDisabled("%s", description.c_str());
-            ImGui::Dummy(ImVec2(0, 5));
-        }
-
-        // Name input
-        ImGui::Text("Name:");
-        ImGui::SameLine();
-        if (m_focusNameInput) {
-            ImGui::SetKeyboardFocusHere();
-            m_focusNameInput = false;
-        }
-
-        const bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer),
-            ImGuiInputTextFlags_EnterReturnsTrue);
-
-        ImGui::Dummy(ImVec2(0, 5));
-
-        // Buttons
-        const bool createClicked = ImGui::Button("Create") || enterPressed;
-        ImGui::SameLine();
-        const bool cancelClicked = ImGui::Button("Cancel");
-
-        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
-            if (m_creationType == AssetCreationType::SCRIPT) {
-                _createScript();
-            }
-            else if (m_creationType == AssetCreationType::SCENE) {
-                _createScene();
-            }
-            else if (m_creationType == AssetCreationType::FOLDER) {
-                _createFolder();
-            }
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (cancelClicked) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::PopFont();
-        ImGui::EndPopup();
-    }
+    // Asset creation dialog is rendered by the context menu handler to avoid duplicate popups.
 }
 
 // Render the main content area (file list and file info panels)
@@ -473,10 +389,10 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
             // Render icon
             ImGui::PushFont(m_symbolsFont);
             if (entry.is_directory()) {
-                ImGui::Text("\xEE\x8B\x87"); // Folder icon
+                ImGui::Text(EditorIcons::Folder); // Folder icon
             }
             else {
-                ImGui::Text("\xEE\xA1\xB3"); // File icon
+                ImGui::Text(EditorIcons::File); // File icon
             }
             ImGui::PopFont();
 
@@ -692,6 +608,13 @@ void AssetBrowserPanel::_renderDeleteButton() {
         ImGui::Separator();
         ImGui::Dummy(ImVec2(0, 5));
 
+        const bool isSingleSelection = m_selectedAssets.size() == 1;
+        bool isFolderSelection = false;
+        if (isSingleSelection) {
+            std::error_code ec;
+            isFolderSelection = std::filesystem::is_directory(*m_selectedAssets.begin(), ec) && !ec;
+        }
+
         // Style the delete button: icon font + transparent background + red text
         ImGui::PushFont(m_symbolsFont);
         // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
@@ -699,26 +622,42 @@ void AssetBrowserPanel::_renderDeleteButton() {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 
         // Render delete icon button
-        if (ImGui::SmallButton("\xEE\xA1\xB2\\##Delete2")) {
+        if (ImGui::SmallButton((std::string(EditorIcons::Delete) + "##Delete2").c_str())) {
             _deleteSelectedAssets();
         }
-
-        // Restore style overrides and font state
-        ImGui::PopStyleColor(4);
         ImGui::PopFont();
 
         // Show tooltip on hover
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             if (m_selectedAssets.size() == 1) {
-                const bool isFolder = std::filesystem::is_directory(*m_selectedAssets.begin());
-                ImGui::SetTooltip(isFolder ? "Delete selected folder and all contents" : "Delete selected file");
+                ImGui::SetTooltip(isFolderSelection ? "Delete selected folder and all contents" : "Delete selected file");
             }
             else {
                 ImGui::SetTooltip("Delete %zu selected items", m_selectedAssets.size());
             }
         }
+
+        if (isSingleSelection && !isFolderSelection) {
+            ImGui::PushFont(m_symbolsFont);
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+            if (ImGui::SmallButton((std::string(EditorIcons::Browse) + "##RevealInExplorer").c_str())) {
+                _openInExplorer(*m_selectedAssets.begin());
+            }
+            ImGui::PopFont();
+            ImGui::PopStyleColor();
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("Show in Explorer");
+            }
+        }
+
+        // Restore style overrides and font state
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
     }
 }
 
@@ -750,6 +689,103 @@ void AssetBrowserPanel::_renderStatusBar() {
     // Decrement the status timer safely
     m_statusTimer -= dt;
     ImGui::EndChild();
+}
+
+void AssetBrowserPanel::_renderCreateDialog() {
+    const char* dialogTitle = "Create Asset";
+    if (m_creationType == AssetCreationType::SCRIPT) dialogTitle = "Create Script";
+    else if (m_creationType == AssetCreationType::SCENE) dialogTitle = "Create Scene";
+    else if (m_creationType == AssetCreationType::FOLDER) dialogTitle = "Create Folder";
+    const std::string popupTitle = std::string(dialogTitle) + "##CreateAssetDialog";
+
+    if (m_openCreateDialog) {
+        ImGui::OpenPopup(popupTitle.c_str());
+        m_openCreateDialog = false;
+    }
+
+    // Asset creation dialog (modal)
+    if (ImGui::BeginPopupModal(popupTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::PushFont(m_mainFont);
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Show script template selector when creating a script
+        if (m_creationType == AssetCreationType::SCRIPT) {
+            ImGui::Text("Template:");
+            ImGui::SameLine();
+
+            int templateCount = 0;
+            const char* const* templateNames = Editor::Templates::ScriptTemplates::GetTemplateNames(templateCount);
+
+            const char* currentTemplateName = nullptr;
+            switch (m_selectedScriptTemplate) {
+            case Editor::Templates::ScriptTemplateType::BasicSystem:
+                currentTemplateName = "BasicSystem";
+                break;
+            case Editor::Templates::ScriptTemplateType::EditModeSystem:
+                currentTemplateName = "EditModeSystem";
+                break;
+            }
+
+            if (ImGui::BeginCombo("##ScriptTemplate", currentTemplateName)) {
+                for (int i = 0; i < templateCount; i++) {
+                    const bool isSelected = (currentTemplateName && strcmp(templateNames[i], currentTemplateName) == 0);
+                    if (ImGui::Selectable(templateNames[i], isSelected)) {
+                        m_selectedScriptTemplate = Editor::Templates::ScriptTemplates::GetTemplateTypeFromName(templateNames[i]);
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            const std::string description = Editor::Templates::ScriptTemplates::GetTemplateDescription(m_selectedScriptTemplate);
+            ImGui::TextDisabled("%s", description.c_str());
+            ImGui::Dummy(ImVec2(0, 5));
+        }
+
+        // Name input
+        ImGui::Text("Name:");
+        ImGui::SameLine();
+        if (m_focusNameInput) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusNameInput = false;
+        }
+
+        const bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Buttons
+        const bool createClicked = ImGui::Button("Create") || enterPressed;
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+        const bool cancelClicked = ImGui::Button("Cancel");
+        ImGui::PopStyleColor(3);
+
+        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
+            if (m_creationType == AssetCreationType::SCRIPT) {
+                _createScript();
+            }
+            else if (m_creationType == AssetCreationType::SCENE) {
+                _createScene();
+            }
+            else if (m_creationType == AssetCreationType::FOLDER) {
+                _createFolder();
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (cancelClicked) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -889,7 +925,7 @@ bool AssetBrowserPanel::_renderCreateMenuItems() {
     bool openDialog = false;
 
     // Create Script option
-    if (ImGui::MenuItem("C# Script")) {
+    if (ImGui::MenuItem("Create Script")) {
         m_creationType = AssetCreationType::SCRIPT;
         strcpy_s(m_newAssetNameBuffer, "NewScript");
         m_focusNameInput = true;
@@ -897,7 +933,7 @@ bool AssetBrowserPanel::_renderCreateMenuItems() {
     }
 
     // Create Scene option
-    if (ImGui::MenuItem("Scene")) {
+    if (ImGui::MenuItem("Create Scene")) {
         m_creationType = AssetCreationType::SCENE;
         strcpy_s(m_newAssetNameBuffer, "NewScene");
         m_focusNameInput = true;
@@ -905,7 +941,7 @@ bool AssetBrowserPanel::_renderCreateMenuItems() {
     }
 
     // Create Folder option
-    if (ImGui::MenuItem("Folder")) {
+    if (ImGui::MenuItem("Create Folder")) {
         m_creationType = AssetCreationType::FOLDER;
         strcpy_s(m_newAssetNameBuffer, "NewFolder");
         m_focusNameInput = true;
@@ -916,15 +952,11 @@ bool AssetBrowserPanel::_renderCreateMenuItems() {
 }
 
 void AssetBrowserPanel::_renderContextMenu() {
-    bool openCreateDialog = false;
-
     if (ImGui::BeginPopup("AssetContextMenu")) {
         ImGui::PushFont(m_mainFont);
-        ImGui::Text("Create");
-        ImGui::Separator();
 
         // Use shared helper function
-        openCreateDialog = _renderCreateMenuItems();
+        m_openCreateDialog = _renderCreateMenuItems() || m_openCreateDialog;
 
         ImGui::Separator();
 
@@ -938,60 +970,6 @@ void AssetBrowserPanel::_renderContextMenu() {
     }
 
     // Open the dialog outside of the popup to avoid nesting issues
-    if (openCreateDialog) {
-        ImGui::OpenPopup("CreateAssetDialog");
-    }
-
-    // Asset creation dialog (modal)
-    if (ImGui::BeginPopupModal("CreateAssetDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::PushFont(m_mainFont);
-
-        const char* dialogTitle = "Create Asset";
-        if (m_creationType == AssetCreationType::SCRIPT) dialogTitle = "Create Script";
-        else if (m_creationType == AssetCreationType::SCENE) dialogTitle = "Create Scene";
-        else if (m_creationType == AssetCreationType::FOLDER) dialogTitle = "Create Folder";
-        ImGui::Text("%s", dialogTitle);
-        ImGui::Separator();
-        ImGui::Dummy(ImVec2(0, 5));
-
-        // Name input
-        ImGui::Text("Name:");
-        ImGui::SameLine();
-        if (m_focusNameInput) {
-            ImGui::SetKeyboardFocusHere();
-            m_focusNameInput = false;
-        }
-
-        const bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer),
-            ImGuiInputTextFlags_EnterReturnsTrue);
-
-        ImGui::Dummy(ImVec2(0, 5));
-
-        // Buttons
-        const bool createClicked = ImGui::Button("Create") || enterPressed;
-        ImGui::SameLine();
-        const bool cancelClicked = ImGui::Button("Cancel");
-
-        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
-            if (m_creationType == AssetCreationType::SCRIPT) {
-                _createScript();
-            }
-            else if (m_creationType == AssetCreationType::SCENE) {
-                _createScene();
-            }
-            else if (m_creationType == AssetCreationType::FOLDER) {
-                _createFolder();
-            }
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (cancelClicked) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::PopFont();
-        ImGui::EndPopup();
-    }
 }
 
 void AssetBrowserPanel::_renderItemContextMenu() {
@@ -1301,7 +1279,7 @@ void AssetBrowserPanel::_handleAssetDragDrop(const std::string& assetPath) {
 
         // Drag preview
         ImGui::PushFont(m_symbolsFont);
-        ImGui::Text("\xEF\x8E\xB2");
+        ImGui::Text(EditorIcons::Drag);
         ImGui::PopFont();
         ImGui::SameLine();
         if (draggedAssets.size() == 1) {
@@ -1515,4 +1493,36 @@ void AssetBrowserPanel::_openProjectFile() {
         m_statusTimer = 3.0f;
         LOG_ERROR("Failed to open project: " << e.what());
     }
+}
+
+void AssetBrowserPanel::_openInExplorer(const std::string& assetPath) {
+#ifdef _WIN32
+    std::filesystem::path targetPath(assetPath);
+    if (!std::filesystem::exists(targetPath)) {
+        m_statusMessage = "Asset not found";
+        m_statusTimer = 3.0f;
+        return;
+    }
+
+    std::string command;
+    if (std::filesystem::is_directory(targetPath)) {
+        command = "explorer \"" + targetPath.string() + "\"";
+    }
+    else {
+        command = "explorer /select,\"" + targetPath.string() + "\"";
+    }
+
+    int result = system(command.c_str());
+    if (result == 0) {
+        m_statusMessage = "Opened in Explorer";
+        m_statusTimer = 2.0f;
+    }
+    else {
+        m_statusMessage = "Failed to open in Explorer";
+        m_statusTimer = 3.0f;
+    }
+#else
+    m_statusMessage = "Open in Explorer not supported on this platform";
+    m_statusTimer = 3.0f;
+#endif
 }

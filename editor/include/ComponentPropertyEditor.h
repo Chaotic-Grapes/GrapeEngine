@@ -104,9 +104,6 @@ public:
 
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-
-    // Renders SceneButton component for scene transitions
-    void RenderSceneButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
@@ -119,6 +116,7 @@ public:
 	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);

@@ -106,7 +106,15 @@ Sprite SpriteAnimation::currentFrame(const glm::vec2& pos, const glm::vec2& size
         m_emissiveTextureId,
         m_emissiveStrength,
         m_texWidth,      // pass full texture width
-        m_texHeight      // pass full texture height
+        m_texHeight,     // pass full texture height
+        0,               // normalTextureId
+        0,               // mraTextureId
+        0.0f,            // metallic
+        0.5f,            // smoothness
+        1.0f,            // aoStrength
+        1.0f,            // normalStrength
+        0,               // materialFlags
+        Graphics::TextureFilter::Nearest
     };
 }
 

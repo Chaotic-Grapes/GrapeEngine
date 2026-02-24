@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <cstring>
 #include <iostream>
+#include <filesystem>
 #include "ecs/Entity.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
@@ -37,8 +38,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <helpers/EntityUtils.h>
 #include "Serializer.h"
 #include <string.h>
+#include "audio/AudioCueRegistry.h"
 #include "services/ResourceManager.h"  // For texture loading during deserialization
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 
 // Forward declarations for managed serialization interop (defined in Interop_World.cpp)
 extern "C" const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash);
@@ -91,6 +94,33 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Matrix4x4, m00, m01, m02, m03, m10, m11, m12,
 // --- ECS Component Serialization Definitions ---
 namespace ECS {
 	namespace Components {
+		inline std::string NormalizeProjectPathForStorage(const std::string& path) {
+			if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+				return path;
+			}
+
+			std::filesystem::path fsPath(path);
+			if (!fsPath.is_absolute()) {
+				return path;
+			}
+
+			const std::string relative = Engine::ProjectPaths::ToRelativePath(path);
+			return relative.empty() ? path : relative;
+		}
+
+		inline std::string ResolveProjectPathForLoad(const std::string& path) {
+			if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+				return path;
+			}
+
+			std::filesystem::path fsPath(path);
+			if (fsPath.is_absolute()) {
+				return path;
+			}
+
+			return Engine::ProjectPaths::ToAbsolutePath(path);
+		}
+
 		// Place component-specific NLOHMANN macros inside the component namespace so ADL
 		// can locate the generated to_json/from_json overloads for these types.
 
@@ -142,6 +172,9 @@ namespace ECS {
 			std::string texturePath = ECS::StringTable::Resolve(sprite.TexturePath);
 			std::string normalTexturePath = ECS::StringTable::Resolve(sprite.NormalTexturePath);
 			std::string emissiveTexturePath = ECS::StringTable::Resolve(sprite.EmissiveTexturePath);
+			texturePath = NormalizeProjectPathForStorage(texturePath);
+			normalTexturePath = NormalizeProjectPathForStorage(normalTexturePath);
+			emissiveTexturePath = NormalizeProjectPathForStorage(emissiveTexturePath);
 			j = nlohmann::json{
 				{"TextureId", sprite.TextureId},
 				{"TexturePath", texturePath},
@@ -150,6 +183,7 @@ namespace ECS {
 				{"EmissiveTextureId", sprite.EmissiveTextureId},
 				{"EmissiveTexturePath", emissiveTexturePath},
 				{"EmissiveStrength", sprite.EmissiveStrength},
+				{"TextureFilter", static_cast<uint8_t>(sprite.TextureFilter)},
 				{"Color", sprite.Color},
 				{"Tiling", sprite.Tiling},
 				{"Offset", sprite.Offset}
@@ -159,12 +193,14 @@ namespace ECS {
 		inline void from_json(const nlohmann::json& j, SpriteRenderer2D& sprite) {
 			// Handle TexturePath (StringId) first
 			std::string texPath = j.value("TexturePath", std::string());
+			texPath = NormalizeProjectPathForStorage(texPath);
 			sprite.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
 			if (!texPath.empty()) {
-				auto tex = RM.Get<Texture>(texPath);
+				const std::string texLoadPath = ResolveProjectPathForLoad(texPath);
+				auto tex = RM.Get<Texture>(texLoadPath);
 				if (tex) {
 					sprite.TextureId = static_cast<uint32_t>(tex->ID());
 					sprite.Width = tex->Width();
@@ -181,10 +217,12 @@ namespace ECS {
 
 			// Normal map path (optional)
 			std::string normalPath = j.value("NormalTexturePath", std::string());
+			normalPath = NormalizeProjectPathForStorage(normalPath);
 			sprite.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
-				auto normalTex = RM.Get<Texture>(normalPath);
+				const std::string normalLoadPath = ResolveProjectPathForLoad(normalPath);
+				auto normalTex = RM.Get<Texture>(normalLoadPath);
 				if (normalTex) {
 					sprite.NormalTextureId = static_cast<uint32_t>(normalTex->ID());
 				}
@@ -199,10 +237,12 @@ namespace ECS {
 
 			// Emissive map path (optional)
 			std::string emissivePath = j.value("EmissiveTexturePath", std::string());
+			emissivePath = NormalizeProjectPathForStorage(emissivePath);
 			sprite.EmissiveTexturePath = emissivePath.empty() ? 0 : ECS::StringTable::Intern(emissivePath);
 
 			if (!emissivePath.empty()) {
-				auto emissiveTex = RM.Get<Texture>(emissivePath);
+				const std::string emissiveLoadPath = ResolveProjectPathForLoad(emissivePath);
+				auto emissiveTex = RM.Get<Texture>(emissiveLoadPath);
 				if (emissiveTex) {
 					sprite.EmissiveTextureId = static_cast<uint32_t>(emissiveTex->ID());
 				}
@@ -219,6 +259,8 @@ namespace ECS {
 			sprite.Tiling = j.value("Tiling", Vector2D{ 1, 1 });
 			sprite.Offset = j.value("Offset", Vector2D{ 0, 0 });
 			sprite.EmissiveStrength = j.value("EmissiveStrength", 5.0f);
+			sprite.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
@@ -227,6 +269,8 @@ namespace ECS {
 		inline void to_json(nlohmann::json& j, const SpriteSheetAnimation2D& anim) {
 			std::string texturePath = ECS::StringTable::Resolve(anim.TexturePath);
 			std::string normalTexturePath = ECS::StringTable::Resolve(anim.NormalTexturePath);
+			texturePath = NormalizeProjectPathForStorage(texturePath);
+			normalTexturePath = NormalizeProjectPathForStorage(normalTexturePath);
 			j = nlohmann::json{
 				{"TextureId", anim.TextureId},
 				{"TexturePath", texturePath},
@@ -244,19 +288,22 @@ namespace ECS {
 				{"FramesPerSecond", anim.FramesPerSecond},
 				{"Loop", anim.Loop},
 				{"Playing", anim.Playing},
-				{"UseRow", anim.UseRow}
+				{"UseRow", anim.UseRow},
+				{"TextureFilter", static_cast<uint8_t>(anim.TextureFilter)}
 			};
 		}
 
 		inline void from_json(const nlohmann::json& j, SpriteSheetAnimation2D& anim) {
 			// Handle TexturePath (StringId) first
 			std::string texPath = j.value("TexturePath", std::string());
+			texPath = NormalizeProjectPathForStorage(texPath);
 			anim.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
 			if (!texPath.empty()) {
-				auto tex = RM.Get<Texture>(texPath);
+				const std::string texLoadPath = ResolveProjectPathForLoad(texPath);
+				auto tex = RM.Get<Texture>(texLoadPath);
 				if (tex) {
 					anim.TextureId = static_cast<uint32_t>(tex->ID());
 					// Update sheet dimensions from actual texture if not specified
@@ -278,10 +325,12 @@ namespace ECS {
 
 			// Normal map path (optional)
 			std::string normalPath = j.value("NormalTexturePath", std::string());
+			normalPath = NormalizeProjectPathForStorage(normalPath);
 			anim.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
-				auto normalTex = RM.Get<Texture>(normalPath);
+				const std::string normalLoadPath = ResolveProjectPathForLoad(normalPath);
+				auto normalTex = RM.Get<Texture>(normalLoadPath);
 				if (normalTex) {
 					anim.NormalTextureId = static_cast<uint32_t>(normalTex->ID());
 				}
@@ -307,12 +356,16 @@ namespace ECS {
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
 			anim.UseRow = j.value("UseRow", false);
+			anim.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
 		}
 
 		// Custom serialization for TileMapComponent (StringId paths need special handling).
 		inline void to_json(nlohmann::json& j, const TileMapComponent& tilemap) {
 			std::string mapPath = ECS::StringTable::Resolve(tilemap.TileMapPath); // Resolve StringId -> path string.
 			std::string tilesetPath = ECS::StringTable::Resolve(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
+			mapPath = NormalizeProjectPathForStorage(mapPath);
+			tilesetPath = NormalizeProjectPathForStorage(tilesetPath);
 			j = nlohmann::json{
 				{"TileMapPath", mapPath},
 				{"TilesetTexturePath", tilesetPath},
@@ -328,6 +381,8 @@ namespace ECS {
 		inline void from_json(const nlohmann::json& j, TileMapComponent& tilemap) {
 			std::string mapPath = j.value("TileMapPath", std::string()); // Read map path from JSON.
 			std::string tilesetPath = j.value("TilesetTexturePath", std::string()); // Read tileset path from JSON.
+			mapPath = NormalizeProjectPathForStorage(mapPath);
+			tilesetPath = NormalizeProjectPathForStorage(tilesetPath);
 			tilemap.TileMapPath = mapPath.empty() ? 0 : ECS::StringTable::Intern(mapPath); // Store as StringId.
 			tilemap.TilesetTexturePath = tilesetPath.empty() ? 0 : ECS::StringTable::Intern(tilesetPath); // Store as StringId.
 			tilemap.TileWorldSize = j.value("TileWorldSize", 1.0f); // Default to 1.0 if missing.
@@ -352,11 +407,13 @@ namespace ECS {
 		// [DEPRECATED] Kept for backward compatibility during migration to PrefabInstanceMetadata
 		inline void to_json(nlohmann::json& j, const PrefabLink& link) {
 			std::string prefabPath = ECS::StringTable::Resolve(link.PrefabPath);
+			prefabPath = NormalizeProjectPathForStorage(prefabPath);
 			j = nlohmann::json{ {"prefabPath", prefabPath} };
 		}
 
 		inline void from_json(const nlohmann::json& j, PrefabLink& link) {
 			std::string path = j.at("prefabPath").get<std::string>();
+			path = NormalizeProjectPathForStorage(path);
 			link.PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
 		}
 
@@ -386,8 +443,10 @@ namespace ECS {
 
 		// Custom serialization for AudioSource to handle backward-compatible defaults
 		inline void to_json(nlohmann::json& j, const AudioSource& src) {
+			std::string cuePath = ECS::StringTable::Resolve(src.CuePathId);
+			cuePath = NormalizeProjectPathForStorage(cuePath);
 			j = nlohmann::json{
-				{"CueId", src.CueId},
+				{"CuePath", cuePath},
 				{"Volume", src.Volume},
 				{"Pitch", src.Pitch},
 				{"Loop", src.Loop},
@@ -400,10 +459,22 @@ namespace ECS {
 				{"FadeInDuration", src.FadeInDuration},
 				{"FadeOutDuration", src.FadeOutDuration}
 			};
+			if (cuePath.empty()) {
+				j["CueId"] = src.CueId;
+			}
 		}
 
 		inline void from_json(const nlohmann::json& j, AudioSource& src) {
-			src.CueId = j.value("CueId", 0u);
+			std::string cuePath = j.value("CuePath", std::string());
+			if (!cuePath.empty()) {
+				cuePath = NormalizeProjectPathForStorage(cuePath);
+				const std::string norm = Audio::AudioCueRegistry::NormalizePath(cuePath);
+				src.CuePathId = ECS::StringTable::Intern(norm);
+				src.CueId = Audio::AudioCueRegistry::HashPath(norm);
+			} else {
+				src.CuePathId = 0;
+				src.CueId = j.value("CueId", 0u);
+			}
 			src.Volume = j.value("Volume", 1.0f);
 			src.Pitch = j.value("Pitch", 1.0f);
 			src.Loop = j.value("Loop", false);
@@ -421,6 +492,8 @@ namespace ECS {
 		inline void to_json(nlohmann::json& j, const Material2D& mat) {
 			std::string normalTexturePath = ECS::StringTable::Resolve(mat.NormalTexturePath);
 			std::string mraTexturePath = ECS::StringTable::Resolve(mat.MRA_TexturePath);
+			normalTexturePath = NormalizeProjectPathForStorage(normalTexturePath);
+			mraTexturePath = NormalizeProjectPathForStorage(mraTexturePath);
 			j = nlohmann::json{
 				{"NormalTextureId", mat.NormalTextureId},
 				{"MRA_TextureId", mat.MRA_TextureId},
@@ -438,10 +511,12 @@ namespace ECS {
 		inline void from_json(const nlohmann::json& j, Material2D& mat) {
 			// 1. Handle Normal Map
 			std::string normPath = j.value("NormalTexturePath", std::string());
+			normPath = NormalizeProjectPathForStorage(normPath);
 			mat.NormalTexturePath = normPath.empty() ? 0 : ECS::StringTable::Intern(normPath);
 
 			if (!normPath.empty()) {
-				auto tex = RM.Get<Texture>(normPath);
+				const std::string normLoadPath = ResolveProjectPathForLoad(normPath);
+				auto tex = RM.Get<Texture>(normLoadPath);
 				if (tex) mat.NormalTextureId = static_cast<uint32_t>(tex->ID());
 				else mat.NormalTextureId = 0;
 			} else {
@@ -450,10 +525,12 @@ namespace ECS {
 
 			// 2. Handle MRA Map
 			std::string mraPath = j.value("MRA_TexturePath", std::string());
+			mraPath = NormalizeProjectPathForStorage(mraPath);
 			mat.MRA_TexturePath = mraPath.empty() ? 0 : ECS::StringTable::Intern(mraPath);
 
 			if (!mraPath.empty()) {
-				auto tex = RM.Get<Texture>(mraPath);
+				const std::string mraLoadPath = ResolveProjectPathForLoad(mraPath);
+				auto tex = RM.Get<Texture>(mraLoadPath);
 				if (tex) mat.MRA_TextureId = static_cast<uint32_t>(tex->ID());
 				else mat.MRA_TextureId = 0;
 			} else {
@@ -471,6 +548,29 @@ namespace ECS {
 
 		inline std::string ResolveStringId(uint32_t id) {
 			return id ? ECS::StringTable::Resolve(id) : std::string();
+		}
+
+		inline std::string ResolvePathId(uint32_t id) {
+			return NormalizeProjectPathForStorage(ResolveStringId(id));
+		}
+
+		inline uint32_t ReadPathId(const nlohmann::json& j, const char* key, uint32_t defaultId = 0) {
+			if (!j.contains(key)) {
+				return defaultId;
+			}
+
+			const auto& value = j.at(key);
+			if (value.is_string()) {
+				std::string str = value.get<std::string>();
+				str = NormalizeProjectPathForStorage(str);
+				return str.empty() ? 0 : ECS::StringTable::Intern(str);
+			}
+
+			if (value.is_number_unsigned()) {
+				return value.get<uint32_t>();
+			}
+
+			return defaultId;
 		}
 
 		inline uint32_t ReadStringId(const nlohmann::json& j, const char* key, uint32_t defaultId = 0) {
@@ -492,6 +592,15 @@ namespace ECS {
 		}
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
+	inline void to_json(nlohmann::json& j, const GUIRenderMode& mode) {
+		j = nlohmann::json{
+			{"Space", static_cast<uint8_t>(mode.Space)}
+		};
+	}
+
+	inline void from_json(const nlohmann::json& j, GUIRenderMode& mode) {
+		mode.Space = static_cast<GUIRenderSpace>(j.value("Space", static_cast<uint8_t>(GUIRenderSpace::Screen)));
+	}
 	inline void to_json(nlohmann::json& j, const GUIElement& element) {
 		j = nlohmann::json{
 			{"Position", element.Position},
@@ -517,7 +626,8 @@ namespace ECS {
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
 	inline void to_json(nlohmann::json& j, const GUIText& text) {
 		const std::string value = ECS::StringTable::Resolve(text.TextId);
-		const std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
+		std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
+		fontPath = NormalizeProjectPathForStorage(fontPath);
 		j = nlohmann::json{
 			{"Text", value},
 			{"FontPath", fontPath},
@@ -531,7 +641,8 @@ namespace ECS {
 
 	inline void from_json(const nlohmann::json& j, GUIText& text) {
 		const std::string value = j.value("Text", "");
-		const std::string fontPath = j.value("FontPath", "");
+		std::string fontPath = j.value("FontPath", "");
+		fontPath = NormalizeProjectPathForStorage(fontPath);
 		text.TextId = value.empty() ? 0 : ECS::StringTable::Intern(value);
 		text.FontPathId = fontPath.empty() ? 0 : ECS::StringTable::Intern(fontPath);
 		if (j.contains("Color")) {
@@ -547,29 +658,32 @@ namespace ECS {
 		text.VAlign = static_cast<GUIText::VerticalAlign>(j.value("VAlign", 0));
 	}
 
-	inline void to_json(nlohmann::json& j, const GUIImage& image) {
-		j = nlohmann::json{
-			{"TexturePath", ResolveStringId(image.TexturePathId)},
-			{"Color", image.Color},
-			{"UVRect", image.UVRect},
-			{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
-			{"UseSlicing", image.UseSlicing},
-			{"SliceBorder", image.SliceBorder}
-		};
-	}
+		inline void to_json(nlohmann::json& j, const GUIImage& image) {
+			j = nlohmann::json{
+				{"TexturePath", ResolvePathId(image.TexturePathId)},
+				{"Color", image.Color},
+				{"UVRect", image.UVRect},
+				{"ScaleMode", static_cast<uint8_t>(image.ScaleMode)},
+				{"TextureFilter", static_cast<uint8_t>(image.TextureFilter)},
+				{"UseSlicing", image.UseSlicing},
+				{"SliceBorder", image.SliceBorder}
+			};
+		}
 
 	inline void from_json(const nlohmann::json& j, GUIImage& image) {
-		image.TexturePathId = ReadStringId(j, "TexturePath", 0);
+		image.TexturePathId = ReadPathId(j, "TexturePath", 0);
 		if (j.contains("Color")) {
 			image.Color = j.at("Color").get<::Color>();
 		}
 		if (j.contains("UVRect")) {
 			image.UVRect = j.at("UVRect").get<Vector4D>();
 		}
-		image.ScaleMode = static_cast<GUIImageScaleMode>(j.value("ScaleMode", static_cast<uint8_t>(GUIImageScaleMode::Stretch)));
-		image.UseSlicing = j.value("UseSlicing", false);
-		image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
-	}
+			image.ScaleMode = static_cast<GUIImageScaleMode>(j.value("ScaleMode", static_cast<uint8_t>(GUIImageScaleMode::Stretch)));
+			image.TextureFilter = static_cast<Graphics::TextureFilter>(
+				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
+			image.UseSlicing = j.value("UseSlicing", false);
+			image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+		}
 
 	inline void to_json(nlohmann::json& j, const GUIInput& input) {
 		j = nlohmann::json{
@@ -612,12 +726,8 @@ namespace ECS {
 	inline void to_json(nlohmann::json& j, const GUIButton& button) {
 		j = nlohmann::json{
 			{"Text", ResolveStringId(button.TextId)},
-			{"FontPath", ResolveStringId(button.FontPathId)},
-			{"IconPath", ResolveStringId(button.IconPathId)},
-			{"NormalColor", button.NormalColor},
-			{"HoverColor", button.HoverColor},
-			{"PressedColor", button.PressedColor},
-			{"DisabledColor", button.DisabledColor},
+			{"FontPath", ResolvePathId(button.FontPathId)},
+			{"IconPath", ResolvePathId(button.IconPathId)},
 			{"TextColor", button.TextColor},
 			{"IconColor", button.IconColor},
 			{"FontSize", button.FontSize},
@@ -633,12 +743,8 @@ namespace ECS {
 
 	inline void from_json(const nlohmann::json& j, GUIButton& button) {
 		button.TextId = ReadStringId(j, "Text", 0);
-		button.FontPathId = ReadStringId(j, "FontPath", 0);
-		button.IconPathId = ReadStringId(j, "IconPath", 0);
-		if (j.contains("NormalColor")) button.NormalColor = j.at("NormalColor").get<::Color>();
-		if (j.contains("HoverColor")) button.HoverColor = j.at("HoverColor").get<::Color>();
-		if (j.contains("PressedColor")) button.PressedColor = j.at("PressedColor").get<::Color>();
-		if (j.contains("DisabledColor")) button.DisabledColor = j.at("DisabledColor").get<::Color>();
+		button.FontPathId = ReadPathId(j, "FontPath", 0);
+		button.IconPathId = ReadPathId(j, "IconPath", 0);
 		if (j.contains("TextColor")) button.TextColor = j.at("TextColor").get<::Color>();
 		if (j.contains("IconColor")) button.IconColor = j.at("IconColor").get<::Color>();
 		button.FontSize = j.value("FontSize", 24.0f);
@@ -714,17 +820,35 @@ namespace Serialization {
 		template<typename T>
 		static void RegisterComponent(const char* name) {
 			const uint32_t typeHash = Serialization::FNV1aHash(name);
+
+			// Capture the concrete component id so serialization does not depend on hash registration order
+			const ECS::ComponentTypeId componentId = ECS::ComponentRegistry::Type<T>();
+
+			// Special cases: For TileMapComponent/Prefab metadata, always use the captured component ID
+			const bool useCapturedIdOnly = (name && (std::strcmp(name, "TileMapComponent") == 0 || 
+				std::strcmp(name, "PrefabInstanceMetadata") == 0 || std::strcmp(name, "PrefabLink") == 0));
+
+			// Resolver lambda
+			auto resolveId = [typeHash, componentId, useCapturedIdOnly]() -> ECS::ComponentTypeId {
+				if (useCapturedIdOnly) {
+					return componentId;
+				}
+				return ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+			};
+			// Register the component info
 			Registry()[typeHash] = ComponentInfo{
 				name,
 				typeHash,
 				// Serialize
-				[typeHash](const ECS::World& world, ECS::Entity e, json& j) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](const ECS::World& world, ECS::Entity e, json& j) {
+					const ECS::ComponentTypeId id = resolveId();
 					if (id == ECS::NULL_COMPONENT_ID) {
 						j = nullptr;
 						return;
 					}
 
+					// Check if entity has the component
 					if (world.HasById(e, id)) {
 						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, id);
 						if (ptr) {
@@ -737,8 +861,9 @@ namespace Serialization {
 					j = nullptr;
 				},
 				// Deserialize
-				[typeHash](ECS::World& world, ECS::Entity e, const json& j) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](ECS::World& world, ECS::Entity e, const json& j) {
+					const ECS::ComponentTypeId id = resolveId();
 					if (id == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
@@ -749,23 +874,28 @@ namespace Serialization {
 						*static_cast<T*>(ptr) = value;
 					}
 					else {
+						// Component not present, add it
 						world.AddComponentById(e, id, &value, sizeof(T));
 					}
 				},
 				// Has
-				[typeHash](const ECS::World& world, ECS::Entity e) -> bool {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](const ECS::World& world, ECS::Entity e) -> bool {
+					const ECS::ComponentTypeId id = resolveId();
 					if (id == ECS::NULL_COMPONENT_ID) {
 						return false;
 					}
+					// Check presence by ID
 					return world.HasById(e, id);
 				},
 				// Remove
-				[typeHash](ECS::World& world, ECS::Entity e) {
-					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+				// Capture by value to ensure correct behavior even if registry changes
+				[resolveId](ECS::World& world, ECS::Entity e) {
+					const ECS::ComponentTypeId id = resolveId();
 					if (id == ECS::NULL_COMPONENT_ID) {
 						return;
 					}
+					// Remove by ID
 					world.RemoveById(e, id);
 				}
 			};
@@ -1093,6 +1223,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(PrefabInstanceMetadata, ECS::Components::PrefabInstanceMetadata, "PrefabInstanceMetadata")
 	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
 	REGISTER_COMPONENT_SERIALIZER(GUICanvas, ECS::Components::GUICanvas, "GUICanvas")
+	REGISTER_COMPONENT_SERIALIZER(GUIRenderMode, ECS::Components::GUIRenderMode, "GUIRenderMode")
 	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
 	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel");
 	REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");

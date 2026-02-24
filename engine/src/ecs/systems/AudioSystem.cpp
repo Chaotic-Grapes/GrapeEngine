@@ -28,6 +28,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "services/TimeSystem.h"
+#include <algorithm>
+#include "ecs/StringTable.h"
+#include <filesystem>
 
 namespace {
     Audio::Bus ToBus(uint8_t raw) {
@@ -59,6 +63,14 @@ namespace ECS {
             m_sceneUnloadInProgress = false;
             const bool allowCrossfade = m_allowCrossfadeOnUnload;
             m_allowCrossfadeOnUnload = false;
+            if (allowCrossfade && m_crossfadeInDuration > 0.0f) {
+                m_crossfadeInRemaining = m_crossfadeInDuration;
+                m_crossfadeFadeInActive = true;
+            } else {
+                m_crossfadeInRemaining = 0.0f;
+                m_crossfadeFadeInActive = false;
+                m_crossfadeInDuration = 0.0f;
+            }
             m_activeSounds.clear();
 
             // Stop all fading sounds in the engine to prevent carryover
@@ -105,6 +117,17 @@ namespace ECS {
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
 
+        if (m_crossfadeFadeInActive) {
+            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            if (dt > 0.0f) {
+                m_crossfadeInRemaining = std::max(0.0f, m_crossfadeInRemaining - dt);
+                if (m_crossfadeInRemaining <= 0.0f) {
+                    m_crossfadeFadeInActive = false;
+                    m_crossfadeInDuration = 0.0f;
+                }
+            }
+        }
+
         // Track which entities we've processed this frame
         std::unordered_set<Entity, EntityHash> processedEntities;
 
@@ -118,6 +141,7 @@ namespace ECS {
                 // Handle CueId = 0 (no audio assigned)
                 // ----------------------------------------------------------------
                 if (src.CueId == 0) {
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -126,14 +150,29 @@ namespace ECS {
                 // Resolve cueId -> clip info
                 // ----------------------------------------------------------------
                 const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
+                if (!cueInfo && src.CuePathId) {
+                    const std::string cuePathRaw = ECS::StringTable::Resolve(src.CuePathId);
+                    const std::string cuePath = Audio::AudioCueRegistry::NormalizePath(cuePathRaw);
+                    if (!cuePath.empty()) {
+                        cueInfo = m_audioService.CueRegistry().FindByPath(cuePath);
+                        if (!cueInfo) {
+                            cueInfo = &m_audioService.CueRegistry().Register(cuePath);
+                            LOG_INFO("AudioSystem: Registered cue from path '" << cuePath << "' (id=" << cueInfo->Id << ")");
+                        }
+                        src.CueId = cueInfo->Id;
+                    }
+                }
                 if (!cueInfo) {
                     static std::set<uint32_t> s_warnedCues;
                     if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
+                        const std::string cuePath = src.CuePathId ? ECS::StringTable::Resolve(src.CuePathId) : std::string();
                         LOG_WARNING("AudioSystem: Entity " << e.Index
                             << " has invalid CueId " << src.CueId
+                            << " (CuePath='" << cuePath << "')"
                             << " (audio file not found in assets/Audio)");
                         s_warnedCues.insert(src.CueId);
                     }
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -165,6 +204,9 @@ namespace ECS {
                 if (hasInstance && !engine->IsHandleActive(it->second)) {
                     m_activeSounds.erase(it);
                     hasInstance = false;
+                    if (src.PlayOnStart && !src.Loop) {
+                        src.PlayOnStart = false;
+                    }
                 }
                 if (m_sceneUnloadInProgress && !hasInstance) {
                     return;
@@ -175,11 +217,20 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 bool shouldPlay = false;
 
+                if (!src.PlayOnStart || src.Loop) {
+                    m_playOnStartPlayedCue.erase(e);
+                }
+
                 if (src.PlayOnStart) {
                     // PlayOnStart sounds only play when:
                     // 1. Game is in play mode
                     // 2. System has started (prevents playing during entity creation in editor)
-                    shouldPlay = isPlaying && m_hasStarted;
+                    bool playOnStartEligible = true;
+                    auto playedIt = m_playOnStartPlayedCue.find(e);
+                    if (playedIt != m_playOnStartPlayedCue.end() && playedIt->second == src.CueId) {
+                        playOnStartEligible = false;
+                    }
+                    shouldPlay = isPlaying && m_hasStarted && (src.Loop || playOnStartEligible || hasInstance);
                 }
                 else {
                     // Non-PlayOnStart sounds can be controlled manually
@@ -205,7 +256,14 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 if (shouldPlay && !hasInstance) {
                     Audio::PlaySettings settings{};
-                    const bool doFadeIn = src.EnableFadeIn && src.FadeInDuration > 0.0f;
+                    const bool crossfadeFadeIn = m_crossfadeFadeInActive && m_crossfadeInRemaining > 0.0f;
+                    const bool hasSourceFadeIn = src.EnableFadeIn && src.FadeInDuration > 0.0f;
+                    const bool doFadeIn = hasSourceFadeIn || crossfadeFadeIn;
+                    const float fadeInDuration = doFadeIn
+                        ? (hasSourceFadeIn && crossfadeFadeIn
+                            ? std::max(src.FadeInDuration, m_crossfadeInRemaining)
+                            : (hasSourceFadeIn ? src.FadeInDuration : m_crossfadeInRemaining))
+                        : 0.0f;
                     settings.Volume = doFadeIn ? 0.0f : src.Volume;
                     settings.Pitch = src.Pitch;
                     settings.Loop = src.Loop;
@@ -215,11 +273,14 @@ namespace ECS {
                     Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
                     if (handle) {
                         m_activeSounds[e] = handle;
+                        if (src.PlayOnStart && !src.Loop) {
+                            m_playOnStartPlayedCue[e] = src.CueId;
+                        }
 
                         // Check if fadein is enabled
-                        if (doFadeIn) {
-							_fadeInHandle(handle, src.FadeInDuration, src.Volume);
-                            LOG_DEBUG("AudioSystem: Fade-in started (duration=" << src.FadeInDuration << "s)");
+                        if (doFadeIn && fadeInDuration > 0.0f) {
+							_fadeInHandle(handle, fadeInDuration, src.Volume);
+                            LOG_DEBUG("AudioSystem: Fade-in started (duration=" << fadeInDuration << "s)");
                         }
                         LOG_DEBUG("AudioSystem: Playback started (handle ID=" << handle.Id << ")");
                     }
@@ -279,6 +340,7 @@ namespace ECS {
 
         for (auto entity : toRemove) {
             _stopSound(entity, world);
+            m_playOnStartPlayedCue.erase(entity);
         }
     }
 
@@ -307,6 +369,10 @@ namespace ECS {
         m_hasStarted = true;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
+        m_crossfadeInDuration = 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
@@ -315,6 +381,10 @@ namespace ECS {
         m_hasStarted = false;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
+        m_crossfadeInDuration = 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
@@ -377,6 +447,9 @@ namespace ECS {
     void AudioSystem::OnSceneWillUnload(float fadeDuration, bool allowCrossfade) {
         m_sceneUnloadInProgress = true;
         m_allowCrossfadeOnUnload = allowCrossfade;
+        m_crossfadeInDuration = allowCrossfade ? fadeDuration : 0.0f;
+        m_crossfadeInRemaining = 0.0f;
+        m_crossfadeFadeInActive = false;
 
         if (m_activeSounds.empty()) {
             if (fadeDuration > 0.0f) {

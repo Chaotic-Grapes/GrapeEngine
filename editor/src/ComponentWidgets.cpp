@@ -15,6 +15,7 @@ so both entities and prefab files use the same UI drawing path.
 
 #include "ComponentWidgets.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <imgui.h>
 #include <algorithm>
 #include <unordered_map>
@@ -32,7 +33,7 @@ namespace EditorUI {
     static std::unordered_map<const nlohmann::json*, const nlohmann::json*> s_defaultScopeMap; // Maps data to defaults
     static ImFont* s_symbolsFont = nullptr;                // Symbols font for icon-only buttons
 
-    static const char* kResetIcon = "\xEF\x91\xBF";         // Reset icon (material: restart_alt)
+    static const char* kResetIcon = EditorIcons::Reset;
 
     // Strips "##" suffixes so visible labels don't show internal IDs
     static std::string _displayLabel(const std::string& label) {
@@ -106,10 +107,7 @@ namespace EditorUI {
 
         // Position the button correctly
         ImGui::SameLine();
-        const float lineHeight = ImGui::GetTextLineHeight();
-        const float frameHeight = ImGui::GetFrameHeight();
-        const float y = ImGui::GetCursorPosY();
-        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
         ImGui::SetCursorPosX(buttonX);
         ImGui::PushID(("Reset_" + id).c_str());
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);

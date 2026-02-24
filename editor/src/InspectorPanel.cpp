@@ -40,6 +40,7 @@ through a unified system shared by both entities and prefab templates.
 #include <algorithm>
 #include <unordered_set>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "core/Application.h"
 #include "scene/SceneManager.h"
 
@@ -267,7 +268,26 @@ namespace {
                     }
 
                     if (typeName == prefabTypeName || shortExistingName == shortTypeName) {
-                        entityComp["Data"] = prefabComp["Data"];
+                        // For LocalTransform, preserve Position and Rotation from the scene file
+                        // unless specifically asked to overwrite (which we assume we don't for root instances)
+                        if (shortTypeName == "LocalTransform") {
+                             nlohmann::json newTransformData = prefabComp["Data"];
+                             
+                             // Restore Position from existing scene data if present
+                             if (entityComp["Data"].contains("Position")) {
+                                 newTransformData["Position"] = entityComp["Data"]["Position"];
+                             }
+                             // Restore Rotation from existing scene data if present
+                             if (entityComp["Data"].contains("Rotation")) {
+                                 newTransformData["Rotation"] = entityComp["Data"]["Rotation"];
+                             }
+                             
+                             entityComp["Data"] = newTransformData;
+                        } 
+                        else {
+                            entityComp["Data"] = prefabComp["Data"];
+                        }
+
                         found = true;
                         sceneModified = true;
                         break;
@@ -476,7 +496,8 @@ void InspectorPanel::Render() {
     ImGui::PushFont(m_mainFont);
 
     // Window name changes depending on what we are editing
-    const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
+    const bool isPrefab = (m_mode == InspectionMode::Prefab);
+    const char* windowTitle = isPrefab ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
 
     // Keyboard shortcuts for common inspector actions
@@ -896,9 +917,13 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
 
     // Button to save this entity and its components as a prefab
     ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
     if (ImGui::Button("Save as Prefab")) {
         _saveEntityAsPrefab(entity);
     }
+    ImGui::PopStyleColor(3);
 
     // Popup menu listing all available components from the registry
     if (m_openAddComponentPopup) {
@@ -1041,8 +1066,16 @@ void InspectorPanel::_renderPrefabComponents() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
 
+    // Determine which components array to use (Flat vs Hierarchical)
+    nlohmann::json* componentsPtr = nullptr;
+    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Components"];
+    } else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Entity"]["Components"];
+    }
+
     // Prefab JSON must have a Components array or there is nothing to draw
-    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) {
+    if (!componentsPtr) {
         ImGui::TextDisabled("No components in prefab");
         ImGui::EndChild();
         ImGui::PopStyleVar();
@@ -1050,7 +1083,7 @@ void InspectorPanel::_renderPrefabComponents() {
     }
 
     ImGui::Dummy(ImVec2(0, 4));
-    auto& components = m_prefabData["Components"];
+    auto& components = *componentsPtr;
 
     // Apply property filter so per-field rows can be narrowed
     if (m_componentFilter.empty()) {
@@ -1426,9 +1459,19 @@ bool InspectorPanel::_entityHasComponent(EntityId id, const std::string& compone
 // Add a component entry to the prefab JSON
 // Prefabs are stored and edited entirely through JSON so we modify the data directly
 bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
-    // Ensure Components array exists
-    if (!m_prefabData.contains("Components")) {
-        m_prefabData["Components"] = nlohmann::json::array();
+    // Determine which components array to use (Flat vs Hierarchical)
+    nlohmann::json* componentsPtr = nullptr;
+    if (m_prefabData.contains("Entity")) {
+        if (!m_prefabData["Entity"].contains("Components")) {
+            m_prefabData["Entity"]["Components"] = nlohmann::json::array();
+        }
+        componentsPtr = &m_prefabData["Entity"]["Components"];
+    } 
+    else {
+        if (!m_prefabData.contains("Components")) {
+            m_prefabData["Components"] = nlohmann::json::array();
+        }
+        componentsPtr = &m_prefabData["Components"];
     }
 
     // No duplicates allowed
@@ -1446,7 +1489,7 @@ bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
     if (!meta) return false;
 
     // Append new component entry into prefab JSON
-    m_prefabData["Components"].push_back({ {"TypeName", meta->FullTypeName}, {"Data", meta->GetDefaults()} });
+    componentsPtr->push_back({ {"TypeName", meta->FullTypeName}, {"Data", meta->GetDefaults()} });
 
     // Prefab data changed so we sync the file right away
     _savePrefabData();
@@ -1459,9 +1502,17 @@ bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 // Prefabs store components as JSON objects so we search the Components array by TypeName
 // Some entries store the short name while others store the fully qualified ECS type so we check for both
 void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType) {
-    // Prefab must have a valid Components array
-    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return;
-    auto& components = m_prefabData["Components"];
+    // Determine which components array to use (Flat vs Hierarchical)
+    nlohmann::json* componentsPtr = nullptr;
+    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Components"];
+    } 
+    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Entity"]["Components"];
+    }
+
+    if (!componentsPtr) return;
+    auto& components = *componentsPtr;
 
     // Iterate over each component entry to find a matching TypeName
     for (auto it = components.begin(); it != components.end(); it++) {
@@ -1484,11 +1535,19 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
 
 // Checks whether the prefab JSON already contains a component of this type
 bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
-    // Must have a Components array to search
-    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return false;
+    // Determine which components array to use (Flat vs Hierarchical)
+    nlohmann::json* componentsPtr = nullptr;
+    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Components"];
+    } 
+    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Entity"]["Components"];
+    }
+
+    if (!componentsPtr) return false;
 
     // Search each component entry
-    for (const auto& comp : m_prefabData["Components"]) {
+    for (const auto& comp : *componentsPtr) {
         // Validate type name
         if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
         std::string typeName = comp["TypeName"];
@@ -1566,6 +1625,30 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
 
     // Convert entity to JSON and extract just the Components list
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntityHierarchy(*m_world, entity);
+
+    // Force root transform to identity (Position = 0, Rotation = 0) but keep Scale
+    // This ensures that the prefab definition itself doesn't carry the instance's world position
+    if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+		// Find the LocalTransform component
+        for (auto& comp : entityJson["Components"]) {
+			// Validate component entry
+            if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
+            std::string typeName = comp["TypeName"];
+
+			// Match LocalTransform by short or full name
+            if (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform") {
+                // Reset Position to (0,0,0)
+                if (comp["Data"].contains("Position")) {
+                    comp["Data"]["Position"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f} };
+                }
+                // Reset Rotation to Identity (0,0,0,1)
+                if (comp["Data"].contains("Rotation")) {
+                    comp["Data"]["Rotation"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f} };
+                }
+                break;
+            }
+        }
+    }
 
     nlohmann::json prefabData;
     // If entity has children, save the full hierarchy in new format
@@ -1668,11 +1751,20 @@ void InspectorPanel::_applyPrefabToInstances() {
 // Applies all component data from the prefab JSON to one entity instance
 // This overwrites any local edits so the instance stays in sync with the prefab
 void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
+    // Determine which components array to use (Flat vs Hierarchical)
+    nlohmann::json* componentsPtr = nullptr;
+    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Components"];
+    } 
+    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
+        componentsPtr = &m_prefabData["Entity"]["Components"];
+    }
+
     // Prefab must have a valid Components array
-    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return;
+    if (!componentsPtr) return;
 
     // For each component in the prefab assign its JSON back into the ECS entity
-    for (const auto& componentEntry : m_prefabData["Components"]) {
+    for (const auto& componentEntry : *componentsPtr) {
         // Basic validation
         if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
         if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
@@ -1682,7 +1774,42 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
 
         // Use metadata to load the JSON into the live ECS component
         if (meta) {
-            meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+            // For LocalTransform on the root entity, we only want to apply Scale from the prefab
+            // Position and Rotation should remain specific to the instance
+            // We ensure this is the prefab root by checking for PrefabInstanceMetadata
+            bool isPrefabRoot = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+
+            if (isPrefabRoot && (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform")) {
+                // 1. Capture current instance values
+                ECS::Components::LocalTransform backupPosRot;
+                bool hasTransform = false;
+                {
+					// Get current transform from entity
+                    auto* t = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+                    if (t) {
+						// Backup Position and Rotation
+                        backupPosRot = *t;
+                        hasTransform = true;
+                    }
+                }
+
+                // 2. Apply prefab data (this overwrites everything with prefab values)
+                meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+
+                // 3. Restore Position and Rotation from the instance, keeping the new Scale
+                if (hasTransform) {
+                    auto* t = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+					// Restore Position and Rotation
+                    if (t) {
+                        t->Position = backupPosRot.Position;
+                        t->Rotation = backupPosRot.Rotation;
+                    }
+                }
+            }
+			// For all other components, apply normally
+            else {
+                meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+            }
         }
     }
 }

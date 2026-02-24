@@ -44,7 +44,7 @@ public:
      * @param mainFont Main font for regular text
      * @param boldFont Bold font for section headers
      */
-    void Initialize(ImFont* mainFont, ImFont* boldFont);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
     /**
      * @brief Render the systems panel UI.
@@ -69,6 +69,7 @@ public:
 private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
     ECS::World* m_world = nullptr;
     ECS::SystemManager* m_systemManager = nullptr;
 

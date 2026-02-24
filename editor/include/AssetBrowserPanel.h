@@ -97,6 +97,9 @@ private:
     // Render status message bar
     void _renderStatusBar();
 
+    // Render the create asset dialog popup
+    void _renderCreateDialog();
+
     // -------------------------------------------------------------------------
     // Prefab Operations and Selection
     // -------------------------------------------------------------------------
@@ -138,6 +141,9 @@ private:
 
     // Open the generated C# project file with default code editor
     void _openProjectFile();
+
+    // Show the selected asset in Windows Explorer
+    void _openInExplorer(const std::string& assetPath);
 
     // -------------------------------------------------------------------------
     // Copy/Paste Operations
@@ -212,6 +218,7 @@ private:
     std::string m_renamingAsset;
     char m_renameBuffer[256] = "";
     bool m_focusRenameInput = false;
+
 };
 
 #endif

@@ -102,6 +102,8 @@ namespace ECS {
 
         // Map entity -> playing audio handle
         std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
+        // Track PlayOnStart cues that have already fired (entity -> cue id).
+        std::unordered_map<Entity, uint32_t, EntityHash> m_playOnStartPlayedCue;
 
         // Cached world pointer for fade-outs during scene transitions
         World* m_world = nullptr;
@@ -112,6 +114,11 @@ namespace ECS {
         // Guard against restarting audio while a scene unload transition is pending
         bool m_sceneUnloadInProgress = false;
         bool m_allowCrossfadeOnUnload = false;
+
+        // Crossfade-in support for new scene audio
+        float m_crossfadeInDuration = 0.0f;
+        float m_crossfadeInRemaining = 0.0f;
+        bool m_crossfadeFadeInActive = false;
 
         // Helper methods
         void _stopSound(Entity entity, World& world, bool allowFade = true);

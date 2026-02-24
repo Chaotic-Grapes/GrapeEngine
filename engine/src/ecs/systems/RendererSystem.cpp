@@ -2,7 +2,7 @@
 /*!
 \file   RendererSystem.cpp
 \author Choi Meng Yew
-\date   31st October 2025
+\date   31st January 2026
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline
 for the ECS. Manages shader programs, framebuffers, and the RenderGraph
@@ -80,6 +80,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
@@ -106,6 +107,47 @@ namespace ECS {
         m_guiViewport.Size = m_renderTargetSize;
         m_guiViewport.DisplayScale = { 1.0f, 1.0f };
         m_guiViewport.Active = true;
+    }
+
+    // Convert world coordinates to screen space.
+    bool RendererSystem::WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
+        const Vector2D& viewportSize, Vector2D& outScreen) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::vec4 clip = projection * view * glm::vec4(worldPos.X, worldPos.Y, worldPos.Z, 1.0f);
+        if (std::abs(clip.w) < 1e-6f) {
+            return false;
+        }
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        if (ndc.z < -1.0f || ndc.z > 1.0f) {
+            return false;
+        }
+
+        const float screenX = viewportOrigin.X + (ndc.x * 0.5f + 0.5f) * viewportSize.X;
+        const float screenY = viewportOrigin.Y + (1.0f - (ndc.y * 0.5f + 0.5f)) * viewportSize.Y;
+        outScreen = { screenX, screenY };
+        return true;
+    }
+
+    // Return camera basis.
+    bool RendererSystem::GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp) {
+        glm::mat4 view(1.0f);
+        glm::mat4 projection(1.0f);
+        float orthoSize = kReferenceOrthoSize;
+        if (!GetCameraMatrices(world, view, projection, orthoSize)) {
+            return false;
+        }
+
+        const glm::mat4 invView = glm::inverse(view);
+        outRight = glm::normalize(glm::vec3(invView[0]));
+        outUp = glm::normalize(glm::vec3(invView[1]));
+        return true;
     }
 
     // Helper function to get the effective transform for rendering
@@ -148,9 +190,11 @@ namespace ECS {
         glm::mat4 invViewProj = glm::inverse(projection * view);
         glm::vec4 worldPos = invViewProj * ndc;
 
+        // Convert to a 2D vector.
         return glm::vec2(worldPos.x, worldPos.y);
     }
 
+    // Return metadata.
     SystemMetadata RendererSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Renderer");
         // Note: RendererSystem reads many components (SpriteRenderer2D, WorldTransform, etc.)
@@ -163,6 +207,7 @@ namespace ECS {
         return builder.Build();
     }
 
+    // Initialize system state.
     void RendererSystem::OnCreate(World& world) {
         if (m_initialized)
             return;
@@ -182,6 +227,8 @@ namespace ECS {
         const int height = mainWindow->GetHeight();
         m_renderTargetSize = { static_cast<float>(width), static_cast<float>(height) };
         ResetGUIViewport();
+        m_windowAspectRatio = (height > 0) ? (static_cast<float>(width) / height) : 1.0f;
+        m_windowAspectDirty = true;
 
         // Use RM instead!
         m_shader = RM.Get<Shader>("assets/shaders/batch");
@@ -206,6 +253,7 @@ namespace ECS {
 
         // Renderer
         m_renderer = std::make_unique<Renderer>(15000);
+        m_guiRenderer = std::make_unique<Renderer>(4000);
 
         // RenderGraph now owns all framebuffers (no more m_fbos!)
         m_renderGraph = std::make_unique<RenderGraph>();
@@ -251,6 +299,8 @@ namespace ECS {
 
                 m_renderTargetSize = { static_cast<float>(msg.Width), static_cast<float>(msg.Height) };
                 ResetGUIViewport();
+                m_windowAspectRatio = msg.AspectRatio;
+                m_windowAspectDirty = true;
             });
 
         // Projection matrix
@@ -268,10 +318,12 @@ namespace ECS {
         m_lightManager.Initialize();
     }
 
+    // Bind world.
     void RendererSystem::BindWorld(World& world) {
         (void)world; // Currently unused
     }
 
+    // Return camera matrices.
     bool RendererSystem::GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize) {
         // Default fallback
         outView = glm::mat4(1.0f);
@@ -289,33 +341,59 @@ namespace ECS {
         // Fall back to ECS camera
         bool foundActive = false;
         world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
-            [&](ECS::Entity /*e*/,
+            [&](ECS::Entity e,
                 const ECS::Components::LocalTransform& transform,
                 const ECS::Components::Camera3D& camera)
             {
-                if (foundActive || !camera.Active) return;
+                if (foundActive || !camera.Active || !world.IsActiveInHierarchy(e)) return;
 
-                // --- View: eye looks forward along -Z
-                const glm::vec3 eye(
-                    transform.Position.X,
-                    transform.Position.Y,
-                    transform.Position.Z
-                );
-                const glm::vec3 target = eye + glm::vec3(0.f, 0.f, -1.f);
-                outView = glm::lookAt(eye, target, glm::vec3(0.f, 1.f, 0.f));
+                Vector3D position{};
+                Quaternion rotation{};
+                if (world.Has<Components::WorldTransform>(e)) {
+                    const auto& wt = world.Get<Components::WorldTransform>(e);
+                    bool useWorld = true;
+                    if (world.Has<Components::LocalTransform>(e)) {
+                        const float localLenSq = transform.Position.X * transform.Position.X
+                            + transform.Position.Y * transform.Position.Y
+                            + transform.Position.Z * transform.Position.Z;
+                        const bool worldAtOrigin = std::abs(wt.Matrix.m03) < 1e-4f
+                            && std::abs(wt.Matrix.m13) < 1e-4f
+                            && std::abs(wt.Matrix.m23) < 1e-4f;
+                        if (worldAtOrigin && localLenSq > 1e-6f) {
+                            useWorld = false;
+                        }
+                    }
+                    if (useWorld) {
+                        Vector3D scale;
+                        // Decompose transform matrix into TRS components.
+                        TransformUtils::DecomposeTRS(wt.Matrix, position, rotation, scale);
+                    } else {
+                        position = transform.Position;
+                        rotation = transform.Rotation;
+                    }
+                } else {
+                    position = transform.Position;
+                    rotation = transform.Rotation;
+                }
+
+                const glm::vec3 eye(position.X, position.Y, position.Z);
+                const glm::quat rot(rotation.W, rotation.X, rotation.Y, rotation.Z);
+                const glm::vec3 forward = rot * glm::vec3(0.0f, 0.0f, -1.0f);
+                const glm::vec3 up = rot * glm::vec3(0.0f, 1.0f, 0.0f);
+                outView = glm::lookAt(eye, eye + forward, up);
 
                 // --- Projection
                 if (camera.UsePerspective) {
-                    // camera.FOV assumed radians
+                    // camera.FOV stored in degrees
                     outProjection = glm::perspective(
-                        camera.FOV,
+                        glm::radians(camera.FOV),
                         camera.AspectRatio,
                         camera.NearPlane,
                         camera.FarPlane
                     );
                 }
                 else {
-                    const float halfH = camera.OrthoSize * 0.5f;
+                    const float halfH = camera.OrthoSize;
                     const float halfW = halfH * camera.AspectRatio;
                     outProjection = glm::ortho(
                         -halfW, +halfW,
@@ -346,6 +424,7 @@ namespace ECS {
         return false;
     }
 
+    // Update system state for this frame.
     void RendererSystem::OnUpdate(World& world) {
         if (!m_renderer)
             return;
@@ -353,6 +432,16 @@ namespace ECS {
         auto* context = Engine::CORE->GetPlatformContext();
         auto* win = context ? context->GetMainWindow() : nullptr;
         if (!win) return;
+
+        if (m_windowAspectDirty && m_viewports.empty() && !m_activeCamera) {
+            const float aspect = (m_windowAspectRatio > 0.0f) ? m_windowAspectRatio : 1.0f;
+            // Render 3D camera passes.
+            world.Each<ECS::Components::Camera3D>([&](ECS::Entity /*e*/, ECS::Components::Camera3D& camera)
+                {
+                    camera.AspectRatio = aspect;
+                });
+            m_windowAspectDirty = false;
+        }
 
         // ============================================================
         // SHARED WORK (once per frame)
@@ -383,15 +472,22 @@ namespace ECS {
                 RenderSceneToHDR(world, vp, viewProj, buckets, maxLayerId);
                 RenderBloom(vp, bloomRadius);
                 ToneMap(vp);
+                RenderOverlayQuads(vp, viewProj);
                 RenderWireframes(vp, viewProj);
                 RenderGUI(vp);
                 RenderPicking(world, vp, viewProj, buckets);
             }
 
             m_wireframeQueue.clear();
+            m_overlayQuadQueue.clear();
             m_guiPanelQueue.clear();
+            m_guiImageQueue.clear();
             m_guiTextQueue.clear();
+            m_worldGuiPanelQueue.clear();
+            m_worldGuiImageQueue.clear();
+            m_worldGuiTextQueue.clear();
 
+            // Unbind the current render target.
             Framebuffer::Unbind();
             return;  // EXIT HERE - skip RenderGraph path
         }
@@ -496,8 +592,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
@@ -554,9 +649,20 @@ namespace ECS {
                         // Render all tilemaps requested by the editor.
                         TileMapRenderer tileRenderer;
                         for (const auto& entry : m_debugTileMaps) {
+							// Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
+                            std::vector<const Tileset*> rawTilesets;
+
+							// Preallocate for efficiency
+                            rawTilesets.reserve(entry.Tilesets.size());
+
+							// Populate raw pointer list
+                            for (const auto& ts : entry.Tilesets) {
+                                rawTilesets.push_back(ts.get());
+                            }
+							// Submit tilemap for rendering
                             tileRenderer.Submit(
                                 entry.Map.get(),
-                                entry.Tilesets,
+                                rawTilesets,
                                 *m_renderer,
                                 entry.Offset
                             );
@@ -565,8 +671,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles here (already drawn by SDF pass)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -604,10 +709,12 @@ namespace ECS {
                                     transformedCorners.push_back(ToGlm(Vector2D{ hc.X, hc.Y }) + ToGlm(sb.Offset));
                                 }
                                 if (sb.Filled) {
+                                    // Submit polygon geometry.
                                     DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                                 }
                                 else {
                                     for (int i = 0; i < 4; ++i)
+                                        // Submit line geometry.
                                         DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                                 }
                             }
@@ -624,6 +731,7 @@ namespace ECS {
                             const Vector4D worldA = m * Vector4D{sl.A.X, sl.A.Y, 0.0f, 1.0f};
                             const Vector4D worldB = m * Vector4D{sl.B.X, sl.B.Y, 0.0f, 1.0f};
                             
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer,
                                 ToGlm(Vector2D{worldA.X, worldA.Y}),
                                 ToGlm(Vector2D{worldB.X, worldB.Y}),
@@ -684,13 +792,15 @@ namespace ECS {
                                 smoothness,         // Material2D: smoothness value
                                 aoStrength,         // Material2D: AO strength
                                 normalStrength,     // Material2D: normal strength
-                                flags
+                                flags,
+                                sr.TextureFilter
                                 });
                         }
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
                 }
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -728,6 +838,7 @@ namespace ECS {
                 glm::vec2 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
                 glm::dvec2 mousePos;
+                // Return mouse position.
                 Input::GetMousePosition(mousePos.x, mousePos.y);
 
                 // If there is a current async pick request being processed, 
@@ -800,8 +911,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Only render circles in this pass
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -822,6 +932,7 @@ namespace ECS {
                         GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                         const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                        // Submit circle geometry.
                         DebugDraw2D::Circle(
                             *m_renderer,
                             ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
@@ -850,8 +961,7 @@ namespace ECS {
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
-                        if (world.Has<Components::Active>(entity) &&
-                            !world.Get<Components::Active>(entity).Enabled) continue;
+                        if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles (already rendered above)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
@@ -901,7 +1011,17 @@ namespace ECS {
                                 angleZ,
                                 1.0f,
                                 0,      // emissiveTextureId (no emissive in picking pass)
-                                0.0f    // emissiveStrength (no emissive in picking pass)
+                                0.0f,   // emissiveStrength (no emissive in picking pass)
+                                0,      // texture width
+                                0,      // texture height
+                                0,      // normalTextureId
+                                0,      // mraTextureId
+                                0.0f,   // metallic
+                                0.5f,   // smoothness
+                                1.0f,   // aoStrength
+                                1.0f,   // normalStrength
+                                0,      // materialFlags
+                                sr.TextureFilter
                                 });
                         }
                     }
@@ -976,6 +1096,7 @@ namespace ECS {
                 // Restore blending state
                 if (blendWasEnabled) glEnable(GL_BLEND);
 
+                // Unbind the current render target.
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
@@ -983,10 +1104,26 @@ namespace ECS {
             });
 
 
+        m_renderGraph->AddPass("WorldGUI", { "HDR" }, { "HDR" },
+            [this, &viewProj](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
+                if (!hdrFbo) return;
+
+                hdrFbo->Bind();
+                glViewport(0, 0, hdrFbo->Width(), hdrFbo->Height());
+                RenderWorldGUI(viewProj);
+                Framebuffer::Unbind();
+
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
+            });
+
         m_renderGraph->AddPass("BloomExtract", { "HDR" }, { "BloomExtract" },
-                [this](ResourceAccessor& res)
-                {
-                    auto* hdrFbo = res.GetFramebuffer("HDR");
+            [this](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
                     auto* extractFbo = res.GetFramebuffer("BloomExtract");
                     if (!hdrFbo || !extractFbo) return;
 
@@ -996,6 +1133,7 @@ namespace ECS {
                     m_bloomExtractShader->setUniform("uScene", 0);
                     hdrFbo->BindColorTexture(0);                            // texture unit 0 in shader
                     m_renderer->drawFullscreenQuad();
+                    // Unbind the current render target.
                     Framebuffer::Unbind();
                 });
 
@@ -1015,6 +1153,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1035,6 +1174,7 @@ namespace ECS {
 
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1060,6 +1200,7 @@ namespace ECS {
                 bloom->BindColorTexture(0, 1);
 
                 m_renderer->drawFullscreenQuad();
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1115,6 +1256,7 @@ namespace ECS {
                         m_sdfCircleShader->setUniform("uPicking", 0);
                         m_renderer->beginFrame();
 
+                        // Submit circle geometry.
                         DebugDraw2D::Circle(*m_renderer,
                             sub.center,
                             sub.radius,
@@ -1137,12 +1279,14 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.filled && sub.vertices.size() >= 3) {
+                            // Submit polygon geometry.
                             DebugDraw2D::Polygon(*m_renderer, sub.vertices, sub.color, 0);
                         }
                         else if (sub.vertices.size() >= 2) {
                             for (size_t i = 0; i < sub.vertices.size(); ++i) {
                                 size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                                 if (next < sub.vertices.size()) {
+                                    // Submit line geometry.
                                     DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
                                         sub.thickness, sub.color, 0);
                                 }
@@ -1162,6 +1306,7 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.vertices.size() == 2) {
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
                                 sub.thickness, sub.color, 0);
                         }
@@ -1185,6 +1330,7 @@ namespace ECS {
                                     uint32_t idx0 = sub.indices[i];
                                     uint32_t idx1 = sub.indices[i + 1];
                                     if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
+                                        // Submit line geometry.
                                         DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
                                             sub.thickness, sub.color, 0);
                                     }
@@ -1216,9 +1362,11 @@ namespace ECS {
                             const auto& min = sub.vertices[0];
                             const auto& max = sub.vertices[2];
                             if (sub.filled) {
+                                // Submit filled rectangle geometry.
                                 DebugDraw2D::RectFill(*m_renderer, min, max, sub.color, 0);
                             }
                             else {
+                                // Submit rectangle outline geometry.
                                 DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
                             }
                         }
@@ -1237,6 +1385,7 @@ namespace ECS {
                 // Restore blend state
                 if (!blendWasEnabled) glDisable(GL_BLEND);
 
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1284,6 +1433,11 @@ namespace ECS {
                     glScissor(scissorX, scissorY, scissorW, scissorH);
                 }
 
+                Renderer* guiRenderer = m_guiRenderer ? m_guiRenderer.get() : m_renderer.get();
+                if (!guiRenderer) {
+                    return;
+                }
+
                 // Render GUI panels (solid quads with optional corner radius).
                 if (!m_guiPanelQueue.empty()) {
                     if (m_shader) {
@@ -1291,7 +1445,7 @@ namespace ECS {
                         m_shader->setMat4("uViewProj", screenOrtho);
                         m_shader->setUniform("uLightingEnabled", 0);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& panel : m_guiPanelQueue) { // Render each panel
                         const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
                                                panel.position.Y + panel.size.Y * 0.5f);
@@ -1299,9 +1453,9 @@ namespace ECS {
                         const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
                         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
                         GLuint textureId = 0;
-                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Render GUI images/icons (textured quads).
@@ -1311,17 +1465,19 @@ namespace ECS {
                         m_shader->setMat4("uViewProj", screenOrtho);
                         m_shader->setUniform("uLightingEnabled", 0);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& image : m_guiImageQueue) {
                         const glm::vec2 center(image.position.X + image.size.X * 0.5f,
                                                image.position.Y + image.size.Y * 0.5f);
                         const glm::vec2 size(image.size.X, image.size.Y);
                         const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                        const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                        // GUI projection uses Y-down; flip V to keep textures upright.
+                        const glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
                         const GLuint textureId = image.textureId;
-                        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                        guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                            0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Render GUI text (SDF font rendering in screen space).
@@ -1331,7 +1487,7 @@ namespace ECS {
                         m_textShader->use();
                         m_textShader->setMat4("uProjection", textOrtho);
                     }
-                    m_renderer->beginFrame();
+                    guiRenderer->beginFrame();
                     for (const auto& text : m_guiTextQueue) { // Render each text element
                         if (text.text.empty()) {
                             continue;
@@ -1339,7 +1495,7 @@ namespace ECS {
 
                         // Load font (fallback to default if path is empty).
                         const std::string fontPath = text.fontPath.empty()
-                            ? std::string("assets/fonts/Roboto/Roboto-Regular.ttf")
+                            ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                             : text.fontPath;
                         const int pixelSize = std::max(1, static_cast<int>(std::round(text.pixelSize)));
                         auto font = RM.GetFont(fontPath, pixelSize);
@@ -1352,9 +1508,9 @@ namespace ECS {
                         const float ascent = font->getAscent() * scale;
                         const glm::vec2 textPos(text.position.X, height - text.position.Y - ascent);
                         const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                        m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+                        guiRenderer->submitText(*font, text.text, textPos, color, text.pixelSize);
                     }
-                    m_renderer->endFrame();
+                    guiRenderer->endFrame();
                 }
 
                 // Disable scissor test if it was enabled.
@@ -1366,8 +1522,12 @@ namespace ECS {
                 m_guiPanelQueue.clear();
                 m_guiImageQueue.clear();
                 m_guiTextQueue.clear();
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
+                // Unbind the current render target.
                 Framebuffer::Unbind();
             });
 
@@ -1378,6 +1538,7 @@ namespace ECS {
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
 
+                // Bind default.
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
@@ -1412,10 +1573,12 @@ namespace ECS {
         }
     }
 
+    // Tear down system state.
     void RendererSystem::OnDestroy(World& world) {
         (void)world;
         // Cleanup rendering resources
         m_renderer.reset();
+        m_guiRenderer.reset();
         m_renderGraph.reset();
         m_shader.reset();
         m_textShader.reset();
@@ -1470,8 +1633,10 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Created '" << name << "' (" << w << "x" << h << ")");
     }
 
+    // Remove viewport.
     void RendererSystem::RemoveViewport(const std::string& name) {
         m_viewports.erase(
+            // Remove items that no longer match filters.
             std::remove_if(m_viewports.begin(), m_viewports.end(),
                 [&](const Viewport& vp) { return vp.Name == name; }),
             m_viewports.end());
@@ -1479,6 +1644,7 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Removed '" << name << "'");
     }
 
+    // Resize viewport.
     void RendererSystem::ResizeViewport(const std::string& name, int w, int h) {
         Viewport* vp = GetViewport(name);
         if (!vp) return;
@@ -1499,17 +1665,20 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Resized '" << name << "' to " << w << "x" << h);
     }
 
+    // Set viewport camera.
     void RendererSystem::SetViewportCamera(const std::string& name, Engine::Camera* camera) {
         if (Viewport* vp = GetViewport(name))
             vp->Camera = camera;
     }
 
+    // Return viewport.
     RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
         for (auto& vp : m_viewports)
             if (vp.Name == name) return &vp;
         return nullptr;
     }
 
+    // Return viewport texture.
     GLuint RendererSystem::GetViewportTexture(const std::string& name) const {
         for (const auto& vp : m_viewports)
             if (vp.Name == name && vp.LDR)
@@ -1526,8 +1695,7 @@ namespace ECS {
 
         world.Each<Components::LocalTransform, Components::Light2D>(
             [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
-                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
-                    return;
+                if (!world.IsActiveInHierarchy(e)) return;
 
                 Vector3D position, scale;
                 Quaternion rotation;
@@ -1551,10 +1719,12 @@ namespace ECS {
         m_lightManager.Upload();
     }
 
+    // Bucket entities for ordered rendering.
     void RendererSystem::BucketEntities(World& world,
         std::vector<std::vector<Entity>>& buckets,
         int& maxLayerId) {
         maxLayerId = -1;
+        // Render per-layer passes.
         world.Each<Components::Layer>([&](Entity, const Components::Layer& ly) {
             maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
             });
@@ -1569,6 +1739,7 @@ namespace ECS {
             });
     }
 
+    // Render bloom.
     void RendererSystem::RenderBloom(Viewport& vp, float bloomRadius) {
         // Extract
         vp.BloomExtract->BindAndClear(0, 0, 0, 1);
@@ -1597,9 +1768,11 @@ namespace ECS {
         vp.BloomBlur->BindColorTexture(0);
         m_renderer->drawFullscreenQuad();
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Tone map.
     void RendererSystem::ToneMap(Viewport& vp) {
         vp.LDR->BindAndClear(0, 0, 0, 1);
         glViewport(0, 0, vp.Size.x, vp.Size.y);
@@ -1615,9 +1788,11 @@ namespace ECS {
         vp.BloomExtract->BindColorTexture(0, 1);
         m_renderer->drawFullscreenQuad();
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render scene to hdr.
     void RendererSystem::RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets,
         int maxLayerId) {
@@ -1646,6 +1821,7 @@ namespace ECS {
             if (layer >= static_cast<int>(buckets.size())) continue;
 
             auto list = buckets[layer];
+            // Finalize rendering pass state.
             std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
                 int za = 0, zb = 0;
                 if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
@@ -1662,7 +1838,7 @@ namespace ECS {
             m_renderer->beginFrame();
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 const auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -1670,6 +1846,7 @@ namespace ECS {
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                 const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                // Submit circle geometry.
                 DebugDraw2D::Circle(*m_renderer,
                     ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
                     sc.Radius * ((scale.X + scale.Y) * 0.5f),
@@ -1702,12 +1879,17 @@ namespace ECS {
                 TileMapRenderer tileRenderer;
 				// Same thing here, but for multiple tilemaps
                 for (const auto& entry : m_debugTileMaps) {
-                    tileRenderer.Submit(entry.Map.get(), entry.Tilesets, *m_renderer, entry.Offset);
+                    std::vector<const Tileset*> rawTilesets;
+                    rawTilesets.reserve(entry.Tilesets.size());
+                    for (const auto& ts : entry.Tilesets) {
+                        rawTilesets.push_back(ts.get());
+                    }
+                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset);
                 }
             }
 
             for (Entity entity : list) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
                 if (world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                 auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -1739,6 +1921,7 @@ namespace ECS {
                         }
                         if (sb.Filled) DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                         else for (int i = 0; i < 4; ++i)
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                     }
                 }
@@ -1749,6 +1932,7 @@ namespace ECS {
                     const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
                     const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
                     const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
+                    // Submit line geometry.
                     DebugDraw2D::Line(*m_renderer, ToGlm(Vector2D{ worldA.X, worldA.Y }), ToGlm(Vector2D{ worldB.X, worldB.Y }), sl.Thickness, ToGlm(sl.Color), 0);
                 }
 
@@ -1782,16 +1966,21 @@ namespace ECS {
                         ToGlm(sr.Color), sr.TextureId, angleZ, 1.0f,
                         sr.EmissiveTextureId, sr.EmissiveStrength, sr.Width, sr.Height,
                         normalTexId, mraTexId, metallic, smoothness, aoStrength, normalStrength,
-                          flags
-                          });
+                        flags,
+                        sr.TextureFilter
+                        });
                 }
             }
-            m_renderer->endFrame();
-        }
+              m_renderer->endFrame();
+          }
 
-        Framebuffer::Unbind();
-    }
+          RenderWorldGUI(viewProj);
 
+          // Unbind the current render target.
+          Framebuffer::Unbind();
+      }
+
+    // Render wireframes.
     void RendererSystem::RenderWireframes(Viewport& vp, const glm::mat4& viewProj) {
         if (m_wireframeQueue.empty()) return;
 
@@ -1806,6 +1995,7 @@ namespace ECS {
                 m_sdfCircleShader->setMat4("uViewProj", viewProj);
                 m_sdfCircleShader->setUniform("uPicking", 0);
                 m_renderer->beginFrame();
+                // Submit circle geometry.
                 DebugDraw2D::Circle(*m_renderer, sub.center, sub.radius, sub.color, sub.filled ? 0.0f : sub.thickness, 0);
                 m_renderer->endFrame();
             }
@@ -1821,6 +2011,7 @@ namespace ECS {
                     else DebugDraw2D::RectStroke(*m_renderer, sub.vertices[0], sub.vertices[2], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Line && sub.vertices.size() == 2) {
+                    // Submit line geometry.
                     DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Polygon && sub.vertices.size() >= 2) {
@@ -1828,6 +2019,7 @@ namespace ECS {
                     else for (size_t i = 0; i < sub.vertices.size(); ++i) {
                         size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                         if (next < sub.vertices.size())
+                            // Submit line geometry.
                             DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next], sub.thickness, sub.color, 0);
                     }
                 }
@@ -1835,11 +2027,60 @@ namespace ECS {
             }
         }
 
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Render overlay quads.
+    void RendererSystem::RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj) {
+        if (m_overlayQuadQueue.empty()) return;
+
+        vp.LDR->Bind();
+        glViewport(0, 0, vp.Size.x, vp.Size.y);
+
+        // Enable blending for overlay quads
+        GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Setup shader
+        if (m_shader) {
+            m_shader->use();
+            m_shader->setMat4("uViewProj", viewProj);
+            m_shader->setUniform("uPicking", 0);
+            m_shader->setUniform("uLightingEnabled", 0);
+        }
+
+        // Render quads
+        m_renderer->beginFrame();
+        for (const auto& quad : m_overlayQuadQueue) {
+            m_renderer->submitQuad(
+                quad.center,
+                quad.size,
+                quad.textureId,
+                quad.uvRect,
+                quad.color,
+                quad.rotation,
+                1.0f,
+                0
+            );
+        }
+        m_renderer->endFrame();
+
+        if (!blendWasEnabled) glDisable(GL_BLEND);
+
+        // Unbind the current render target.
+        Framebuffer::Unbind();
+    }
+
+    // Render gui.
     void RendererSystem::RenderGUI(Viewport& vp) {
         if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
+
+        Renderer* guiRenderer = m_guiRenderer ? m_guiRenderer.get() : m_renderer.get();
+        if (!guiRenderer) {
+            return;
+        }
 
         vp.LDR->Bind();
         glViewport(0, 0, vp.Size.x, vp.Size.y);
@@ -1850,19 +2091,38 @@ namespace ECS {
         const float h = static_cast<float>(vp.Size.y);
         glm::mat4 screenOrtho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
 
+        // Layout is produced once before render; remap it into the current viewport size so
+        // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
+        GUIViewport layoutViewport = m_guiViewport;
+        if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
+            layoutViewport.Size = m_renderTargetSize;
+        }
+        const float layoutW = std::max(1.0f, layoutViewport.Size.X);
+        const float layoutH = std::max(1.0f, layoutViewport.Size.Y);
+        const float guiScaleX = w / layoutW;
+        const float guiScaleY = h / layoutH;
+        auto scalePos = [&](const Vector2D& p) {
+            return Vector2D{ p.X * guiScaleX, p.Y * guiScaleY };
+        };
+        auto scaleSize = [&](const Vector2D& s) {
+            return Vector2D{ s.X * guiScaleX, s.Y * guiScaleY };
+        };
+
         // Panels
         if (!m_guiPanelQueue.empty()) {
             m_shader->use();
             m_shader->setMat4("uViewProj", screenOrtho);
             m_shader->setUniform("uLightingEnabled", 0);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& panel : m_guiPanelQueue) {
-                glm::vec2 center(panel.position.X + panel.size.X * 0.5f, panel.position.Y + panel.size.Y * 0.5f);
-                glm::vec2 size(panel.size.X, panel.size.Y);
+                const Vector2D panelPos = scalePos(panel.position);
+                const Vector2D panelSize = scaleSize(panel.size);
+                glm::vec2 center(panelPos.X + panelSize.X * 0.5f, panelPos.Y + panelSize.Y * 0.5f);
+                glm::vec2 size(panelSize.X, panelSize.Y);
                 glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
-                m_renderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
             }
-            m_renderer->endFrame();
+            guiRenderer->endFrame();
         }
 
         // Images
@@ -1870,15 +2130,19 @@ namespace ECS {
             m_shader->use();
             m_shader->setMat4("uViewProj", screenOrtho);
             m_shader->setUniform("uLightingEnabled", 0);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& image : m_guiImageQueue) {
-                glm::vec2 center(image.position.X + image.size.X * 0.5f, image.position.Y + image.size.Y * 0.5f);
-                glm::vec2 size(image.size.X, image.size.Y);
+                const Vector2D imagePos = scalePos(image.position);
+                const Vector2D imageSize = scaleSize(image.size);
+                glm::vec2 center(imagePos.X + imageSize.X * 0.5f, imagePos.Y + imageSize.Y * 0.5f);
+                glm::vec2 size(imageSize.X, imageSize.Y);
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
-                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                // GUI projection uses Y-down; flip V to keep textures upright.
+                glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
+                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
             }
-            m_renderer->endFrame();
+            guiRenderer->endFrame();
         }
 
         // Text
@@ -1886,24 +2150,103 @@ namespace ECS {
             glm::mat4 textOrtho = glm::ortho(0.0f, w, 0.0f, h, -1.0f, 1.0f);
             m_textShader->use();
             m_textShader->setMat4("uProjection", textOrtho);
-            m_renderer->beginFrame();
+            guiRenderer->beginFrame();
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
-                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/Roboto-Regular.ttf" : text.fontPath;
-                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
+                std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
+                const Vector2D textPosScaled = scalePos(text.position);
+                const float textPixelSize = text.pixelSize * std::min(guiScaleX, guiScaleY);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(textPixelSize)));
                 if (!font) continue;
-                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float scale = textPixelSize / static_cast<float>(font->getPixelSize());
                 const float ascent = font->getAscent() * scale;
-                glm::vec2 pos(text.position.X, h - text.position.Y - ascent);
+                glm::vec2 pos(textPosScaled.X, h - textPosScaled.Y - ascent);
                 glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                m_renderer->submitText(*font, text.text, pos, color, text.pixelSize);
+                guiRenderer->submitText(*font, text.text, pos, color, textPixelSize);
+            }
+            guiRenderer->endFrame();
+        }
+
+        // Unbind the current render target.
+        Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderWorldGUI(const glm::mat4& viewProj) {
+        if (m_worldGuiPanelQueue.empty() && m_worldGuiTextQueue.empty() && m_worldGuiImageQueue.empty()) return;
+        if (!m_renderer) return;
+
+        GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Panels
+        if (!m_worldGuiPanelQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& panel : m_worldGuiPanelQueue) {
+                const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
+                                       panel.position.Y + panel.size.Y * 0.5f);
+                const glm::vec2 size(panel.size.X, panel.size.Y);
+                const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                m_renderer->submitQuad(center, size, 0, { 0.0f, 0.0f, 1.0f, 1.0f }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
             }
             m_renderer->endFrame();
         }
 
-        Framebuffer::Unbind();
+        // Images
+        if (!m_worldGuiImageQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& image : m_worldGuiImageQueue) {
+                const glm::vec2 center(image.position.X + image.size.X * 0.5f,
+                                       image.position.Y + image.size.Y * 0.5f);
+                const glm::vec2 size(image.size.X, image.size.Y);
+                const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
+                const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Text
+        if (!m_worldGuiTextQueue.empty()) {
+            if (m_textShader) {
+                m_textShader->use();
+                m_textShader->setMat4("uProjection", viewProj);
+            }
+            m_renderer->beginFrame();
+            for (const auto& text : m_worldGuiTextQueue) {
+                if (text.text.empty()) continue;
+                const std::string fontPath = text.fontPath.empty()
+                    ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
+                    : text.fontPath;
+                const float fontPixelSize = UnitsToPixels(text.pixelSize);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(std::round(fontPixelSize))));
+                if (!font) continue;
+                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float ascent = font->getAscent() * scale;
+                const glm::vec2 textPos(text.position.X, text.position.Y - ascent);
+                const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+            }
+            m_renderer->endFrame();
+        }
+
+        if (!blendWasEnabled) glDisable(GL_BLEND);
     }
 
+    // Render picking.
     void RendererSystem::RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets) {
         // Only run if there are pending pick requests
@@ -1944,6 +2287,42 @@ namespace ECS {
         glViewport(0, 0, vp.Size.x, vp.Size.y);
         glDisable(GL_BLEND);
 
+        // Render circles with ID colors using SDF shader
+        m_sdfCircleShader->use();
+        m_sdfCircleShader->setMat4("uViewProj", viewProj);
+        m_sdfCircleShader->setUniform("uPicking", 1);
+        m_renderer->beginFrame();
+        for (const auto& bucket : buckets) {
+            for (Entity entity : bucket) {
+                if (!world.IsActiveInHierarchy(entity)) continue;
+                if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                uint32_t id = entity.Index + 1;
+                glm::vec4 idColor(
+                    ((id >> 0) & 0xFF) / 255.0f,
+                    ((id >> 8) & 0xFF) / 255.0f,
+                    ((id >> 16) & 0xFF) / 255.0f,
+                    1.0f
+                );
+
+                const auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position, scale; Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                // Submit circle geometry.
+                DebugDraw2D::Circle(
+                    *m_renderer,
+                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
+                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
+                    idColor,
+                    0.0f,
+                    0
+                );
+            }
+        }
+        m_renderer->endFrame();
+
         // Render entities with ID colors (simplified - just sprites/boxes)
         m_shader->use();
         m_shader->setMat4("uViewProj", viewProj);
@@ -1953,7 +2332,7 @@ namespace ECS {
 
         for (const auto& bucket : buckets) {
             for (Entity entity : bucket) {
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) continue;
+                if (!world.IsActiveInHierarchy(entity)) continue;
 
                 uint32_t id = entity.Index + 1;
                 glm::vec4 idColor(((id >> 0) & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f);
@@ -1967,13 +2346,20 @@ namespace ECS {
                     float angleZ = std::atan2(2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
                     m_renderer->submitSprite({ ToGlm(Vector2D{position.X, position.Y}), ToGlm(Vector2D{scale.X, scale.Y}),
-                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f, 0, 0.0f });
+                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f,
+                        0, 0.0f,
+                        0, 0,
+                        0, 0,
+                        0.0f, 0.5f, 1.0f, 1.0f,
+                        0,
+                        sr.TextureFilter });
                 }
 
                 if (world.Has<Components::ShapeBox2D>(entity)) {
                     const auto& sb = world.Get<Components::ShapeBox2D>(entity);
                     glm::vec2 he = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
                     glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
+                    // Submit filled rectangle geometry.
                     DebugDraw2D::RectFill(*m_renderer, center - he, center + he, idColor, static_cast<GLuint>(-1));
                 }
             }
@@ -1995,9 +2381,11 @@ namespace ECS {
         m_currentPBO = 1 - m_currentPBO;
 
         glEnable(GL_BLEND);
+        // Unbind the current render target.
         Framebuffer::Unbind();
     }
 
+    // Request pick.
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
         // Check if within viewport bounds
         if (screenX < viewportPos.x || screenX >= (viewportPos.x + viewportSize.x) ||
@@ -2020,6 +2408,7 @@ namespace ECS {
         return id;
     }
 
+    // Try to get pick result.
     bool RendererSystem::TryGetPickResult(uint32_t requestId, uint32_t& outEntityId) {
         auto it = m_completedPickResults.find(requestId);
         if (it == m_completedPickResults.end()) return false;
@@ -2051,6 +2440,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a filled quad for debug rendering.
     void RendererSystem::SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
                                           const glm::vec4& color) {
         if (!m_renderer) return;
@@ -2070,6 +2460,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe circle for debug rendering.
     void RendererSystem::SubmitWireframeCircle(const glm::vec2& center, float radius,
                                                 const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -2085,6 +2476,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe polygon for debug rendering.
     void RendererSystem::SubmitWireframePolygon(const glm::vec2* vertices, size_t vertexCount,
                                                  const glm::vec4& color, float thickness, bool closed) {
         if (!m_renderer || !vertices || vertexCount < 2) return;
@@ -2099,6 +2491,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe line for debug rendering.
     void RendererSystem::SubmitWireframeLine(const glm::vec2& p1, const glm::vec2& p2,
                                               const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -2113,6 +2506,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit a wireframe mesh for debug rendering.
     void RendererSystem::SubmitWireframeMesh(const glm::vec2* vertices, size_t vertexCount,
                                               const uint32_t* indices, size_t indexCount,
                                               const glm::vec4& color, float thickness) {
@@ -2131,6 +2525,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
+    // Submit an overlay quad.
     void RendererSystem::SubmitOverlayQuad(const glm::vec2& center,
                                            const glm::vec2& size,
                                            GLuint textureId,
@@ -2149,6 +2544,7 @@ namespace ECS {
         m_overlayQuadQueue.push_back(sub);
     }
 
+    // Submit a GUI panel draw call.
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                                         const Color& color, float cornerRadius) {
         (void)cornerRadius;
@@ -2163,8 +2559,10 @@ namespace ECS {
         m_guiPanelQueue.push_back(submission);
     }
 
+    // Submit a GUI image draw call.
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
-                                        uint32_t textureId, const Vector4D& uvRect, const Color& color) {
+                                         uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                         Graphics::TextureFilter textureFilter) {
         if (!m_renderer) return;
 
         // Queue GUI image/icon draw for the GUI pass.
@@ -2174,11 +2572,13 @@ namespace ECS {
         submission.textureId = textureId;
         submission.uvRect = uvRect;
         submission.color = color;
+        submission.textureFilter = textureFilter;
         m_guiImageQueue.push_back(submission);
     }
 
+    // Submit a GUI text draw call.
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
-                                       const std::string& fontPath, float pixelSize, const Color& color) {
+        const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
 
         // Queue GUI text draw for the GUI pass.
@@ -2191,6 +2591,50 @@ namespace ECS {
         m_guiTextQueue.push_back(std::move(submission));
     }
 
+    // Submit a world-space GUI panel draw call.
+    void RendererSystem::SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+        const Color& color, float cornerRadius) {
+        (void)cornerRadius;
+        if (!m_renderer) return;
+
+        WorldGUIPanelSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.color = color;
+        submission.cornerRadius = cornerRadius;
+        m_worldGuiPanelQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI image draw call.
+    void RendererSystem::SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+        uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter) {
+        if (!m_renderer) return;
+
+        WorldGUIImageSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.textureId = textureId;
+        submission.uvRect = uvRect;
+        submission.color = color;
+        submission.textureFilter = textureFilter;
+        m_worldGuiImageQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI text draw call.
+    void RendererSystem::SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+        const std::string& fontPath, float pixelSize, const Color& color) {
+        if (!m_renderer) return;
+
+        WorldGUITextSubmission submission;
+        submission.position = position;
+        submission.text = text;
+        submission.fontPath = fontPath;
+        submission.pixelSize = pixelSize;
+        submission.color = color;
+        m_worldGuiTextQueue.push_back(std::move(submission));
+    }
+
+    // Submit collider debug draw geometry.
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
         const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
@@ -2219,6 +2663,7 @@ namespace ECS {
         auto rotate2D = [](const glm::vec2& v, float radians) {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
+            // Convert to a 2D vector.
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
             };
 
@@ -2278,6 +2723,7 @@ namespace ECS {
         }
     }
 
+    // Set debug tile map.
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset)
     {
         m_debugTileMap = map;
@@ -2285,11 +2731,13 @@ namespace ECS {
         m_debugTileMapOffset = worldOffset;
     }
 
+    // Set debug tile maps.
     void RendererSystem::SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps)
     {
         m_debugTileMaps = maps; // Store references to editor-owned tilemaps for this frame.
     }
 
+    // Clear debug tile map.
     void RendererSystem::ClearDebugTileMap()
     {
         m_debugTileMap.reset();
@@ -2297,6 +2745,7 @@ namespace ECS {
         m_debugTileMapOffset = glm::vec2(0.0f, 0.0f);
     }
 
+    // Clear debug tile maps.
     void RendererSystem::ClearDebugTileMaps()
     {
         m_debugTileMaps.clear(); // Clear multi-tilemap debug rendering state.

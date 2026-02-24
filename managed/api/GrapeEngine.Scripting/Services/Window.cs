@@ -16,6 +16,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
+using System;
+using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -27,7 +29,26 @@ public enum WindowMode
 {
     Windowed = 1,
     Fullscreen = 2,
-    Borderless = 4
+    Borderless = 4 // Borderless windowed; engine snaps to monitor size.
+}
+
+/// <summary>
+/// Display mode data (resolution + refresh rate).
+/// </summary>
+public readonly struct DisplayMode
+{
+    public readonly int Width;
+    public readonly int Height;
+    public readonly int RefreshRate;
+    public readonly int BitsPerPixel;
+
+    public DisplayMode(int width, int height, int refreshRate, int bitsPerPixel)
+    {
+        Width = width;
+        Height = height;
+        RefreshRate = refreshRate;
+        BitsPerPixel = bitsPerPixel;
+    }
 }
 
 /// <summary>
@@ -181,6 +202,102 @@ public static class Window
     public static bool HasMode(WindowMode mode)
     {
         return WindowAPI.HasMode((int)mode);
+    }
+
+    // ============================================================================
+    // Title and VSync
+    // ============================================================================
+
+    /// <summary>
+    /// Get or set the window title.
+    /// </summary>
+    public static string Title
+    {
+        get
+        {
+            IntPtr titlePtr = WindowAPI.GetTitle();
+            return Marshal.PtrToStringUTF8(titlePtr) ?? string.Empty;
+        }
+        set
+        {
+            WindowAPI.SetTitle(value ?? string.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Get or set whether VSync is enabled.
+    /// </summary>
+    public static bool IsVSync
+    {
+        get
+        {
+            return WindowAPI.IsVSync();
+        }
+        set
+        {
+            WindowAPI.SetVSync(value);
+        }
+    }
+
+    // ============================================================================
+    // Fullscreen and Display Modes
+    // ============================================================================
+
+    /// <summary>
+    /// Toggle fullscreen on the current monitor.
+    /// </summary>
+    public static bool SetFullscreen(bool fullscreen)
+    {
+        return WindowAPI.SetFullscreen(fullscreen);
+    }
+
+    /// <summary>
+    /// Toggle fullscreen on a specific monitor index.
+    /// </summary>
+    public static bool SetFullscreenOnMonitor(int monitorIndex)
+    {
+        return WindowAPI.SetFullscreenOnMonitor(monitorIndex);
+    }
+
+    /// <summary>
+    /// Get supported display modes for the current monitor.
+    /// </summary>
+    public static DisplayMode[] GetSupportedDisplayModes()
+    {
+        int count = WindowAPI.GetSupportedDisplayModeCount();
+        if (count <= 0)
+        {
+            return Array.Empty<DisplayMode>();
+        }
+
+        var modes = new DisplayMode[count];
+        int written = 0;
+
+        for (int i = 0; i < count; i++)
+        {
+            if (WindowAPI.GetSupportedDisplayMode(i, out int width, out int height,
+                    out int refreshRate, out int bitsPerPixel))
+            {
+                modes[written++] = new DisplayMode(width, height, refreshRate, bitsPerPixel);
+            }
+        }
+
+        if (written == count)
+        {
+            return modes;
+        }
+
+        var trimmed = new DisplayMode[written];
+        Array.Copy(modes, trimmed, written);
+        return trimmed;
+    }
+
+    /// <summary>
+    /// Apply a display mode to the current window.
+    /// </summary>
+    public static bool SetDisplayMode(DisplayMode mode)
+    {
+        return WindowAPI.SetDisplayMode(mode.Width, mode.Height, mode.RefreshRate, mode.BitsPerPixel);
     }
 }
 

@@ -1,7 +1,30 @@
-// TileMap.cpp
+/* Start Header *****************************************************************/
+/*!
+\file   TileMap.cpp
+\author Choi Meng Yew
+\date   31st January 2026
+\brief
+Implementation of the TileMap class, providing tile-layer management,
+coordinate conversion, dynamic resizing, and binary serialization.
+
+Details:
+This file implements the core logic for managing tile-based world data.
+It handles layer creation and resizing, signed tile-space origins, safe
+tile access and mutation, world–tile coordinate conversions, and dynamic
+expansion of layers to accommodate out-of-bounds edits.
+
+It also implements binary save/load support for tilemaps, including
+backward-compatible deserialization, persistent tile origins, and
+tileset path lists. No rendering, ECS, collision, or gameplay logic
+is performed in this file.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "../include/core/World/TileMap.hpp"
-
 
 #include <cassert>
 #include <algorithm>

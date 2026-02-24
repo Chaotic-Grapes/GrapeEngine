@@ -22,7 +22,11 @@
 #include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
 #include "EditorState.h"
+#include "EditorStartupStage.h"
+#include "EditorConfiguration.h"
+#include "ProjectStartupUI.h"
 #include <memory>
+#include <functional>
 
 // Forward declarations
 namespace Scenes { class SceneManager; class Scene; }
@@ -68,6 +72,12 @@ namespace Services {
 
         static inline EditorService* Get() { return m_editorInstance; }
 
+        void SetStartupStageGetter(std::function<EditorStartupStage()> getter);
+        void SetProjectStartupCallbacks(const Editor::ProjectStartupCallbacks& callbacks);
+        void SetEditorSettings(EditorSettings* settings);
+        void RequestProjectBrowser();
+        void RequestLevelEditorRebuild();
+
     private:
         Audio::FmodAudioDevice* m_audioDevice = nullptr;
         Scenes::SceneManager& m_sceneManager;
@@ -85,6 +95,8 @@ namespace Services {
         bool m_showLevelEditor = false;
         Scenes::Scene* m_levelEditorForScene = nullptr;
         bool m_pendingLevelEditorRebuild = false;
+
+        Editor::ProjectStartupUI m_projectStartupUI;
 #endif
     };
 }

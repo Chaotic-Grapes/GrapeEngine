@@ -34,6 +34,7 @@ namespace ECS {
         builder.ReadComponent<Components::SpriteSheetAnimation2D>();
         builder.ReadComponent<Components::AnimationState2D>();
         builder.ReadComponent<Components::Active>();
+        builder.ReadComponent<Components::Parent>();
         // Define which components this system modifies
         builder.WriteComponent<Components::SpriteSheetAnimation2D>();
         builder.WriteComponent<Components::AnimationState2D>();
@@ -52,10 +53,9 @@ namespace ECS {
         // Iterate through all entities that have animation and animation state components
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
             [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {
-                // Skip processing if the entity is disabled
-                if (const auto* active = world.TryGet<Components::Active>(entity)) {
-                    if (!active->Enabled)
-                        return;
+                // Skip processing if the entity or its parents are disabled.
+                if (!world.IsActiveInHierarchy(entity)) {
+                    return;
                 }
 
                 // Validate animation dimensions; skip if any dimension is invalid
@@ -139,6 +139,7 @@ namespace ECS {
                     sprite->Height = anim.FrameHeight;
                     sprite->Tiling = Vector2D{ uv.z - uv.x, uv.w - uv.y };
                     sprite->Offset = Vector2D{ uv.x, uv.y };
+                    sprite->TextureFilter = anim.TextureFilter;
                 }
             }
         );

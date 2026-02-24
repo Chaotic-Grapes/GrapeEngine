@@ -27,6 +27,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "ecs/PrefabManager.h"
 #include <imgui.h>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -269,10 +270,18 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
     // Framed: Adds visual border around header for clear section separation
     // SpanFullWidth: Header uses entire available width regardless of content
     ImGui::SetNextItemAllowOverlap();
+    const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen |
+        ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanFullWidth;
+    const ImGuiID headerId = ImGui::GetID(headerName.c_str());
+    const bool wasOpen = ImGui::GetStateStorage()->GetBool(
+        headerId, (headerFlags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
+    const float headerRounding = wasOpen ? 0.0f : ImGui::GetStyle().FrameRounding;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, headerRounding);
     if (m_boldFont) ImGui::PushFont(m_boldFont);
-    bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(),
-        ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanFullWidth);
+    bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(), headerFlags);
     if (m_boldFont) ImGui::PopFont();
+    ImGui::PopStyleVar();
 
     // Render delete button aligned to the right of the header
     float buttonSize = ImGui::GetFrameHeight();
@@ -284,22 +293,22 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(resetX);
 
-        const char* resetIcon = "\xEF\x91\xBF"; // Reset icon (material: restart_alt)
+        const char* resetIcon = EditorIcons::Reset;
 
         // Reset component data back to its default JSON payload
-        const float lineHeight = ImGui::GetTextLineHeight();
-        const float frameHeight = ImGui::GetFrameHeight();
-        const float y = ImGui::GetCursorPosY();
-        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
 
         // Style the reset button with secondary colors and symbol font
         ImGui::PushID((std::string("ResetComponent") + componentType).c_str());
-        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
 
         // Use symbol font for the reset icon
         if (m_symbolsFont) ImGui::PushFont(m_symbolsFont);
@@ -311,7 +320,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         }
 
         ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor(4);
+        ImGui::PopStyleColor(5);
         ImGui::PopID();
 
         if (resetClicked) {
@@ -324,11 +333,10 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(buttonX);
 
+        const char* trashIcon = EditorIcons::Delete;
+
         // Match the reset icon's vertical alignment so header actions line up
-        const float lineHeight = ImGui::GetTextLineHeight();
-        const float frameHeight = ImGui::GetFrameHeight();
-        const float y = ImGui::GetCursorPosY();
-        ImGui::SetCursorPosY(y - (frameHeight - lineHeight) * 0.5f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY());
 
         // Style the remove button with danger colors and symbol font
         bool pushedFont = false;
@@ -342,21 +350,24 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, EditorStyle::Transparent);
         ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        // ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
         // Remove component if button is clicked
-        if (ImGui::Button((std::string("\xEE\xA1\xB2##RemoveComponent") + componentType).c_str(), ImVec2(buttonSize, buttonSize))) {
+        if (ImGui::Button((std::string(trashIcon) + "##RemoveComponent" + componentType).c_str(), ImVec2(buttonSize, buttonSize))) {
             m_componentsToDelete.push_back(componentType);
+        }
+        if (pushedFont) ImGui::PopFont();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Remove component");
         }
 
         // Pop styles and font after button rendering
         ImGui::PopStyleColor(5);
         ImGui::PopStyleVar(2);
-        if (pushedFont) {
-            ImGui::PopFont();
-        }
     }
 
     // Create collapsing header with specific behavior flags
@@ -375,7 +386,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         const float gap = ImGui::GetStyle().ItemSpacing.y;
 
         // Adjust cursor position to account for spacing
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - gap);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - gap * 2.f);
         ImVec2 boxMinScreen = ImGui::GetCursorScreenPos();
 
         // Split draw list into layers for background and content

@@ -16,6 +16,7 @@ operations (deletions, exits) to maintain a uniform look and feel.
 #define EDITOR_STYLE_H
 
 #include <imgui.h>
+#include <string>
 
 namespace EditorStyle {
     extern float FontScale;                               // Global font scaling factor (defined in .cpp)
@@ -25,9 +26,9 @@ namespace EditorStyle {
     static const ImVec4 Transparent         = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
     // Primary / Accent
-    static const ImVec4 Accent              = ImVec4(0.18f, 0.78f, 0.66f, 1.0f);
-    static const ImVec4 AccentHover         = ImVec4(0.26f, 0.86f, 0.74f, 1.0f);
-    static const ImVec4 AccentActive        = ImVec4(0.14f, 0.66f, 0.56f, 1.0f);
+    static const ImVec4 Accent              = ImVec4(0.32f, 0.66f, 0.94f, 1.0f);
+    static const ImVec4 AccentHover         = ImVec4(0.40f, 0.74f, 1.0f, 1.0f);
+    static const ImVec4 AccentActive        = ImVec4(0.26f, 0.58f, 0.86f, 1.0f);
     // Button token aliases for semantic styling.
     static const ImVec4 PrimaryButton       = Accent;
     static const ImVec4 PrimaryButtonHover  = AccentHover;
@@ -94,6 +95,7 @@ namespace EditorStyle {
             c.w * s
         );
     }
+
 
     // Small helper: apply some of these to ImGui style (optional helper function)
     inline void ApplyToImGuiStyle(ImGuiStyle& style) {

@@ -31,11 +31,13 @@ Reference:
 #include "core/Logger.h"
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
+#include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "scripting/ScriptManager.h"
 #include "helpers/EntityUtils.h"
 #include "EditorECSUtils.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
@@ -234,6 +236,23 @@ void Playback::Render() {
         ImVec2 boxMin(rowStartScreen.x + startX, rowStartScreen.y);
         ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
 
+        // Draw active scene name on the left without affecting layout.
+        const Scenes::Scene* activeScene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
+        const char* sceneName = activeScene ? activeScene->GetName().c_str() : "No Scene";
+        const float sceneLeftPad = 12.0f;
+        const float sceneY = boxMin.y + (boxHeight - ImGui::GetTextLineHeight()) * 0.5f;
+        ImFont* sceneFont = m_mainFont ? m_mainFont : ImGui::GetFont();
+        ImGui::PushFont(sceneFont);
+        const float sceneFontSize = ImGui::GetFontSize();
+        ImGui::PopFont();
+        ImGui::GetWindowDrawList()->AddText(
+            sceneFont,
+            sceneFontSize,
+            ImVec2(rowStartScreen.x + sceneLeftPad, sceneY),
+            ImGui::GetColorU32(EditorStyle::Muted),
+            sceneName
+        );
+
         // Draw background box
         ImGui::GetWindowDrawList()->AddRectFilled(
             boxMin, boxMax, ImGui::GetColorU32(EditorStyle::Scale(EditorStyle::FrameBg, 1.1f)),
@@ -255,7 +274,7 @@ void Playback::Render() {
         const bool isPaused = (m_editorState == EditorState::Paused);
 
         // Determine icon, tooltip, and color based on state
-        const char* playIcon = isPlaying ? "\xEE\x80\xB4" : "\xEE\x80\xB7";
+        const char* playIcon = isPlaying ? EditorIcons::Pause : EditorIcons::Play;
         const char* playTooltip = isPlaying ? "Pause (Ctrl+Shift+P)" : (m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         const ImVec4 playColor = isPlaying ? EditorStyle::WarningButton : EditorStyle::SuccessButton;
         const bool playActive = isPlaying || isPaused;
@@ -292,7 +311,7 @@ void Playback::Render() {
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
 
         // Draw Stop button
-        drawIconButton("\xEE\x81\x87", m_editorState != EditorState::Edit, mainBtnSize,
+        drawIconButton(EditorIcons::Stop, m_editorState != EditorState::Edit, mainBtnSize,
             "Stop (Ctrl+P)", false, EditorStyle::DangerButton,
             [this]() {
                 _restoreWorldState();
@@ -307,7 +326,7 @@ void Playback::Render() {
         ImGui::PushID("StepPrimary");
 
         // Draw Step button
-        drawIconButton("\xEE\x81\x84", canStep, mainBtnSize, "Step (Alt+P)",
+        drawIconButton(EditorIcons::Step, canStep, mainBtnSize, "Step (Alt+P)",
             m_editorState == EditorState::Step, EditorStyle::Accent,
             [this]() {
                 _changeState(EditorState::Step);
@@ -342,6 +361,7 @@ void Playback::Render() {
             // Time scale presets
             ImGui::PushFont(m_mainFont);
             const float presets[] = { 0.25f, 0.5f, 1.0f, 2.0f };
+            const float presetButtonWidth = 57.0f;
             for (float preset : presets) {
                 bool active = std::fabs(m_userTimeScale - preset) < 0.01f;
                 // Highlight active preset for quick feedback.
@@ -355,7 +375,7 @@ void Playback::Render() {
                 // Preset button
                 char label[12];
                 snprintf(label, sizeof(label), "%.2fx", preset);
-                if (ImGui::Button(label, ImVec2(52, 0))) {
+                if (ImGui::Button(label, ImVec2(presetButtonWidth, 0))) {
                     m_userTimeScale = preset;
                     if (m_editorState == EditorState::Play) {
                         TimeSystem::Instance().SetTimeScale(m_userTimeScale);

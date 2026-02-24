@@ -17,7 +17,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define EDITOR_CONFIGURATION_H
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cctype>
 #include <string>
+#include <vector>
 #include "core/Logger.h"
 #include "serialization/Serializer.h"
 
@@ -38,7 +41,12 @@ struct EditorSettings {
         int Height = 900;           // Window height in pixels
         bool Maximized = true;      // Whether to start maximized
         bool VSync = true;          // Whether to enable vertical sync
+        std::string Mode = "Windowed"; // Windowed, Fullscreen, Borderless
     } WindowSettings;
+
+    float UiScale = 1.0f;
+    std::vector<std::string> RecentProjects;
+    std::string LastProject;
 };
 
 namespace Editor {
@@ -71,6 +79,21 @@ namespace Editor {
                 _parseWindowConfig(configJson["WindowSettings"], config.WindowSettings);
             }
 
+            if (configJson.contains("RecentProjects") && configJson["RecentProjects"].is_array()) {
+                config.RecentProjects.clear();
+                for (const auto& entry : configJson["RecentProjects"]) {
+                    if (entry.is_string()) {
+                        config.RecentProjects.push_back(entry.get<std::string>());
+                    }
+                }
+            }
+            if (configJson.contains("UiScale") && configJson["UiScale"].is_number()) {
+                config.UiScale = configJson["UiScale"].get<float>();
+            }
+            if (configJson.contains("LastProject") && configJson["LastProject"].is_string()) {
+                config.LastProject = configJson["LastProject"].get<std::string>();
+            }
+
             LOG_DEBUG("Editor configuration loaded successfully from: " << configPath << '\n');
             return true;
         }
@@ -88,6 +111,10 @@ namespace Editor {
             configJson["WindowSettings"]["Height"] = config.WindowSettings.Height;
             configJson["WindowSettings"]["Maximized"] = config.WindowSettings.Maximized;
             configJson["WindowSettings"]["VSync"] = config.WindowSettings.VSync;
+            configJson["WindowSettings"]["Mode"] = _normalizeWindowMode(config.WindowSettings.Mode);
+            configJson["UiScale"] = config.UiScale;
+            configJson["RecentProjects"] = config.RecentProjects;
+            configJson["LastProject"] = config.LastProject;
 
             return Serialization::Serializer::SaveJson(configPath, "json", configJson);
         }
@@ -101,6 +128,8 @@ namespace Editor {
             // Basic validation: width/height positive
             if (config.WindowSettings.Width <= 0 || config.WindowSettings.Height <= 0)
                 return false;
+            if (_normalizeWindowMode(config.WindowSettings.Mode).empty())
+                return false;
             return true;
         }
 
@@ -113,6 +142,29 @@ namespace Editor {
         }
         
     private:
+        static std::string _normalizeWindowMode(const std::string& mode) {
+            if (mode.empty()) {
+                return "Windowed";
+            }
+
+            std::string lowered = mode;
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (lowered == "fullscreen" || lowered == "exclusive") {
+                return "Fullscreen";
+            }
+            if (lowered == "borderlessfullscreen" || lowered == "borderless_fullscreen" || lowered == "borderless fullscreen" ||
+                lowered == "borderless") {
+                return "Borderless";
+            }
+            if (lowered == "windowed" || lowered == "window") {
+                return "Windowed";
+            }
+
+            return "Windowed";
+        }
+
         static void _parseWindowConfig(const json& configJson, EditorSettings::Window& window) {
             if (configJson.contains("Width")) {
                 window.Width = configJson["Width"].get<int>();
@@ -125,6 +177,9 @@ namespace Editor {
             }
             if (configJson.contains("VSync")) {
                 window.VSync = configJson["VSync"].get<bool>();
+            }
+            if (configJson.contains("Mode")) {
+                window.Mode = _normalizeWindowMode(configJson["Mode"].get<std::string>());
             }
         }
     };

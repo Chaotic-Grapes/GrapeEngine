@@ -14,6 +14,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 ********************************************************************************/
 
 #include "LayersPanel.h"
+#include "EditorIcons.h"
+#include "EditorStyle.h"
 #include <imgui.h>
 #include "core/Logger.h"
 #include "ecs/Components.h"

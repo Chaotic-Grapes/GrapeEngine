@@ -57,6 +57,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
+BaseViewport::~BaseViewport() {
+    Messaging::MessageSystem::Unsubscribe<Messaging::EntityTransformChanged>(m_transformChangedSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
+}
+
 void BaseViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
     ECS::World* world, Scenes::SceneManager* sceneManager) {
     (void)sceneManager;

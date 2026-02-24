@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "graphics/graphicsConfig.hpp"
 #include "LevelEditor.h"
 #include "services/TimeSystem.h"
@@ -140,6 +141,7 @@ LevelEditor::~LevelEditor() {
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityCreated>(m_entityCreatedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityDestroyed>(m_entityDestroyedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::EditorViewportLayoutRequested>(m_viewportLayoutSubscription);
     
     // Clear file menu state getter to avoid calling back into this object during member teardown
     m_fileMenu.SetEditorStateGetter(nullptr);
@@ -159,6 +161,7 @@ LevelEditor::~LevelEditor() {
 void LevelEditor::_registerPanel(const char* panelName,
     const std::function<void()>& initFn,
     const std::function<void()>& renderFn,
+    // Optional world setter for panels that require ECS context.
     const std::function<void(ECS::World*)>& setWorldFn) {
     PanelRegistration reg;
     reg.Name = panelName;
@@ -209,12 +212,14 @@ void LevelEditor::_buildDockLayout() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     if (vp->Size.x <= 0 || vp->Size.y <= 0) return;         // Guard against zero size
 
+    // Reset the dock builder root node.
     ImGui::DockBuilderRemoveNode(m_dockspaceId);
     // Flags: DockSpace creates a root docking container; PassthruCentralNode lets the central area render game content underneath
     // Combine dock node flags using integer casts to avoid deprecated enum-| between different enum types (C5054)
     const ImGuiDockNodeFlags dockNodeFlags = static_cast<ImGuiDockNodeFlags>(
         static_cast<int>(ImGuiDockNodeFlags_DockSpace) | static_cast<int>(ImGuiDockNodeFlags_PassthruCentralNode)
     );
+    // Create the dock builder root node.
     ImGui::DockBuilderAddNode(m_dockspaceId, dockNodeFlags);
     ImGui::DockBuilderSetNodeSize(m_dockspaceId, vp->Size); // Match viewport size
 
@@ -224,6 +229,7 @@ void LevelEditor::_buildDockLayout() {
     // First split: toolbar at the very top (calculate ratio from config)
     const float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
     ImGuiID toolbarNode, mainAreaNode;
+    // Split the dock node for layout regions.
     ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
 
     // Hide tab bar and disable resizing on toolbar node
@@ -251,33 +257,45 @@ void LevelEditor::_buildDockLayout() {
     // Layout preset 1: single shared Scene/Game dock.
     if (m_viewportLayoutPreset == 1) {
         ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
+        // Dock a window into the layout region.
         ImGui::DockBuilderDockWindow("Game", sceneGameNode);
     // Layout preset 2: split Scene/Game side-by-side.
     } else if (m_viewportLayoutPreset == 2) {
         ImGuiID sceneNode, gameNode;
+        // Split the dock node for layout regions.
         ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Right, 0.5f, &gameNode, &sceneNode);
         ImGui::DockBuilderDockWindow("Scene", sceneNode);
+        // Dock a window into the layout region.
         ImGui::DockBuilderDockWindow("Game", gameNode);
     // Layout preset 4: quad split for multiple viewports.
     } else {
         ImGuiID topNode, bottomNode;
+        // Split the dock node for layout regions.
         ImGui::DockBuilderSplitNode(sceneGameNode, ImGuiDir_Down, 0.5f, &bottomNode, &topNode);
         ImGuiID topLeft, topRight;
+        // Split the dock node for layout regions.
         ImGui::DockBuilderSplitNode(topNode, ImGuiDir_Right, 0.5f, &topRight, &topLeft);
         ImGuiID bottomLeft, bottomRight;
+        // Split the dock node for layout regions.
         ImGui::DockBuilderSplitNode(bottomNode, ImGuiDir_Right, 0.5f, &bottomRight, &bottomLeft);
         ImGui::DockBuilderDockWindow("Scene", topLeft);
+        // Dock a window into the layout region.
         ImGui::DockBuilderDockWindow("Game", topRight);
     }
+    // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
+    // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Layers", rightNode);
     ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
+    // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
+    // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Systems", assetBrowserNode);
 
+    // Finalize the dock builder layout.
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     
     // Programmatically select Asset Browser tab by default
@@ -312,8 +330,10 @@ void LevelEditor::_renderDockSpace() {
     // Use raw viewport size and keep proportions stable via docking splits
     const ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset));
 
+    // Set next window pos.
     ImGui::SetNextWindowPos(safePos);     // Position dock host under main menu bar
     ImGui::SetNextWindowSize(safeSize);   // Size dock host to fill viewport
+    // Set next window viewport.
     ImGui::SetNextWindowViewport(vp->ID); // Pin host to current viewport
 
     // Host window flags: prevent interactions and visuals on the host container
@@ -327,21 +347,26 @@ void LevelEditor::_renderDockSpace() {
         static_cast<int>(ImGuiWindowFlags_NoBringToFrontOnFocus) | static_cast<int>(ImGuiWindowFlags_NoNavFocus)
     );
 
+    // Push a temporary style override.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
+    // Push a temporary style override.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));     // No padding; dockspace fills fully
     ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorStyle::Transparent);       // Transparent host background
 
     // Begin invisible host window
     ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
     ImGui::PopStyleColor();
+    // Restore the previous style override.
     ImGui::PopStyleVar(3);
 
     m_dockspaceId = ImGui::GetID("MainDockSpace");                         // Stable ID for this dockspace
     constexpr ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Let central node pass content
+    // Create the dock space for editor panels.
     ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);        // Create dockspace filling the host window
 
     _buildDockLayout(); // Build once on first frame or after resize
+    // End.
     ImGui::End();       // End host window
 }
 
@@ -353,6 +378,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     if (!pWin) return;
 
     ImGuiStyle& style = ImGui::GetStyle();
+    m_uiScale = EditorStyle::FontScale;
+    ImGui::GetIO().FontGlobalScale = m_uiScale;
 
     // Initialize audio asset library:
     // this will scan for audio anywhere under the project root
@@ -364,8 +391,9 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
     m_fileMenu.Initialize(sm);
 
-    // Wire up fonts to file menu so it can render bold asterisk
+    // Wire up fonts to file menu so it can render bold asterisk and icons.
     m_fileMenu.SetFonts(m_mainFont, m_boldFont);
+    m_fileMenu.SetSymbolsFont(m_symbolsFont);
 
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
@@ -378,6 +406,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_fileMenu.SetPlaybackSnapshotClearCallback([this]() { m_playback.ClearSavedState(); });
     // Ensure tilemaps are flushed to disk before the scene serializer runs.
     m_fileMenu.SetPreSaveCallback([this](const std::string& scenePath) { _saveActiveTileMapAsset(scenePath); });
+    m_fileMenu.SetProjectBrowserRequestCallback([this]() {
+        if (m_projectBrowserRequest) {
+            m_projectBrowserRequest();
+        }
+    });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -467,6 +500,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_assetBrowser.SetSelectionChangedCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
         },
         [this]() { m_assetBrowser.Render(); },
+        // Set world.
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
     );
 
@@ -482,6 +516,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
                 });
         },
         [this]() { m_sceneViewport.ShowEditorWindows(); },
+        // Set undo system.
         [this](ECS::World* w) { m_sceneViewport.SetWorld(w); m_sceneViewport.SetUndoSystem(&m_undoSystem); }
     );
 
@@ -493,6 +528,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_gameViewport.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_gameViewport.ShowEditorWindows(); },
+        // Set undo system.
         [this](ECS::World* w) { m_gameViewport.SetWorld(w); m_gameViewport.SetUndoSystem(&m_undoSystem); }
     );
 
@@ -514,15 +550,18 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_inspector.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_inspector.Render(); },
+        // Set world.
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );
 
     _registerPanel("Tile Palette",
         [this]() {
-            m_tilePalette.Initialize(nullptr, nullptr, m_world);
+            m_tilePalette.Initialize(nullptr, nullptr, m_world, m_symbolsFont);
             m_tilePalette.SetAssetDropCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
+            m_tilePalette.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_tilePalette.Render(); },
+        // Set world.
         [this](ECS::World* w) { m_tilePalette.SetWorld(w); }
     );
 
@@ -533,6 +572,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_layersPanel.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_layersPanel.Render(); },
+        // Set world.
         [this](ECS::World* w) { m_layersPanel.SetWorld(w); }
     );
 
@@ -554,6 +594,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Register Compile Panel as an editor-global modal for blocking compilation status
     _registerPanel("Compile",
         [this]() {
+            // Initialize.
             CompilePanel::Initialize();
         },
         [this]() { CompilePanel::Render(); },
@@ -563,7 +604,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Register Performance panel (monitoring)
     _registerPanel("Performance",
         [this]() {
-            m_performancePanel.Initialize(m_mainFont, m_boldFont);
+            m_performancePanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
         },
         [this]() { 
             // Get SystemManager from engine
@@ -574,13 +615,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_performancePanel.SetSystemManager(systemManager);
             m_performancePanel.Render(m_playback.IsPlaying()); 
         },
+        // Set world.
         [this](ECS::World* w) { m_performancePanel.SetWorld(w); }
     );
 
     // Register Systems panel (shows registered C# and C++ systems)
     _registerPanel("Systems",
         [this]() {
-            m_systemsPanel.Initialize(m_mainFont, m_boldFont);
+            m_systemsPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
         },
         [this]() { 
             // Get SystemManager from engine
@@ -590,6 +632,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             }
             m_systemsPanel.Render(systemManager);
         },
+        // Set world.
         [this](ECS::World* w) { m_systemsPanel.SetWorld(w); }
     );
 
@@ -605,6 +648,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_gameViewport.SetFileMenu(&m_fileMenu);
     m_sceneViewport.SetTilePalette(&m_tilePalette);
     m_tilePalette.SetActiveTileMapCallback([this](const EntityId id) { _setActiveTileMap(id); });
+    // Set active tileset callback.
     m_tilePalette.SetActiveTilesetCallback([this](const uint8_t index) {
         const auto it = m_tileMapCache.find(m_activeTileMapEntityId);
         if (it == m_tileMapCache.end()) {
@@ -655,6 +699,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         });
 }
 
+// Load editor fonts and icon sets.
 void LevelEditor::_loadFonts() {
     auto& io = ImGui::GetIO();
     float textFontSize = m_config.TextFontSize;
@@ -674,10 +719,11 @@ void LevelEditor::_loadFonts() {
             strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
             return io.Fonts->AddFontFromMemoryTTF(raw->Data.data(), (int)raw->Data.size(), size, &cfg, ranges);
         }
-        else {
-            LOG_ERROR("Failed to load font via RM: " << path);
-            return nullptr;
-        }
+
+        LOG_WARNING("Failed to load font via RM, falling back to file: " << path);
+        ImFontConfig cfg = config ? *config : ImFontConfig();
+        strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
+        return io.Fonts->AddFontFromFileTTF(path.c_str(), size, &cfg, ranges);
     };
 
 	// Load main text font (caching handled by RM)
@@ -720,6 +766,21 @@ void LevelEditor::_loadFonts() {
     iconsConfig.OversampleH = 3;
     iconsConfig.OversampleV = 3;
 
+    // Merge icon glyphs into the main font for tab labels and mixed text.
+    static ImFontAtlas* s_mergedAtlas = nullptr;
+    if (m_mainFont && s_mergedAtlas != io.Fonts) {
+        ImFontConfig mergeConfig = iconsConfig;
+        mergeConfig.MergeMode = true;
+        loadFont(
+            "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
+            textFontSize,
+            &mergeConfig,
+            iconRanges
+        );
+        s_mergedAtlas = io.Fonts;
+    }
+
+
 	// Load icon font (Material Symbols); AGAIN, caching via RM
     if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
         m_symbolsFont = loadFont(
@@ -737,9 +798,7 @@ void LevelEditor::_loadFonts() {
         m_symbolsFont = io.Fonts->Fonts[2];
     }
 
-    if (!io.Fonts->Fonts.empty() && !io.Fonts->IsBuilt()) {
-        io.Fonts->Build();
-    }
+    (void)io;
 }
 
 // -------------------------------------------------------------------------
@@ -761,7 +820,6 @@ void LevelEditor::Update() {
     // Apply global shortcuts
     m_fileMenu.HandleShortcuts(m_uiScale);
 
-    // Handle undo/redo shortcuts globally (not tied to a specific viewport).
     m_undoSystem.Update();
 
     // Auto-sync to active scene world if it changed (e.g. via File > New Scene)
@@ -775,9 +833,9 @@ void LevelEditor::Update() {
         }
     }
 
-    m_playback.ProcessInput(); // Handle playback hotkeys and actions
-    m_sceneViewport.HandleInWorldInteraction(); // Handle scene viewport interactions and camera input control
-    m_gameViewport.HandleInWorldInteraction(); // Handle game viewport interactions
+    m_playback.ProcessInput(); // Process playback hotkeys and actions
+    m_sceneViewport.HandleInWorldInteraction(); // Process scene viewport interactions and camera input control
+    m_gameViewport.HandleInWorldInteraction(); // Process game viewport interactions
 
     // Ensure the engine's RendererSystem uses the editor viewport camera
     // for the upcoming systems update. This must happen here because
@@ -802,13 +860,12 @@ void LevelEditor::Update() {
 // -------------------------------------------------------------------------
 // Event Handlers
 // -------------------------------------------------------------------------
-// Handle playback state changes (called by Playback via callback)
+// Process playback state changes from the toolbar.
 void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newState) {
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
 
-    // Handle audio pause/resume based on state
     auto audioService = Engine::CORE ? Engine::CORE->GetAudioService() : nullptr;
     if (audioService) {
         if (newState == EditorState::Paused || newState == EditorState::Step) {
@@ -822,7 +879,6 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
         // When entering Edit state, audio will be stopped by OnSceneStop callback in AudioSystem
     }
 
-    // Handle state transitions
     if (newState == EditorState::Edit) {
         // Entity IDs are preserved during restore, so keep selection intact.
         // Rebuild entity order to reflect restored hierarchy.
@@ -834,7 +890,7 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
     }
 }
 
-// Handle viewport selection changes (called by Viewport via callback)
+// Process selection changes coming from viewports.
 void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
@@ -864,6 +920,7 @@ void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
         }
 }
 
+// Process asset selection events from the asset browser.
 void LevelEditor::_onAssetSelected(const std::string& assetPath) {
     if (!m_world) {
         return; // No active world, so ignore asset selections.
@@ -925,10 +982,28 @@ void LevelEditor::_onAssetSelected(const std::string& assetPath) {
         return;
     }
 
-    m_pendingTilesetPath = assetPath; // Cache tileset path for the create prompt.
-    m_showTilemapCreateModal = true; // Trigger the modal to create a tilemap.
+    // Auto-create a tilemap if none exists.
+    const EntityId newId = m_entityActions.AddEntity("Tilemap", ECS::Entity::NPOS32);
+
+	// Add TileMapComponent to the new entity
+    ECS::Entity targetEntity = m_world->Resolve(newId);
+
+	// Initialize TileMapComponent with default values
+    if (m_world->IsAlive(targetEntity)) {
+        _applyTilesetToTilemap(targetEntity, assetPath);
+        m_hierarchyWindow.SetSelectedEntity(targetEntity.Index);
+        m_inspector.InspectEntity(targetEntity.Index);
+    }
+	// Sync viewports to new selection
+    if (m_sceneViewport.HasValidWorld()) {
+        m_sceneViewport.SetSelectedEntity(newId);
+    }
+    if (m_gameViewport.HasValidWorld()) {
+        m_gameViewport.SetSelectedEntity(newId);
+    }
 }
 
+// Sync the tile palette to the active selection.
 void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
     if (!m_world) {
         return; // Nothing to sync without a world.
@@ -952,6 +1027,7 @@ void LevelEditor::_syncTilePaletteToSelection(const EntityId id) {
     _setActiveTileMap(id); // Activate the tilemap for the palette without hiding others.
 }
 
+// Refresh cached tilemap data after edits.
 void LevelEditor::_refreshTileMapCache() {
     if (!m_world) {
         return; // No world available to refresh tilemaps.
@@ -961,14 +1037,13 @@ void LevelEditor::_refreshTileMapCache() {
     std::unordered_set<EntityId> seen; // Track which entities still have tilemaps.
     m_tileMapList.clear(); // Rebuild the list of tilemaps for the palette dropdown.
 
+    // Update tilemap panels when tilemap components change.
     m_world->Each<ECS::Components::TileMapComponent>([this, &seen, &scenePath](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
         seen.insert(entity.Index); // Mark this tilemap entity as active.
 
         std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
         const std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path.
-        LOG_INFO("[TileMap] Refresh entity " << entity.Index
-            << " mapPath=\"" << mapPath
-            << "\" legacyTileset=\"" << legacyTilesetPath << "\"");
+        (void)legacyTilesetPath;
 
         if (mapPath.empty() && !scenePath.empty()) {
             // Derive a tilemap path from the saved scene path when none exists.
@@ -1007,6 +1082,7 @@ void LevelEditor::_refreshTileMapCache() {
             entry.MapPath == mapPath &&
             entry.Map->GetTilesetPaths().empty() &&
             !legacyTilesetPath.empty() &&
+            // Skip entries that already exist.
             std::filesystem::exists(mapPath));
         const bool mapNeedsReload = generationChanged ||
             (!entry.Map) ||
@@ -1015,12 +1091,6 @@ void LevelEditor::_refreshTileMapCache() {
             entry.TileWorldSize != comp.TileWorldSize ||
             entry.DefaultWidth != comp.DefaultWidth ||
             entry.DefaultHeight != comp.DefaultHeight;
-        LOG_INFO("[TileMap] Cache state entity " << entity.Index
-            << " mapNeedsReload=" << (mapNeedsReload ? "true" : "false")
-            << " entryMapPath=\"" << entry.MapPath << "\""
-            << " hasMap=" << (entry.Map ? "true" : "false")
-            << " missingTilesetList=" << (missingTilesetList ? "true" : "false")
-            << " generationChanged=" << (generationChanged ? "true" : "false"));
 
         if (mapNeedsReload) {
             entry.Map = mapPath.empty() ? nullptr : LoadOrCreateTileMap(mapPath, comp.TileWorldSize, comp.DefaultWidth, comp.DefaultHeight);
@@ -1033,6 +1103,7 @@ void LevelEditor::_refreshTileMapCache() {
                     << " tilesets=" << entry.Map->GetTilesetPaths().size()
                     << " layers=" << entry.Map->LayerCount());
             }
+        // Skip empty entries.
         } else if (mapPath.empty() && !entry.MapPath.empty()) {
             // Drop stale map paths when the component no longer points to a file.
             entry.MapPath.clear();
@@ -1059,8 +1130,6 @@ void LevelEditor::_refreshTileMapCache() {
         }
 
         const std::vector<std::string>& mapTilesetPaths = entry.Map->GetTilesetPaths();
-        LOG_INFO("[TileMap] Map tileset paths entity " << entity.Index
-            << " count=" << mapTilesetPaths.size());
         if (legacyTilesetPath.empty() && !mapTilesetPaths.empty()) {
             // Keep the legacy component field in sync so scenes retain a usable tileset path.
             comp.TilesetTexturePath = ECS::StringTable::Intern(mapTilesetPaths.front());
@@ -1114,6 +1183,7 @@ void LevelEditor::_refreshTileMapCache() {
     m_tilePalette.SetTileMapList(m_tileMapList, m_activeTileMapEntityId);
 
     if (m_activeTileMapEntityId != ECS::Entity::NPOS32 &&
+        // Skip duplicate entries.
         !m_tileMapCache.contains(m_activeTileMapEntityId)) {
         // Clear active state if the tilemap entity was removed.
         m_activeTileMapEntityId = ECS::Entity::NPOS32;
@@ -1124,6 +1194,7 @@ void LevelEditor::_refreshTileMapCache() {
         const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
         const std::vector<std::string> emptyPaths;
         m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
+    // Select the appropriate execution path.
     } else if (m_activeTileMapEntityId != ECS::Entity::NPOS32) {
         const auto it = m_tileMapCache.find(m_activeTileMapEntityId);
         if (it != m_tileMapCache.end()) {
@@ -1152,16 +1223,16 @@ void LevelEditor::_refreshTileMapCache() {
         std::vector<ECS::RendererSystem::DebugTileMapEntry> debugMaps;
         debugMaps.reserve(m_tileMapCache.size());
 
-    const bool hasMultiple = (m_tileMapCache.size() > 1);
+    // const bool hasMultiple = (m_tileMapCache.size() > 1);
     for (auto& [id, entry] : m_tileMapCache) {
         if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
             continue; // Skip hidden or incomplete tilemaps.
         }
 
-        std::vector<const Tileset*> tilesets;
+        std::vector<std::shared_ptr<const Tileset>> tilesets;
         tilesets.reserve(entry.Tilesets.size());
         for (const auto& tileset : entry.Tilesets) {
-            tilesets.push_back(tileset.get());
+            tilesets.push_back(tileset);
         }
         debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
     }
@@ -1170,54 +1241,7 @@ void LevelEditor::_refreshTileMapCache() {
     }
 }
 
-void LevelEditor::_renderTilemapCreateModal() {
-    if (m_showTilemapCreateModal) {
-        ImGui::OpenPopup("Create Tilemap");
-        m_showTilemapCreateModal = false;
-    }
-
-    if (ImGui::BeginPopupModal("Create Tilemap", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("No Tilemap entity is selected. Create a new Tilemap entity to use this tileset?");
-        ImGui::Separator();
-
-        if (ImGui::Button("Create Tilemap", ImVec2(160, 0))) {
-            if (m_world && !m_pendingTilesetPath.empty()) {
-                ECS::Entity target = m_world->Create();
-
-                ECS::Components::Name name;
-                name.Value = ECS::StringTable::Intern("Tilemap");
-                m_world->Set<ECS::Components::Name>(target, name);
-
-                ECS::Components::LocalTransform transform;
-                m_world->Set<ECS::Components::LocalTransform>(target, transform);
-
-                _applyTilesetToTilemap(target, m_pendingTilesetPath);
-
-                m_hierarchyWindow.SetSelectedEntity(target.Index);
-                m_inspector.InspectEntity(target.Index);
-                if (m_sceneViewport.HasValidWorld()) {
-                    m_sceneViewport.SetSelectedEntity(target.Index);
-                }
-                if (m_gameViewport.HasValidWorld()) {
-                    m_gameViewport.SetSelectedEntity(target.Index);
-                }
-            }
-
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
-            m_pendingTilesetPath.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-}
-
+// Apply the selected tileset to the active tilemap.
 void LevelEditor::_applyTilesetToTilemap(ECS::Entity entity, const std::string& assetPath) {
     if (!m_world || !m_world->IsAlive(entity)) {
         return;
@@ -1267,6 +1291,7 @@ void LevelEditor::_applyTilesetToTilemap(ECS::Entity entity, const std::string& 
     _setActiveTileMap(entity.Index);
 }
 
+// Set the active tilemap from the selector.
 void LevelEditor::_setActiveTileMap(EntityId id) {
     if (!m_world || id == ECS::Entity::NPOS32) {
         return;
@@ -1283,7 +1308,12 @@ void LevelEditor::_setActiveTileMap(EntityId id) {
     if (it != m_tileMapCache.end() && it->second.Map) {
         const TileMapCacheEntry& entry = it->second;
         const uint8_t activeTilesetIndex = entry.Tilesets.empty() ? 0 : std::min(entry.ActiveTilesetIndex, static_cast<uint8_t>(entry.Tilesets.size() - 1));
+        
+        // Grab a shared_ptr to the active tileset
+        // This ensures the tileset remains alive even if the editor replaces it (e.g. via drag-and-drop) 
+        // before the renderer finishes the current frame
         const std::shared_ptr<Tileset> activeTileset = entry.Tilesets.empty() ? nullptr : entry.Tilesets[activeTilesetIndex];
+        
         m_activeTileMap = entry.Map;
         m_activeTileset = activeTileset;
         m_activeTileMapPath = entry.MapPath;
@@ -1295,6 +1325,7 @@ void LevelEditor::_setActiveTileMap(EntityId id) {
     // Cache is expected to populate via _refreshTileMapCache.
 }
 
+// Save the active tilemap asset to disk.
 void LevelEditor::_saveActiveTileMapAsset(const std::string& scenePath) {
     if (m_tileMapCache.empty()) {
         return; // No cached tilemaps to save.
@@ -1363,6 +1394,7 @@ void LevelEditor::_saveActiveTileMapAsset(const std::string& scenePath) {
         const std::filesystem::path mapDir = mapPath.parent_path(); // Save directory so we can create it if missing.
 
         if (!mapDir.empty() && !std::filesystem::exists(mapDir)) {
+            // Create output directories if missing.
             std::filesystem::create_directories(mapDir); // Ensure the tilemap folder exists before writing.
         }
 
@@ -1383,6 +1415,7 @@ void LevelEditor::Render() {
         m_fileMenu.RenderFileMenu();
         m_fileMenu.RenderEditMenu();
         m_fileMenu.RenderViewMenu(m_uiScale);
+        // End main menu bar.
         ImGui::EndMainMenuBar();
     }
     _renderDockSpace();
@@ -1398,13 +1431,12 @@ void LevelEditor::Render() {
         // Override inspector with placeholder message when no world attached
         ImGui::PushFont(m_mainFont);
         ImGui::Begin("Property Editor");
+        // Render disabled text.
         ImGui::TextDisabled("No scene attached"); // Inform user about missing scene
         ImGui::PopFont();
+        // End.
         ImGui::End();
     }
-
-    // Render tilemap creation modal after panels so it shows on top.
-    _renderTilemapCreateModal();
 }
 
 // -------------------------------------------------------------------------
@@ -1441,8 +1473,6 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
     m_tileMapList.clear(); // Drop tilemap list for the new scene.
-    m_pendingTilesetPath.clear();
-    m_showTilemapCreateModal = false;
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
     const std::vector<std::string> emptyPaths;
     m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
@@ -1499,14 +1529,17 @@ bool LevelEditor::IsPlaying() const {
     return m_playback.IsPlaying();
 }
 
+// Check whether step requested.
 bool LevelEditor::IsStepRequested() const {
     return m_playback.IsStepRequested();
 }
 
+// Clear step request.
 void LevelEditor::ClearStepRequest() {
     m_playback.ClearStepRequest();
 }
 
+// Return editor state.
 EditorState LevelEditor::GetEditorState() const {
     return m_playback.GetEditorState();
 }

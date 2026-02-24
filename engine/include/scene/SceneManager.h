@@ -36,14 +36,22 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/systems/AudioSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "services/ResourceManager.h"
+#include "services/TimeSystem.h"
 
 using json = nlohmann::json;
 
 namespace Scenes {
     class SceneManager {
     public:
+        enum class SceneTransitionMode {
+            Immediate,
+            FadeOut,
+            CrossFade
+        };
+
         // Default constructor
         SceneManager() : m_prefabManager(std::make_unique<ECS::PrefabManager>()) { }
         
@@ -160,6 +168,18 @@ namespace Scenes {
             m_pendingAudioTransitionFade = fadeDuration;
             m_pendingAudioTransitionCrossfade = allowCrossfade;
             m_hasPendingAudioTransition = true;
+
+            m_transitionFadeDuration = std::max(0.0f, fadeDuration);
+            if (allowCrossfade && m_transitionFadeDuration > 0.0f) {
+                m_transitionMode = SceneTransitionMode::CrossFade;
+            } else if (m_transitionFadeDuration > 0.0f) {
+                m_transitionMode = SceneTransitionMode::FadeOut;
+            } else {
+                m_transitionMode = SceneTransitionMode::Immediate;
+            }
+            m_crossfadeTriggered = false;
+            m_waitingForFadeOut = false;
+            m_transitionFadeTimer = 0.0f;
         }
 
         /**
@@ -204,6 +224,10 @@ namespace Scenes {
          * @return Number of scenes.
          */
         size_t GetSceneCount() const   { return m_scenes.size(); }
+
+        void SetAudioSystem(ECS::AudioSystem* audioSystem) {
+            m_audioSystem = audioSystem;
+        }
 
         /**
          * @brief Gets a scene by index.
@@ -320,13 +344,14 @@ namespace Scenes {
                 sceneJson["EntityCount"] = entityCount;
                 sceneJson["Hierarchy"] = std::move(hierarchyArray);
 
-                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
-                if (!Serialization::Serializer::SaveJson(filename, ext, sceneJson)) {
-                    LOG_ERROR("Error: Could not open file for writing: " << filename);
+                const std::string resolvedPath = _resolveScenePath(filename);
+                const std::string ext = Serialization::Serializer::HasExtension(resolvedPath, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::SaveJson(resolvedPath, ext, sceneJson)) {
+                    LOG_ERROR("Error: Could not open file for writing: " << resolvedPath);
                     return false;
                 }
 
-                LOG_DEBUG("Scene successfully saved to: " << filename);
+                LOG_DEBUG("Scene successfully saved to: " << resolvedPath);
                 LOG_DEBUG(" Entities: " << entityCount);
                 return true;
             }
@@ -369,9 +394,10 @@ namespace Scenes {
 
             try {
                 json sceneJson;
-                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
-                if (!Serialization::Serializer::LoadJson(filename, ext, sceneJson)) {
-                    LOG_ERROR("Error: Cannot open file: " << filename);
+                const std::string resolvedPath = _resolveScenePath(filename);
+                const std::string ext = Serialization::Serializer::HasExtension(resolvedPath, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::LoadJson(resolvedPath, ext, sceneJson)) {
+                    LOG_ERROR("Error: Cannot open file: " << resolvedPath);
                     return false;
                 }
 
@@ -445,7 +471,7 @@ namespace Scenes {
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
 					<< "\tEntities loaded: " << loadedCount);
 
-                scene.SetPath(filename);
+                scene.SetPath(_toSceneStoragePath(resolvedPath));
                 if (sceneJson.contains("SceneName")) {
                     scene.SetName(sceneJson["SceneName"].get<std::string>());
                 }
@@ -504,10 +530,53 @@ namespace Scenes {
             if (m_pendingActive == NPOS)
                 return;
 
+            // Handle fade-aware transitions
+            if (m_transitionMode != SceneTransitionMode::Immediate && m_audioSystem) {
+                if (m_transitionMode == SceneTransitionMode::CrossFade) {
+                    if (!m_crossfadeTriggered) {
+                        m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, true);
+                        m_crossfadeTriggered = true;
+                        return; // Start fade first, transition next update
+                    }
+                }
+                else if (!m_waitingForFadeOut) {
+                    // Start fade-out on first call
+                    m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, false);
+                    m_waitingForFadeOut = true;
+                    m_transitionFadeTimer = 0.0f;
+                    const float maxRemaining = m_audioSystem->GetMaxFadeOutRemaining();
+                    if (maxRemaining > m_transitionFadeDuration) {
+                        m_transitionFadeDuration = maxRemaining;
+                    }
+                    return; // Don't transition yet, wait for fade
+                }
+                else {
+                    // Update fade timer
+                    m_transitionFadeTimer += static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+
+                    // Check if fade is complete
+                    bool fadeComplete = !m_audioSystem->HasActiveFadeOuts();
+                    bool timeoutReached = m_transitionFadeTimer >= (m_transitionFadeDuration + 0.1f); // Small buffer
+
+                    if (!fadeComplete && !timeoutReached) {
+                        return; // Still fading, wait
+                    }
+
+                    // Fade complete or timeout - proceed with transition
+                    m_waitingForFadeOut = false;
+                }
+            }
+
+            // Perform the actual transition
             _notifySceneChanging(m_pendingActive);
             _performTransition(m_pendingActive);
             m_pendingActive = NPOS;
             m_hasPendingAudioTransition = false;
+            m_transitionMode = SceneTransitionMode::Immediate;
+            m_transitionFadeDuration = 0.0f;
+            m_transitionFadeTimer = 0.0f;
+            m_crossfadeTriggered = false;
+            m_waitingForFadeOut = false;
         }
 
         void _performTransition(const size_t toIndex) {
@@ -577,9 +646,25 @@ namespace Scenes {
             }
 
             std::filesystem::path pathFs(path);
+            if (Engine::ProjectPaths::IsInitialized()) {
+                const std::filesystem::path rootName = std::filesystem::path(Engine::ProjectPaths::GetProjectRoot()).filename();
+                if (!rootName.empty() && pathFs.begin() != pathFs.end() && *pathFs.begin() == rootName) {
+                    pathFs = pathFs.lexically_relative(rootName);
+                }
+            }
             return pathFs.is_absolute()
                 ? pathFs.string()
-                : Engine::ProjectPaths::ToAbsolutePath(path);
+                : Engine::ProjectPaths::ToAbsolutePath(pathFs.string());
+        }
+
+        static std::string _toSceneStoragePath(const std::string& resolvedPath) {
+            if (!resolvedPath.empty()
+                && Engine::ProjectPaths::IsInitialized()
+                && Engine::ProjectPaths::IsInProject(resolvedPath)) {
+                return Engine::ProjectPaths::ToRelativePath(resolvedPath);
+            }
+
+            return resolvedPath;
         }
 
         static std::string _normalizePath(const std::string& path) {
@@ -663,6 +748,13 @@ namespace Scenes {
         static constexpr size_t NPOS = static_cast<size_t>(-1);
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;
+
+        ECS::AudioSystem* m_audioSystem = nullptr;
+        SceneTransitionMode m_transitionMode = SceneTransitionMode::Immediate;
+        float m_transitionFadeDuration = 0.0f;
+        float m_transitionFadeTimer = 0.0f;
+        bool m_crossfadeTriggered = false;
+        bool m_waitingForFadeOut = false;
 
         bool m_hasPendingAudioTransition = false; // Whether there is a pending audio transition
         float m_pendingAudioTransitionFade = 0.0f; // Fade duration in seconds

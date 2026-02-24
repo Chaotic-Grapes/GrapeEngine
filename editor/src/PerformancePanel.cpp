@@ -18,6 +18,8 @@ polling system counters while the game is not running.
 /* End Header *******************************************************************/
 
 #include "PerformancePanel.h"
+#include "EditorIcons.h"
+#include "EditorStyle.h"
 #include "services/TimeSystem.h"
 #include "ecs/SystemManager.h"
 #include "services/MemoryManager.h"
@@ -27,9 +29,10 @@ polling system counters while the game is not running.
 #include <algorithm>
 #include <deque>
 
-void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
+void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
+    m_symbolsFont = symbolsFont;
     m_initialized = true;
 }
 
@@ -57,6 +60,7 @@ void PerformancePanel::Render(bool /*isPlaying*/) {
         ImGui::End();
         return;
     }
+
 
     // Update cached data each frame (continuous monitoring)
     _updateCachedData();
@@ -620,7 +624,7 @@ void PerformancePanel::_renderMemoryBenchmark() {
     if (m_lastTestTime >= 0.0) snprintf(timeLabel, sizeof(timeLabel), "Time: %.2f ms", m_lastTestTime);
 
     // Access current style for size calculations
-    ImGuiStyle& style = ImGui::GetStyle();
+    // ImGuiStyle& style = ImGui::GetStyle();
 
     // Vertical alignment fix: Align text to frame padding to center vertically with buttons
     ImGui::AlignTextToFramePadding();
@@ -628,7 +632,23 @@ void PerformancePanel::_renderMemoryBenchmark() {
     ImGui::SameLine();
 
     // Run test with 10,000 allocations between 16 and 1024 bytes
+	// Style button to match frame background
+    const ImVec4 btnColor = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+
+	// Hover and active colors
+    const ImVec4 btnHover = ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered);
+    const ImVec4 btnActive = ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive);
+
+	// Style button colors
+    ImGui::PushStyleColor(ImGuiCol_Button, btnColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, btnHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, btnActive);
+
+	// On button press, run benchmark and store last test time
     if (ImGui::Button(btnLabel)) m_lastTestTime = MemoryManager::GetInstance().Benchmark(m_useCustomAllocator, 10000, 16, 1024);
+    
+	// Pop button style colors
+    ImGui::PopStyleColor(3);
 
     // Tooltip for button
     if (ImGui::IsItemHovered()) {
