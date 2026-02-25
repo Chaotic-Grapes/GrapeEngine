@@ -448,6 +448,7 @@ namespace ECS {
         // TEXTURE/SHADER/FONT CAN BE REUSED WITHOUT DUPLICATING MEMORY
 
         std::shared_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::shared_ptr<Shader> m_guiShader;       ///< GUI-only shader with gamma correction
         std::shared_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::shared_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
         std::shared_ptr<Shader> m_blitShader;
