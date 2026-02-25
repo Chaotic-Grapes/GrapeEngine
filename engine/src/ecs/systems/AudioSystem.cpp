@@ -152,9 +152,22 @@ namespace ECS {
                 const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
                 if (!cueInfo && src.CuePathId) {
                     const std::string cuePathRaw = ECS::StringTable::Resolve(src.CuePathId);
-                    const std::string cuePath = Audio::AudioCueRegistry::NormalizePath(cuePathRaw);
+                    std::string cuePath = cuePathRaw;
+
+                    // If the path is not empty and not absolute, resolve it relative to project root
+                    if (!cuePath.empty() && Engine::ProjectPaths::IsInitialized()) {
+                        std::filesystem::path fsPath(cuePath);
+
+                        // If the path is not absolute, resolve it relative to project root
+                        if (!fsPath.is_absolute()) {
+                            cuePath = Engine::ProjectPaths::ToAbsolutePath(cuePath);
+                        }
+                    }
+                    cuePath = Audio::AudioCueRegistry::NormalizePath(cuePath);
                     if (!cuePath.empty()) {
                         cueInfo = m_audioService.CueRegistry().FindByPath(cuePath);
+
+                        // If still not found, register it (this allows dynamic cues that aren't pre-registered)
                         if (!cueInfo) {
                             cueInfo = &m_audioService.CueRegistry().Register(cuePath);
                             LOG_INFO("AudioSystem: Registered cue from path '" << cuePath << "' (id=" << cueInfo->Id << ")");
@@ -164,6 +177,7 @@ namespace ECS {
                 }
                 if (!cueInfo) {
                     static std::set<uint32_t> s_warnedCues;
+
                     if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
                         const std::string cuePath = src.CuePathId ? ECS::StringTable::Resolve(src.CuePathId) : std::string();
                         LOG_WARNING("AudioSystem: Entity " << e.Index
@@ -189,6 +203,7 @@ namespace ECS {
 
                 if (!m_audioService.LoadCue(cueKey, cueKey, params)) {
                     static std::set<std::string> s_failedCues;
+                    
                     if (s_failedCues.find(cueKey) == s_failedCues.end()) {
                         LOG_ERROR("AudioSystem: Failed to load cue: " << cueKey);
                         s_failedCues.insert(cueKey);

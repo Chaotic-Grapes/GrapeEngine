@@ -600,6 +600,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             m_assetBrowser.SetInspector(&m_inspector);
             m_assetBrowser.SetSelectionChangedCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
+            m_assetBrowser.SetSceneOpenCallback([this](const std::string& scenePath) { m_fileMenu.OpenSceneFromPath(scenePath); });
         },
         [this]() { m_assetBrowser.Render(); },
         // Set world.

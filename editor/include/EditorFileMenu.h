@@ -109,6 +109,8 @@ public:
 
     // Shows a file dialog allowing the user to pick a .scene file to load
     void OpenSceneDialog();
+    // Opens a scene directly from a provided path (e.g., asset browser double-click).
+    void OpenSceneFromPath(const std::string& path);
 
     // Shows a Save As dialog and writes the current scene to disk
     void SaveSceneAsDialog();

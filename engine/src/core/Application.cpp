@@ -335,6 +335,7 @@ namespace Engine {
     void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world) {
         // Public API for editor to directly control which modes execute
         // This allows editor to implement play/pause/step/edit state transitions
+        m_systemManager.SetActiveRunModeMask(modes);
 
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world);

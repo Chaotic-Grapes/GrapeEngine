@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 
 namespace ECS {
@@ -163,9 +164,10 @@ namespace ECS {
 
             _sortSystemGroup(group);
             
-            // If world is provided, initialize the system immediately
-            if (world) {
+            // If world is provided and run mode is active, initialize immediately
+            if (world && IsRunModeActive(GetSystemMetadataRunMode(system))) {
                 system->OnCreate(*world);
+                m_createdSystems.insert(system);
             }
         }
 
@@ -179,15 +181,30 @@ namespace ECS {
         void CreateAll(World& world) {
             for (auto& [group, systems] : m_systemGroups) {
                 for (auto& system : systems) {
-                    system->OnCreate(world);
+                    if (!IsSystemCreated(system.get())) {
+                        system->OnCreate(world);
+                        m_createdSystems.insert(system.get());
+                    }
                 }
             }
 
             for (auto& [group, systems] : m_scriptedSystemGroups) {
                 for (auto* system : systems) {
-                    system->OnCreate(world);
+                    if (!IsSystemCreated(system)) {
+                        system->OnCreate(world);
+                        m_createdSystems.insert(system);
+                    }
                 }
             }
+        }
+
+        /**
+         * @brief Initialize all systems that match a run mode.
+         * @param mode Run mode to create
+         * @param world Initial world
+         */
+        void CreateSystemsForMode(SystemRunMode mode, World& world) {
+            _createAllGroupsForMode(mode, world);
         }
 
         /**
@@ -241,6 +258,25 @@ namespace ECS {
                     system->OnDestroy(world);
                 }
             }
+
+            m_createdSystems.clear();
+        }
+
+        /**
+         * @brief Destroy all systems that match a run mode.
+         * @param mode Run mode to destroy
+         * @param world Active world
+         */
+        void DestroySystemsForMode(SystemRunMode mode, World& world) {
+            _destroyAllGroupsForMode(mode, world);
+        }
+
+        /**
+         * @brief Set the active run mode bitmask (used for registration-time OnCreate).
+         * @param modes Bitmask of SystemRunMode values to treat as active
+         */
+        void SetActiveRunModeMask(uint32_t modes) {
+            m_activeRunModesMask = modes;
         }
 
         /**
@@ -263,6 +299,9 @@ namespace ECS {
 
                         // Remove from name cache
                         m_systemNameCache.erase(system);
+
+                        // Remove from created set
+                        m_createdSystems.erase(system);
                     }
                 }
             }
@@ -432,6 +471,11 @@ namespace ECS {
             // Call OnSceneStart on all owned systems
             for (auto& [group, systems] : m_systemGroups) {
                 for (auto& system : systems) {
+                    if (!IsSystemCreated(system.get()))
+                        continue;
+                    auto runMode = GetSystemMetadataRunMode(system.get());
+                    if (runMode == SystemRunMode::EditOnly)
+                        continue;
                     system->OnSceneStart();
                 }
             }
@@ -439,6 +483,11 @@ namespace ECS {
             // Call OnSceneStart on all scripted systems
             for (auto& [group, systems] : m_scriptedSystemGroups) {
                 for (auto* system : systems) {
+                    if (!IsSystemCreated(system))
+                        continue;
+                    auto runMode = GetSystemMetadataRunMode(system);
+                    if (runMode == SystemRunMode::EditOnly)
+                        continue;
                     system->OnSceneStart();
                 }
             }
@@ -455,6 +504,11 @@ namespace ECS {
             // Call OnSceneStop on all owned systems
             for (auto& [group, systems] : m_systemGroups) {
                 for (auto& system : systems) {
+                    if (!IsSystemCreated(system.get()))
+                        continue;
+                    auto runMode = GetSystemMetadataRunMode(system.get());
+                    if (runMode == SystemRunMode::EditOnly)
+                        continue;
                     system->OnSceneStop();
                 }
             }
@@ -462,6 +516,11 @@ namespace ECS {
             // Call OnSceneStop on all scripted systems
             for (auto& [group, systems] : m_scriptedSystemGroups) {
                 for (auto* system : systems) {
+                    if (!IsSystemCreated(system))
+                        continue;
+                    auto runMode = GetSystemMetadataRunMode(system);
+                    if (runMode == SystemRunMode::EditOnly)
+                        continue;
                     system->OnSceneStop();
                 }
             }
@@ -656,6 +715,14 @@ namespace ECS {
         // Dependency graphs for each system group (for parallel execution analysis)
         std::unordered_map<SystemGroup, SystemDependencyGraph> m_dependencyGraphs;
 
+        // Track created systems to avoid duplicate OnCreate calls
+        std::unordered_set<ISystem*> m_createdSystems;
+
+        // Active run mode bitmask (used for registration-time OnCreate)
+        uint32_t m_activeRunModesMask =
+            (1u << static_cast<uint32_t>(SystemRunMode::Always)) |
+            (1u << static_cast<uint32_t>(SystemRunMode::PlayOnly));
+
         /**
          * @brief Sort systems within a group by execution order.
          */
@@ -744,12 +811,110 @@ namespace ECS {
             }
         }
 
+        bool IsRunModeActive(SystemRunMode mode) const {
+            auto bit = 1u << static_cast<uint32_t>(mode);
+            return (m_activeRunModesMask & bit) != 0;
+        }
+
+        bool IsSystemCreated(const ISystem* system) const {
+            return system && (m_createdSystems.find(const_cast<ISystem*>(system)) != m_createdSystems.end());
+        }
+
+        void _createAllGroupsForMode(SystemRunMode mode, World& world) {
+            const SystemGroup orderedGroups[] = {
+                SystemGroup::PreUpdate,
+                SystemGroup::Update,
+                SystemGroup::PostUpdate,
+                SystemGroup::PrePhysics,
+                SystemGroup::Physics,
+                SystemGroup::PostPhysics,
+                SystemGroup::PreRender,
+                SystemGroup::Render,
+                SystemGroup::PostRender
+            };
+
+            for (SystemGroup group : orderedGroups) {
+                _createGroupForMode(group, mode, world);
+            }
+        }
+
+        void _destroyAllGroupsForMode(SystemRunMode mode, World& world) {
+            const SystemGroup orderedGroups[] = {
+                SystemGroup::PreUpdate,
+                SystemGroup::Update,
+                SystemGroup::PostUpdate,
+                SystemGroup::PrePhysics,
+                SystemGroup::Physics,
+                SystemGroup::PostPhysics,
+                SystemGroup::PreRender,
+                SystemGroup::Render,
+                SystemGroup::PostRender
+            };
+
+            for (SystemGroup group : orderedGroups) {
+                _destroyGroupForMode(group, mode, world);
+            }
+        }
+
+        void _createGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
+            auto itOwned = m_systemGroups.find(group);
+            if (itOwned != m_systemGroups.end()) {
+                for (auto& system : itOwned->second) {
+                    if (GetSystemMetadataRunMode(system.get()) != mode)
+                        continue;
+                    if (IsSystemCreated(system.get()))
+                        continue;
+                    system->OnCreate(world);
+                    m_createdSystems.insert(system.get());
+                }
+            }
+
+            auto itScripted = m_scriptedSystemGroups.find(group);
+            if (itScripted != m_scriptedSystemGroups.end()) {
+                for (auto* system : itScripted->second) {
+                    if (GetSystemMetadataRunMode(system) != mode)
+                        continue;
+                    if (IsSystemCreated(system))
+                        continue;
+                    system->OnCreate(world);
+                    m_createdSystems.insert(system);
+                }
+            }
+        }
+
+        void _destroyGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
+            auto itOwned = m_systemGroups.find(group);
+            if (itOwned != m_systemGroups.end()) {
+                for (auto& system : itOwned->second) {
+                    if (GetSystemMetadataRunMode(system.get()) != mode)
+                        continue;
+                    if (!IsSystemCreated(system.get()))
+                        continue;
+                    system->OnDestroy(world);
+                    m_createdSystems.erase(system.get());
+                }
+            }
+
+            auto itScripted = m_scriptedSystemGroups.find(group);
+            if (itScripted != m_scriptedSystemGroups.end()) {
+                for (auto* system : itScripted->second) {
+                    if (GetSystemMetadataRunMode(system) != mode)
+                        continue;
+                    if (!IsSystemCreated(system))
+                        continue;
+                    system->OnDestroy(world);
+                    m_createdSystems.erase(system);
+                }
+            }
+        }
+
         void _updateGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
             // Update owned systems
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    if (system->IsEnabled() && system->GetRunMode() == mode) {
+                    if (system->IsEnabled() && IsSystemCreated(system.get()) &&
+                        GetSystemMetadataRunMode(system.get()) == mode) {
                         TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
                         TimeSystem::Instance().ProfileEnd();
@@ -761,7 +926,8 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    if (system->IsEnabled() && system->GetRunMode() == mode) {
+                    if (system->IsEnabled() && IsSystemCreated(system) &&
+                        GetSystemMetadataRunMode(system) == mode) {
                         auto it = m_systemNameCache.find(system);
                         const char* systemName = (it != m_systemNameCache.end()) ? 
                             it->second.c_str() : "Unknown";

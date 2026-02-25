@@ -15,6 +15,7 @@ functionality for translating ECS GUI components into draw calls.
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,6 +25,7 @@ functionality for translating ECS GUI components into draw calls.
 #include "graphics/font.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/texture.hpp"
+#include "core/ProjectPaths.h"
 #include "services/ResourceManager.h"
 
 namespace ECS {
@@ -194,6 +196,19 @@ namespace ECS {
             return lines;
         }
 
+        std::string ResolveProjectPathForLoad(const std::string& path) {
+            if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+                return path;
+            }
+
+            std::filesystem::path fsPath(path);
+            if (fsPath.is_absolute()) {
+                return path;
+            }
+
+            return Engine::ProjectPaths::ToAbsolutePath(path);
+        }
+
     }
 
     /**
@@ -318,10 +333,11 @@ namespace ECS {
                 const std::string fontPath = textFontPath.empty()
                                                 ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                                                 : textFontPath;
+                const std::string fontLoadPath = ResolveProjectPathForLoad(fontPath);
                 const float pixelSize = isWorldSpace ? PixelsToUnits(text.FontSize) : (text.FontSize * scaleX);
                 const float fontPixelSize = isWorldSpace ? text.FontSize : pixelSize;
                 const int fontSize = std::max(1, static_cast<int>(std::round(fontPixelSize)));
-                auto font = RM.GetFont(fontPath, fontSize);
+                auto font = RM.GetFont(fontLoadPath, fontSize);
 
                 if (!font) break;
 
@@ -355,9 +371,9 @@ namespace ECS {
                     // Submit each line as its own text draw.
                     const Vector2D linePos = { startX, startY + ySign * static_cast<float>(i) * lineHeight };
                     if (isWorldSpace) {
-                        renderer->SubmitWorldGUIText(linePos, line, fontPath, pixelSize, textColor);
+                        renderer->SubmitWorldGUIText(linePos, line, fontLoadPath, pixelSize, textColor);
                     } else {
-                        renderer->SubmitGUIText(linePos, line, fontPath, pixelSize, textColor);
+                        renderer->SubmitGUIText(linePos, line, fontLoadPath, pixelSize, textColor);
                     }
                 }
                 break;
@@ -365,10 +381,11 @@ namespace ECS {
             case RenderItem::Type::Image: {
                 const auto& image = world.Get<Components::GUIImage>(item.entity);
                 const std::string path = ECS::StringTable::Resolve(image.TexturePathId);
+                const std::string loadPath = ResolveProjectPathForLoad(path);
                 uint32_t textureId = image.TextureId;
                 std::shared_ptr<Texture> texture;
-                if (!path.empty()) {
-                    texture = RM.Get<Texture>(path);
+                if (!loadPath.empty()) {
+                    texture = RM.Get<Texture>(loadPath);
                     if (texture) {
                         textureId = texture->ID();
                     }
@@ -542,19 +559,20 @@ namespace ECS {
                 if (!label.empty()) {
                     // Label text is anchored at the inner content origin.
                     const float labelSize = isWorldSpace ? PixelsToUnits(button.FontSize) : (button.FontSize * scaleX);
+                    const std::string buttonFontPath = button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : std::string();
+                    const std::string buttonFontLoadPath = ResolveProjectPathForLoad(buttonFontPath);
                     if (isWorldSpace) {
-                        renderer->SubmitWorldGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
-                            labelSize, button.TextColor);
+                        renderer->SubmitWorldGUIText(innerPos, label, buttonFontLoadPath, labelSize, button.TextColor);
                     } else {
-                        renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
-                            labelSize, button.TextColor);
+                        renderer->SubmitGUIText(innerPos, label, buttonFontLoadPath, labelSize, button.TextColor);
                     }
                 }
 
                 if (button.IconPathId != 0) {
                     const std::string iconPath = ECS::StringTable::Resolve(button.IconPathId);
-                    if (!iconPath.empty()) {
-                        auto iconTex = RM.Get<Texture>(iconPath);
+                    const std::string iconLoadPath = ResolveProjectPathForLoad(iconPath);
+                    if (!iconLoadPath.empty()) {
+                        auto iconTex = RM.Get<Texture>(iconLoadPath);
                         if (iconTex) {
                             const Vector2D iconSize = { button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
                             const Vector2D iconPos = {

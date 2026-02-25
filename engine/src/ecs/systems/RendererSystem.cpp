@@ -310,6 +310,7 @@ namespace ECS {
 
         // Use RM instead!
         m_shader = RM.Get<Shader>("assets/shaders/batch");
+        m_guiShader = RM.Get<Shader>("assets/shaders/gui");
         m_textShader = RM.Get<Shader>("assets/shaders/sdf_text");
         m_sdfCircleShader = RM.Get<Shader>("assets/shaders/sdf_circle");
         m_bloomExtractShader = RM.Get<Shader>("assets/shaders/bloom_extract");
@@ -1530,10 +1531,11 @@ namespace ECS {
 
                 // Render GUI panels (solid quads with optional corner radius).
                 if (!m_guiPanelQueue.empty()) {
-                    if (m_shader) {
-                        m_shader->use();
-                        m_shader->setMat4("uViewProj", screenOrtho);
-                        m_shader->setUniform("uLightingEnabled", 0);
+                    Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+                    if (guiShader) {
+                        guiShader->use();
+                        guiShader->setMat4("uViewProj", screenOrtho);
+                        guiShader->setUniform("uGamma", 1.5f);
                     }
                     guiRenderer->beginFrame();
                     for (const auto& panel : m_guiPanelQueue) { // Render each panel
@@ -1550,10 +1552,11 @@ namespace ECS {
 
                 // Render GUI images/icons (textured quads).
                 if (!m_guiImageQueue.empty()) {
-                    if (m_shader) {
-                        m_shader->use();
-                        m_shader->setMat4("uViewProj", screenOrtho);
-                        m_shader->setUniform("uLightingEnabled", 0);
+                    Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+                    if (guiShader) {
+                        guiShader->use();
+                        guiShader->setMat4("uViewProj", screenOrtho);
+                        guiShader->setUniform("uGamma", 1.5f);
                     }
                     guiRenderer->beginFrame();
                     for (const auto& image : m_guiImageQueue) {
@@ -1671,6 +1674,7 @@ namespace ECS {
         m_guiRenderer.reset();
         m_renderGraph.reset();
         m_shader.reset();
+        m_guiShader.reset();
         m_textShader.reset();
         m_sdfCircleShader.reset();
         m_blitShader.reset();
@@ -2422,9 +2426,11 @@ namespace ECS {
 
         // Panels
         if (!m_guiPanelQueue.empty()) {
-            m_shader->use();
-            m_shader->setMat4("uViewProj", screenOrtho);
-            m_shader->setUniform("uLightingEnabled", 0);
+            Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+            if (!guiShader) return;
+            guiShader->use();
+            guiShader->setMat4("uViewProj", screenOrtho);
+            guiShader->setUniform("uGamma", 1.5f);
             guiRenderer->beginFrame();
             for (const auto& panel : m_guiPanelQueue) {
                 const Vector2D panelPos = scalePos(panel.position);
@@ -2439,9 +2445,11 @@ namespace ECS {
 
         // Images
         if (!m_guiImageQueue.empty()) {
-            m_shader->use();
-            m_shader->setMat4("uViewProj", screenOrtho);
-            m_shader->setUniform("uLightingEnabled", 0);
+            Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+            if (!guiShader) return;
+            guiShader->use();
+            guiShader->setMat4("uViewProj", screenOrtho);
+            guiShader->setUniform("uGamma", 1.5f);
             guiRenderer->beginFrame();
             for (const auto& image : m_guiImageQueue) {
                 const Vector2D imagePos = scalePos(image.position);

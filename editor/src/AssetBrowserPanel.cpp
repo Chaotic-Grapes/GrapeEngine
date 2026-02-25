@@ -32,8 +32,73 @@ Provides:
 #include "ScriptTemplates.h"
 #include <fstream>
 #include <cstring>
+#include <algorithm>
+#include <cctype>
 #include "EditorStyle.h"
 #include "EditorIcons.h"
+
+namespace {
+    std::string ToLowerCopy(std::string value) {
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    struct AssetBadgeInfo {
+        ImVec4 IconColor;
+        const char* BadgeText;
+        const char* IconGlyph;
+    };
+
+    AssetBadgeInfo GetAssetBadgeInfo(const bool isDirectory, const std::string& extLower) {
+        if (isDirectory) {
+            return { EditorStyle::WarningText, "", EditorIcons::Folder };
+        }
+        if (extLower == ".scn" || extLower == ".scene") {
+            return { EditorStyle::LogDebug, "SCN", EditorIcons::Scene };
+        }
+        if (extLower == ".cs") {
+            return { EditorStyle::SuccessText, "CS", EditorIcons::Script };
+        }
+        if (extLower == ".prefab") {
+            return { EditorStyle::Accent, "PREFAB", EditorIcons::Prefab };
+        }
+        if (extLower == ".png") {
+            return { EditorStyle::AccentHover, "PNG", EditorIcons::Texture };
+        }
+        if (extLower == ".jpg" || extLower == ".jpeg") {
+            return { EditorStyle::AccentHover, "JPG", EditorIcons::Texture };
+        }
+        if (extLower == ".tga") {
+            return { EditorStyle::AccentHover, "TGA", EditorIcons::Texture };
+        }
+        if (extLower == ".bmp") {
+            return { EditorStyle::AccentHover, "BMP", EditorIcons::Texture };
+        }
+        if (extLower == ".wav") {
+            return { EditorStyle::LogCritical, "WAV", EditorIcons::Audio };
+        }
+        if (extLower == ".mp3") {
+            return { EditorStyle::LogCritical, "MP3", EditorIcons::Audio };
+        }
+        if (extLower == ".ogg") {
+            return { EditorStyle::LogCritical, "OGG", EditorIcons::Audio };
+        }
+        if (extLower == ".vert") {
+            return { EditorStyle::Muted, "VERT", EditorIcons::Shader };
+        }
+        if (extLower == ".frag") {
+            return { EditorStyle::Muted, "FRAG", EditorIcons::Shader };
+        }
+        if (extLower == ".ttf") {
+            return { EditorStyle::Muted, "TTF", EditorIcons::Font };
+        }
+        if (extLower == ".otf") {
+            return { EditorStyle::Muted, "OTF", EditorIcons::Font };
+        }
+        return { EditorStyle::Muted, "", EditorIcons::File };
+    }
+}
 
 
 // -------------------------------------------------------------------------
@@ -385,16 +450,17 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
             std::string entryPath = entry.path().string();
             std::string entryName = entry.path().filename().string();
             const bool isSelected = m_selectedAssets.contains(entryPath);
+            const bool isDirectory = entry.is_directory();
+            const std::string extLower = isDirectory ? std::string() : ToLowerCopy(entry.path().extension().string());
+            const AssetBadgeInfo badgeInfo = GetAssetBadgeInfo(isDirectory, extLower);
 
             // Render icon
             ImGui::PushFont(m_symbolsFont);
-            if (entry.is_directory()) {
-                ImGui::Text(EditorIcons::Folder); // Folder icon
-            }
-            else {
-                ImGui::Text(EditorIcons::File); // File icon
-            }
+            ImGui::PushStyleColor(ImGuiCol_Text, badgeInfo.IconColor);
+            ImGui::Text(badgeInfo.IconGlyph); // Per-type icon
+            ImGui::PopStyleColor();
             ImGui::PopFont();
+            const bool iconHovered = ImGui::IsItemHovered();
 
             ImGui::SameLine();
 
@@ -439,16 +505,27 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                     const bool ctrlPressed = ImGui::GetIO().KeyCtrl;
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
 
-                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && entry.is_directory()) {
+                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && isDirectory) {
                         // Double-click folder: navigate
                         m_currentPath = entryPath;
                         m_selectedAssets.clear();
                         m_selectedAsset.clear();
                     }
                     else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-                        entry.path().extension() == ".prefab" && m_inspector) {
+                        extLower == ".prefab" && m_inspector) {
                         // Double-click prefab: open in inspector
                         m_inspector->InspectPrefab(entryPath);
+                    }
+                    else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+                        (extLower == ".scn" || extLower == ".scene")) {
+                        // Double-click scene: open through file menu
+                        if (m_sceneOpenCallback) {
+                            m_sceneOpenCallback(entryPath);
+                        }
+                    }
+                    else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && extLower == ".cs") {
+                        // Double-click script: open project and focus file
+                        _openProjectFile(entryPath);
                     }
                     else if (ctrlPressed) {
                         // Ctrl+click: toggle selection
@@ -495,8 +572,42 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                     }
                 }
 
+                // Handle drag-drop while the selectable is the last item (has a valid ID).
+                _handleAssetDragDrop(entryPath);
+
+                const ImVec2 itemMin = ImGui::GetItemRectMin();
+                const ImVec2 itemMax = ImGui::GetItemRectMax();
+                bool rowHovered = ImGui::IsItemHovered() || iconHovered;
+
+                // Type badge, right-aligned on the same row
+                if (badgeInfo.BadgeText && badgeInfo.BadgeText[0] != '\0') {
+                    const ImVec2 badgeSize = ImGui::CalcTextSize(badgeInfo.BadgeText);
+                    const ImVec2 windowPos = ImGui::GetWindowPos();
+                    const ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
+                    const float badgeX = (windowPos.x + contentMax.x) - badgeSize.x - ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(badgeX - windowPos.x);
+                    ImGui::TextDisabled("%s", badgeInfo.BadgeText);
+                    rowHovered = rowHovered || ImGui::IsItemHovered();
+                }
+
+                // Hover background and selection accent
+                const ImVec2 windowPos = ImGui::GetWindowPos();
+                const ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
+                const ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
+                const float rowMinX = windowPos.x + contentMin.x;
+                const float rowMaxX = windowPos.x + contentMax.x;
+
+                if (rowHovered) {
+                    ImVec4 hoverColor = EditorStyle::FrameBgHover;
+                    hoverColor.w = 0.20f;
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        ImVec2(rowMinX, itemMin.y),
+                        ImVec2(rowMaxX, itemMax.y),
+                        ImGui::ColorConvertFloat4ToU32(hoverColor));
+                }
+
                 // Handle right-click on item
-                if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                if (rowHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // Select this item if not already selected
                     if (!m_selectedAssets.contains(entryPath)) {
                         m_selectedAssets.clear();
@@ -510,9 +621,6 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                     }
                     ImGui::OpenPopup("ItemContextMenu");
                 }
-
-                // Handle drag-drop
-                _handleAssetDragDrop(entryPath);
 
                 // Handle drop target for folders and auto-navigation
                 if (entry.is_directory()) {
@@ -1405,7 +1513,7 @@ void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& a
     m_statusTimer = 2.0f;
 }
 
-void AssetBrowserPanel::_openProjectFile() {
+void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
     // Get the project root directory
     std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
     std::string csprojDir = Engine::ProjectPaths::GetCsProjPath();
@@ -1418,6 +1526,13 @@ void AssetBrowserPanel::_openProjectFile() {
         m_statusMessage = "Project file not found: " + std::filesystem::path(csprojPath).filename().string();
         m_statusTimer = 3.0f;
         LOG_WARNING("Project file not found: " << csprojPath);
+        return;
+    }
+
+    if (!fileToOpen.empty() && !std::filesystem::exists(fileToOpen)) {
+        m_statusMessage = "Script file not found";
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Script file not found: " << fileToOpen);
         return;
     }
 
@@ -1454,14 +1569,19 @@ void AssetBrowserPanel::_openProjectFile() {
             // Found Visual Studio, open the project
             // Use ShellExecuteA via system() - properly formatted for Windows
             std::string command = "start \"\" \"" + devenvPath + "\" \"" + csprojPath + "\"";
+            if (!fileToOpen.empty()) {
+                command += " /Edit \"" + fileToOpen + "\"";
+            }
             int result = system(command.c_str());
             if (result == 0) {
-                m_statusMessage = "Opened project in Visual Studio";
+                m_statusMessage = fileToOpen.empty()
+                    ? "Opened project in Visual Studio"
+                    : "Opened script in Visual Studio";
                 m_statusTimer = 2.0f;
                 LOG_INFO("Opened project in Visual Studio: " << csprojPath);
             }
             else {
-                m_statusMessage = "Failed to open project in Visual Studio";
+                m_statusMessage = "Failed to open in Visual Studio";
                 m_statusTimer = 3.0f;
                 LOG_ERROR("Failed to open project in Visual Studio, system() returned: " << result);
             }
@@ -1479,6 +1599,11 @@ void AssetBrowserPanel::_openProjectFile() {
                 m_statusMessage = "Failed to open project file. Please ensure Visual Studio is installed.";
                 m_statusTimer = 3.0f;
                 LOG_WARNING("Could not find Visual Studio. Tried to open with default application.");
+            }
+
+            if (!fileToOpen.empty()) {
+                std::string fileCommand = "start \"\" \"" + fileToOpen + "\"";
+                system(fileCommand.c_str());
             }
         }
 #endif

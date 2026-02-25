@@ -414,6 +414,11 @@ void EditorApplication::HandleProjectSelected(const std::string& projectRoot) {
     m_projectLoadInProgress = true;
 
     // Clear any existing scenes and editor state before loading the new project
+    if (m_editorService) {
+        // Drop the current level editor instance before destroying scenes to avoid dangling pointers.
+        m_editorService->DisableLevelEditor();
+        m_editorService->SetWorld(nullptr);
+    }
     _clearScenes();
 
     // Initialize project paths and settings for the selected project

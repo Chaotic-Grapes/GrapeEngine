@@ -79,6 +79,16 @@ public abstract class SystemBase : ISystem
         }
     }
 
+    void ISystem.OnSceneStart()
+    {
+        OnSceneStart();
+    }
+
+    void ISystem.OnSceneStop()
+    {
+        OnSceneStop();
+    }
+
     /// <summary>
     /// Log a message at the specified level.
     /// </summary>
@@ -127,6 +137,16 @@ public abstract class SystemBase : ISystem
     /// Override for cleanup logic.
     /// </summary>
     protected virtual void OnDestroy() { }
+
+    /// <summary>
+    /// Called when a scene starts playing (editor: transitioning to Play mode).
+    /// </summary>
+    protected virtual void OnSceneStart() { }
+
+    /// <summary>
+    /// Called when a scene stops playing (editor: transitioning away from Play mode).
+    /// </summary>
+    protected virtual void OnSceneStop() { }
 
     // ------------------------ Query helpers ------------------------
 

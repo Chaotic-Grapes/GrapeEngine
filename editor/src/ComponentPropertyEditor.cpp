@@ -233,6 +233,24 @@ namespace {
         return clicked;
     }
 
+    bool RenderAssetDropRow(const char* label,
+        const std::string& valueText,
+        bool isEmpty,
+        const char* clearId,
+        const char* clearTooltip,
+        ImFont* symbolsFont,
+        const std::unordered_set<std::string>& allowedExtensions,
+        const std::function<bool(const std::string&)>& onAccepted,
+        const std::function<void()>& onClear) {
+        EditorUI::RenderStaticValueRow(label, valueText, isEmpty);
+        if (!isEmpty && RenderClearTrashButton(clearId, clearTooltip, symbolsFont)) {
+            onClear();
+        }
+        return HandleAssetDragDropTarget(allowedExtensions, onAccepted, [&](const std::string& rejectedPath) {
+            QueueAssetDropError(rejectedPath, allowedExtensions);
+        });
+    }
+
     // Update sprite animation preview.
     void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
         if (!world || entity.IsNull() || !world->IsAlive(entity))
@@ -685,34 +703,30 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         "Color", "Tiling", "Offset" });
 
     // Show the sprite information in a read only row
-    EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
-    if (!texPath.empty() && RenderClearTrashButton("SpriteClear", "Clear sprite", m_symbolsFont)) {
-        data["TextureId"] = 0;
-        data["TexturePath"] = "";
-        data["Width"] = 0;
-        data["Height"] = 0;
-    }
+    const bool dropped = RenderAssetDropRow("Sprite", valueText, texPath.empty(),
+        "SpriteClear", "Clear sprite", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                data["TexturePath"] = droppedPath;
+                data["Width"] = tex->Width();
+                data["Height"] = tex->Height();
+                LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
+                return true;
+            }
+            LOG_ERROR("Failed to load dropped texture: " << droppedPath);
+            return false;
+        }, [&]() {
+            data["TextureId"] = 0;
+            data["TexturePath"] = "";
+            data["Width"] = 0;
+            data["Height"] = 0;
+        });
+
     // Inline thumbnail preview to confirm the assigned sprite quickly
     if (EditorUI::PropertyFilterAllows("Sprite")) {
         RenderInlineTexturePreview(data.value("TextureId", 0u), "Sprite preview");
     }
-
-    // Process asset drag-drop targets for this field.
-    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        auto tex = RM.Get<Texture>(droppedPath);
-        if (tex) {
-            data["TextureId"] = static_cast<uint32_t>(tex->ID());
-            data["TexturePath"] = droppedPath;
-            data["Width"] = tex->Width();
-            data["Height"] = tex->Height();
-            LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
-            return true;
-        }
-        LOG_ERROR("Failed to load dropped texture: " << droppedPath);
-        return false;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
 
     // If a valid texture was dropped, show a small success message inline
     if (dropped) {
@@ -744,77 +758,69 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
     }
 
     // Normal map row
-    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
-    if (!normalPath.empty() && RenderClearTrashButton("NormalMapClear", "Clear normal map", m_symbolsFont)) {
-        data["NormalTextureId"] = 0;
-        data["NormalTexturePath"] = "";
-    }
+    const bool droppedNormal = RenderAssetDropRow("Normal Map", normalValueText, normalPath.empty(),
+        "NormalMapClear", "Clear normal map", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                data["NormalTexturePath"] = droppedPath;
+                LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
+                return true;
+            }
+            LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
+            return false;
+        }, [&]() {
+            data["NormalTextureId"] = 0;
+            data["NormalTexturePath"] = "";
+        });
+
     // Inline thumbnail preview for the normal map
     if (EditorUI::PropertyFilterAllows("Normal Map")) {
         RenderInlineTexturePreview(data.value("NormalTextureId", 0u), "Normal map preview");
     }
-    // Process asset drag-drop targets for this field.
-    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        auto tex = RM.Get<Texture>(droppedPath);
-        if (tex) {
-            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-            data["NormalTexturePath"] = droppedPath;
-            LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
-            return true;
-        }
-        LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
-        return false;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
-
     if (droppedNormal) {
-        // Keep the next widget on the same line.
         ImGui::SameLine();
         ImGui::TextColored(EditorStyle::SuccessText, "Normal map updated");
     }
 
     // Emissive map row
-    EditorUI::RenderStaticValueRow("Emissive Map", emissiveValueText, emissivePath.empty());
+    const bool droppedEmissive = RenderAssetDropRow("Emissive Map", emissiveValueText, emissivePath.empty(),
+        "EmissiveMapClear", "Clear emissive map", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
+                data["EmissiveTexturePath"] = droppedPath;
+                LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
+                return true;
+            }
+            LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
+            return false;
+        }, [&]() {
+            data["EmissiveTextureId"] = 0;
+            data["EmissiveTexturePath"] = "";
+        });
+
     // Inline thumbnail preview for the emissive map
     if (EditorUI::PropertyFilterAllows("Emissive Map")) {
         RenderInlineTexturePreview(data.value("EmissiveTextureId", 0u), "Emissive map preview");
     }
-    // Process asset drag-drop targets for this field.
-    const bool droppedEmissive = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        auto tex = RM.Get<Texture>(droppedPath);
-        if (tex) {
-            data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
-            data["EmissiveTexturePath"] = droppedPath;
-            LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
-            return true;
-        }
-        LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
-        return false;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
-
     if (droppedEmissive) {
-        // Keep the next widget on the same line.
         ImGui::SameLine();
         ImGui::TextColored(EditorStyle::SuccessText, "Emissive map updated");
     }
 
-    // Emissive strength multiplier
+    // Render float row.
     EditorUI::RenderFloatRow("Emissive Strength", "", data, "EmissiveStrength", 0.1f, 0.0f, 100.0f);
-
     // Color tint applied on top of the sprite
     EditorUI::RenderColorProperty("Color##Sprite", data["Color"]);
-
     // UV tiling controls how many times the texture repeats over the shape
     EditorUI::RenderVector2DRow("Tiling##Sprite", data["Tiling"], "X", "Y", 0.1f);
-
     // UV offset shifts the texture sampling across the sprite
     EditorUI::RenderVector2DRow("Offset##Sprite", data["Offset"], "X", "Y", 0.1f);
+
+    // End property section.
     EditorUI::EndPropertySection();
 }
-
 // Renders the Rigidbody2D physics component properties
 void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
@@ -1211,34 +1217,30 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
-    EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
-    if (!texPath.empty() && RenderClearTrashButton("SpriteSheetClear", "Clear sprite sheet", m_symbolsFont)) {
-        data["TextureId"] = 0;
-        data["TexturePath"] = "";
-        data["SheetWidth"] = 0;
-        data["SheetHeight"] = 0;
-    }
+    const bool dropped = RenderAssetDropRow("Sprite Sheet", valueText, texPath.empty(),
+        "SpriteSheetClear", "Clear sprite sheet", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                data["TexturePath"] = droppedPath;
+                data["SheetWidth"] = tex->Width();
+                data["SheetHeight"] = tex->Height();
+                LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
+                return true;
+            }
+            LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
+            return false;
+        }, [&]() {
+            data["TextureId"] = 0;
+            data["TexturePath"] = "";
+            data["SheetWidth"] = 0;
+            data["SheetHeight"] = 0;
+        });
+
     // Inline thumbnail preview for the sprite sheet texture
     if (EditorUI::PropertyFilterAllows("Sprite Sheet")) {
         RenderInlineTexturePreview(data.value("TextureId", 0u), "Sprite sheet preview");
     }
-
-    // Process asset drag-drop targets for this field.
-    const bool dropped = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        auto tex = RM.Get<Texture>(droppedPath);
-        if (tex) {
-            data["TextureId"] = static_cast<uint32_t>(tex->ID());
-            data["TexturePath"] = droppedPath;
-            data["SheetWidth"] = tex->Width();
-            data["SheetHeight"] = tex->Height();
-            LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
-            return true;
-        }
-        LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
-        return false;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
     const char* filterLabels[] = { "Nearest", "Linear" };
     int filter = data.value("TextureFilter", 0);
     filter = std::clamp(filter, 0, 1);
@@ -1263,29 +1265,26 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     (void)dropped; // suppress for now, could be used for feedback
 
     // Normal map row
-    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
-    if (!normalPath.empty() && RenderClearTrashButton("SpriteSheetNormalClear", "Clear normal map", m_symbolsFont)) {
-        data["NormalTextureId"] = 0;
-        data["NormalTexturePath"] = "";
-    }
+    const bool droppedNormal = RenderAssetDropRow("Normal Map", normalValueText, normalPath.empty(),
+        "SpriteSheetNormalClear", "Clear normal map", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) {
+                data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                data["NormalTexturePath"] = droppedPath;
+                LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
+                return true;
+            }
+            LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
+            return false;
+        }, [&]() {
+            data["NormalTextureId"] = 0;
+            data["NormalTexturePath"] = "";
+        });
+
     // Inline thumbnail preview for the normal sheet
     if (EditorUI::PropertyFilterAllows("Normal Map")) {
         RenderInlineTexturePreview(data.value("NormalTextureId", 0u), "Normal sheet preview");
     }
-    // Process asset drag-drop targets for this field.
-    const bool droppedNormal = HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        auto tex = RM.Get<Texture>(droppedPath);
-        if (tex) {
-            data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
-            data["NormalTexturePath"] = droppedPath;
-            LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
-            return true;
-        }
-        LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
-        return false;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
 
     if (droppedNormal) {
         // Keep the next widget on the same line.
@@ -1683,18 +1682,13 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
     }
 
     // Render static value row.
-    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
-    if (!fontPath.empty() && RenderClearTrashButton("GUITextFontClear", "Clear font", m_symbolsFont)) {
-        data["FontPath"] = "";
-    }
-
-    // Process asset drag-drop targets for this field.
-    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
-        data["FontPath"] = droppedPath;
-        return true;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kFontExtensions);
-    });
+    RenderAssetDropRow("Font", fontValueText, fontPath.empty(),
+        "GUITextFontClear", "Clear font", m_symbolsFont, kFontExtensions, [&](const std::string& droppedPath) {
+            data["FontPath"] = droppedPath;
+            return true;
+        }, [&]() {
+            data["FontPath"] = "";
+        });
 
     // Render color row.
     EditorUI::RenderColorRow("Color", data["Color"]);
@@ -1773,17 +1767,13 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
         textureValueText = "None (drag texture here)";
     }
     // Render static value row.
-    EditorUI::RenderStaticValueRow("Texture", textureValueText, texturePath.empty());
-    if (!texturePath.empty() && RenderClearTrashButton("GUIImageTextureClear", "Clear texture", m_symbolsFont)) {
-        data["TexturePath"] = "";
-    }
-    // Process asset drag-drop targets for this field.
-    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        data["TexturePath"] = droppedPath;
-        return true;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
+    RenderAssetDropRow("Texture", textureValueText, texturePath.empty(),
+        "GUIImageTextureClear", "Clear texture", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            data["TexturePath"] = droppedPath;
+            return true;
+        }, [&]() {
+            data["TexturePath"] = "";
+        });
 
     const char* filterLabels[] = { "Nearest", "Linear" };
     int filter = data.value("TextureFilter", 0);
@@ -1928,34 +1918,26 @@ void ComponentUI::RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS:
         ? "None (drag font here)"
         : std::filesystem::path(fontPath).filename().string();
     // Render static value row.
-    EditorUI::RenderStaticValueRow("Font", fontValueText, fontPath.empty());
-    if (!fontPath.empty() && RenderClearTrashButton("GUIButtonFontClear", "Clear font", m_symbolsFont)) {
-        data["FontPath"] = "";
-    }
-    // Process asset drag-drop targets for this field.
-    HandleAssetDragDropTarget(kFontExtensions, [&](const std::string& droppedPath) {
-        data["FontPath"] = droppedPath;
-        return true;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kFontExtensions);
-    });
+    RenderAssetDropRow("Font", fontValueText, fontPath.empty(),
+        "GUIButtonFontClear", "Clear font", m_symbolsFont, kFontExtensions, [&](const std::string& droppedPath) {
+            data["FontPath"] = droppedPath;
+            return true;
+        }, [&]() {
+            data["FontPath"] = "";
+        });
 
     std::string iconPath = data.value("IconPath", std::string());
     std::string iconValueText = iconPath.empty()
         ? "None (drag icon here)"
         : std::filesystem::path(iconPath).filename().string();
     // Render static value row.
-    EditorUI::RenderStaticValueRow("Icon", iconValueText, iconPath.empty());
-    if (!iconPath.empty() && RenderClearTrashButton("GUIButtonIconClear", "Clear icon", m_symbolsFont)) {
-        data["IconPath"] = "";
-    }
-    // Process asset drag-drop targets for this field.
-    HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-        data["IconPath"] = droppedPath;
-        return true;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kImageExtensions);
-    });
+    RenderAssetDropRow("Icon", iconValueText, iconPath.empty(),
+        "GUIButtonIconClear", "Clear icon", m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+            data["IconPath"] = droppedPath;
+            return true;
+        }, [&]() {
+            data["IconPath"] = "";
+        });
 
     // Render color row.
     EditorUI::RenderColorRow("Text Color", data["TextColor"]);
@@ -2102,8 +2084,14 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     // This prevents JSON modification every frame which would mark component as dirty
     ImGuiIdScope id("AudioSource");
     // Ensure keys exist with defaults
-    if (!data.contains("CueId"))       data["CueId"] = 0;
     if (!data.contains("CuePath"))     data["CuePath"] = "";
+    if (data.value("CuePath", std::string()).empty()) {
+        if (!data.contains("CueId")) {
+            data["CueId"] = 0;
+        }
+    } else if (data.contains("CueId")) {
+        data.erase("CueId");
+    }
     if (!data.contains("Volume"))      data["Volume"] = 1.0f;
     if (!data.contains("Pitch"))       data["Pitch"] = 1.0f;
     if (!data.contains("Loop"))        data["Loop"] = false;
@@ -2117,11 +2105,12 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
     uint32_t cueId = data.value("CueId", 0u);
     std::string cuePath = data.value("CuePath", std::string());
+    const std::string cuePathResolved = ECS::Components::ResolveProjectPathForLoad(cuePath);
     auto& lib = AudioAssetLibrary::Get();
 
     const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
     if (!cuePath.empty()) {
-        selectedClip = lib.FindByPath(cuePath);
+        selectedClip = lib.FindByPath(cuePathResolved);
     }
     if (!selectedClip && cueId != 0) {
         selectedClip = lib.FindById(cueId);
@@ -2132,17 +2121,18 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     std::string currentLabel = selectedClip ? selectedClip->Name : "None (drag audio here)";
 
     // Audio clip row + drag drop support like SpriteRenderer2D
-    EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
-
-    // Drag-drop support
-    HandleAssetDragDropTarget(kAudioExtensions, [&](const std::string& droppedPath) {
-        const auto& clipInfo = lib.Register(droppedPath);
-        data["CueId"] = clipInfo.Id;
-        data["CuePath"] = clipInfo.Path;
-        return true;
-    }, [&](const std::string& rejectedPath) {
-        QueueAssetDropError(rejectedPath, kAudioExtensions);
-    });
+    RenderAssetDropRow("Audio Clip", currentLabel, selectedClip == nullptr,
+        "AudioClipClear", "Clear audio clip", m_symbolsFont, kAudioExtensions, [&](const std::string& droppedPath) {
+            const std::string storedPath = ECS::Components::NormalizeProjectPathForStorage(droppedPath);
+            const std::string registerPath = ECS::Components::ResolveProjectPathForLoad(storedPath);
+            const auto& clipInfo = lib.Register(registerPath);
+            data["CuePath"] = storedPath;
+            data.erase("CueId");
+            return true;
+        }, [&]() {
+            data["CuePath"] = "";
+            data["CueId"] = 0;
+        });
 
     // Volume + Pitch sliders using EditorUI helpers
     EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
@@ -2292,6 +2282,7 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
         // Fetch texture path from serialized data (empty if none)
         std::string texPath = data.value(pathKey, "");
         std::string valueText;
+        const std::string attemptKey = std::string("_LoadAttempt_") + pathKey;
 
         if (!texPath.empty()) {
             // Display only the filename, not the full path
@@ -2299,7 +2290,6 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
             uint32_t currentId = data.value(idKey, 0u);
             if (currentId == 0) {
                 // Prevent repeated reload attempts every frame
-                std::string attemptKey = std::string("_LoadAttempt_") + pathKey;
                 if (!data.contains(attemptKey)) {
                     // Attempt to fetch texture from resource manager
                     auto tex = RM.Get<Texture>(texPath);
@@ -2318,24 +2308,26 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
         }
 
         // Render a read-only row displaying the current texture
-        EditorUI::RenderStaticValueRow(label, valueText, texPath.empty());
+        const std::string clearId = std::string("Material2D_") + pathKey;
+        const std::string clearTooltip = std::string("Clear ") + label;
+        RenderAssetDropRow(label, valueText, texPath.empty(), clearId.c_str(), clearTooltip.c_str(),
+            m_symbolsFont, kImageExtensions, [&](const std::string& droppedPath) {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data[idKey] = static_cast<uint32_t>(tex->ID());
+                    data[pathKey] = droppedPath;
+                    return true;
+                }
+                return false;
+            }, [&]() {
+                data[idKey] = 0;
+                data[pathKey] = "";
+                data.erase(attemptKey);
+            });
         // Inline thumbnail preview for material texture assignments
         if (EditorUI::PropertyFilterAllows(label)) {
             RenderInlineTexturePreview(data.value(idKey, 0u), "Material texture preview");
         }
-
-        // Process asset drag-drop targets for this field.
-        HandleAssetDragDropTarget(kImageExtensions, [&](const std::string& droppedPath) {
-            auto tex = RM.Get<Texture>(droppedPath);
-            if (tex) {
-                data[idKey] = static_cast<uint32_t>(tex->ID());
-                data[pathKey] = droppedPath;
-                return true;
-            }
-            return false;
-        }, [&](const std::string& rejectedPath) {
-            QueueAssetDropError(rejectedPath, kImageExtensions);
-        });
     };
 
     // Texture slots
