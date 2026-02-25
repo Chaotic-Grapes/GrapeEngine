@@ -1329,7 +1329,6 @@ void LevelEditor::_refreshTileMapCache() {
             else {
                 entry.ActiveTilesetIndex = 0;
             }
-            LOG_INFO("[TileMap] Tileset rebuild entity " << entity.Index << " count=" << entry.Tilesets.size());
         }
 
         entry.Origin = origin; // Update origin every frame to follow entity transforms.
