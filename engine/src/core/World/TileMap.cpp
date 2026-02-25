@@ -32,6 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <filesystem>
+#include "core/ProjectPaths.h"
 
 TileMap::TileMap(float tileSize)
     : m_tileSize(tileSize)
@@ -438,9 +440,37 @@ bool TileMap::SaveMap(const std::string& filepath) const
     out.write(reinterpret_cast<const char*>(&m_originY), sizeof(int32_t));
 
     // Append tileset list (count + length-prefixed strings).
-    const uint32_t tilesetCount = static_cast<uint32_t>(m_tilesetPaths.size());
-    out.write(reinterpret_cast<const char*>(&tilesetCount), sizeof(uint32_t));
+	// We normalize paths to be relative to the project root if possible, to improve portability of the 
+    // tilemap asset across different machines and project locations
+    auto normalizePathForStorage = [](const std::string& path) {
+		// If the path is empty or project paths aren't initialized, we can't normalize, so return as-is
+        if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+            return path;
+        }
+		// Only normalize absolute paths; relative paths are stored as-is
+        std::filesystem::path fsPath(path);
+        if (!fsPath.is_absolute()) {
+            return path;
+        }
+		// Convert to relative path; if the path is outside the project, this will return an empty string, 
+        // so we fall back to storing the original absolute path in that case
+        const std::string relative = Engine::ProjectPaths::ToRelativePath(path);
+        return relative.empty() ? path : relative;
+    };
+
+	// Normalize all paths before writing to ensure consistent storage format
+    std::vector<std::string> normalizedPaths;
+    normalizedPaths.reserve(m_tilesetPaths.size());
     for (const auto& path : m_tilesetPaths) {
+        normalizedPaths.push_back(normalizePathForStorage(path));
+    }
+
+	// Write the count of tileset paths, followed by each path as a length-prefixed string
+    const uint32_t tilesetCount = static_cast<uint32_t>(normalizedPaths.size());
+    out.write(reinterpret_cast<const char*>(&tilesetCount), sizeof(uint32_t));
+
+	// Each path is stored as a 4-byte length prefix followed by the UTF-8 string data (without null terminator)
+    for (const auto& path : normalizedPaths) {
         const uint32_t len = static_cast<uint32_t>(path.size());
         out.write(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
         if (len > 0) {
