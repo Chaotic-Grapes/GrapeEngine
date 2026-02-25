@@ -112,6 +112,15 @@ endif()
 
 # Always build the engine library first
 add_subdirectory(engine)
+# Compiler warnings for engine: keep consistent regardless of editor/game builds.
+if(TARGET GrapeEngineLib)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    elseif (MSVC)
+        # /FS ensures shared PDB access for parallel cl.exe usage.
+        target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
+    endif()
+endif()
 # Build editor if requested
 if(BUILD_EDITOR)
     add_subdirectory(editor)
@@ -157,20 +166,16 @@ if(BUILD_EDITOR)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for editor: apply to the actual editor or engine targets
+    # Compiler warnings for editor: apply to the editor target.
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(TARGET GrapeEditor)
             target_compile_options(GrapeEditor PRIVATE -Wall -Wextra -Wpedantic -Werror)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
         endif()
     elseif (MSVC)
         if(TARGET GrapeEditor)
             # /FS ensures the compiler uses shared PDB access when multiple cl.exe
             # processes write to the same PDB (fixes C1041 in parallel builds).
             target_compile_options(GrapeEditor PRIVATE /W4 /FS)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
         endif()
     endif()
 endif()
@@ -198,23 +203,42 @@ if(BUILD_GAME)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for game: apply to runtime or engine targets
+    # Compiler warnings for game: apply to the runtime target.
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(TARGET GrapeRuntime)
             target_compile_options(GrapeRuntime PRIVATE -Wall -Wextra -Wpedantic -Werror)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
         endif()
     elseif (MSVC)
         if(TARGET GrapeRuntime)
             target_compile_options(GrapeRuntime PRIVATE /W4)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE /W4)
         endif()
     endif()
 endif()
 
 # ======================= Copy files and assets =========================
+
+# Copy engine DLL to editor/game output
+if(BUILD_ENGINE_SHARED AND TARGET GrapeEngineLib)
+    if(BUILD_EDITOR AND TARGET GrapeEditor)
+        add_custom_target(Copy_Engine_DLL_Editor ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:GrapeEngineLib>"
+                "$<TARGET_FILE_DIR:GrapeEditor>"
+            DEPENDS GrapeEngineLib GrapeEditor
+            COMMENT "Copying GrapeEngineNative.dll to editor output directory"
+        )
+    endif()
+
+    if(BUILD_GAME AND TARGET GrapeRuntime)
+        add_custom_target(Copy_Engine_DLL_Runtime ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:GrapeEngineLib>"
+                "$<TARGET_FILE_DIR:GrapeRuntime>"
+            DEPENDS GrapeEngineLib GrapeRuntime
+            COMMENT "Copying GrapeEngineNative.dll to runtime output directory"
+        )
+    endif()
+endif()
 
 # Copy assets to build directory for editor
 if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
