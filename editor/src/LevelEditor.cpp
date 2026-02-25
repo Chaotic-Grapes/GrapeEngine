@@ -599,7 +599,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             m_assetBrowser.SetInspector(&m_inspector);
-            m_assetBrowser.SetSelectionChangedCallback([this](const std::string& assetPath) { _onAssetSelected(assetPath); });
+            // Asset Browser selection should be passive; tilesets are applied only via explicit drag-drop
+            m_assetBrowser.SetSelectionChangedCallback(nullptr);
             m_assetBrowser.SetSceneOpenCallback([this](const std::string& scenePath) { m_fileMenu.OpenSceneFromPath(scenePath); });
         },
         [this]() { m_assetBrowser.Render(); },
@@ -937,8 +938,7 @@ void LevelEditor::Update() {
         auto* active = sm.GetActive();
         ECS::World* activeWorld = active ? &active->GetWorld() : nullptr;
         if (activeWorld != m_world) {
-            m_entityActions.SetScene(active);
-            SetWorld(activeWorld);
+            SetScene(active);
         }
     }
 
@@ -1150,8 +1150,28 @@ void LevelEditor::_refreshTileMapCache() {
     ForEachTileMapComponent(m_world, [this, &seen, &scenePath](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
         seen.insert(entity.Index); // Mark this tilemap entity as active.
 
-        std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId.
-        std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path.
+        std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath); // Resolve map path from StringId
+        std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath); // Legacy single tileset path
+
+        // If we have a legacy tileset path and the project paths system is ready
+        if (!legacyTilesetPath.empty() && Engine::ProjectPaths::IsInitialized()) {
+            std::filesystem::path legacyPathFs(legacyTilesetPath);
+
+            // Only process if the path is absolute (e.g. C:/project/tileset.png)
+            // Relative paths are already fine, no need to convert
+            if (legacyPathFs.is_absolute()) {
+
+                // Convert absolute path to relative (e.g. assets/tileset.png)
+                const std::string relative = Engine::ProjectPaths::ToRelativePath(legacyTilesetPath);
+
+                // Only update if conversion succeeded (non-empty result)
+                if (!relative.empty()) {
+                    legacyTilesetPath = relative;
+                    // Store the relative path in the component's interned string table
+                    comp.TilesetTexturePath = ECS::StringTable::Intern(legacyTilesetPath);
+                }
+            }
+        }
 
         if (mapPath.empty() && !scenePath.empty()) {
             // Derive a tilemap path from the saved scene path when none exists.
@@ -1230,8 +1250,31 @@ void LevelEditor::_refreshTileMapCache() {
 
         bool addedLegacyTileset = false;
         if (entry.Map && !legacyTilesetPath.empty()) {
+            // Lambda that checks if a tileset path already exists in the map
+            // (handles both raw paths and resolved/normalized paths)
+            auto hasLegacyTileset = [&entry](const std::string& path) {
+                // If no path given or map doesn't exist, obviously can't have it
+                if (path.empty() || !entry.Map) {
+                    return false;
+                }
+                // Fast path: check if the path exists directly in the map's tileset list
+                if (entry.Map->FindTilesetPath(path) >= 0) {
+                    return true;
+                }
+                // Slow path: the path might be stored differently (e.g. absolute vs relative)
+                // so resolve both sides and compare normalized versions
+                const std::string resolved = ResolveProjectPathForLoad(path);
+                for (const auto& existing : entry.Map->GetTilesetPaths()) {
+                    if (ResolveProjectPathForLoad(existing) == resolved) {
+                        return true;
+                    }
+                }
+                // Not found either way
+                return false;
+            };
+
             // Ensure the legacy tileset path exists in the map's tileset list.
-            if (entry.Map->FindTilesetPath(legacyTilesetPath) < 0) {
+            if (!hasLegacyTileset(legacyTilesetPath)) {
                 entry.Map->AddTilesetPath(legacyTilesetPath);
                 addedLegacyTileset = true;
             }
@@ -1681,6 +1724,9 @@ void LevelEditor::SetWorld(ECS::World* world) {
 // Set the active Scenes::Scene so EntityActions has the scene pointer
 void LevelEditor::SetScene(Scenes::Scene* scene) {
     m_entityActions.SetScene(scene);
+    if (scene) {
+        m_fileMenu.SyncActiveScenePath(scene->GetPath());
+    }
     ECS::World* world = scene ? &scene->GetWorld() : nullptr;
     SetWorld(world);
     // Propagate scene to panels that require Scene access

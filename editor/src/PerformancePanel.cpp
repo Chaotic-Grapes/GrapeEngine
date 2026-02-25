@@ -444,8 +444,7 @@ bool PerformancePanel::_validateMemoryStats() {
 	constexpr int NUM_TESTS = 3;                    // Number of test allocations
 	constexpr size_t ALIGNMENT = 16;                // Memory alignment
 
-    // If a block cannot be split, the allocator may consume a bit of extra space
-    // (internal fragmentation)
+    // If a block cannot be split, the allocator may consume a bit of extra space (internal fragmentation)
     // Worst-case overhead per allocation is < header + alignment
     // We conservatively allow up to 2 * ALIGNMENT per allocation
     constexpr size_t MAX_INTERNAL_FRAG = ALIGNMENT * 2;

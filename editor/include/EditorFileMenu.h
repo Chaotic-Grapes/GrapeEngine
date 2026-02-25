@@ -121,6 +121,16 @@ public:
     // Expose the current scene path for editor systems.
     const std::string& GetCurrentScenePath() const { return m_currentScenePath; }
 
+    // Sync the current scene path when scenes are activated outside the file menu
+    void SyncActiveScenePath(const std::string& path) {
+        if (path.empty()) {
+            return;
+        }
+        if (m_currentScenePath != path) {
+            m_currentScenePath = path;
+        }
+    }
+
     // Mark the scene as having unsaved changes (only if it was loaded from a file)
     void MarkSceneDirty() {
         if (!m_currentScenePath.empty()) {

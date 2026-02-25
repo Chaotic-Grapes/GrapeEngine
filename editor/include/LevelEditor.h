@@ -100,7 +100,7 @@ private:
     // Event handlers
     void _onPlaybackStateChanged(EditorState oldState, EditorState newState);
     void _onViewportSelectionChanged(EntityId id);
-    // Asset selection handler for tileset -> tile palette wiring.
+    // Tileset apply handler (triggered by explicit drag-drop into the tile palette)
     void _onAssetSelected(const std::string& assetPath);
     // Sync tile palette/editor state from a selected entity (if it has a tilemap component).
     void _syncTilePaletteToSelection(EntityId id);
