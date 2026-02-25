@@ -318,6 +318,7 @@ void EditorFileMenu::_exportProject() {
             "Build & export game",
             "Validate export output",
             "Compile scripts",
+            "Copy project settings",
             "Prepare destination",
             "Copy export output"
         };
@@ -451,9 +452,29 @@ void EditorFileMenu::_exportProject() {
                 }
             }
 
+            m_exportCurrentStep = 5;
+            const std::filesystem::path exportProjectDir = exportRoot / projectName;
+            const std::filesystem::path docSettingsPath = Engine::ProjectPaths::GetSettingsPath();
+
+            // Copy the ProjectSettings.json from the project directory to the export output
+            if (std::filesystem::exists(docSettingsPath)) {
+                std::error_code settingsCopyEc;
+                std::filesystem::copy_file(docSettingsPath, exportProjectDir / "ProjectSettings.json",
+                    std::filesystem::copy_options::overwrite_existing, settingsCopyEc);
+                // If the copy fails, log an error but continue with the export since the game can still run with default settings
+                // We just won't have the user's custom settings applied
+                if (settingsCopyEc) {
+                    pushResult({ "Copy project settings", false, "Failed to copy ProjectSettings.json from Documents.", "" });
+                } else {
+                    pushResult({ "Copy project settings", true, "OK", "" });
+                }
+            } else {
+                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in Documents; skipped.", "" });
+            }
+
             std::error_code removeDestEc;
             if (std::filesystem::exists(destinationRoot)) {
-                m_exportCurrentStep = 5;
+                m_exportCurrentStep = 6;
                 std::filesystem::remove_all(destinationRoot, removeDestEc);
                 if (removeDestEc) {
                     pushResult({ "Prepare destination", false, "Failed to clear destination.", "" });
@@ -474,7 +495,7 @@ void EditorFileMenu::_exportProject() {
             pushResult({ "Prepare destination", true, "OK", "" });
 
             std::error_code copyEc;
-            m_exportCurrentStep = 6;
+            m_exportCurrentStep = 7;
             std::filesystem::copy(exportRoot, destinationRoot,
                 std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, copyEc);
             if (copyEc) {
