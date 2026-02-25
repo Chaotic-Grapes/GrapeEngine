@@ -367,6 +367,22 @@ namespace ECS {
         } catch (...) {}
     }
 
+    void ScriptManager::CallSystemOnSceneStart(uint64_t handle)
+    {
+        if (!m_initialized || !m_callSystemOnSceneStart) return;
+        try {
+            m_callSystemOnSceneStart(handle);
+        } catch (...) {}
+    }
+
+    void ScriptManager::CallSystemOnSceneStop(uint64_t handle)
+    {
+        if (!m_initialized || !m_callSystemOnSceneStop) return;
+        try {
+            m_callSystemOnSceneStop(handle);
+        } catch (...) {}
+    }
+
     /**
      * @brief Register discovered scripted systems with the SystemManager.
      * @param systemManager Reference to the SystemManager
@@ -801,6 +817,8 @@ namespace ECS {
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
+        success &= loadMethod("CallSystemOnSceneStart",           scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStart));
+        success &= loadMethod("CallSystemOnSceneStop",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStop));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -966,6 +984,24 @@ namespace ECS {
         }
     }
 
+    void ScriptSystemWrapper::OnSceneStart() {
+        if (!m_scriptManager) return;
+
+        auto callOnSceneStart = m_scriptManager->GetCallSystemOnSceneStart();
+        if (callOnSceneStart) {
+            callOnSceneStart(m_managedHandle);
+        }
+    }
+
+    void ScriptSystemWrapper::OnSceneStop() {
+        if (!m_scriptManager) return;
+
+        auto callOnSceneStop = m_scriptManager->GetCallSystemOnSceneStop();
+        if (callOnSceneStop) {
+            callOnSceneStop(m_managedHandle);
+        }
+    }
+
     /**
      * @brief Get the metadata of the managed system.
      * @return SystemMetadata structure
@@ -1007,6 +1043,7 @@ namespace ECS {
         std::string systemName = m_typeName;
         SystemGroup group = SystemGroup::Update;
         SystemRunMode runMode = SystemRunMode::PlayOnly;
+        int executionOrder = 0;
 
         if (m_scriptManager) {
             auto getMetadata = m_scriptManager->GetGetSystemMetadata();
@@ -1015,7 +1052,7 @@ namespace ECS {
                 int groupInt = 0;
                 int runModeInt = 0;
 
-                getMetadata(m_managedHandle, nameBuffer, &groupInt, &runModeInt);
+                getMetadata(m_managedHandle, nameBuffer, &groupInt, &runModeInt, &executionOrder);
 
                 // Extract metadata from C# system
                 if (nameBuffer[0] != '\0') {
@@ -1028,7 +1065,7 @@ namespace ECS {
 
         // Build immutable metadata using ComponentAccessBuilder
         ComponentAccessBuilder builder(systemName);
-        builder.SetExecutionOrder(0)  // TODO: Get from C#
+        builder.SetExecutionOrder(executionOrder)
             .SetGroup(group)
             .SetRunMode(runMode)
             .SetEnabled(true)

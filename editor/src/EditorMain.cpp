@@ -69,7 +69,12 @@ int main() {
 
     // Initialize systems after window is created
     ECS::World emptyWorld;
-    engine.GetSystemManager().CreateAll(emptyWorld);
+    auto& systemManager = engine.GetSystemManager();
+    systemManager.SetActiveRunModeMask(
+        (1u << static_cast<int>(ECS::SystemRunMode::Always)) |
+        (1u << static_cast<int>(ECS::SystemRunMode::EditOnly)));
+    systemManager.CreateSystemsForMode(ECS::SystemRunMode::Always, emptyWorld);
+    systemManager.CreateSystemsForMode(ECS::SystemRunMode::EditOnly, emptyWorld);
 
     // Build the initial component registry immediately so the editor UI has metadata
     // This ensures components are available for rendering in the inspector on startup
@@ -198,10 +203,12 @@ int main() {
                     // Transitioning to Edit: stop PlayOnly systems
                     auto& systemManager = engine.GetSystemManager();
                     systemManager.OnSceneStop(world);
+                    systemManager.DestroySystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                 }
                 else if (wasInEdit && !isInEdit) {
                     // Transitioning from Edit to any active state: start PlayOnly systems
                     auto& systemManager = engine.GetSystemManager();
+                    systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
                 

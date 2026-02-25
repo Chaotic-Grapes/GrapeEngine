@@ -976,7 +976,7 @@ public static class ScriptHost
     /// Get metadata about a system (name, group, run mode).
     /// </summary>
     [UnmanagedCallersOnly]
-    public static void GetSystemMetadata(ulong handle, IntPtr outNameBuffer, IntPtr outGroupPtr, IntPtr outRunModePtr)
+    public static void GetSystemMetadata(ulong handle, IntPtr outNameBuffer, IntPtr outGroupPtr, IntPtr outRunModePtr, IntPtr outOrderPtr)
     {
         try
         {
@@ -995,7 +995,13 @@ public static class ScriptHost
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
             if (outNameBuffer != IntPtr.Zero)
             {
-                Marshal.Copy(nameBytes, 0, outNameBuffer, System.Math.Min(nameBytes.Length, 256));
+                const int maxLen = 256;
+                int copyLen = System.Math.Min(nameBytes.Length, maxLen - 1);
+                if (copyLen > 0)
+                {
+                    Marshal.Copy(nameBytes, 0, outNameBuffer, copyLen);
+                }
+                Marshal.WriteByte(outNameBuffer, copyLen, 0);
             }
             
             // Get group from ISystemMetadata interface first, then [SystemGroup] attribute
@@ -1008,6 +1014,11 @@ public static class ScriptHost
             if (outRunModePtr != IntPtr.Zero)
             {
                 Marshal.WriteInt32(outRunModePtr, (int)SystemMetadataExtractor.GetSystemRunMode(systemType, instance));
+            }
+
+            if (outOrderPtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outOrderPtr, SystemMetadataExtractor.GetSystemOrder(systemType));
             }
         }
         catch (Exception ex)
@@ -1222,6 +1233,58 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnSceneStart on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnSceneStart(ulong handle)
+    {
+        try
+        {
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                system.OnSceneStart();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnSceneStart: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnSceneStop on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnSceneStop(ulong handle)
+    {
+        try
+        {
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                system.OnSceneStop();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnSceneStop: {ex.Message}", LogLevel.Error);
         }
     }
 
