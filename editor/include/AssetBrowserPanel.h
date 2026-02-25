@@ -52,6 +52,8 @@ public:
     void SetInspector(InspectorPanel* inspector);
     // Register a callback for asset selection changes.
     void SetSelectionChangedCallback(AssetSelectionCallback callback) { m_selectionCallback = std::move(callback); }
+    // Register a callback for scene file double-click opens.
+    void SetSceneOpenCallback(std::function<void(const std::string&)> callback) { m_sceneOpenCallback = std::move(callback); }
 
     // -------------------------------------------------------------------------
     // Rendering
@@ -131,8 +133,8 @@ private:
     // Right-click context menu for asset creation
     bool _renderCreateMenuItems();
 
-    // Open the generated C# project file with default code editor
-    void _openProjectFile();
+    // Open the generated C# project file (optionally focusing a script file).
+    void _openProjectFile(const std::string& fileToOpen = std::string());
 
     // Show the selected asset in Windows Explorer
     void _openInExplorer(const std::string& assetPath);
@@ -189,6 +191,7 @@ private:
     std::unordered_set<std::string> m_selectedAssets; // Multi-selection support
     std::string m_anchorAsset;                        // For shift-selection
     AssetSelectionCallback m_selectionCallback;       // Selection change callback
+    std::function<void(const std::string&)> m_sceneOpenCallback;
 
     // Clipboard state
     std::vector<std::string> m_clipboardAssets;

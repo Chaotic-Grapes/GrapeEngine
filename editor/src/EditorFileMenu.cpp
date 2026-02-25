@@ -1522,6 +1522,13 @@ void EditorFileMenu::OpenSceneDialog() {
 #endif
 }
 
+void EditorFileMenu::OpenSceneFromPath(const std::string& path) {
+    if (path.empty()) {
+        return;
+    }
+    _openScene(path);
+}
+
 // Opens a Windows file save dialog for the user to choose a filename and location for saving
 // Then saves the active scene to that path
 void EditorFileMenu::SaveSceneAsDialog() {

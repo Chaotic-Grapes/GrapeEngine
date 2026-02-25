@@ -37,6 +37,12 @@ namespace EditorIcons {
     static constexpr const char* Import = "\xEF\x82\x9B";          // upload_file
     static constexpr const char* Replace = "\xEE\xA3\x94";         // swap_horiz
     static constexpr const char* NewFolder = "\xEE\x8B\x8C";       // e2cc
+    static constexpr const char* Audio = "\xEE\xAE\x82";           // eb82
+    static constexpr const char* Scene = "\xEE\x8F\xB7";           // e3f7
+    static constexpr const char* Script = "\xEF\xA1\x8D";          // f84d
+    static constexpr const char* Texture = "\xEE\x90\xA1";         // e421
+    static constexpr const char* Shader = "\xEE\xBE\x8F";          // ef8f
+    static constexpr const char* Font = "\xEE\x89\xA2";            // e262
 
     // Hierarchy
     static constexpr const char* Prefab = "\xEF\x9C\xA0";          // deployed_code
