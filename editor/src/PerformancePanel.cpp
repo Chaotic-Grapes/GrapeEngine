@@ -431,8 +431,7 @@ void PerformancePanel::_renderMemoryStats() {
         m_statsValidated = true;
 
 		// Run validation
-        if (_validateMemoryStats()) LOG_INFO("Memory Manager working as expected");
-        else LOG_ERROR("Memory Manager stats MISMATCH");
+        if (!_validateMemoryStats()) LOG_ERROR("Memory Manager stats MISMATCH");
     }
 }
 
@@ -440,10 +439,16 @@ bool PerformancePanel::_validateMemoryStats() {
     MemoryManager& mm = MemoryManager::GetInstance();
 
 	// Each allocation rounded up to nearest 16 bytes
-	// So we know exactly how much to expect in total allocated/freed
+	// This gives us a minimum expected delta; internal fragmentation may add a small overhead
 	constexpr int TEST_SIZES[] = { 64, 128, 256 };  // Aligned sizes
 	constexpr int NUM_TESTS = 3;                    // Number of test allocations
 	constexpr size_t ALIGNMENT = 16;                // Memory alignment
+
+    // If a block cannot be split, the allocator may consume a bit of extra space
+    // (internal fragmentation)
+    // Worst-case overhead per allocation is < header + alignment
+    // We conservatively allow up to 2 * ALIGNMENT per allocation
+    constexpr size_t MAX_INTERNAL_FRAG = ALIGNMENT * 2;
     size_t expectedAllocDelta = 0;
 
 	// Calculate expected allocation delta
@@ -506,14 +511,25 @@ bool PerformancePanel::_validateMemoryStats() {
     int freeBlocksAfterFree = mm.GetFreeBlockCount();
     int pagesAfterFree = mm.GetPageCount();
 
-	// Verify that allocated and freed deltas match expected
-	bool allocDeltaOk = (allocAfterAlloc - allocBefore) == expectedAllocDelta;  // Allocated delta matches expected
-	bool freeDeltaOk = (freedAfterFree - freedBefore) == expectedAllocDelta;    // Freed delta matches expected
-	bool freedStableDuringAllocOk = (freedAfterAlloc == freedBefore);           // Freed did not change during alloc
+    // How much allocator's tracked bytes changed across alloc/free operations
+    const size_t allocDelta = (allocAfterAlloc - allocBefore);
+    const size_t freeDelta = (freedAfterFree - freedBefore);
+    const size_t usageDelta = (usageAfterAlloc - usageBefore);
+
+    // Fragmentation tolerance exists because if a free block can't be split (too small to hold both request
+    // and leftover block with header), the allocator may give a slightly larger chunk than we asked for
+    // Rather than leaving an unusably tiny remainder
+    const size_t maxAllocDelta = expectedAllocDelta + (NUM_TESTS * MAX_INTERNAL_FRAG);
+
+	// Verify that allocated and freed deltas are within expected range
+    // (Allowing small internal fragmentation when blocks cannot be split)
+	bool allocDeltaOk = (allocDelta >= expectedAllocDelta) && (allocDelta <= maxAllocDelta);
+	bool freeDeltaOk = (freeDelta == allocDelta);
+	bool freedStableDuringAllocOk = (freedAfterAlloc == freedBefore); // Freed did not change during alloc
 
 	// Usage checks
-	bool usageRestoredOk = (usageAfterFree == usageBefore);                     // Usage restored after free
-	bool usageDuringOk = (usageAfterAlloc - usageBefore) == expectedAllocDelta; // Usage increased correctly during alloc
+	bool usageRestoredOk = (usageAfterFree == usageBefore);           // Usage restored after free
+	bool usageDuringOk = (usageDelta == allocDelta);                  // Usage increased correctly during alloc
 
 	// Usage consistency checks
 	bool usageConsistencyBeforeOk = (allocBefore >= freedBefore) && (usageBefore == (allocBefore - freedBefore));                          // Before alloc
@@ -580,12 +596,19 @@ bool PerformancePanel::_validateMemoryStats() {
         poolAfterFreeOk && pageSizeBeforeOk && pageSizeAfterAllocOk && pageSizeAfterFreeOk && pageSizeConsistentOk &&
         allPtrsOk && freeBlocksDroppedOk && freeBlocksRestoredOk;
 
+    if (passed) {
+        LOG_INFO("Memory Manager stats OK (allocDelta=" << allocDelta
+            << ", freeDelta=" << freeDelta
+            << ", usageDelta=" << usageDelta
+            << ", expected range=[" << expectedAllocDelta << ", " << maxAllocDelta << "])");
+    }
+
 	// Log detailed failure reasons
-    if (!allocDeltaOk) LOG_ERROR("FAIL [1] allocDelta: got " << (allocAfterAlloc - allocBefore) << ", expected " << expectedAllocDelta);
-    if (!freeDeltaOk) LOG_ERROR("FAIL [2] freeDelta: got " << (freedAfterFree - freedBefore) << ", expected " << expectedAllocDelta);
+    if (!allocDeltaOk) LOG_ERROR("FAIL [1] allocDelta: got " << allocDelta << ", expected range [" << expectedAllocDelta << ", " << maxAllocDelta << "]");
+    if (!freeDeltaOk) LOG_ERROR("FAIL [2] freeDelta: got " << freeDelta << ", expected " << allocDelta);
     if (!freedStableDuringAllocOk) LOG_ERROR("FAIL [3] freed changed during alloc: before=" << freedBefore << ", after=" << freedAfterAlloc);
     if (!usageRestoredOk) LOG_ERROR("FAIL [4] usageRestored: after=" << usageAfterFree << ", before=" << usageBefore);
-    if (!usageDuringOk) LOG_ERROR("FAIL [5] usageDuring: got " << (usageAfterAlloc - usageBefore) << ", expected " << expectedAllocDelta);
+    if (!usageDuringOk) LOG_ERROR("FAIL [5] usageDuring: got " << usageDelta << ", expected " << allocDelta);
     if (!usageConsistencyBeforeOk) LOG_ERROR("FAIL [6] usageBefore != allocBefore - freedBefore");
     if (!usageConsistencyAfterAllocOk) LOG_ERROR("FAIL [7] usageAfterAlloc != allocAfterAlloc - freedAfterAlloc");
     if (!usageConsistencyAfterFreeOk) LOG_ERROR("FAIL [8] usageAfterFree != allocAfterFree - freedAfterFree");
