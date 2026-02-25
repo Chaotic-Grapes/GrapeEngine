@@ -94,7 +94,9 @@ namespace SpriteSheetUtils {
 
         // Determine row and column from absolute frame index (row-major layout)
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        int row = absoluteFrame / totalCols;
+        const int totalRows = sheetHeight / frameHeight;
+        row = (totalRows - 1) - row; // Flip so row 0 is the top row.
 
         // Convert pixel coordinates to normalized UV coordinates (0.0 to 1.0)
         const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);

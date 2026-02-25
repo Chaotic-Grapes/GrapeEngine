@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include <unordered_map>
 
 namespace ECS {
     /**
@@ -43,6 +44,16 @@ namespace ECS {
         SystemMetadata GetMetadata() const override;
         SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
+
+    private:
+        struct AnimationTracker {
+            uint32_t ConfigHash = 0;
+            bool WasPlaying = false;
+            int LastFrame = 0;
+            bool SeenThisFrame = false; // Used to prune dead entities safely.
+        };
+
+        std::unordered_map<uint32_t, AnimationTracker> m_trackers;
     };
 }
 

@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <nlohmann/json.hpp>
 #include <cstdint>
 #include <string>
+#include <array>
 #include <type_traits>
 
 /*
@@ -361,6 +362,94 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<TileMapComponent>, "TileMapComponent must be trivially copyable");
 
         // ---------------------------------- Animation ----------------------------------
+
+        static constexpr uint32_t kAnimationMaxParams = 16;
+        static constexpr uint32_t kAnimationMaxHitboxes = 8;
+        static constexpr uint32_t kAnimationMaxAttachments = 8;
+
+        // Animation controller binding (asset-driven).
+        struct AnimationController2D {
+        public:
+            uint32_t ControllerPath = 0; // StringTable id for .animctrl path
+            uint32_t ControllerAssetId = 0; // Runtime asset id
+            bool Transient = false; // True when controller is auto-migrated at runtime.
+            uint8_t _padding[3] = { 0, 0, 0 };
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationController2D>, "AnimationController2D must be trivially copyable");
+
+        // Runtime controller state (state machine + blending).
+        struct AnimationRuntime2D {
+        public:
+            int CurrentState = 0;
+            int NextState = -1;
+            float StateTime = 0.0f;
+            float NextStateTime = 0.0f;
+            float BlendAlpha = 0.0f;
+            float BlendDuration = 0.0f;
+            bool Playing = true;
+            uint8_t _padding[3] = { 0, 0, 0 };
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationRuntime2D>, "AnimationRuntime2D must be trivially copyable");
+
+        // Parameter store for controller transitions.
+        struct AnimationParameters2D {
+        public:
+            uint8_t BoolCount = 0;
+            uint8_t IntCount = 0;
+            uint8_t FloatCount = 0;
+            uint8_t _paddingCount = 0;
+            std::array<bool, kAnimationMaxParams> BoolValues{};
+            std::array<int, kAnimationMaxParams> IntValues{};
+            std::array<float, kAnimationMaxParams> FloatValues{};
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationParameters2D>, "AnimationParameters2D must be trivially copyable");
+
+        // Secondary sprite data for crossfade blending.
+        struct AnimationBlend2D {
+        public:
+            uint32_t TextureId = 0;
+            uint32_t NormalTextureId = 0;
+            Vector2D Tiling{1.0f, 1.0f};
+            Vector2D Offset{0.0f, 0.0f};
+            int Width = 0;
+            int Height = 0;
+            float Alpha = 0.0f;
+            Graphics::TextureFilter TextureFilter = Graphics::TextureFilter::Nearest;
+            uint8_t _paddingFilter[3] = { 0, 0, 0 };
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationBlend2D>, "AnimationBlend2D must be trivially copyable");
+
+        // Per-frame hitbox metadata.
+        struct AnimationHitbox2D {
+        public:
+            uint32_t NameId = 0; // StringTable id for hitbox name
+            Vector2D Offset{0.0f, 0.0f};
+            Vector2D Size{0.0f, 0.0f};
+            Color Color{1.0f, 0.0f, 0.0f, 1.0f};
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationHitbox2D>, "AnimationHitbox2D must be trivially copyable");
+
+        struct AnimationHitboxBuffer2D {
+        public:
+            uint32_t Count = 0;
+            AnimationHitbox2D Hitboxes[kAnimationMaxHitboxes]{};
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationHitboxBuffer2D>, "AnimationHitboxBuffer2D must be trivially copyable");
+
+        // Per-frame attachment metadata.
+        struct AnimationAttachment2D {
+        public:
+            uint32_t NameId = 0; // StringTable id for attachment name
+            Vector2D Offset{0.0f, 0.0f};
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationAttachment2D>, "AnimationAttachment2D must be trivially copyable");
+
+        struct AnimationAttachmentBuffer2D {
+        public:
+            uint32_t Count = 0;
+            AnimationAttachment2D Attachments[kAnimationMaxAttachments]{};
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationAttachmentBuffer2D>, "AnimationAttachmentBuffer2D must be trivially copyable");
 
         // Sprite sheet animation configuration (POD)
         struct SpriteSheetAnimation2D {

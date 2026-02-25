@@ -282,12 +282,13 @@ void LevelEditor::_buildDockLayout() {
         // Dock a window into the layout region.
         ImGui::DockBuilderDockWindow("Game", topRight);
     }
-    // Dock a window into the layout region.
-    ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
-    ImGui::DockBuilderDockWindow("Property Editor", rightNode);
-    // Dock a window into the layout region.
-    ImGui::DockBuilderDockWindow("Layers", rightNode);
-    ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
+      // Dock a window into the layout region.
+      ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
+      ImGui::DockBuilderDockWindow("Property Editor", rightNode);
+      // Dock a window into the layout region.
+      ImGui::DockBuilderDockWindow("Layers", rightNode);
+      ImGui::DockBuilderDockWindow("Animation", rightNode);
+      ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
     // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
@@ -634,6 +635,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         },
         // Set world.
         [this](ECS::World* w) { m_systemsPanel.SetWorld(w); }
+    );
+
+    _registerPanel("Animation",
+        [this]() {
+            m_animationEditorPanel.Initialize(m_mainFont, m_boldFont);
+        },
+        [this]() { m_animationEditorPanel.Render(); },
+        nullptr
     );
 
     // Initialize all registered panels

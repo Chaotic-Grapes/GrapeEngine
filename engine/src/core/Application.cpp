@@ -24,6 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/GUIRenderSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
+#include "ecs/systems/AnimationControllerSystem2D.h"
+#include "ecs/systems/AnimationClipSystem2D.h"
 #include "ecs/events/EventDispatcher.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
@@ -393,6 +395,8 @@ namespace Engine {
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
+        m_systemManager.RegisterSystem<ECS::AnimationControllerSystem2D>();
+        m_systemManager.RegisterSystem<ECS::AnimationClipSystem2D>();
         auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         m_sceneManager.SetAudioSystem(audioSystem);
         

@@ -21,6 +21,7 @@ Features:
 #include "services/ResourceManager.h"
 #include "core/Logger.h"
 #include "core/messaging/MessageSystem.h"
+#include "animation/AnimationAssetManager.h"
 #include <fstream>
 #include <algorithm>
 
@@ -50,6 +51,16 @@ template<>
 std::unordered_map<std::string, std::shared_ptr<PrefabData>>&
 ResourceManager::GetCacheMap<PrefabData>() { return m_prefabs; }
 
+// When T = AnimationClipData, return animation clip cache
+template<>
+std::unordered_map<std::string, std::shared_ptr<AnimationClipData>>&
+ResourceManager::GetCacheMap<AnimationClipData>() { return m_animationClips; }
+
+// When T = AnimationControllerData, return animation controller cache
+template<>
+std::unordered_map<std::string, std::shared_ptr<AnimationControllerData>>&
+ResourceManager::GetCacheMap<AnimationControllerData>() { return m_animationControllers; }
+
 // When T = RawData, return raw data cache
 template<>
 std::unordered_map<std::string, std::shared_ptr<RawData>>&
@@ -78,6 +89,16 @@ ResourceManager::GetOwnerMap<Shader>() { return m_shaderOwners; }
 template<>
 std::unordered_map<std::string, std::unordered_set<std::string>>&
 ResourceManager::GetOwnerMap<PrefabData>() { return m_prefabOwners; }
+
+// When T = AnimationClipData, return animation clip owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<AnimationClipData>() { return m_animationClipOwners; }
+
+// When T = AnimationControllerData, return animation controller owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<AnimationControllerData>() { return m_animationControllerOwners; }
 
 // When T = RawData, return raw data owner map
 template<>
@@ -121,6 +142,8 @@ template GRAPEENGINE_API std::shared_ptr<AudioData> ResourceManager::Get<AudioDa
 template GRAPEENGINE_API std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<Shader> ResourceManager::Get<Shader>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<PrefabData> ResourceManager::Get<PrefabData>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<AnimationClipData> ResourceManager::Get<AnimationClipData>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<AnimationControllerData> ResourceManager::Get<AnimationControllerData>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<RawData> ResourceManager::Get<RawData>(const std::string&);
 
 // Loading function for textures
@@ -357,6 +380,56 @@ template<>std::shared_ptr<PrefabData> ResourceManager::Load<PrefabData>(const st
     }
 }
 
+// Loading function for animation clips
+template<>std::shared_ptr<AnimationClipData> ResourceManager::Load<AnimationClipData>(const std::string& filePath) {
+    if (!std::filesystem::exists(filePath)) {
+        LOG_ERROR("File not found: " << filePath);
+        return nullptr;
+    }
+
+    std::string extension = std::filesystem::path(filePath).extension().string();
+    if (extension != ".anim") {
+        LOG_WARNING("Not an .anim file: " << filePath);
+        return nullptr;
+    }
+
+    Animation::AnimationClip2DData clip{};
+    if (!Animation::AnimationAssetManager::LoadClipFromJson(filePath, clip)) {
+        return nullptr;
+    }
+
+    auto asset = std::make_shared<AnimationClipData>();
+    asset->Path = filePath;
+    asset->Data = std::move(clip);
+    asset->IsValid = true;
+    return asset;
+}
+
+// Loading function for animation controllers
+template<>std::shared_ptr<AnimationControllerData> ResourceManager::Load<AnimationControllerData>(const std::string& filePath) {
+    if (!std::filesystem::exists(filePath)) {
+        LOG_ERROR("File not found: " << filePath);
+        return nullptr;
+    }
+
+    std::string extension = std::filesystem::path(filePath).extension().string();
+    if (extension != ".animctrl") {
+        LOG_WARNING("Not an .animctrl file: " << filePath);
+        return nullptr;
+    }
+
+    Animation::AnimationController2DData controller{};
+    if (!Animation::AnimationAssetManager::LoadControllerFromJson(filePath, controller)) {
+        return nullptr;
+    }
+
+    auto asset = std::make_shared<AnimationControllerData>();
+    asset->Path = filePath;
+    asset->Data = std::move(controller);
+    asset->IsValid = true;
+    return asset;
+}
+
 // Load font with custom pixel size
 std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixelSize) {
     // Create unique cache key that includes size (same font, different sizes cached separately)
@@ -415,12 +488,16 @@ void ResourceManager::ClearCache() {
     m_fonts.clear();
     m_shaders.clear();
     m_prefabs.clear();
+    m_animationClips.clear();
+    m_animationControllers.clear();
     m_rawData.clear();
     m_textureOwners.clear();
     m_audioOwners.clear();
     m_fontOwners.clear();
     m_shaderOwners.clear();
     m_prefabOwners.clear();
+    m_animationClipOwners.clear();
+    m_animationControllerOwners.clear();
     m_rawDataOwners.clear();
     m_loggedFontCacheHits.clear();
     LOG_INFO("Cleared all cached assets");
@@ -458,6 +535,8 @@ void ResourceManager::UnloadAsset(const std::string& name) {
     }
     removed |= m_shaders.erase(name) > 0;
     removed |= m_prefabs.erase(name) > 0;
+    removed |= m_animationClips.erase(name) > 0;
+    removed |= m_animationControllers.erase(name) > 0;
     removed |= m_rawData.erase(name) > 0;
 
     m_textureOwners.erase(name);
@@ -465,6 +544,8 @@ void ResourceManager::UnloadAsset(const std::string& name) {
     m_fontOwners.erase(name);
     m_shaderOwners.erase(name);
     m_prefabOwners.erase(name);
+    m_animationClipOwners.erase(name);
+    m_animationControllerOwners.erase(name);
     m_rawDataOwners.erase(name);
 
     if (removed) {
@@ -477,7 +558,8 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
 // Get total number of cached assets
 size_t ResourceManager::GetCacheSize() const {
-    return m_textures.size() + m_audioFiles.size() + m_fonts.size() + m_shaders.size() + m_prefabs.size() + m_rawData.size();
+    return m_textures.size() + m_audioFiles.size() + m_fonts.size() + m_shaders.size() +
+        m_prefabs.size() + m_animationClips.size() + m_animationControllers.size() + m_rawData.size();
 }
 
 // Get cache info broken down by type
@@ -488,6 +570,8 @@ void ResourceManager::PrintCacheInfo() const {
     LOG_INFO("Fonts: " << m_fonts.size());
     LOG_INFO("Shaders: " << m_shaders.size());
     LOG_INFO("Prefabs: " << m_prefabs.size());
+    LOG_INFO("Animation clips: " << m_animationClips.size());
+    LOG_INFO("Animation controllers: " << m_animationControllers.size());
     LOG_INFO("Raw data: " << m_rawData.size());
     LOG_INFO("Total assets: " << GetCacheSize());
 
@@ -531,6 +615,8 @@ void ResourceManager::PrintCacheInfo() const {
     dumpOwners("Font", m_fontOwners);
     dumpOwners("Shader", m_shaderOwners);
     dumpOwners("Prefab", m_prefabOwners);
+    dumpOwners("AnimationClip", m_animationClipOwners);
+    dumpOwners("AnimationController", m_animationControllerOwners);
     dumpOwners("RawData", m_rawDataOwners);
 }
 
@@ -553,6 +639,8 @@ bool ResourceManager::IsAssetCached(const std::string& name) const {
         (m_fonts.find(name) != m_fonts.end()) ||
         (m_shaders.find(name) != m_shaders.end()) ||
         (m_prefabs.find(name) != m_prefabs.end()) ||
+        (m_animationClips.find(name) != m_animationClips.end()) ||
+        (m_animationControllers.find(name) != m_animationControllers.end()) ||
         (m_rawData.find(name) != m_rawData.end());
 }
 
@@ -653,6 +741,12 @@ bool ResourceManager::ReplaceAsset(const std::string& assetPath, const std::stri
         }
         else if (ext == ".prefab") {
             Get<PrefabData>(assetPath);
+        }
+        else if (ext == ".anim") {
+            Get<AnimationClipData>(assetPath);
+        }
+        else if (ext == ".animctrl") {
+            Get<AnimationControllerData>(assetPath);
         }
 
         LOG_INFO("Replaced asset: " << assetPath);

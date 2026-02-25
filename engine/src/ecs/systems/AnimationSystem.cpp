@@ -25,9 +25,49 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/SpriteSheetUtils.h"
 #include <algorithm>
 #include <vector>
+#include <cstring>
 #include "services/TimeSystem.h"
+#include "core/messaging/MessageSystem.h"
 
 namespace ECS {
+    namespace {
+        constexpr uint32_t kFNVOffsetBasis = 2166136261u;
+        constexpr uint32_t kFNVPrime = 16777619u;
+
+        inline void HashCombine(uint32_t& hash, uint32_t value) {
+            hash ^= value;
+            hash *= kFNVPrime;
+        }
+
+        inline uint32_t HashFloat(float value) {
+            uint32_t bits = 0;
+            std::memcpy(&bits, &value, sizeof(bits)); // Hash float by bit pattern to avoid precision loss.
+            return bits;
+        }
+
+        uint32_t HashAnimationConfig(const Components::SpriteSheetAnimation2D& anim) {
+            uint32_t hash = kFNVOffsetBasis;
+            HashCombine(hash, anim.TextureId);
+            HashCombine(hash, anim.NormalTextureId);
+            HashCombine(hash, static_cast<uint32_t>(anim.FrameWidth));
+            HashCombine(hash, static_cast<uint32_t>(anim.FrameHeight));
+            HashCombine(hash, static_cast<uint32_t>(anim.SheetWidth));
+            HashCombine(hash, static_cast<uint32_t>(anim.SheetHeight));
+            HashCombine(hash, static_cast<uint32_t>(anim.StartFrame));
+            HashCombine(hash, static_cast<uint32_t>(anim.FrameCount));
+            HashCombine(hash, static_cast<uint32_t>(anim.Row));
+            HashCombine(hash, static_cast<uint32_t>(anim.FrameOffset));
+            HashCombine(hash, static_cast<uint32_t>(anim.FrameLength));
+            HashCombine(hash, HashFloat(anim.FramesPerSecond));
+            HashCombine(hash, static_cast<uint32_t>(anim.Loop ? 1 : 0));
+            HashCombine(hash, static_cast<uint32_t>(anim.UseRow ? 1 : 0));
+            HashCombine(hash, static_cast<uint32_t>(anim.TextureFilter));
+            HashCombine(hash, anim.TexturePath);
+            HashCombine(hash, anim.NormalTexturePath);
+            return hash;
+        }
+    }
+
     SystemMetadata AnimationSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Animation");
         // Define which components this system reads from
@@ -50,9 +90,44 @@ namespace ECS {
     void AnimationSystem::OnUpdate(World& world) {
         // Get the delta time since the last frame for animation timing
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        std::vector<Entity> missingStates;
+        world.Each<Components::SpriteSheetAnimation2D>(
+            [&](Entity entity, const Components::SpriteSheetAnimation2D&) {
+                if (!world.Has<Components::AnimationState2D>(entity)) {
+                    missingStates.push_back(entity);
+                }
+            }
+        );
+        for (const Entity entity : missingStates) {
+            world.Add<Components::AnimationState2D>(entity); // Defer Add to avoid archetype mutation mid-iteration.
+        }
+        for (auto& [id, tracker] : m_trackers) {
+            tracker.SeenThisFrame = false; // Reset marker before this frame's pass.
+        }
         // Iterate through all entities that have animation and animation state components
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
             [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {
+                if (world.Has<Components::AnimationController2D>(entity)) {
+                    return; // Controller-driven animation overrides legacy sprite sheet playback.
+                }
+                auto [it, inserted] = m_trackers.try_emplace(entity.Index);
+                auto& tracker = it->second;
+                if (inserted) {
+                    tracker.LastFrame = state.CurrentFrame;
+                }
+                tracker.SeenThisFrame = true;
+                const uint32_t configHash = HashAnimationConfig(anim);
+                const bool configChanged = (tracker.ConfigHash != 0 && tracker.ConfigHash != configHash);
+                tracker.ConfigHash = configHash;
+                bool resetThisFrame = false;
+
+                if (configChanged) {
+                    state.CurrentFrame = 0;
+                    state.TimeAccumulator = 0.0f;
+                    state.Finished = false;
+                    resetThisFrame = true;
+                }
+
                 // Skip processing if the entity or its parents are disabled.
                 if (!world.IsActiveInHierarchy(entity)) {
                     return;
@@ -96,6 +171,8 @@ namespace ECS {
                 const bool canAdvance = anim.Playing && anim.FramesPerSecond > 0.0f &&
                     (anim.Loop || !state.Finished);
 
+                bool loopedThisTick = false;
+                const bool finishedBefore = state.Finished;
                 if (canAdvance) {
                     // Add elapsed time to accumulator for frame timing
                     state.TimeAccumulator += dt;
@@ -113,6 +190,7 @@ namespace ECS {
                             if (anim.Loop) {
                                 state.CurrentFrame = 0;
                                 state.Finished = false;
+                                loopedThisTick = true;
                             }
                             else {
                                 state.CurrentFrame = window.Count - 1;
@@ -129,6 +207,74 @@ namespace ECS {
                 const glm::vec4 uv = SpriteSheetUtils::ComputeUV(
                     absoluteFrame, anim.FrameWidth, anim.FrameHeight, anim.SheetWidth, anim.SheetHeight);
 
+                if (resetThisFrame) {
+                    Messaging::MessageSystem::Notify(Messaging::AnimationEvent2D{
+                        Messaging::AnimationEvent2D::Type::Reset,
+                        entity.Index,
+                        state.CurrentFrame,
+                        absoluteFrame,
+                        window.Start,
+                        window.Count,
+                        anim.Loop,
+                        anim.Playing
+                    });
+                }
+
+                if (anim.Playing && !tracker.WasPlaying) {
+                    Messaging::MessageSystem::Notify(Messaging::AnimationEvent2D{
+                        Messaging::AnimationEvent2D::Type::Started,
+                        entity.Index,
+                        state.CurrentFrame,
+                        absoluteFrame,
+                        window.Start,
+                        window.Count,
+                        anim.Loop,
+                        anim.Playing
+                    });
+                }
+
+                if (loopedThisTick) {
+                    Messaging::MessageSystem::Notify(Messaging::AnimationEvent2D{
+                        Messaging::AnimationEvent2D::Type::Loop,
+                        entity.Index,
+                        state.CurrentFrame,
+                        absoluteFrame,
+                        window.Start,
+                        window.Count,
+                        anim.Loop,
+                        anim.Playing
+                    });
+                }
+
+                if (!finishedBefore && state.Finished) {
+                    Messaging::MessageSystem::Notify(Messaging::AnimationEvent2D{
+                        Messaging::AnimationEvent2D::Type::Finished,
+                        entity.Index,
+                        state.CurrentFrame,
+                        absoluteFrame,
+                        window.Start,
+                        window.Count,
+                        anim.Loop,
+                        anim.Playing
+                    });
+                }
+
+                if (state.CurrentFrame != tracker.LastFrame) {
+                    Messaging::MessageSystem::Notify(Messaging::AnimationEvent2D{
+                        Messaging::AnimationEvent2D::Type::FrameChanged,
+                        entity.Index,
+                        state.CurrentFrame,
+                        absoluteFrame,
+                        window.Start,
+                        window.Count,
+                        anim.Loop,
+                        anim.Playing
+                    });
+                }
+
+                tracker.LastFrame = state.CurrentFrame;
+                tracker.WasPlaying = anim.Playing;
+
                 // Update the sprite renderer with current frame data; only do this if the sprite component exists
                 // Animation state is advanced regardless to maintain consistency even without a renderer
                 if (auto* sprite = world.TryGet<Components::SpriteRenderer2D>(entity)) {
@@ -143,6 +289,15 @@ namespace ECS {
                 }
             }
         );
+
+        for (auto it = m_trackers.begin(); it != m_trackers.end(); ) {
+            if (!it->second.SeenThisFrame) {
+                it = m_trackers.erase(it); // Drop stale trackers for removed entities.
+            }
+            else {
+                ++it;
+            }
+        }
     }
 
 }

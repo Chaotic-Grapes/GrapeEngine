@@ -126,6 +126,10 @@ namespace ECS::Events {
             if (world.IsAlive(e) && world.Has<ECS::Events::TriggerExitEventBuffer>(e))
                 world.Remove<ECS::Events::TriggerExitEventBuffer>(e);
         });
+        world.Each<ECS::Events::AnimationEventBuffer2D>([&](Entity e, ECS::Events::AnimationEventBuffer2D&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::AnimationEventBuffer2D>(e))
+                world.Remove<ECS::Events::AnimationEventBuffer2D>(e);
+        });
     }
 }
 

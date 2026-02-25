@@ -53,6 +53,7 @@ glm::vec4 SpriteAnimation::currentUV() const {
 
     int col = absoluteFrame % m_totalCols;
     int row = absoluteFrame / m_totalCols;
+    row = (m_totalRows - 1) - row; // Flip so row 0 is the top row.
 
     float u0 = (col * m_frameWidth) / (float)m_texWidth;
     float v0 = (row * m_frameHeight) / (float)m_texHeight;

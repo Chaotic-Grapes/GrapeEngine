@@ -1,0 +1,60 @@
+{
+  "name": "Fishfolk Idle",
+  "spriteSheet": {
+    "texture": "Assets/Sprites/FishfolkSheet.png",
+    "normal": "",
+    "frameWidth": 32,
+    "frameHeight": 16,
+    "sheetWidth": 512,
+    "sheetHeight": 160,
+    "startFrame": 0,
+    "frameCount": 16,
+    "row": 0,
+    "frameOffset": 0,
+    "frameLength": 16,
+    "fps": 12.0,
+    "loop": true,
+    "useRow": true
+  },
+  "frameDurations": [
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08,
+    0.08
+  ],
+  "frames": [
+    {
+      "rootMotion": [0.02, 0.0],
+      "notifies": [
+        { "name": "Step" }
+      ],
+      "hitboxes": [
+        { "name": "Body", "offset": [0.0, 0.0], "size": [0.5, 0.8], "color": [1.0, 0.0, 0.0, 1.0] }
+      ],
+      "attachments": [
+        { "name": "Weapon", "offset": [0.3, 0.1] }
+      ]
+    },
+    {
+      "rootMotion": [0.02, 0.0],
+      "hitboxes": [
+        { "name": "Body", "offset": [0.0, 0.0], "size": [0.5, 0.8], "color": [1.0, 0.0, 0.0, 1.0] }
+      ],
+      "attachments": [
+        { "name": "Weapon", "offset": [0.35, 0.1] }
+      ]
+    }
+  ]
+}

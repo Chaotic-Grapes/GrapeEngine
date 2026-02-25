@@ -44,6 +44,8 @@ Usage:
 #include "graphics/Texture.hpp"
 #include "graphics/Font.hpp"
 #include "graphics/Shader.hpp"
+#include "animation/AnimationClip2D.h"
+#include "animation/AnimationController2D.h"
 
 // A struct is created for audio data since there's no audio class
 struct AudioData {
@@ -58,6 +60,20 @@ struct PrefabData {
     std::string Path;           // Original file path of the prefab
     std::string JsonContent;    // Raw JSON content from the .prefab file
     bool IsValid = false;       // Flag indicating if the prefab was loaded successfully
+};
+
+// Animation clip asset data (.anim)
+struct AnimationClipData {
+    std::string Path;                   // Original file path of the clip
+    Animation::AnimationClip2DData Data; // Parsed clip data
+    bool IsValid = false;               // Flag indicating load success
+};
+
+// Animation controller asset data (.animctrl)
+struct AnimationControllerData {
+    std::string Path;                        // Original file path of the controller
+    Animation::AnimationController2DData Data; // Parsed controller data
+    bool IsValid = false;                    // Flag indicating load success
 };
 
 // Raw data structure for generic file loading
@@ -158,6 +174,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
     std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders;
     std::unordered_map<std::string, std::shared_ptr<PrefabData>> m_prefabs;
+    std::unordered_map<std::string, std::shared_ptr<AnimationClipData>> m_animationClips;
+    std::unordered_map<std::string, std::shared_ptr<AnimationControllerData>> m_animationControllers;
     std::unordered_map<std::string, std::shared_ptr<RawData>> m_rawData;
 
     // Asset owners per type (asset path/cache key -> set of owner tags)
@@ -166,6 +184,8 @@ private:
     std::unordered_map<std::string, std::unordered_set<std::string>> m_fontOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_shaderOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_prefabOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_animationClipOwners;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_animationControllerOwners;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_rawDataOwners;
 
     std::unordered_set<std::string> m_loggedFontCacheHits;

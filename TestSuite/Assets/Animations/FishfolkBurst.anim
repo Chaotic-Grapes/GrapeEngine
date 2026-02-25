@@ -1,0 +1,60 @@
+{
+  "name": "Fishfolk Burst",
+  "spriteSheet": {
+    "texture": "Assets/Sprites/FishfolkSheet.png",
+    "normal": "",
+    "frameWidth": 32,
+    "frameHeight": 16,
+    "sheetWidth": 512,
+    "sheetHeight": 160,
+    "startFrame": 0,
+    "frameCount": 16,
+    "row": 1,
+    "frameOffset": 0,
+    "frameLength": 16,
+    "fps": 18.0,
+    "loop": false,
+    "useRow": true
+  },
+  "frameDurations": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+  ],
+  "frames": [
+    {
+      "rootMotion": [0.05, 0.0],
+      "notifies": [
+        { "name": "Attack" }
+      ],
+      "hitboxes": [
+        { "name": "Hit", "offset": [0.4, 0.0], "size": [0.6, 0.4], "color": [1.0, 0.4, 0.0, 1.0] }
+      ],
+      "attachments": [
+        { "name": "Weapon", "offset": [0.45, 0.15] }
+      ]
+    },
+    {
+      "rootMotion": [0.05, 0.0],
+      "hitboxes": [
+        { "name": "Hit", "offset": [0.45, 0.0], "size": [0.6, 0.4], "color": [1.0, 0.4, 0.0, 1.0] }
+      ],
+      "attachments": [
+        { "name": "Weapon", "offset": [0.5, 0.15] }
+      ]
+    }
+  ]
+}

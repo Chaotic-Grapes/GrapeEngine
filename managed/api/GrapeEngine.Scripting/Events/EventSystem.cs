@@ -111,6 +111,31 @@ public class EventSystem(World world)
     }
 
     /// <summary>
+    /// Check if an entity has an animation event this frame.
+    /// </summary>
+    public bool HasAnimationEvent(ulong entityId)
+    {
+        var entity = Entity.FromId(_world, entityId);
+        if (!entity.IsAlive || !entity.HasComponent<AnimationEventBuffer2D>())
+            return false;
+        return entity.GetComponent<AnimationEventBuffer2D>().Count > 0;
+    }
+
+    /// <summary>
+    /// Get the first animation event for an entity (if any).
+    /// </summary>
+    public AnimationEvent2D? GetAnimationEvent(ulong entityId)
+    {
+        var entity = Entity.FromId(_world, entityId);
+        if (entity.IsAlive && entity.HasComponent<AnimationEventBuffer2D>())
+        {
+            var buffer = entity.GetComponent<AnimationEventBuffer2D>();
+            return buffer.Count > 0 ? buffer.GetEvent(0) : null;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Get the count of collision events this frame (all entities with CollisionEvent).
     /// </summary>
     public int CollisionEventCount
@@ -153,6 +178,20 @@ public class EventSystem(World world)
     }
 
     /// <summary>
+    /// Get the count of animation events this frame.
+    /// </summary>
+    public int AnimationEventCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var (_, buffer) in _world.Query<AnimationEventBuffer2D>())
+                count += (int)buffer.Count;
+            return count;
+        }
+    }
+
+    /// <summary>
     /// Get all collision events that occurred this frame.
     /// </summary>
     public IEnumerable<(Entity Entity, CollisionEvent Event)> GetAllCollisionEvents()
@@ -182,6 +221,18 @@ public class EventSystem(World world)
     public IEnumerable<(Entity Entity, CollisionExitEvent Event)> GetAllCollisionExitEvents()
     {
         foreach (var (entity, buffer) in _world.Query<CollisionExitEventBuffer>())
+        {
+            for (int i = 0; i < buffer.Count; ++i)
+                yield return (entity, buffer.GetEvent(i));
+        }
+    }
+
+    /// <summary>
+    /// Get all animation events that occurred this frame.
+    /// </summary>
+    public IEnumerable<(Entity Entity, AnimationEvent2D Event)> GetAllAnimationEvents()
+    {
+        foreach (var (entity, buffer) in _world.Query<AnimationEventBuffer2D>())
         {
             for (int i = 0; i < buffer.Count; ++i)
                 yield return (entity, buffer.GetEvent(i));

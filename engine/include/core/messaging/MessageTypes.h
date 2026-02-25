@@ -124,6 +124,20 @@ namespace Messaging {
         float MaxHealth; // Maximum health
     };
 
+    // Sent when a 2D sprite animation advances or changes state.
+    struct AnimationEvent2D {
+        enum class Type { Started, FrameChanged, Loop, Finished, Reset, Notify };
+        Type EventType;
+        uint32_t EntityId;
+        int LocalFrame;
+        int AbsoluteFrame;
+        int WindowStart;
+        int WindowCount;
+        bool Looping;
+        bool Playing;
+        uint32_t NotifyNameId; // StringTable id for notify name (Notify events only).
+    };
+
     // -------------------------------
     // System Events
     // -------------------------------

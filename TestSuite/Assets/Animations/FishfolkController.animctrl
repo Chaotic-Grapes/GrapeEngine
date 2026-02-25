@@ -1,0 +1,31 @@
+{
+  "entryState": "Idle",
+  "parameters": [
+    { "name": "Burst", "type": "bool", "default": true }
+  ],
+  "states": [
+    {
+      "name": "Idle",
+      "clip": "Assets/Animations/FishfolkIdle.anim",
+      "speed": 1.0,
+      "loop": true
+    },
+    {
+      "name": "Burst",
+      "clip": "Assets/Animations/FishfolkBurst.anim",
+      "speed": 1.0,
+      "loop": false
+    }
+  ],
+  "transitions": [
+    {
+      "from": "Idle",
+      "to": "Burst",
+      "exitTime": 0.2,
+      "duration": 0.25,
+      "conditions": [
+        { "param": "Burst", "op": "==", "value": 1.0 }
+      ]
+    }
+  ]
+}

@@ -774,27 +774,56 @@ namespace ECS {
                                 }
                             }
 
-                            m_renderer->submitSprite({
-                                ToGlm(Vector2D{position.X, position.Y}),
-                                ToGlm(Vector2D{scale.X, scale.Y}),
-                                {u0, v0, u1, v1},
-                                ToGlm(sr.Color),
-                                sr.TextureId,
-                                angleZ,
-                                1.0f,
-                                sr.EmissiveTextureId,
-                                sr.EmissiveStrength,
-                                sr.Width,           // texture width
-                                sr.Height,          // texture height
-                                normalTexId,        // Material2D: normal map
-                                mraTexId,           // Material2D: MRA map
-                                metallic,           // Material2D: metallic value
-                                smoothness,         // Material2D: smoothness value
-                                aoStrength,         // Material2D: AO strength
-                                normalStrength,     // Material2D: normal strength
-                                flags,
-                                sr.TextureFilter
-                                });
+                              m_renderer->submitSprite({
+                                  ToGlm(Vector2D{position.X, position.Y}),
+                                  ToGlm(Vector2D{scale.X, scale.Y}),
+                                  {u0, v0, u1, v1},
+                                  ToGlm(sr.Color),
+                                  sr.TextureId,
+                                  angleZ,
+                                  1.0f,
+                                  sr.EmissiveTextureId,
+                                  sr.EmissiveStrength,
+                                  sr.Width,           // texture width
+                                  sr.Height,          // texture height
+                                  normalTexId,        // Material2D: normal map
+                                  mraTexId,           // Material2D: MRA map
+                                  metallic,           // Material2D: metallic value
+                                  smoothness,         // Material2D: smoothness value
+                                  aoStrength,         // Material2D: AO strength
+                                  normalStrength,     // Material2D: normal strength
+                                  flags,
+                                  sr.TextureFilter
+                                  });
+                              
+                              if (world.Has<Components::AnimationBlend2D>(entity)) {
+                                  const auto& blend = world.Get<Components::AnimationBlend2D>(entity);
+                                  if (blend.Alpha > 0.0f && blend.TextureId != 0) {
+                                      Color blendColor = sr.Color;
+                                      blendColor.A *= blend.Alpha; // Crossfade by scaling alpha on the blended sprite.
+                                      m_renderer->submitSprite({
+                                          ToGlm(Vector2D{position.X, position.Y}),
+                                          ToGlm(Vector2D{scale.X, scale.Y}),
+                                          {blend.Offset.X, blend.Offset.Y, blend.Offset.X + blend.Tiling.X, blend.Offset.Y + blend.Tiling.Y},
+                                          ToGlm(blendColor),
+                                          blend.TextureId,
+                                          angleZ,
+                                          1.0f,
+                                          0,
+                                          0.0f,
+                                          blend.Width,
+                                          blend.Height,
+                                          blend.NormalTextureId,
+                                          0,
+                                          0.0f,
+                                          0.5f,
+                                          1.0f,
+                                          1.0f,
+                                          0,
+                                          blend.TextureFilter
+                                          });
+                                  }
+                              }
                         }
                     }
 

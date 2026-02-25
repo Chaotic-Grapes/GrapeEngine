@@ -1,0 +1,43 @@
+/* Start Header *****************************************************************/
+/*!
+\file   AnimationControllerSystem2D.h
+\author Muhammad Nur Fadzly Bin Zulkifli
+\brief
+Defines the AnimationControllerSystem2D for clip/controller-driven animation.
+*/
+/* End Header *******************************************************************/
+
+#ifndef ANIMATIONCONTROLLERSYSTEM2D_H
+#define ANIMATIONCONTROLLERSYSTEM2D_H
+
+#include "ecs/World.h"
+#include "ecs/ISystem.h"
+#include "ecs/ComponentAccessAttribute.h"
+
+namespace ECS {
+    /**
+     * @brief The AnimationControllerSystem2D is responsible for updating the animation state of 
+     * entities with AnimationController2D components based on their parameters and transition conditions.
+     * 
+     * It evaluates the conditions for transitioning between animation states and updates the current 
+     * state accordingly.
+     * 
+     * This system runs in the Update phase and is only active during Play mode, as it relies on delta time 
+     * and is meant to drive gameplay animations.
+     */
+    class AnimationControllerSystem2D : public ISystem {
+    public:
+        AnimationControllerSystem2D() = default;
+        ~AnimationControllerSystem2D() override = default;
+
+        void OnCreate(World& world) override {}
+        void OnUpdate(World& world) override;
+        void OnDestroy(World& world) override {}
+
+        SystemMetadata GetMetadata() const override;
+        SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
+        SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
+    };
+}
+
+#endif

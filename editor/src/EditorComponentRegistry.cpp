@@ -62,6 +62,8 @@ namespace {
     const uint32_t kHashShapeLine2D = Editor::ECSUtils::FNV1aHash("ShapeLine2D");
     const uint32_t kHashLight2D = Editor::ECSUtils::FNV1aHash("Light2D");
     const uint32_t kHashAnimationState2D = Editor::ECSUtils::FNV1aHash("AnimationState2D");
+    const uint32_t kHashAnimationController2D = Editor::ECSUtils::FNV1aHash("AnimationController2D");
+    const uint32_t kHashAnimationParameters2D = Editor::ECSUtils::FNV1aHash("AnimationParameters2D");
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
@@ -256,6 +258,14 @@ Without these, the macro would end early and break the expansion
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashAnimationState2D, "AnimationState2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashAnimationController2D, "AnimationController2D"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationController2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashAnimationParameters2D, "AnimationParameters2D"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationParameters2D(d, e, w); };
         }
         
         if (const auto id = GetComponentIdFromHashOrWarn(kHashAudioSource, "AudioSource"); id != ECS::NULL_COMPONENT_ID) {
@@ -518,6 +528,25 @@ Without these, the macro would end early and break the expansion
                 return nlohmann::json{
                 {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
             }; 
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashAnimationController2D, "AnimationController2D"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                    {"ControllerPath", ""}, {"ControllerAssetId", 0}, {"Transient", false}
+                };
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashAnimationParameters2D, "AnimationParameters2D"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[id] = []() {
+                return nlohmann::json{
+                    {"BoolCount", 0}, {"IntCount", 0}, {"FloatCount", 0},
+                    {"BoolValues", std::vector<bool>(16, false)},
+                    {"IntValues", std::vector<int>(16, 0)},
+                    {"FloatValues", std::vector<float>(16, 0.0f)}
+                };
             };
         }
         
@@ -978,6 +1007,29 @@ static void _initializeDefaultRegistry() {
                 {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
             }; }),
             COMPONENT_OPS_HASH(AnimationState2D, kHashAnimationState2D)
+        },
+        // Animation Controller 2D
+        {
+            "Animation Controller 2D", "AnimationController2D", "ECS::Components::AnimationController2D",
+            GetComponentIdFromHashOrWarn(kHashAnimationController2D, "AnimationController2D"), kHashAnimationController2D, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationController2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                {"ControllerPath", ""}, {"ControllerAssetId", 0}, {"Transient", false}
+            }; }),
+            COMPONENT_OPS_HASH(AnimationController2D, kHashAnimationController2D)
+        },
+        // Animation Parameters 2D
+        {
+            "Animation Parameters 2D", "AnimationParameters2D", "ECS::Components::AnimationParameters2D",
+            GetComponentIdFromHashOrWarn(kHashAnimationParameters2D, "AnimationParameters2D"), kHashAnimationParameters2D, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationParameters2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                {"BoolCount", 0}, {"IntCount", 0}, {"FloatCount", 0},
+                {"BoolValues", std::vector<bool>(16, false)},
+                {"IntValues", std::vector<int>(16, 0)},
+                {"FloatValues", std::vector<float>(16, 0.0f)}
+            }; }),
+            COMPONENT_OPS_HASH(AnimationParameters2D, kHashAnimationParameters2D)
         },
         // Audio Source
         {

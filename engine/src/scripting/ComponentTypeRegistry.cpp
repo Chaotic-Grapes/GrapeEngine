@@ -106,6 +106,12 @@ namespace ECS {
         // Animation
         REGISTER_COMPONENT(SpriteSheetAnimation2D);
         REGISTER_COMPONENT(AnimationState2D);
+        REGISTER_COMPONENT(AnimationController2D);
+        REGISTER_COMPONENT(AnimationRuntime2D);
+        REGISTER_COMPONENT(AnimationParameters2D);
+        REGISTER_COMPONENT(AnimationBlend2D);
+        REGISTER_COMPONENT(AnimationHitboxBuffer2D);
+        REGISTER_COMPONENT(AnimationAttachmentBuffer2D);
 
         // Debug Shapes
         REGISTER_COMPONENT(ShapeCircle2D);
@@ -179,6 +185,12 @@ namespace ECS {
 
         LogComponentTypeIds("SpriteSheetAnimation2D", FNV1a_Hash("SpriteSheetAnimation2D"));
         LogComponentTypeIds("AnimationState2D", FNV1a_Hash("AnimationState2D"));
+        LogComponentTypeIds("AnimationController2D", FNV1a_Hash("AnimationController2D"));
+        LogComponentTypeIds("AnimationRuntime2D", FNV1a_Hash("AnimationRuntime2D"));
+        LogComponentTypeIds("AnimationParameters2D", FNV1a_Hash("AnimationParameters2D"));
+        LogComponentTypeIds("AnimationBlend2D", FNV1a_Hash("AnimationBlend2D"));
+        LogComponentTypeIds("AnimationHitboxBuffer2D", FNV1a_Hash("AnimationHitboxBuffer2D"));
+        LogComponentTypeIds("AnimationAttachmentBuffer2D", FNV1a_Hash("AnimationAttachmentBuffer2D"));
 
         LogComponentTypeIds("ShapeCircle2D", FNV1a_Hash("ShapeCircle2D"));
         LogComponentTypeIds("ShapeBox2D", FNV1a_Hash("ShapeBox2D"));

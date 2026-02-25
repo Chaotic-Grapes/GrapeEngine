@@ -40,6 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string.h>
 #include "audio/AudioCueRegistry.h"
 #include "services/ResourceManager.h"  // For texture loading during deserialization
+#include "animation/AnimationAssetManager.h"
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
 
@@ -394,6 +395,27 @@ namespace ECS {
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationState2D, CurrentFrame, TimeAccumulator, Finished)
+
+		// Custom serialization for AnimationController2D (StringId path needs special handling).
+		inline void to_json(nlohmann::json& j, const AnimationController2D& controller) {
+			std::string controllerPath = ECS::StringTable::Resolve(controller.ControllerPath);
+			controllerPath = NormalizeProjectPathForStorage(controllerPath);
+			j = nlohmann::json{
+				{"ControllerPath", controllerPath},
+				{"ControllerAssetId", controller.ControllerAssetId},
+				{"Transient", controller.Transient}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, AnimationController2D& controller) {
+			std::string controllerPath = j.value("ControllerPath", std::string());
+			controllerPath = NormalizeProjectPathForStorage(controllerPath);
+			controller.ControllerPath = controllerPath.empty() ? 0 : ECS::StringTable::Intern(controllerPath);
+			controller.ControllerAssetId = controllerPath.empty() ? j.value("ControllerAssetId", 0u) : 0u; // Force reload when a path is provided.
+			controller.Transient = j.value("Transient", false);
+		}
+
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationParameters2D, BoolCount, IntCount, FloatCount, BoolValues, IntValues, FloatValues)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeLine2D, A, B, Color, Thickness)
@@ -1078,6 +1100,48 @@ namespace Serialization {
 			if (!world.Has<ECS::Components::Layer>(e)) {
 				world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
 			}
+
+			if (world.Has<ECS::Components::SpriteSheetAnimation2D>(e) && !world.Has<ECS::Components::AnimationController2D>(e)) {
+				// Auto-migrate legacy sprite sheet animations into transient controller assets.
+				const auto& legacy = world.Get<ECS::Components::SpriteSheetAnimation2D>(e);
+				Animation::AnimationClip2DData clip{};
+				clip.Name = "Legacy_" + std::to_string(e.Index);
+				clip.SpriteSheet.TexturePath = ECS::StringTable::Resolve(legacy.TexturePath);
+				clip.SpriteSheet.NormalTexturePath = ECS::StringTable::Resolve(legacy.NormalTexturePath);
+				clip.SpriteSheet.FrameWidth = legacy.FrameWidth;
+				clip.SpriteSheet.FrameHeight = legacy.FrameHeight;
+				clip.SpriteSheet.SheetWidth = legacy.SheetWidth;
+				clip.SpriteSheet.SheetHeight = legacy.SheetHeight;
+				clip.SpriteSheet.StartFrame = legacy.StartFrame;
+				clip.SpriteSheet.FrameCount = legacy.FrameCount;
+				clip.SpriteSheet.Row = legacy.Row;
+				clip.SpriteSheet.FrameOffset = legacy.FrameOffset;
+				clip.SpriteSheet.FrameLength = legacy.FrameLength;
+				clip.SpriteSheet.FramesPerSecond = legacy.FramesPerSecond;
+				clip.SpriteSheet.Loop = legacy.Loop;
+				clip.SpriteSheet.UseRow = legacy.UseRow;
+
+				const std::string clipPath = "transient://legacy_clip/" + std::to_string(e.Index);
+				Animation::AnimationAssetManager::Get().CreateTransientClipWithPath(clipPath, clip);
+
+				Animation::AnimationController2DData controller{};
+				controller.EntryState = "Legacy";
+				Animation::AnimationState2D state{};
+				state.Name = "Legacy";
+				state.ClipPath = clipPath;
+				state.Speed = 1.0f;
+				state.Loop = legacy.Loop;
+				controller.States.push_back(state);
+
+				const std::string controllerPath = "transient://legacy_controller/" + std::to_string(e.Index);
+				const uint32_t controllerId = Animation::AnimationAssetManager::Get().CreateTransientControllerWithPath(controllerPath, controller);
+
+				ECS::Components::AnimationController2D controllerComp{};
+				controllerComp.ControllerPath = ECS::StringTable::Intern(controllerPath);
+				controllerComp.ControllerAssetId = controllerId;
+				controllerComp.Transient = true; // Marks auto-migrated controllers as runtime-only.
+				world.Set<ECS::Components::AnimationController2D>(e, controllerComp);
+			}
 			return e;
 		}
 
@@ -1210,6 +1274,8 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(TileMapComponent, ECS::Components::TileMapComponent, "TileMapComponent")
 	REGISTER_COMPONENT_SERIALIZER(SpriteSheetAnimation2D, ECS::Components::SpriteSheetAnimation2D, "SpriteSheetAnimation2D")
 	REGISTER_COMPONENT_SERIALIZER(AnimationState2D, ECS::Components::AnimationState2D, "AnimationState2D")
+	REGISTER_COMPONENT_SERIALIZER(AnimationController2D, ECS::Components::AnimationController2D, "AnimationController2D")
+	REGISTER_COMPONENT_SERIALIZER(AnimationParameters2D, ECS::Components::AnimationParameters2D, "AnimationParameters2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D, "ShapeCircle2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeBox2D, ECS::Components::ShapeBox2D, "ShapeBox2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeLine2D, ECS::Components::ShapeLine2D, "ShapeLine2D")

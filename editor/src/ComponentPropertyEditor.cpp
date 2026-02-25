@@ -50,6 +50,7 @@ namespace {
     const std::unordered_set<std::string> kImageExtensions = { ".png", ".jpg", ".jpeg" };
     const std::unordered_set<std::string> kFontExtensions = { ".ttf", ".otf", ".ttc" };
     const std::unordered_set<std::string> kAudioExtensions = { ".wav", ".ogg", ".mp3", ".flac" };
+    const std::unordered_set<std::string> kAnimControllerExtensions = { ".animctrl" };
     static bool s_showAssetDropError = false;
     static std::string s_assetDropErrorMessage;
 
@@ -285,7 +286,8 @@ namespace {
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
         const int absoluteFrame = windowStart + localFrame;
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        int row = absoluteFrame / totalCols;
+        row = (totalRows - 1) - row; // Flip so row 0 is the top row.
 
         const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
         const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
@@ -1499,6 +1501,90 @@ void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entit
 
     // End property section.
     EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderAnimationController2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("AnimationController2D");
+
+    if (!data.contains("ControllerPath")) data["ControllerPath"] = "";
+    if (!data.contains("ControllerAssetId")) data["ControllerAssetId"] = 0;
+    if (!data.contains("Transient")) data["Transient"] = false;
+
+    EditorUI::BeginPropertySection({ "Controller", "Transient" });
+
+    std::string controllerPath = data.value("ControllerPath", std::string());
+    std::string controllerValueText = controllerPath.empty()
+        ? "None (drag .animctrl here)"
+        : std::filesystem::path(controllerPath).filename().string();
+    EditorUI::RenderStaticValueRow("Controller", controllerValueText, controllerPath.empty());
+    if (!controllerPath.empty() && RenderClearTrashButton("AnimControllerClear", "Clear controller", m_symbolsFont)) {
+        data["ControllerPath"] = "";
+        data["ControllerAssetId"] = 0;
+    }
+    HandleAssetDragDropTarget(kAnimControllerExtensions, [&](const std::string& droppedPath) {
+        data["ControllerPath"] = droppedPath;
+        data["ControllerAssetId"] = 0; // Force reload on next update.
+        return true;
+    }, [&](const std::string& rejectedPath) {
+        QueueAssetDropError(rejectedPath, kAnimControllerExtensions);
+    });
+
+    EditorUI::RenderCheckboxProperty("Transient", data, "Transient");
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderAnimationParameters2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("AnimationParameters2D");
+
+    if (!data.contains("BoolCount")) data["BoolCount"] = 0;
+    if (!data.contains("IntCount")) data["IntCount"] = 0;
+    if (!data.contains("FloatCount")) data["FloatCount"] = 0;
+    if (!data.contains("BoolValues")) data["BoolValues"] = std::vector<bool>(16, false);
+    if (!data.contains("IntValues")) data["IntValues"] = std::vector<int>(16, 0);
+    if (!data.contains("FloatValues")) data["FloatValues"] = std::vector<float>(16, 0.0f);
+
+    EditorUI::BeginPropertySection({ "Bool Count", "Int Count", "Float Count" });
+    EditorUI::RenderIntProperty("Bool Count", data, "BoolCount");
+    EditorUI::RenderIntProperty("Int Count", data, "IntCount");
+    EditorUI::RenderIntProperty("Float Count", data, "FloatCount");
+    EditorUI::EndPropertySection();
+
+    if (ImGui::TreeNode("Bool Params")) {
+        auto& boolValues = data["BoolValues"];
+        for (int i = 0; i < 16; ++i) {
+            bool value = boolValues.at(i).get<bool>();
+            if (ImGui::Checkbox(("Bool " + std::to_string(i)).c_str(), &value)) {
+                boolValues[i] = value;
+            }
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Int Params")) {
+        auto& intValues = data["IntValues"];
+        for (int i = 0; i < 16; ++i) {
+            int value = intValues.at(i).get<int>();
+            if (ImGui::InputInt(("Int " + std::to_string(i)).c_str(), &value)) {
+                intValues[i] = value;
+            }
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Float Params")) {
+        auto& floatValues = data["FloatValues"];
+        for (int i = 0; i < 16; ++i) {
+            float value = floatValues.at(i).get<float>();
+            if (ImGui::InputFloat(("Float " + std::to_string(i)).c_str(), &value)) {
+                floatValues[i] = value;
+            }
+        }
+        ImGui::TreePop();
+    }
 }
 
 // Render guicanvas.

@@ -1,4 +1,5 @@
 using GrapeEngine.Math;
+using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Events;
 
@@ -78,6 +79,30 @@ public struct TriggerEvent
     /// True if the overlap is currently active.
     /// </summary>
     public bool IsActive { get; set; }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct AnimationEvent2D
+{
+    public enum EventType : byte
+    {
+        Started = 0,
+        FrameChanged = 1,
+        Loop = 2,
+        Finished = 3,
+        Reset = 4,
+        Notify = 5
+    }
+
+    public EventType Type;
+    public uint EntityId;
+    public int LocalFrame;
+    public int AbsoluteFrame;
+    public int WindowStart;
+    public int WindowCount;
+    public bool Looping;
+    public bool Playing;
+    public uint NotifyNameId;
 }
 
 /// <summary>
@@ -193,6 +218,33 @@ public struct TriggerEventBuffer
             _ => default
         };
     }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct AnimationEventBuffer2D
+{
+    public uint Count;
+    public AnimationEvent2D Event0;
+    public AnimationEvent2D Event1;
+    public AnimationEvent2D Event2;
+    public AnimationEvent2D Event3;
+    public AnimationEvent2D Event4;
+    public AnimationEvent2D Event5;
+    public AnimationEvent2D Event6;
+    public AnimationEvent2D Event7;
+
+    public AnimationEvent2D GetEvent(int index) => index switch
+    {
+        0 => Event0,
+        1 => Event1,
+        2 => Event2,
+        3 => Event3,
+        4 => Event4,
+        5 => Event5,
+        6 => Event6,
+        7 => Event7,
+        _ => default
+    };
 }
 
 /// <summary>

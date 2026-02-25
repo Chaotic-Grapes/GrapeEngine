@@ -128,6 +128,12 @@ private:
     // Create a new folder
     void _createFolder();
 
+    // Create a new animation clip asset
+    void _createAnimClip();
+
+    // Create a new animation controller asset
+    void _createAnimController();
+
     // Right-click context menu for asset creation
     bool _renderCreateMenuItems();
 
@@ -202,7 +208,7 @@ private:
     bool m_openCreateDialog = false;
     char m_newAssetNameBuffer[128] = "";
     bool m_focusNameInput = false;
-    enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER };
+    enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER, ANIM_CLIP, ANIM_CONTROLLER };
     AssetCreationType m_creationType = AssetCreationType::NONE;
     Editor::Templates::ScriptTemplateType m_selectedScriptTemplate = Editor::Templates::ScriptTemplateType::BasicSystem;
 

@@ -102,6 +102,12 @@ public:
     // Renders animation state for sprite sheet animation playback
     void RenderAnimationState2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders animation controller asset reference
+    void RenderAnimationController2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders animation parameters for controller transitions
+    void RenderAnimationParameters2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     

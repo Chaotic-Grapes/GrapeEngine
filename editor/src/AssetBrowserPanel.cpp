@@ -691,6 +691,8 @@ void AssetBrowserPanel::_renderCreateDialog() {
     if (m_creationType == AssetCreationType::SCRIPT) dialogTitle = "Create Script";
     else if (m_creationType == AssetCreationType::SCENE) dialogTitle = "Create Scene";
     else if (m_creationType == AssetCreationType::FOLDER) dialogTitle = "Create Folder";
+    else if (m_creationType == AssetCreationType::ANIM_CLIP) dialogTitle = "Create Animation Clip";
+    else if (m_creationType == AssetCreationType::ANIM_CONTROLLER) dialogTitle = "Create Animation Controller";
     const std::string popupTitle = std::string(dialogTitle) + "##CreateAssetDialog";
 
     if (m_openCreateDialog) {
@@ -770,6 +772,12 @@ void AssetBrowserPanel::_renderCreateDialog() {
             }
             else if (m_creationType == AssetCreationType::FOLDER) {
                 _createFolder();
+            }
+            else if (m_creationType == AssetCreationType::ANIM_CLIP) {
+                _createAnimClip();
+            }
+            else if (m_creationType == AssetCreationType::ANIM_CONTROLLER) {
+                _createAnimController();
             }
             ImGui::CloseCurrentPopup();
         }
@@ -939,6 +947,22 @@ bool AssetBrowserPanel::_renderCreateMenuItems() {
     if (ImGui::MenuItem("Create Folder")) {
         m_creationType = AssetCreationType::FOLDER;
         strcpy_s(m_newAssetNameBuffer, "NewFolder");
+        m_focusNameInput = true;
+        openDialog = true;
+    }
+
+    // Create Animation Clip option
+    if (ImGui::MenuItem("Create Animation Clip")) {
+        m_creationType = AssetCreationType::ANIM_CLIP;
+        strcpy_s(m_newAssetNameBuffer, "NewClip");
+        m_focusNameInput = true;
+        openDialog = true;
+    }
+
+    // Create Animation Controller option
+    if (ImGui::MenuItem("Create Animation Controller")) {
+        m_creationType = AssetCreationType::ANIM_CONTROLLER;
+        strcpy_s(m_newAssetNameBuffer, "NewController");
         m_focusNameInput = true;
         openDialog = true;
     }
@@ -1175,6 +1199,122 @@ void AssetBrowserPanel::_createFolder() {
     else {
         m_statusMessage = "Failed to create folder: " + folderName;
         m_statusTimer = 3.0f;
+    }
+}
+
+void AssetBrowserPanel::_createAnimClip() {
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".anim") == std::string::npos) {
+        fileName += ".anim";
+    }
+    std::filesystem::path filePath = std::filesystem::path(m_currentPath) / fileName;
+
+    if (exists(filePath)) {
+        m_statusMessage = "Animation clip already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Animation clip already exists: " << filePath.string());
+        return;
+    }
+
+    const std::string clipContent =
+        "{\n"
+        "  \"name\": \"" + std::string(m_newAssetNameBuffer) + "\",\n"
+        "  \"spriteSheet\": {\n"
+        "    \"texture\": \"\",\n"
+        "    \"normal\": \"\",\n"
+        "    \"frameWidth\": 0,\n"
+        "    \"frameHeight\": 0,\n"
+        "    \"sheetWidth\": 0,\n"
+        "    \"sheetHeight\": 0,\n"
+        "    \"startFrame\": 0,\n"
+        "    \"frameCount\": 0,\n"
+        "    \"row\": 0,\n"
+        "    \"frameOffset\": 0,\n"
+        "    \"frameLength\": 0,\n"
+        "    \"fps\": 10.0,\n"
+        "    \"loop\": true,\n"
+        "    \"useRow\": false\n"
+        "  },\n"
+        "  \"frameDurations\": [],\n"
+        "  \"frames\": []\n"
+        "}\n";
+
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create animation clip: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create animation clip file: " << filePath.string());
+            return;
+        }
+
+        file << clipContent; // Minimal schema so the clip loads without warnings.
+        file.close();
+
+        m_statusMessage = "Created animation clip: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created animation clip: " << filePath.string());
+
+        m_selectedAsset = filePath.string();
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating animation clip: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating animation clip: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_createAnimController() {
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".animctrl") == std::string::npos) {
+        fileName += ".animctrl";
+    }
+    std::filesystem::path filePath = std::filesystem::path(m_currentPath) / fileName;
+
+    if (exists(filePath)) {
+        m_statusMessage = "Animation controller already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Animation controller already exists: " << filePath.string());
+        return;
+    }
+
+    const std::string controllerContent =
+        "{\n"
+        "  \"entryState\": \"Idle\",\n"
+        "  \"parameters\": [],\n"
+        "  \"states\": [\n"
+        "    {\n"
+        "      \"name\": \"Idle\",\n"
+        "      \"clip\": \"\",\n"
+        "      \"speed\": 1.0,\n"
+        "      \"loop\": true\n"
+        "    }\n"
+        "  ],\n"
+        "  \"transitions\": []\n"
+        "}\n";
+
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create animation controller: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create animation controller file: " << filePath.string());
+            return;
+        }
+
+        file << controllerContent; // Seed an entry state to keep the controller valid.
+        file.close();
+
+        m_statusMessage = "Created animation controller: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created animation controller: " << filePath.string());
+
+        m_selectedAsset = filePath.string();
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating animation controller: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating animation controller: " << e.what());
     }
 }
 

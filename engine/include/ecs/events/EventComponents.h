@@ -81,6 +81,25 @@ namespace ECS::Events {
         TriggerEvent Events[kMaxEventBufferSize]{};
     };
 
+    struct AnimationEvent2D {
+        uint8_t Type = 0; // Mirrors Messaging::AnimationEvent2D::Type.
+        uint8_t _padding[3] = { 0, 0, 0 };
+        uint32_t EntityId = 0;
+        int LocalFrame = 0;
+        int AbsoluteFrame = 0;
+        int WindowStart = 0;
+        int WindowCount = 0;
+        bool Looping = false;
+        bool Playing = false;
+        uint8_t _paddingFlags[2] = { 0, 0 };
+        uint32_t NotifyNameId = 0;
+    };
+
+    struct AnimationEventBuffer2D {
+        uint32_t Count = 0;
+        AnimationEvent2D Events[kMaxEventBufferSize]{};
+    };
+
     /**
      * @brief Per-entity buffer of collision exit events for the current frame.
      */

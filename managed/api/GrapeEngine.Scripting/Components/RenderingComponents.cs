@@ -76,6 +76,140 @@ public record struct AnimationState2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public record struct AnimationController2D
+{
+    public uint ControllerPath;
+    public uint ControllerAssetId;
+    public bool Transient;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationRuntime2D
+{
+    public int CurrentState;
+    public int NextState;
+    public float StateTime;
+    public float NextStateTime;
+    public float BlendAlpha;
+    public float BlendDuration;
+    public bool Playing;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationParameters2D
+{
+    public byte BoolCount;
+    public byte IntCount;
+    public byte FloatCount;
+    public byte PaddingCount;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public byte[] BoolValues;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public int[] IntValues;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public float[] FloatValues;
+
+    public void EnsureAllocated() // Arrays are reference types; guard against default/null structs.
+    {
+        if (BoolValues == null || BoolValues.Length != 16) BoolValues = new byte[16];
+        if (IntValues == null || IntValues.Length != 16) IntValues = new int[16];
+        if (FloatValues == null || FloatValues.Length != 16) FloatValues = new float[16];
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationBlend2D
+{
+    public uint TextureId;
+    public uint NormalTextureId;
+    public Vector2 Tiling;
+    public Vector2 Offset;
+    public int Width;
+    public int Height;
+    public float Alpha;
+    public TextureFilter TextureFilter;
+}
+
+public enum TextureFilter : byte
+{
+    Nearest = 0,
+    Linear = 1
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationHitbox2D
+{
+    public uint NameId;
+    public Vector2 Offset;
+    public Vector2 Size;
+    public Color Color;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationHitboxBuffer2D
+{
+    public uint Count;
+    public AnimationHitbox2D Hitbox0;
+    public AnimationHitbox2D Hitbox1;
+    public AnimationHitbox2D Hitbox2;
+    public AnimationHitbox2D Hitbox3;
+    public AnimationHitbox2D Hitbox4;
+    public AnimationHitbox2D Hitbox5;
+    public AnimationHitbox2D Hitbox6;
+    public AnimationHitbox2D Hitbox7;
+
+    public AnimationHitbox2D GetHitbox(int index) => index switch
+    {
+        0 => Hitbox0,
+        1 => Hitbox1,
+        2 => Hitbox2,
+        3 => Hitbox3,
+        4 => Hitbox4,
+        5 => Hitbox5,
+        6 => Hitbox6,
+        7 => Hitbox7,
+        _ => default
+    };
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationAttachment2D
+{
+    public uint NameId;
+    public Vector2 Offset;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct AnimationAttachmentBuffer2D
+{
+    public uint Count;
+    public AnimationAttachment2D Attachment0;
+    public AnimationAttachment2D Attachment1;
+    public AnimationAttachment2D Attachment2;
+    public AnimationAttachment2D Attachment3;
+    public AnimationAttachment2D Attachment4;
+    public AnimationAttachment2D Attachment5;
+    public AnimationAttachment2D Attachment6;
+    public AnimationAttachment2D Attachment7;
+
+    public AnimationAttachment2D GetAttachment(int index) => index switch
+    {
+        0 => Attachment0,
+        1 => Attachment1,
+        2 => Attachment2,
+        3 => Attachment3,
+        4 => Attachment4,
+        5 => Attachment5,
+        6 => Attachment6,
+        7 => Attachment7,
+        _ => default
+    };
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public record struct ShapeCircle2D
 {
     public float Radius;
