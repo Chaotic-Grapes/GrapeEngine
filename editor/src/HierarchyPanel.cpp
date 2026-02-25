@@ -874,7 +874,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         if (m_world) {
             const ECS::Entity entity = m_world->Resolve(entityId);
 			// If this is a tilemap entity, also focus the tile palette so user can edit tiles immediately after double-clicking
-            if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::TileMapComponent>(entity)) {
+            if (m_world->IsAlive(entity) && Editor::ECSUtils::HasComponent(m_world, entity, "TileMapComponent")) {
                 ImGui::SetWindowFocus("Tile Palette");
             }
         }
