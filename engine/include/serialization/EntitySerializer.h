@@ -824,9 +824,9 @@ namespace Serialization {
 			// Capture the concrete component id so serialization does not depend on hash registration order
 			const ECS::ComponentTypeId componentId = ECS::ComponentRegistry::Type<T>();
 
-			// Special cases: For TileMapComponent/Prefab metadata, always use the captured component ID
-			const bool useCapturedIdOnly = (name && (std::strcmp(name, "TileMapComponent") == 0 || 
-				std::strcmp(name, "PrefabInstanceMetadata") == 0 || std::strcmp(name, "PrefabLink") == 0));
+			// Special cases: For prefab metadata, always use the captured component ID
+			const bool useCapturedIdOnly = (name &&
+				(std::strcmp(name, "PrefabInstanceMetadata") == 0 || std::strcmp(name, "PrefabLink") == 0));
 
 			// Resolver lambda
 			auto resolveId = [typeHash, componentId, useCapturedIdOnly]() -> ECS::ComponentTypeId {
