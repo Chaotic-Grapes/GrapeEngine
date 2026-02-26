@@ -587,6 +587,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             // Wire play controls into file menu dirty tracking.
             m_playback.SetUnsavedChangesProvider([this]() { return m_fileMenu.HasUnsavedChanges(); });
             m_playback.SetSaveSceneCallback([this]() { m_fileMenu.SaveScene(); });
+            m_playback.SetHasScenePathProvider([this]() { return !m_fileMenu.GetCurrentScenePath().empty(); });
         },
         [this]() { m_playback.Render(); },
         [this](ECS::World* w) {
@@ -974,6 +975,12 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
+
+	// When entering play mode, ensure any unsaved changes are saved to disk so the runtime scene serializer has 
+    // the latest data
+    if (newState == EditorState::Play) {
+        _saveActiveTileMapAsset(m_fileMenu.GetCurrentScenePath());
+    }
 
     auto audioService = Engine::CORE ? Engine::CORE->GetAudioService() : nullptr;
     if (audioService) {
