@@ -776,6 +776,12 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         if (m_mainFont) ImGui::PopFont();
 
         // Now create the tree node with the truncated label (safer, preserves ImGui internal state)
+        const bool isSelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
+        if (isSelected) {
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.22f, 0.84f, 0.72f, 0.28f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.24f, 0.86f, 0.74f, 0.34f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.26f, 0.88f, 0.76f, 0.40f));
+        }
         nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, nodeFlags, "%s", displayLabel.c_str());
 
         // After creating the node, get item rect to position icons correctly
@@ -801,6 +807,10 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
         _handleNodeInteraction(entityId);
         _handleNodeDragDrop(entityId);
+
+        if (isSelected) {
+            ImGui::PopStyleColor(3);
+        }
     }
 
     // Pop blue color if it was a prefab instance
