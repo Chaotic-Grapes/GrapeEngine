@@ -11,15 +11,14 @@ Implements the TilePalettePanel editor UI responsible for:
 - Allowing tile selection, rotation, and erasing
 - Handling drag-and-drop asset loading
 - Painting tiles into the active tilemap
-- Synchronizing tile collisions with ECS physics entities
+- Editing per-tile collision masks
 - Rendering hover previews in the editor viewport
 
 This panel bridges editor UI interactions with runtime tilemap data,
-ensuring visual edits are immediately reflected in both rendering and
-physics systems.
+ensuring visual edits are immediately reflected in rendering and persisted
+to tilemap assets.
 
-Dependencies include ImGui for UI, ECS world systems for physics,
-and tilemap/tileset asset management.
+Dependencies include ImGui for UI and tilemap/tileset asset management.
 
 */
 /* End Header *******************************************************************/
@@ -32,8 +31,6 @@ and tilemap/tileset asset management.
 #include <algorithm>
 #include <iostream>
 
-#include "ecs/World.h"
-#include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -158,17 +155,6 @@ void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap
     const std::string& tileMapPath,
     const glm::vec2& worldOrigin)
 {
-    // Remove any cached physics entities tied to the previous map.
-    if (m_world) {
-        for (const auto& [key, entity] : m_physicsEntities) {
-            (void)key; // Suppress unused warning for the map key.
-            if (m_world->IsAlive(entity)) {
-                m_world->Destroy(entity); // Clean up physics entities spawned by the old map.
-            }
-        }
-    }
-
-    m_physicsEntities.clear(); // Reset cached physics entity map.
     m_tileMap = tileMap; // Assign the new active tilemap.
     m_tilesets = tilesets; // Assign the tileset list for this tilemap.
     m_tilesetPaths = tilesetPaths; // Cache tileset paths for UI labels.
@@ -730,11 +716,7 @@ bool TilePalettePanel::OnViewportClick(const glm::vec2& worldPos, bool isRightCl
     }
 
 	// Define the tile changed callback to sync physics and handle saves.
-    auto onTileChanged = [this](int32_t x, int32_t y, TileID id) {
-		// Sync physics entities for this tile change.
-        bool isEraser = (id == EMPTY_TILE);
-        this->SyncPhysics(x, y, id, isEraser);
-
+    auto onTileChanged = [this](int32_t, int32_t, TileID) {
         // Mark the scene dirty so saves are enabled and tracked.
         Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap paint"));
 
@@ -845,67 +827,3 @@ based on tile collision metadata.
 \param id Packed tile ID
 \param isEraser True if tile removed
 */
-void TilePalettePanel::SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser)
-{
-    if (!m_world) return;
-
-    int64_t key = PackCoord(x, y);
-    
-    // Always remove existing entity at this location
-    auto it = m_physicsEntities.find(key);
-    if (it != m_physicsEntities.end())
-    {
-        if (m_world->IsAlive(it->second))
-        {
-            m_world->Destroy(it->second);
-        }
-        m_physicsEntities.erase(it);
-    }
-
-    if (isEraser) return;
-
-    // If adding a tile, check collision
-    TileID baseID = GetTileBaseID(id);
-    uint8_t tilesetIndex = GetTileTilesetIndex(id);
-    if (tilesetIndex >= m_tilesets.size() || !m_tilesets[tilesetIndex]) {
-        return; // Missing tileset, so skip collider setup.
-    }
-    CollisionType type = m_tilesets[tilesetIndex]->GetCollisionType(baseID);
-    
-    if (type == CollisionType::NONE) return;
-
-    // Spawn Entity
-    // Position: TileToWorld gives bottom-left (or top-left?). 
-    // BoxCollider2D expects center.
-    float tileSize = m_tileMap->TileSize();
-    float halfSize = tileSize * 0.5f;
-    glm::vec2 pos(m_tileMap->TileToWorldSigned(x) + halfSize, m_tileMap->TileToWorldSigned(y) + halfSize);
-    pos += m_worldOrigin; // Move collider position into world space using tilemap origin.
-    
-    // Create Entity
-    ECS::Entity e = m_world->Create();
-    
-    // Add Transform
-    ECS::Components::LocalTransform trans;
-    trans.Position = { pos.x, pos.y, 0.0f }; // Z=0
-    m_world->Add<ECS::Components::LocalTransform>(e, trans);
-    
-    // Add BoxCollider2D
-    ECS::Components::BoxCollider2D collider;
-    collider.HalfExtents = { halfSize, halfSize };
-    
-    // Handle Rotation
-    uint8_t rotIdx = GetTileRotation(id);
-    collider.Rotation = rotIdx * 1.57079632679f; // 90 deg steps in radians
-    
-    m_world->Add<ECS::Components::BoxCollider2D>(e, collider);
-
-    // Add Rigidbody2D (Static)
-    ECS::Components::Rigidbody2D rb;
-    rb.Mass = 0.0f; // Static
-    rb.Flags = 0; // Fixed rotation? Maybe.
-    m_world->Add<ECS::Components::Rigidbody2D>(e, rb);
-
-    // Track it
-    m_physicsEntities[key] = e;
-}

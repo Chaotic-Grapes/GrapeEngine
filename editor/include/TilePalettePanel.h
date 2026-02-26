@@ -32,7 +32,6 @@ Dependencies:
 #pragma once
 
 #include <memory>
-#include <map>
 #include <vector>
 #include <string>
 #include <functional>
@@ -269,6 +268,12 @@ public:
     // Update the world-space origin without resetting selection state.
     void SetTileMapOrigin(const glm::vec2& origin) { m_worldOrigin = origin; }
 
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Updates the tilemap asset path without resetting palette state.
+    */
+    void SetTileMapPath(const std::string& path) { m_tileMapPath = path; }
+
 private:
     bool m_active = true;                  // Palette enabled state
     bool m_paintMode = true;               // Viewport painting enabled
@@ -315,20 +320,6 @@ private:
 	bool m_hasLastPaint = false;   // Track last painted tile to avoid redundant paints
 	bool m_lastPaintErase = false; // Whether the last paint was an erase
 	int64_t m_lastPaintKey = 0;    // Packed coordinate of last painted tile
-
-     /*!
-    Physics collider entity cache.
-    Key = packed tile coordinate.
-    */
-    // Physics Sync State
-    // Key: (x << 16) | y. Value: Entity handle.
-    std::map<int64_t, ECS::Entity> m_physicsEntities;
-
-    /*------------------------------------------------------------------*/
-    /*!
-    \brief Synchronizes physics collider state with tile edits.
-    */
-    void SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser);
 
     /*------------------------------------------------------------------*/
     /*!

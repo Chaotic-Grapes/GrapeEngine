@@ -1441,6 +1441,13 @@ void LevelEditor::_refreshTileMapCache() {
                 } else {
                     // Keep selection state but update origin as the entity moves.
                     m_tilePalette.SetTileMapOrigin(entry.Origin);
+
+					// Update the active tileset path if it changed externally (e.g. via another tilemap entry or direct map edits) 
+                    // to keep them in sync
+                    if (m_activeTileMapPath != entry.MapPath) {
+                        m_activeTileMapPath = entry.MapPath;
+                        m_tilePalette.SetTileMapPath(m_activeTileMapPath);
+                    }
                 }
             }
         }
