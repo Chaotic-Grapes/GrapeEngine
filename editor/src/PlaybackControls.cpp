@@ -429,7 +429,9 @@ void Playback::Render() {
         if (wrapWidth > 0.0f) {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrapWidth);
         }
-        ImGui::TextDisabled("This scene has no save location yet. Play needs a saved scene so tile collisions (if any) can load. You can still play without saving.");
+        ImGui::TextDisabled("This scene has no save location yet. Play needs a saved scene so tile collisions (if any) can load.");
+        ImGui::Dummy(ImVec2(0.0f, 0.2f));
+        ImGui::TextDisabled("You can still play without saving.");
         
         if (wrapWidth > 0.0f) {
             ImGui::PopTextWrapPos();

@@ -778,9 +778,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Now create the tree node with the truncated label (safer, preserves ImGui internal state)
         const bool isSelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.22f, 0.84f, 0.72f, 0.28f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.24f, 0.86f, 0.74f, 0.34f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.26f, 0.88f, 0.76f, 0.40f));
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.32f, 0.66f, 0.94f, 0.28f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.40f, 0.74f, 1.00f, 0.34f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.26f, 0.58f, 0.86f, 0.40f));
         }
         nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, nodeFlags, "%s", displayLabel.c_str());
 
