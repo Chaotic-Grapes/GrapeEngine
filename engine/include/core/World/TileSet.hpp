@@ -3,6 +3,9 @@
 \file   Tileset.hpp
 \author Choi Meng Yew
 \date   31st January 2026
+\author Samantha Leong
+\par    s.leong@digipen.edu
+\date   3rd February 2026
 \brief
 Defines the Tileset class, which maps tile identifiers to texture atlas UVs
 and per-tile collision metadata.

@@ -141,6 +141,7 @@ namespace ECS {
                 // Handle CueId = 0 (no audio assigned)
                 // ----------------------------------------------------------------
                 if (src.CueId == 0) {
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -151,9 +152,22 @@ namespace ECS {
                 const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
                 if (!cueInfo && src.CuePathId) {
                     const std::string cuePathRaw = ECS::StringTable::Resolve(src.CuePathId);
-                    const std::string cuePath = Audio::AudioCueRegistry::NormalizePath(cuePathRaw);
+                    std::string cuePath = cuePathRaw;
+
+                    // If the path is not empty and not absolute, resolve it relative to project root
+                    if (!cuePath.empty() && Engine::ProjectPaths::IsInitialized()) {
+                        std::filesystem::path fsPath(cuePath);
+
+                        // If the path is not absolute, resolve it relative to project root
+                        if (!fsPath.is_absolute()) {
+                            cuePath = Engine::ProjectPaths::ToAbsolutePath(cuePath);
+                        }
+                    }
+                    cuePath = Audio::AudioCueRegistry::NormalizePath(cuePath);
                     if (!cuePath.empty()) {
                         cueInfo = m_audioService.CueRegistry().FindByPath(cuePath);
+
+                        // If still not found, register it (this allows dynamic cues that aren't pre-registered)
                         if (!cueInfo) {
                             cueInfo = &m_audioService.CueRegistry().Register(cuePath);
                             LOG_INFO("AudioSystem: Registered cue from path '" << cuePath << "' (id=" << cueInfo->Id << ")");
@@ -163,6 +177,7 @@ namespace ECS {
                 }
                 if (!cueInfo) {
                     static std::set<uint32_t> s_warnedCues;
+
                     if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
                         const std::string cuePath = src.CuePathId ? ECS::StringTable::Resolve(src.CuePathId) : std::string();
                         LOG_WARNING("AudioSystem: Entity " << e.Index
@@ -171,6 +186,7 @@ namespace ECS {
                             << " (audio file not found in assets/Audio)");
                         s_warnedCues.insert(src.CueId);
                     }
+                    m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
@@ -187,6 +203,7 @@ namespace ECS {
 
                 if (!m_audioService.LoadCue(cueKey, cueKey, params)) {
                     static std::set<std::string> s_failedCues;
+                    
                     if (s_failedCues.find(cueKey) == s_failedCues.end()) {
                         LOG_ERROR("AudioSystem: Failed to load cue: " << cueKey);
                         s_failedCues.insert(cueKey);
@@ -202,6 +219,9 @@ namespace ECS {
                 if (hasInstance && !engine->IsHandleActive(it->second)) {
                     m_activeSounds.erase(it);
                     hasInstance = false;
+                    if (src.PlayOnStart && !src.Loop) {
+                        src.PlayOnStart = false;
+                    }
                 }
                 if (m_sceneUnloadInProgress && !hasInstance) {
                     return;
@@ -212,11 +232,20 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 bool shouldPlay = false;
 
+                if (!src.PlayOnStart || src.Loop) {
+                    m_playOnStartPlayedCue.erase(e);
+                }
+
                 if (src.PlayOnStart) {
                     // PlayOnStart sounds only play when:
                     // 1. Game is in play mode
                     // 2. System has started (prevents playing during entity creation in editor)
-                    shouldPlay = isPlaying && m_hasStarted;
+                    bool playOnStartEligible = true;
+                    auto playedIt = m_playOnStartPlayedCue.find(e);
+                    if (playedIt != m_playOnStartPlayedCue.end() && playedIt->second == src.CueId) {
+                        playOnStartEligible = false;
+                    }
+                    shouldPlay = isPlaying && m_hasStarted && (src.Loop || playOnStartEligible || hasInstance);
                 }
                 else {
                     // Non-PlayOnStart sounds can be controlled manually
@@ -259,6 +288,9 @@ namespace ECS {
                     Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
                     if (handle) {
                         m_activeSounds[e] = handle;
+                        if (src.PlayOnStart && !src.Loop) {
+                            m_playOnStartPlayedCue[e] = src.CueId;
+                        }
 
                         // Check if fadein is enabled
                         if (doFadeIn && fadeInDuration > 0.0f) {
@@ -323,6 +355,7 @@ namespace ECS {
 
         for (auto entity : toRemove) {
             _stopSound(entity, world);
+            m_playOnStartPlayedCue.erase(entity);
         }
     }
 
@@ -354,6 +387,7 @@ namespace ECS {
         m_crossfadeInDuration = 0.0f;
         m_crossfadeInRemaining = 0.0f;
         m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
@@ -365,6 +399,7 @@ namespace ECS {
         m_crossfadeInDuration = 0.0f;
         m_crossfadeInRemaining = 0.0f;
         m_crossfadeFadeInActive = false;
+        m_playOnStartPlayedCue.clear();
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {

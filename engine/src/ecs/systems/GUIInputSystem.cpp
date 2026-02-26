@@ -15,6 +15,7 @@ pointer capture within the GUI system.
 #include <cmath>
 #include "ecs/Components.h"
 #include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 #include "services/Input.h"
 
@@ -93,8 +94,9 @@ namespace ECS {
             }
 
             // Use resolved layout rects for hit testing.
-            const Vector2D pos = element.ResolvedPosition;
-            const Vector2D size = element.ResolvedSize;
+            const bool isWorldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
+            const Vector2D pos = isWorldSpace ? element.ScreenPosition : element.ResolvedPosition;
+            const Vector2D size = isWorldSpace ? element.ScreenSize : element.ResolvedSize;
             const bool hovered = PointInRect(mouse, pos, size);
             const bool wasHovered = input.Hovered;
             input.Hovered = hovered;
@@ -151,24 +153,52 @@ namespace ECS {
 
                 slider.ValueChanged = false;
 
-                // Scale padding based on resolved size so layout and input stay in sync.
-                const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
-                const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
-                const Vector4D padding = {
-                    slider.Padding.X * scaleX,
-                    slider.Padding.Y * scaleY,
-                    slider.Padding.Z * scaleX,
-                    slider.Padding.W * scaleY
-                };
-                // Track rect is the interactive area of the slider.
-                Vector2D trackPos = {
-                    element.ContentPosition.X + padding.X,
-                    element.ContentPosition.Y + padding.Y
-                };
-                Vector2D trackSize = {
-                    std::max(0.0f, element.ContentSize.X - padding.X - padding.Z),
-                    std::max(0.0f, element.ContentSize.Y - padding.Y - padding.W)
-                };
+                // Calculate the slider track rect (interactive area) by applying padding to the element rect.
+                Vector2D trackPos{};
+                Vector2D trackSize{};
+
+                // For world-space sliders, we need to scale padding based on the ratio between screen size and resolved size to keep input aligned with rendering.
+                if (isWorldSpace) {
+                    const float screenScaleX = element.ResolvedSize.X > 0.0f
+                        ? (element.ScreenSize.X / element.ResolvedSize.X)
+                        : 1.0f;
+                    const float screenScaleY = element.ResolvedSize.Y > 0.0f
+                        ? (element.ScreenSize.Y / element.ResolvedSize.Y)
+                        : 1.0f;
+                    const Vector4D padding = { // Scale padding from element space to screen space for hit testing.
+                        slider.Padding.X * screenScaleX,
+                        slider.Padding.Y * screenScaleY,
+                        slider.Padding.Z * screenScaleX,
+                        slider.Padding.W * screenScaleY
+                    };
+                    trackPos = { // Screen-space position of the track rect, accounting for padding.
+                        element.ScreenPosition.X + padding.X,
+                        element.ScreenPosition.Y + padding.Y
+                    };
+                    trackSize = { // Screen-space size of the track rect, accounting for padding.
+                        std::max(0.0f, element.ScreenSize.X - padding.X - padding.Z),
+                        std::max(0.0f, element.ScreenSize.Y - padding.Y - padding.W)
+                    };
+                } else {
+                    // Scale padding based on resolved size so layout and input stay in sync.
+                    const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+                    const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+                    const Vector4D padding = {
+                        slider.Padding.X * scaleX,
+                        slider.Padding.Y * scaleY,
+                        slider.Padding.Z * scaleX,
+                        slider.Padding.W * scaleY
+                    };
+                    // Track rect is the interactive area of the slider.
+                    trackPos = {
+                        element.ContentPosition.X + padding.X,
+                        element.ContentPosition.Y + padding.Y
+                    };
+                    trackSize = {
+                        std::max(0.0f, element.ContentSize.X - padding.X - padding.Z),
+                        std::max(0.0f, element.ContentSize.Y - padding.Y - padding.W)
+                    };
+                }
 
                 // Update slider while dragging or on initial press.
                 const bool active = captured || (hovered && mousePressed);

@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <windows.h>
 #include "HierarchyPanel.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include "EditorECSUtils.h"
@@ -37,6 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "core/Application.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/Components.h"
 #include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
@@ -731,7 +733,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Calculate icon sizes to reserve space on the right BEFORE creating the tree node.
         const float iconPadding = 6.0f; // space between icons and edge
         float prefabIconWidth = 0.0f;
-        const char* prefabIcon = "\xEE\xA6\xA4";
+        const char* prefabIcon = EditorIcons::Prefab;
 
         if (m_symbolsFont && isPrefabInstance) {
             // Push the font for this section.
@@ -774,6 +776,12 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         if (m_mainFont) ImGui::PopFont();
 
         // Now create the tree node with the truncated label (safer, preserves ImGui internal state)
+        const bool isSelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
+        if (isSelected) {
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.32f, 0.66f, 0.94f, 0.28f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.40f, 0.74f, 1.00f, 0.34f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.26f, 0.58f, 0.86f, 0.40f));
+        }
         nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, nodeFlags, "%s", displayLabel.c_str());
 
         // After creating the node, get item rect to position icons correctly
@@ -799,6 +807,10 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
         _handleNodeInteraction(entityId);
         _handleNodeDragDrop(entityId);
+
+        if (isSelected) {
+            ImGui::PopStyleColor(3);
+        }
     }
 
     // Pop blue color if it was a prefab instance
@@ -867,6 +879,14 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         if (m_viewport) { 
             // Focus on entity
             m_viewport->FocusOnEntity(entityId);  
+        }
+		// Also set focus to the hierarchy window so user can continue interacting with it after double-clicking
+        if (m_world) {
+            const ECS::Entity entity = m_world->Resolve(entityId);
+			// If this is a tilemap entity, also focus the tile palette so user can edit tiles immediately after double-clicking
+            if (m_world->IsAlive(entity) && Editor::ECSUtils::HasComponent(m_world, entity, "TileMapComponent")) {
+                ImGui::SetWindowFocus("Tile Palette");
+            }
         }
         // Update click tracking
         m_lastClickedEntity = entityId;

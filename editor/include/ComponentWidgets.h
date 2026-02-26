@@ -55,7 +55,7 @@ namespace EditorUI {
     void BeginPropertySection(const std::vector<std::string>& labels);
 
     // Ends the property section and restores default ImGui layout state
-    void EndPropertySection();
+    void EndPropertySection(bool addSpacing = true);
 
     // -------------------------------------------------------------------------
     // Basic Value Rendering

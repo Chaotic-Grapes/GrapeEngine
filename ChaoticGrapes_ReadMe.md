@@ -1,17 +1,16 @@
-# GrapeEngine
+﻿# GrapeEngine
 
-GrapeEngine is a custom game engine developed for academic and personal projects at DigiPen.
-
----
+GrapeEngine is a custom game engine developed for academic projects at DigiPen.
 
 ## Getting Started
 
 ### Prerequisites
 
-- **C++ Compiler** (Visual Studio 2022 or equivalent)
+- **Visual Studio 2022** with "Desktop development with C++" (C++23 toolset)
 - **CMake:** Version 3.13 or later
 - **.NET SDK:** Version 9.0 or later (for C# scripting support)
 - **Git:** (for cloning the repository)
+- **Doxygen:** (optional, for documentation generation)
 
 ### Cloning the Repository
 
@@ -31,16 +30,36 @@ Interactive Menu (recommended):
 
 Per-target scripts:
 - Editor: `script_build_editor.bat` -> outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
-- Game: `script_build_game.bat` -> outputs to `build_game\<Config>` (e.g. `build_game\Debug\<GameName>.exe`)
-- Build All: `script_build_all.bat` will build Editor into `build` and Game into `build_game`
+- Game: `script_build_game.bat` -> outputs to `build_game\export\<ProjectName>\<Config>` (e.g. `build_game\export\EchoesBelow\Release`)
 
 Notes:
 - The CMake configuration requests **C++23**.
-- The standalone game executable name may be auto-detected from the first
-  game project folder found (a folder containing `ProjectSettings.json`).
-  You can override this with the CMake cache variable `GAME_OUTPUT_NAME`.
+- `script_build_game.bat` will prompt you to pick a project if more than one is listed in
+  `Documents\Grape Engine\EditorSettings.json`. You can also pass a project name as the
+  second argument.
+- You can export projects outside the repo by passing `-DEXPORT_PROJECT_DIR="C:\Path\To\Project"`
+  to CMake (the batch script passes this automatically when a path is selected).
+- The standalone game executable name may be auto-detected from the first game project
+  folder found (a folder containing `ProjectSettings.json`). You can override this with
+  the CMake cache variable `GAME_OUTPUT_NAME`.
 
----
+## Project Structure
+
+```
+└── GrapeEngine/
+   ├── assets/         # Shared engine assets (textures, shaders, etc.)
+   ├── build/          # Editor build output (generated)
+   ├── build_game/     # Standalone game export output (generated)
+   ├── cmake/          # CMake modules and configuration
+   ├── editor/         # Editor source and headers
+   ├── engine/         # Engine source and headers
+   ├── externals/      # Third-party dependencies
+   ├── managed/        # C# scripting and tools
+   ├── runtime/        # Runtime assets/binaries for game export
+   ├── TestSuite/      # Sample project (To add in editor for testing)
+   ├── CMakeLists.txt  # Main CMake configuration
+   └── script_*.bat    # Build, run and clean scripts
+```
 
 ## Game Concept
 
@@ -52,96 +71,72 @@ GrapeEngine is a 2D game engine built for educational purposes at DigiPen. Core 
 - FMOD audio integration
 - Scene management and serialization
 
----
-
 ## C# Scripting
 
-GrapeEngine supports C# scripting through CoreCLR integration. Game scripts are **separate C# projects** in the `scripts/` folder, for now.
+GrapeEngine supports C# scripting through CoreCLR integration. Scripts are plain
+`.cs` files placed inside your project folder (the same folder that contains
+`ProjectSettings.json`).
+
+The editor compiles scripts in the background and hot-reloads systems on change.
+Standalone exports compile scripts into `GameScripts.dll` during the export step.
 
 ### Quick Start
 
-1. **Create a game script project:**
-   ```powershell
-   cd scripts
-   dotnet new classlib -n MyGame -f net9.0
-   cd MyGame
-   dotnet add reference ../GrapeEngine.Scripting/GrapeEngine.Scripting.csproj
-   ```
-
-2. **Write scripts:**
+1. **Create a script file** in your project folder (or use the editor's script templates).
+2. **Write a system:**
    ```csharp
-   using GrapeEngine.Scripting;
-   
+   using GrapeEngine.Scripting.Systems;
+   using GrapeEngine.Scripting.Systems.Attributes;
+
    namespace MyGame;
-   
-   public class PlayerController : ScriptBehaviour
+
+   [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
+   public class PlayerController : SystemBase
    {
        protected override void OnUpdate()
        {
-            // Code here
+           // Your gameplay logic here.
        }
    }
    ```
+3. **Save the file** and let the editor recompile and hot-reload.
 
----
+## Demo Usage (TestSuite)
 
-## Demo Usage
+The `TestSuite` project contains the current demo scenes:
 
-The engine includes four test scenes:
+1. **AudioCrossfadeDemo** - Audio crossfade showcase
+2. **AudioCrossfadeTarget** - Audio crossfade target setup
+3. **GUITest** - UI/GUI test scene
+4. **LayerSystemSample** - Layer system sample scene
+5. **OwnerTracking_\*** - Owner tracking sample for resource cache testing between scenes
+7. **SpriteAnimationSample** - Sprite animation sample scene
 
-1. **Physics & Collision 2D Test** - Interactive physics simulation
-   - Controls: `P` (toggle step mode), `Space` (step physics), Arrow keys (move triangle)
-
-2. **Graphics & Art Pipeline Test** - Comprehensive rendering system showcase with 10 test cases:
-   - Basic Graphics, Debug Drawing, Basic Sprites, Background Rendering
-   - Sprite Scaling, Sprite Rotation, Sprite Animation, Multi-Animation  
-   - Performance/Batch Stress Testing, Font System Testing
-   - Controls: `G` (cycle through test cases)
-
-3. **Serialization Check Test** - Save/load system validation
-
-4. **Memory Tracking Test** - Custom memory management system validation
-   - Demonstrates allocation tracking, leak detection, and memory usage statistics
-
-### Audio System
-
-The GrapeEngine features a comprehensive FMOD-powered audio system:
-- FMOD Integration: Professional audio engine for 3D spatial audio
-- Audio Debug Interface: Accessible via DebugUI -> Audio Monitor
-- Features: Sound loading and caching, real-time playback controls, volume and pitch adjustment, 3D positional audio support, audio resource management
-
-The audio system is integrated across all test scenes and can be monitored through the debug interface.
-
-Run the engine and select a test scene from the menu.
-
----
+Run the engine/editor and open a scene from `TestSuite/Scenes`.
 
 ## Team Roster
 
 **Chaotic Grapes Development Team**
 
-- **Muhammad Nur Fadzly Bin Zulkifli** – Product Manager  
+- **Muhammad Nur Fadzly Bin Zulkifli** - Product Manager  
   *Mechanics & Production Champion* (muhammadnurfadzly.b@digipen.edu)
 
-- **Mohammed Ubaidillah Bin Mohammed Izam** – Art Lead  
+- **Mohammed Ubaidillah Bin Mohammed Izam** - Art Lead  
   *Art Animation, Environment & Concepts Champion* (m.binmohammedizam@digipen.edu)
 
-- **Hooi Kai Ru** – Design Lead  
+- **Hooi Kai Ru** - Design Lead  
   *UI Design & Story Champion* (h.kairu@digipen.edu)
 
-- **Foo Rui Qin** – Technical Lead  
+- **Foo Rui Qin** - Technical Lead  
   *Engine & Input Champion* (ruiqin.foo@digipen.edu)
 
-- **Samantha Leong Sher Yen** – Programmer  
+- **Samantha Leong Sher Yen** - Programmer  
   *Animation Editor & Debugging Champion* (s.leong@digipen.edu)
 
-- **Choi Meng Yew** – Graphics Programmer  
+- **Choi Meng Yew** - Graphics Programmer  
   *Graphics & Rendering Champion* (choi.m@digipen.edu)
 
-- **Daniel Kay Neo Zuo Feng** – Systems Programmer  
-  *Level Editor, Physics & Collision Champion* (k.danielneozuofeng@digipen.edu)
-
-- **Dalton Koh Shi Hao** – Gameplay Programmer  
+- **Dalton Koh Shi Hao** - Gameplay Programmer  
   *Gameplay & AI Champion* (d.koh@digipen.edu)
 
 **Instructors:**
@@ -154,10 +149,9 @@ Run the engine and select a test scene from the menu.
 - Choon Wee Keh
 - Vuk Krakovic
 - Gavin Parker
+- Rudy Castan
 
 *DigiPen Institute of Technology academic project*
-
----
 
 ## Credits
 
@@ -172,7 +166,7 @@ Licensed under the MIT License.
 **GLM (OpenGL Mathematics)** - Copyright (C) 2005 - 2014 G-Truc Creation.  
 Licensed under the MIT License.
 
-**GLFW** - Copyright (C) 2002-2006 Marcus Geelnard, 2006-2019 Camilla Löwy.  
+**GLFW** - Copyright (C) 2002-2006 Marcus Geelnard, 2006-2019 Camilla Lowy.  
 Licensed under the zlib/libpng License.
 
 **GLAD** - Copyright (C) 2013-2020 David Herberth.  
@@ -189,9 +183,7 @@ Licensed under the MIT License.
 
 Image "johnPork.png" by Dariomartinezpinto, CC BY 4.0, via Wikimedia Commons. (Modified for project use.)
 
----
-
 ## License
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 All rights reserved.

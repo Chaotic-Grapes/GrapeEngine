@@ -25,18 +25,15 @@ namespace Engine {
     /**
      * @brief Manages paths to game project directories and files
      * 
-     * TODO: Remove hardcoded "EchoesBelow" path when editor is separated.
-     *       Future implementation should support loading projects from any location.
+     * Projects can be loaded from any location; per-project settings live in Documents.
      */
     class GRAPEENGINE_API ProjectPaths {
     public:
         /**
          * @brief Initialize project paths system
-         * @param projectRoot Root directory of the project (optional, defaults to "EchoesBelow")
-         * 
-         * TODO: Make projectRoot mandatory when editor is separated and can open any project
+         * @param projectRoot Root directory of the project (required)
          */
-        static void Initialize(const std::string& projectRoot = "EchoesBelow");
+        static void Initialize(const std::string& projectRoot);
         
         /**
          * @brief Check if project paths have been initialized
@@ -45,19 +42,18 @@ namespace Engine {
         
         /**
          * @brief Get the root directory of the game project
-         * TODO: Remove default "EchoesBelow" when editor separation is complete
          */
         static std::string GetProjectRoot();
         
         /**
          * @brief Get the Assets directory path
-         * @return Full path to project/Assets/
+        * @return Full path to project/Assets/
          */
         static std::string GetAssetsPath();
         
         /**
          * @brief Get the ProjectSettings.json file path
-         * @return Full path to project/ProjectSettings.json
+         * @return Full path to Documents/Grape Engine/<project-name>/ProjectSettings.json
          */
         static std::string GetSettingsPath();
 
@@ -85,6 +81,12 @@ namespace Engine {
          * @return Full path to Documents/Grape Engine/<project-name>/
          */
         static std::string GetProjectDocumentsRoot();
+
+        /**
+         * @brief Get editor-level Documents folder
+         * @return Full path to Documents/Grape Engine/
+         */
+        static std::string GetEditorDocumentsRoot();
 
         /**
          * @brief Get per-project logs folder

@@ -92,6 +92,48 @@ internal partial class WindowAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_Resize")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void Resize(int width, int height);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_GetTitle")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial IntPtr GetTitle();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetTitle", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetTitle(string title);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsVSync")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static partial bool IsVSync();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetVSync")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetVSync([MarshalAs(UnmanagedType.I1)] bool enabled);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetFullscreen")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static partial bool SetFullscreen([MarshalAs(UnmanagedType.I1)] bool fullscreen);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetFullscreenOnMonitor")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static partial bool SetFullscreenOnMonitor(int monitorIndex);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_GetSupportedDisplayModeCount")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int GetSupportedDisplayModeCount();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_GetSupportedDisplayMode")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static partial bool GetSupportedDisplayMode(int index, out int width, out int height,
+        out int refreshRate, out int bitsPerPixel);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetDisplayMode")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static partial bool SetDisplayMode(int width, int height, int refreshRate, int bitsPerPixel);
 }
 
 

@@ -344,13 +344,14 @@ namespace Scenes {
                 sceneJson["EntityCount"] = entityCount;
                 sceneJson["Hierarchy"] = std::move(hierarchyArray);
 
-                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
-                if (!Serialization::Serializer::SaveJson(filename, ext, sceneJson)) {
-                    LOG_ERROR("Error: Could not open file for writing: " << filename);
+                const std::string resolvedPath = _resolveScenePath(filename);
+                const std::string ext = Serialization::Serializer::HasExtension(resolvedPath, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::SaveJson(resolvedPath, ext, sceneJson)) {
+                    LOG_ERROR("Error: Could not open file for writing: " << resolvedPath);
                     return false;
                 }
 
-                LOG_DEBUG("Scene successfully saved to: " << filename);
+                LOG_DEBUG("Scene successfully saved to: " << resolvedPath);
                 LOG_DEBUG(" Entities: " << entityCount);
                 return true;
             }
@@ -393,9 +394,10 @@ namespace Scenes {
 
             try {
                 json sceneJson;
-                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
-                if (!Serialization::Serializer::LoadJson(filename, ext, sceneJson)) {
-                    LOG_ERROR("Error: Cannot open file: " << filename);
+                const std::string resolvedPath = _resolveScenePath(filename);
+                const std::string ext = Serialization::Serializer::HasExtension(resolvedPath, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::LoadJson(resolvedPath, ext, sceneJson)) {
+                    LOG_ERROR("Error: Cannot open file: " << resolvedPath);
                     return false;
                 }
 
@@ -469,7 +471,7 @@ namespace Scenes {
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
 					<< "\tEntities loaded: " << loadedCount);
 
-                scene.SetPath(filename);
+                scene.SetPath(_toSceneStoragePath(resolvedPath));
                 if (sceneJson.contains("SceneName")) {
                     scene.SetName(sceneJson["SceneName"].get<std::string>());
                 }
@@ -644,9 +646,25 @@ namespace Scenes {
             }
 
             std::filesystem::path pathFs(path);
+            if (Engine::ProjectPaths::IsInitialized()) {
+                const std::filesystem::path rootName = std::filesystem::path(Engine::ProjectPaths::GetProjectRoot()).filename();
+                if (!rootName.empty() && pathFs.begin() != pathFs.end() && *pathFs.begin() == rootName) {
+                    pathFs = pathFs.lexically_relative(rootName);
+                }
+            }
             return pathFs.is_absolute()
                 ? pathFs.string()
-                : Engine::ProjectPaths::ToAbsolutePath(path);
+                : Engine::ProjectPaths::ToAbsolutePath(pathFs.string());
+        }
+
+        static std::string _toSceneStoragePath(const std::string& resolvedPath) {
+            if (!resolvedPath.empty()
+                && Engine::ProjectPaths::IsInitialized()
+                && Engine::ProjectPaths::IsInProject(resolvedPath)) {
+                return Engine::ProjectPaths::ToRelativePath(resolvedPath);
+            }
+
+            return resolvedPath;
         }
 
         static std::string _normalizePath(const std::string& path) {

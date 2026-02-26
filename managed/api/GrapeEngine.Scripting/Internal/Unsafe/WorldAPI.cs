@@ -64,7 +64,7 @@ internal static partial class WorldAPI
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_IsEntityAlive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    [return: MarshalAs(UnmanagedType.Bool)]
+    [return: MarshalAs(UnmanagedType.I1)]
     public static unsafe partial bool IsEntityAlive(void* worldPtr, ulong entityId);
 
     // ============================================================================
@@ -73,7 +73,7 @@ internal static partial class WorldAPI
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_HasComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    [return: MarshalAs(UnmanagedType.Bool)]
+    [return: MarshalAs(UnmanagedType.I1)]
     public static unsafe partial bool HasComponent(void* worldPtr, ulong entityId, uint componentTypeHash);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetComponentPtr")]

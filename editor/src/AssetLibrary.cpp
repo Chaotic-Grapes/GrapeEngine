@@ -34,6 +34,7 @@ Provides:
 #include <vector>
 #include <services/ResourceManager.h>
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -133,7 +134,7 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
         if (entry.is_directory()) {
             // Render folder icon with symbols font
             ImGui::PushFont(m_symbolsFont);
-            ImGui::Text("\xEE\x8B\x87");
+            ImGui::Text(EditorIcons::Folder);
             ImGui::PopFont();
 
             ImGui::SameLine();
@@ -173,7 +174,7 @@ void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::stri
 
     // Render icon with symbols font
     ImGui::PushFont(m_symbolsFont);
-    ImGui::Text("\xEE\xA1\xB3");
+    ImGui::Text(EditorIcons::File);
     ImGui::PopFont();
 
     ImGui::SameLine();
@@ -200,7 +201,7 @@ void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::stri
 
         // Drag preview: icon + filename
         ImGui::PushFont(m_symbolsFont);
-        ImGui::Text("\xEF\x8E\xB2");
+        ImGui::Text(EditorIcons::Drag);
         ImGui::PopFont();
         ImGui::SameLine();
         ImGui::Text("%s", filename.c_str());

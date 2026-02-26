@@ -1,4 +1,4 @@
-================================================================================
+﻿================================================================================
                             GRAPEENGINE PROJECT GUIDE
 ================================================================================
 
@@ -16,17 +16,25 @@ PREREQUISITES
 
 2. GIT
    - Download: https://git-scm.com/downloads
-   - Required for cloning the repository
+   - Required for cloning the repository (including third-party libraries)
 
-3. .NET 9 SDK
+3. CMAKE 3.13+
+   - Download: https://cmake.org/download/
+   - Required for building
+
+4. .NET 9 SDK
    - Download: https://dotnet.microsoft.com/en-us/download/dotnet/9.0
    - Required for scripting
+
+5. DOXYGEN
+   - Download: https://www.doxygen.nl/download.html
+   - Optional, but required for documentation
 
 ================================================================================
 STEP 1: INSTALL CMAKE (Build System)
 ================================================================================
 
-CMAKE is required to generate the Visual Studio solution files.
+  CMAKE 3.13 or later is required to generate the Visual Studio solution files.
 
 OPTION A: Download from Official Website (Recommended)
 ----------------------------------------------------------
@@ -91,10 +99,9 @@ The menu script provides quick access to all common tasks:
 
 Each option will configure and build into separate folders:
 - Editor builds use the `build` folder (e.g. `build\Debug`)
-- Game builds use the `build_game` folder (e.g. `build_game\Debug`)
+- Game builds use the `build_game\export\<ProjectName>` folder (e.g. `build_game\export\EchoesBelow\Release`)
 
-You can still use `script_build_editor.bat`, `script_build_game.bat`, and
-`script_build_all.bat` directly if you prefer.
+You can still use `script_build_editor.bat`, and `script_build_game.bat` directly if you prefer.
 
 METHOD 2: Manual CMake Commands
 -------------------------------
@@ -122,7 +129,7 @@ STEP 4: OPEN AND BUILD IN VISUAL STUDIO
 6. Press F5 or click 'Local Windows Debugger' to build and run
 
 ================================================================================
-STEP 5: RUNNING THE ENGINE
+STEP 5: RUNNING THE EDITOR
 ================================================================================
 
 OPTION A: From Visual Studio
@@ -172,24 +179,23 @@ REGENERATE SOLUTION:
  - Run script_build_editor.bat again
 - Or use the manual CMake commands above
 
-BUILD AND RUN IN ONE STEP:
-- Run: script_build_editor_and_run.bat
-
 ================================================================================
 PROJECT STRUCTURE
 ================================================================================
-
-GrapeEngine/
-├── assets/          # Game assets (textures, shaders, etc.)
-├── build/           # Generated build files (created by CMake)
-├── cmake/           # CMake modules and configuration
-├── include/         # Header files
-├── lib/             # Static libraries
-├── src/             # Source code files
-├── CMakeLists.txt   # Main CMake configuration
-├── script_*.bat     # Build and run scripts
-├── config.json      # Application configuration file
-└── README.md        # Project overview
+  
+└── GrapeEngine/
+   ├── assets/         # Shared engine assets (textures, shaders, etc.)
+   ├── build/          # Editor build output (generated)
+   ├── build_game/     # Standalone game export output (generated)
+   ├── cmake/          # CMake modules and configuration
+   ├── editor/         # Editor source and headers
+   ├── engine/         # Engine source and headers
+   ├── externals/      # Third-party dependencies
+   ├── managed/        # C# scripting and tools
+   ├── runtime/        # Runtime assets/binaries for game export
+   ├── TestSuite/      # Sample project (To add in editor for testing)
+   ├── CMakeLists.txt  # Main CMake configuration
+   └── script_*.bat    # Build, run and clean scripts
 
 ================================================================================
 PROJECT SETTINGS AND CONFIGURATION
@@ -221,50 +227,32 @@ TARGETS (Editor vs Standalone Game)
 
 The project produces two targets:
 - Editor: interactive level editor, built into `build\Debug` / `build\Release`
-- Standalone Game: gameplay-only executable, built via scripts into `build_game\Debug` / `build_game\Release`
+- Standalone Game: gameplay-only executable, built via scripts into `build_game\export\<ProjectName>\<Config>`
 
 How to select targets:
 - Use 'script_build_editor.bat' / 'script_run_editor.bat' for the Editor
-- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game
+- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game (editor needs to be built first!)
+  - If no project is provided, the scripts prompt you to pick from `Documents\Grape Engine\EditorSettings.json`
 - In Visual Studio, open the solution in 'build\' and run the Editor; game builds are produced by scripts
 
-APPLICATION CONFIGURATION (config.json)
----------------------------------------
+APPLICATION CONFIGURATION (EditorSettings.json / ProjectSettings.json)
+---------------------------------------------------------------------
 
-The engine uses a config.json file for runtime configuration. The config.json 
-file is located in the project root directory and is automatically found by the 
-executable using a relative path (../config.json).
+Editor and project configuration are stored in the user Documents folder:
+- Editor settings (recent projects, window/UI options):
+  Documents\Grape Engine\EditorSettings.json
+- Project settings (per-project runtime options):
+  Documents\Grape Engine\<ProjectName>\ProjectSettings.json
 
-Default config.json structure (located in project root):
-{
-  "application": {
-    "title": "GrapeEngine",
-    "window": {
-      "width": 1600,
-      "height": 900,
-      "fullscreen": false,
-      "vsync": true
-    }
-  }
-}
+Notes:
+- The editor writes these files automatically. If they are missing, defaults
+  are created on first run.
+- Game export copies ProjectSettings.json into the export output so the
+  standalone build uses the project-specific settings.
 
-Configuration Options:
-- title: Window title displayed in the title bar
-- width: Initial window width in pixels
-- height: Initial window height in pixels
-- fullscreen: Whether to start in fullscreen mode (true/false)
-- vsync: Enable vertical synchronization (true/false)
-
-**TROUBLESHOOTING:** If you encounter "Could not open config file: config.json" 
-warnings:
-
-1. Verify config.json exists in the project root directory
-2. Ensure the executable is running from the build directory (build/Debug/ or 
-   build/Release/)
-3. Check that the working directory is set correctly when running from an IDE
-
-The config.json file should remain in the project root and does NOT need to be 
-copied to build directories.
+TROUBLESHOOTING:
+- If settings are not loading, verify the Documents folder is writable and
+  the project name matches the folder under Documents\Grape Engine.
 
 LEVEL EDITOR MODES
 ------------------
@@ -310,14 +298,3 @@ Manual CMake:
 Notes:
 - Use 'cmake --version' to verify CMake is installed
 - If generator errors occur, ensure Visual Studio 2022 and C++ workload are installed
-
-================================================================================
-SUPPORT
-================================================================================
-
-For additional help:
-- Check the README.md file in the project root
-- Review the source code documentation
-- Contact the development team (see README.md for contacts)
-
-================================================================================

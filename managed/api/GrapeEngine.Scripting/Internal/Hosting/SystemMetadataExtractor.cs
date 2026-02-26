@@ -123,7 +123,22 @@ public static class SystemMetadataExtractor
         }
 
         // Default
-        return SystemRunMode.EditOnly;
+        return SystemRunMode.PlayOnly;
+    }
+
+    /// <summary>
+    /// Get the execution order for a system.
+    /// Priority: [SystemOrder] attribute > default (0)
+    /// </summary>
+    public static int GetSystemOrder(Type systemType)
+    {
+        var attr = systemType.GetCustomAttribute<SystemOrderAttribute>(true);
+        if (attr != null)
+        {
+            return attr.Order;
+        }
+
+        return 0;
     }
 
     /// <summary>
@@ -191,11 +206,9 @@ public static class SystemMetadataExtractor
     /// </summary>
     public static ComponentAccessMode GetComponentAccessMode(Type systemType, Type componentType)
     {
-        var componentHash = componentType.GetHashCode();
-        
         foreach (var (compType, mode) in GetComponentAccesses(systemType))
         {
-            if (compType.GetHashCode() == componentHash)
+            if (compType == componentType)
             {
                 return mode;
             }

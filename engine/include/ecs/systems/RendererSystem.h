@@ -41,6 +41,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <queue>
 #include <string>
 
@@ -269,6 +270,13 @@ namespace ECS {
                             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
         void SubmitGUIText(const Vector2D& position, const std::string& text,
                            const std::string& fontPath, float pixelSize, const Color& color);
+        void SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+                                 const Color& color, float cornerRadius = 0.0f);
+        void SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+                                 uint32_t textureId, const Vector4D& uvRect, const Color& color,
+                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+        void SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+                                const std::string& fontPath, float pixelSize, const Color& color);
 
         // Call from editor when a tilemap should be rendered
         struct DebugTileMapEntry {
@@ -357,6 +365,24 @@ namespace ECS {
         // Compute systems
         BoidSystem* m_boidSystem = nullptr;
 
+		// This cache holds runtime tilemap data for entities with TileMapComponent, keyed by EntityId
+        struct RuntimeTileMapEntry {
+			uint32_t Generation = 0;       // Used to track changes and invalidate cache when tilemap is modified
+			std::shared_ptr<TileMap> Map;  // Pointer to tilemap data 
+			std::vector<std::shared_ptr<Tileset>> Tilesets;  // Pointers to tilesets used by the tilemap
+			std::vector<std::string> TilesetPaths;           // Original tileset paths
+			std::string MapPath;                             // Original map path
+			float TileWorldSize = 1.0f;    
+			uint32_t TilePixelSize = 32;   
+			uint32_t DefaultWidth = 64;    
+			uint32_t DefaultHeight = 64;  
+            uint16_t RenderLayerId = 0;
+            bool Visible = true;
+            glm::vec2 Origin{ 0.0f, 0.0f };
+        };
+
+        std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;
+
         // ====================================================================
         // Member Variables - Wireframe Submissions
         // ====================================================================
@@ -412,6 +438,33 @@ namespace ECS {
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
 
+        struct WorldGUIPanelSubmission {
+            Vector2D position;
+            Vector2D size;
+            Color color;
+            float cornerRadius = 0.0f;
+        };
+        std::vector<WorldGUIPanelSubmission> m_worldGuiPanelQueue;
+
+        struct WorldGUITextSubmission {
+            Vector2D position;
+            std::string text;
+            std::string fontPath;
+            float pixelSize = 24.0f;
+            Color color;
+        };
+        std::vector<WorldGUITextSubmission> m_worldGuiTextQueue;
+
+        struct WorldGUIImageSubmission {
+            Vector2D position;
+            Vector2D size;
+            uint32_t textureId = 0;
+            Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+            Color color;
+            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+        };
+        std::vector<WorldGUIImageSubmission> m_worldGuiImageQueue;
+
         Graphics::LightManager m_lightManager;
 
         // ====================================================================
@@ -422,6 +475,7 @@ namespace ECS {
         // TEXTURE/SHADER/FONT CAN BE REUSED WITHOUT DUPLICATING MEMORY
 
         std::shared_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::shared_ptr<Shader> m_guiShader;       ///< GUI-only shader with gamma correction
         std::shared_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::shared_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
         std::shared_ptr<Shader> m_blitShader;
@@ -495,9 +549,14 @@ namespace ECS {
             const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
         void RenderBloom(Viewport& vp, float bloomRadius);
         void ToneMap(Viewport& vp);
+
+		void RefreshRuntimeTileMaps(World& world);  // Sync runtime tilemap cache with current world state
+		void SubmitRuntimeTileMaps(int layer);      // Submit tilemaps from runtime cache for rendering in the current layer
+
         void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
         void RenderGUI(Viewport& vp);
+        void RenderWorldGUI(const glm::mat4& viewProj);
         void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
             const std::vector<std::vector<Entity>>& buckets);
 

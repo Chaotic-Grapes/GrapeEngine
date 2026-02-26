@@ -39,5 +39,15 @@ public interface ISystem
     /// </summary>
     /// <param name="world">The ECS World instance</param>
     void OnDestroy(World world) { }
+
+    /// <summary>
+    /// Called when a scene starts playing (editor: transitioning to Play mode).
+    /// </summary>
+    void OnSceneStart() { }
+
+    /// <summary>
+    /// Called when a scene stops playing (editor: transitioning away from Play mode).
+    /// </summary>
+    void OnSceneStop() { }
 }
 

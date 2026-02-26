@@ -37,7 +37,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
+#include "core/ProjectPaths.h"
 #include "platform/glfw/GLFWPlatformContext.h"
+#include "platform/glfw/GLFWWindow.h"
 
 #ifdef GRAPE_HAS_CUDA
 #include "cuda/CudaTest.cuh"
@@ -51,6 +53,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Engine {
     // Global pointer to the core engine
     Application* CORE = nullptr;
+
+    namespace {
+        Platform::WindowMode ResolveWindowMode(const std::string& mode) {
+            if (mode == "Fullscreen") {
+                return Platform::WindowMode::Fullscreen;
+            }
+            if (mode == "Borderless") {
+                return Platform::WindowMode::Borderless;
+            }
+            return Platform::WindowMode::Windowed;
+        }
+    }
 
     void Application::Initialize(EngineMode mode, bool enableConsole) {
         #ifdef GRAPE_HAS_CUDA
@@ -253,10 +267,39 @@ namespace Engine {
     }
 
     bool Application::LoadProjectSettings(const std::string& projectRoot) {
-        std::string settingsPath = projectRoot + "/ProjectSettings.json";
+        if (!ProjectPaths::IsInitialized()) {
+            LOG_ERROR("ProjectPaths not initialized; cannot load project settings");
+            return false;
+        }
+
+        std::string settingsPath = ProjectPaths::GetSettingsPath();
+        if (m_mode == EngineMode::Game && !projectRoot.empty()) {
+            std::filesystem::path localPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
+            if (std::filesystem::exists(localPath)) {
+                settingsPath = localPath.string();
+            }
+        }
         m_hasProjectSettings = Serialization::ConfigurationSerializer::LoadProjectSettings(settingsPath, m_projectSettings);
         if (m_hasProjectSettings) {
             LOG_INFO("Loaded project settings from: " << settingsPath);
+
+            // Apply loaded settings to main window if in game mode
+            if (m_mode == EngineMode::Game && m_platformContext) {
+                auto* window = m_platformContext->GetMainWindow();
+
+                // Apply project settings to window (title, VSync, mode, resolution)
+                if (window) {
+                    window->SetTitle(m_projectSettings.Title);
+                    window->SetVSync(m_projectSettings.WindowSettings.VSync);
+                    window->SetMode(ResolveWindowMode(m_projectSettings.WindowSettings.Mode));
+
+                    // If starting in windowed mode, apply resolution settings. 
+                    // Fullscreen and borderless modes will use the monitor's native resolution.
+                    if (m_projectSettings.WindowSettings.Mode == "Windowed") {
+                        window->Resize(m_projectSettings.WindowSettings.Width, m_projectSettings.WindowSettings.Height);
+                    }
+                }
+            }
         }
         else {
             LOG_WARNING("Failed to load project settings from: " << settingsPath);
@@ -266,7 +309,15 @@ namespace Engine {
 
     bool Application::SaveProjectSettings(const std::string& projectRoot) {
         try {
-            std::filesystem::path settingsPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
+            if (!ProjectPaths::IsInitialized()) {
+                LOG_ERROR("ProjectPaths not initialized; cannot save project settings");
+                return false;
+            }
+
+            std::filesystem::path settingsPath = ProjectPaths::GetSettingsPath();
+            if (m_mode == EngineMode::Game && !projectRoot.empty()) {
+                settingsPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
+            }
 
             // Ensure parent directories exist
             std::filesystem::path parent = settingsPath.parent_path();
@@ -293,6 +344,7 @@ namespace Engine {
     void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world) {
         // Public API for editor to directly control which modes execute
         // This allows editor to implement play/pause/step/edit state transitions
+        m_systemManager.SetActiveRunModeMask(modes);
 
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world);
@@ -468,7 +520,12 @@ namespace Engine {
         }
 
         // Use platform implementation to switch fullscreen mode
-        if (mainWindow->SetFullscreen(fullscreen)) {
+        if (auto* glfwWindow = dynamic_cast<Platform::GLFWWindow*>(mainWindow)) {
+            if (glfwWindow->SetFullscreenOnMonitor(fullscreen ? monitorIndex : -1)) {
+                LOG_INFO("Fullscreen mode switched to " << (fullscreen ? "on" : "off"));
+                return true;
+            }
+        } else if (mainWindow->SetFullscreen(fullscreen)) {
             LOG_INFO("Fullscreen mode switched to " << (fullscreen ? "on" : "off"));
             return true;
         }

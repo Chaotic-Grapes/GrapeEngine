@@ -15,6 +15,8 @@ Launches the application in editor mode with the level editor interface.
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <memory>
+#include <string>
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
 #include "EditorApplication.h"
@@ -44,27 +46,8 @@ int main() {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-    // Initialize project paths early so logs go to the per-project folder.
-    // TODO: Remove hardcoded "EchoesBelow" when editor is separated from engine
-    Engine::ProjectPaths::Initialize("EchoesBelow");
-
     // Log current working directory for debugging
     LOG_INFO(std::filesystem::current_path());
-
-    // Delete temporary compiled script assemblies from previous runs
-    {
-        std::filesystem::path tempScriptsPath = Engine::ProjectPaths::GetTempScriptsPath();
-        if (std::filesystem::exists(tempScriptsPath)) {
-            try {
-                std::filesystem::remove_all(tempScriptsPath);
-                LOG_INFO("[EditorMain] Cleaned up temporary script assemblies at: " << tempScriptsPath.string());
-            } catch (const std::exception& e) {
-                LOG_WARNING("[EditorMain] Failed to clean up temporary script assemblies: " << e.what());
-            }
-        } else {
-            LOG_INFO("[EditorMain] No temporary script assemblies to clean up at: " << tempScriptsPath.string());
-        }
-    }
 
     // Initialize engine in Editor mode
     Engine::Application engine;
@@ -86,36 +69,27 @@ int main() {
 
     // Initialize systems after window is created
     ECS::World emptyWorld;
-    engine.GetSystemManager().CreateAll(emptyWorld);
+    auto& systemManager = engine.GetSystemManager();
+    systemManager.SetActiveRunModeMask(
+        (1u << static_cast<int>(ECS::SystemRunMode::Always)) |
+        (1u << static_cast<int>(ECS::SystemRunMode::EditOnly)));
+    systemManager.CreateSystemsForMode(ECS::SystemRunMode::Always, emptyWorld);
+    systemManager.CreateSystemsForMode(ECS::SystemRunMode::EditOnly, emptyWorld);
 
     // Build the initial component registry immediately so the editor UI has metadata
     // This ensures components are available for rendering in the inspector on startup
     ComponentRegistryUI::RebuildFromNativeRegistry();
     LOG_INFO("[EditorMain] Initial component registry built");
 
-    // Initialize C# script compilation and hot reload watcher
+    // Initialize C# script compilation and hot reload watcher (deferred until project selection)
     ECS::ScriptManager* scriptManager = engine.GetScriptManager();
 
     // Initialize script callbacks for hot reload
     editor.InitializeScriptCallbacks(scriptManager, &emptyWorld);
 
-    // Copy GrapeEngine.Scripting.dll to temp directory so it can be found at runtime
-    {
-        std::filesystem::path tempScriptsPath = Engine::ProjectPaths::GetTempScriptsPath();
-        if (!tempScriptsPath.empty() && std::filesystem::exists(tempScriptsPath)) {
-            if (scriptManager) {
-                scriptManager->CopyScriptingAssemblyToDirectory(tempScriptsPath.string());
-            }
-        }
-    }
-
-    // Create the ScriptsCompiler to manage compilation and hot-reload
-    ScriptsCompiler scriptsCompiler(&engine, &emptyWorld);
-    if (scriptManager && scriptManager->IsInitialized()) {
-        scriptsCompiler.Initialize(scriptManager);
-        scriptsCompiler.Start();
-        LOG_INFO("[EditorMain] ScriptsCompiler initialized and started");
-    }
+    std::unique_ptr<ScriptsCompiler> scriptsCompiler;
+    bool tempCleaned = false;
+    std::string activeProjectRoot;
 
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
@@ -125,8 +99,57 @@ int main() {
 
     // Editor main loop
     while (engine.IsRunning()) {
+        if (editor.IsProjectInitialized()) {
+            if (activeProjectRoot != editor.GetProjectRoot()) {
+                if (scriptsCompiler) { // Check if scriptsCompiler is initialized before trying to shut it down
+                    scriptsCompiler->Shutdown();
+                    scriptsCompiler.reset();
+                }
+                tempCleaned = false;
+                activeProjectRoot = editor.GetProjectRoot();
+            }
+
+            // Clean up temp script assemblies on project change to prevent stale assemblies from being loaded by the ScriptManager during initialization of the new project.
+            // This ensures a clean state for script compilation and loading for the newly selected project.
+            if (!tempCleaned) {
+                std::filesystem::path tempScriptsPath = Engine::ProjectPaths::GetTempScriptsPath();
+                
+                if (std::filesystem::exists(tempScriptsPath)) {
+                    try {
+                        std::filesystem::remove_all(tempScriptsPath);
+                        LOG_INFO("[EditorMain] Cleaned up temporary script assemblies at: " << tempScriptsPath.string());
+                    } catch (const std::exception& e) {
+                        LOG_WARNING("[EditorMain] Failed to clean up temporary script assemblies: " << e.what());
+                    }
+                } else {
+                    LOG_INFO("[EditorMain] No temporary script assemblies to clean up at: " << tempScriptsPath.string());
+                }
+                tempCleaned = true;
+            }
+
+            if (!scriptsCompiler) {
+                // Copy GrapeEngine.Scripting.dll to temp directory so it can be found at runtime
+                std::filesystem::path tempScriptsPath = Engine::ProjectPaths::GetTempScriptsPath();
+                if (!tempScriptsPath.empty() && std::filesystem::exists(tempScriptsPath)) {
+                    if (scriptManager) {
+                        scriptManager->CopyScriptingAssemblyToDirectory(tempScriptsPath.string());
+                    }
+                }
+
+                // Initialize and start the ScriptsCompiler to handle script compilation and hot reload for the selected project
+                scriptsCompiler = std::make_unique<ScriptsCompiler>(&engine, &emptyWorld);
+                if (scriptManager && scriptManager->IsInitialized()) {
+                    scriptsCompiler->Initialize(scriptManager);
+                    scriptsCompiler->Start();
+                    LOG_INFO("[EditorMain] ScriptsCompiler initialized and started");
+                }
+            }
+        }
+
         // Let ScriptsCompiler handle compilation/hot-reload and deferred registry rebuild
-        scriptsCompiler.Update();
+        if (scriptsCompiler) {
+            scriptsCompiler->Update();
+        }
         
 
         // If the editor window is minimized or unfocused, avoid burning CPU in a tight loop.
@@ -180,10 +203,12 @@ int main() {
                     // Transitioning to Edit: stop PlayOnly systems
                     auto& systemManager = engine.GetSystemManager();
                     systemManager.OnSceneStop(world);
+                    systemManager.DestroySystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                 }
                 else if (wasInEdit && !isInEdit) {
                     // Transitioning from Edit to any active state: start PlayOnly systems
                     auto& systemManager = engine.GetSystemManager();
+                    systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
                 
@@ -243,7 +268,9 @@ int main() {
     engine.Shutdown();
 
     // Make sure script compiler background work is finished before exiting
-    scriptsCompiler.Shutdown();
+    if (scriptsCompiler) {
+        scriptsCompiler->Shutdown();
+    }
 
     return 0;
 }

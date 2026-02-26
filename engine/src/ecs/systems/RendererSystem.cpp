@@ -36,6 +36,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Core Engine
 // ============================================================================
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
+#include "core/Logger.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "services/Input.h"
@@ -66,6 +68,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Helpers
 // ============================================================================
 #include "helpers/TransformUtils.h"
+#include "core/World/TileTypes.hpp"
+#include "ecs/StringTable.h"
 
 // ============================================================================
 // Standard Library
@@ -74,14 +78,88 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iterator>
 #include <iostream>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <cmath>
+#include <filesystem>
 
 // ============================================================================
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+
+namespace {
+	// Resolve a project-relative path to an absolute path for loading assets (for existing maps)
+    std::string ResolveProjectPathForLoad(const std::string& path) {
+        if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+            return path;
+        }
+
+		// Only convert to absolute if the path is relative, otherwise assume it's already absolute to avoid messing with non-project paths
+        std::filesystem::path fsPath(path);
+        if (fsPath.is_absolute()) {
+            return path;
+        }
+
+		// Convert to absolute path based on project directory and normalize it to remove redundant components
+        std::filesystem::path absolute = Engine::ProjectPaths::ToAbsolutePath(path);
+        return absolute.lexically_normal().string();
+    }
+
+	// Build a tileset from a texture by slicing it into a grid of tile UVs based on the specified tile pixel size
+    std::shared_ptr<Tileset> BuildTilesetFromTexture(const std::string& texturePath, uint32_t tilePixelSize) {
+		// Load the texture using RM
+        auto texture = RM.Get<Texture>(texturePath);
+        if (!texture) {
+            LOG_WARNING("[TileMap] Failed to load tileset texture: " << texturePath);
+            return nullptr;
+        }
+
+		// Compute the number of columns and rows of tiles based on the texture dimensions and tile pixel size
+        const uint32_t texWidth = static_cast<uint32_t>(texture->Width());
+        const uint32_t texHeight = static_cast<uint32_t>(texture->Height());
+        const uint32_t tilePx = std::max(1u, tilePixelSize);
+        const uint32_t cols = texWidth / tilePx;
+        const uint32_t rows = texHeight / tilePx;
+
+		// If the texture is too small to fit even one tile, log a warning and return null to indicate failure
+        if (cols == 0 || rows == 0) {
+            LOG_WARNING("[TileMap] Tileset texture too small for tile size: " << texturePath);
+            return nullptr;
+        }
+
+		// Create tileset
+        // Tile IDs are assigned sequentially starting from 0
+        auto tileset = std::make_shared<Tileset>(static_cast<uint32_t>(texture->ID()));
+        TileID id = 0;
+
+		// Iterate over the grid of tiles in row-major order and compute UV coordinates for each tile
+        for (uint32_t row = 0; row < rows; row++) {
+			// For each tile, compute the UV coordinates based on its position in the texture
+            for (uint32_t col = 0; col < cols; col++) {
+				// Tile IDs are limited to 12 bits (see TileTypes.hpp), so if we exceed that, we stop defining more tiles
+                if (id >= TILE_ID_MASK) {
+                    return tileset;
+                }
+
+				// Compute UVs with row 0 at the top of the texture
+                // OpenGL expects (0,0) at the bottom-left, so we flip the V coordinate
+                const float u0 = static_cast<float>(col * tilePx) / static_cast<float>(texWidth);
+                const float u1 = static_cast<float>((col + 1) * tilePx) / static_cast<float>(texWidth);
+                const float v1 = 1.0f - static_cast<float>(row * tilePx) / static_cast<float>(texHeight);
+                const float v0 = 1.0f - static_cast<float>((row + 1) * tilePx) / static_cast<float>(texHeight);
+
+				// Define the tile in the tileset with the computed UVs and no collision by default
+                TileUV uv{ u0, v0, u1, v1 };
+                tileset->DefineTile(id, uv, CollisionType::NONE);
+                id++;
+            }
+        }
+		// Return the constructed tileset
+        return tileset;
+    }
+}
 
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
@@ -233,6 +311,7 @@ namespace ECS {
 
         // Use RM instead!
         m_shader = RM.Get<Shader>("assets/shaders/batch");
+        m_guiShader = RM.Get<Shader>("assets/shaders/gui");
         m_textShader = RM.Get<Shader>("assets/shaders/sdf_text");
         m_sdfCircleShader = RM.Get<Shader>("assets/shaders/sdf_circle");
         m_bloomExtractShader = RM.Get<Shader>("assets/shaders/bloom_extract");
@@ -351,7 +430,7 @@ namespace ECS {
                 const ECS::Components::LocalTransform& transform,
                 const ECS::Components::Camera3D& camera)
             {
-                if (foundActive || !camera.Active) return;
+                if (foundActive || !camera.Active || !world.IsActiveInHierarchy(e)) return;
 
                 Vector3D position{};
                 Quaternion rotation{};
@@ -449,6 +528,16 @@ namespace ECS {
             m_windowAspectDirty = false;
         }
 
+		// For game mode, sync the runtime tilemap cache with the current world state
+        // This will add new tilemaps, update changed ones and remove deleted ones
+        if (Engine::CORE->GetMode() == Engine::EngineMode::Game) {
+            RefreshRuntimeTileMaps(world);
+        } 
+		// For editor mode, we rely on the debug tilemap list which is manually managed by the editor (no automatic syncing)
+        else if (!m_runtimeTileMaps.empty()) {
+            m_runtimeTileMaps.clear();
+        }
+
         // ============================================================
         // SHARED WORK (once per frame)
         // ============================================================
@@ -489,6 +578,9 @@ namespace ECS {
             m_guiPanelQueue.clear();
             m_guiImageQueue.clear();
             m_guiTextQueue.clear();
+            m_worldGuiPanelQueue.clear();
+            m_worldGuiImageQueue.clear();
+            m_worldGuiTextQueue.clear();
 
             // Unbind the current render target.
             Framebuffer::Unbind();
@@ -634,6 +726,8 @@ namespace ECS {
                     // ===============================
                     // TILEMAP DRAW (WORLD BACKGROUND)
                     // ===============================
+                    SubmitRuntimeTileMaps(layer);
+
                     if (m_debugTileMap && m_debugTileset)
                     {
                         // Backward-compatible single debug tilemap path.
@@ -1139,10 +1233,26 @@ namespace ECS {
             });
 
 
+        m_renderGraph->AddPass("WorldGUI", { "HDR" }, { "HDR" },
+            [this, &viewProj](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
+                if (!hdrFbo) return;
+
+                hdrFbo->Bind();
+                glViewport(0, 0, hdrFbo->Width(), hdrFbo->Height());
+                RenderWorldGUI(viewProj);
+                Framebuffer::Unbind();
+
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
+            });
+
         m_renderGraph->AddPass("BloomExtract", { "HDR" }, { "BloomExtract" },
-                [this](ResourceAccessor& res)
-                {
-                    auto* hdrFbo = res.GetFramebuffer("HDR");
+            [this](ResourceAccessor& res)
+            {
+                auto* hdrFbo = res.GetFramebuffer("HDR");
                     auto* extractFbo = res.GetFramebuffer("BloomExtract");
                     if (!hdrFbo || !extractFbo) return;
 
@@ -1459,10 +1569,11 @@ namespace ECS {
 
                 // Render GUI panels (solid quads with optional corner radius).
                 if (!m_guiPanelQueue.empty()) {
-                    if (m_shader) {
-                        m_shader->use();
-                        m_shader->setMat4("uViewProj", screenOrtho);
-                        m_shader->setUniform("uLightingEnabled", 0);
+                    Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+                    if (guiShader) {
+                        guiShader->use();
+                        guiShader->setMat4("uViewProj", screenOrtho);
+                        guiShader->setUniform("uGamma", 1.5f);
                     }
                     guiRenderer->beginFrame();
                     for (const auto& panel : m_guiPanelQueue) { // Render each panel
@@ -1479,10 +1590,11 @@ namespace ECS {
 
                 // Render GUI images/icons (textured quads).
                 if (!m_guiImageQueue.empty()) {
-                    if (m_shader) {
-                        m_shader->use();
-                        m_shader->setMat4("uViewProj", screenOrtho);
-                        m_shader->setUniform("uLightingEnabled", 0);
+                    Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+                    if (guiShader) {
+                        guiShader->use();
+                        guiShader->setMat4("uViewProj", screenOrtho);
+                        guiShader->setUniform("uGamma", 1.5f);
                     }
                     guiRenderer->beginFrame();
                     for (const auto& image : m_guiImageQueue) {
@@ -1541,6 +1653,9 @@ namespace ECS {
                 m_guiPanelQueue.clear();
                 m_guiImageQueue.clear();
                 m_guiTextQueue.clear();
+                m_worldGuiPanelQueue.clear();
+                m_worldGuiImageQueue.clear();
+                m_worldGuiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
                 // Unbind the current render target.
@@ -1597,6 +1712,7 @@ namespace ECS {
         m_guiRenderer.reset();
         m_renderGraph.reset();
         m_shader.reset();
+        m_guiShader.reset();
         m_textShader.reset();
         m_sdfCircleShader.reset();
         m_blitShader.reset();
@@ -1604,6 +1720,7 @@ namespace ECS {
         m_bloomExtractShader.reset();
         m_bloomCombineShader.reset();
         m_pickingFBO.Destroy();
+        m_runtimeTileMaps.clear();
         g_rendererSystemInstance = nullptr;
         m_lightManager.Shutdown();
     }
@@ -1703,8 +1820,229 @@ namespace ECS {
     }
 
     // ====================================================================
-// Extracted Render Helpers
-// ====================================================================
+    // Extracted Render Helpers
+    // ====================================================================
+
+	// Refresh or load tilemaps for all entities that have a TileMapComponent
+    void RendererSystem::RefreshRuntimeTileMaps(World& world) {
+		// Only refresh tilemaps in Game mode
+        // In Editor mode, tilemaps are managed by the editor and should not be overridden by runtime loading logic
+        if (Engine::CORE->GetMode() != Engine::EngineMode::Game) {
+            return;
+        }
+
+		// Track which entities we've seen with TileMapComponents to identify removed ones
+        std::unordered_set<EntityId> seen;
+        world.Each<ECS::Components::TileMapComponent>([this, &seen, &world](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
+			// Mark this entity as seen
+            seen.insert(entity.Index);
+
+			// Find or create runtime entry for this entity
+            RuntimeTileMapEntry& entry = m_runtimeTileMaps[entity.Index];
+            const bool generationChanged = (entry.Generation != entity.Generation);
+
+			// If the generation has changed, it means the entity was destroyed and possibly recreated
+            // In that case, we should reset the entry to avoid carrying over stale data from a previous entity with the same index
+            if (generationChanged) {
+                entry = RuntimeTileMapEntry{};
+            }
+			// Update generation to current entity generation
+            entry.Generation = entity.Generation;
+
+			// Resolve paths
+            std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath);
+            std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath);
+            mapPath = ResolveProjectPathForLoad(mapPath);
+            legacyTilesetPath = ResolveProjectPathForLoad(legacyTilesetPath);
+            const bool legacyTilesetExists = (!legacyTilesetPath.empty() && std::filesystem::exists(legacyTilesetPath));
+
+			// Determine if we need to reload the map based on changes to the map path, tile world size or default dimensions
+            const bool mapNeedsReload = generationChanged || entry.MapPath != mapPath || entry.TileWorldSize != comp.TileWorldSize ||
+                entry.DefaultWidth != comp.DefaultWidth || entry.DefaultHeight != comp.DefaultHeight;
+
+			// Reload map if needed
+            if (mapNeedsReload) {
+                entry.Map.reset();
+                entry.Tilesets.clear();
+                entry.TilesetPaths.clear();
+                entry.MapPath = mapPath;
+                entry.TileWorldSize = comp.TileWorldSize;
+                entry.DefaultWidth = comp.DefaultWidth;
+                entry.DefaultHeight = comp.DefaultHeight;
+
+				// First try loading the map from the specified path
+                // If that fails and a legacy tileset path is provided, we'll attempt to load the map without tileset references, relying on fallback logic to find the tileset
+                if (!mapPath.empty() && std::filesystem::exists(mapPath)) {
+                    entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+					// If loading fails
+                    // Reset the map pointer to ensure we don't keep an invalid map
+                    if (!entry.Map->LoadMap(mapPath)) {
+                        LOG_WARNING("[TileMap] (Runtime) Failed to load tilemap: " << mapPath);
+                        entry.Map.reset();
+                    }
+                } 
+				// If the map path is specified but the file doesn't exist
+                else if (!mapPath.empty()) {
+                    LOG_WARNING("[TileMap] (Runtime) Tilemap file does not exist: " << mapPath);
+                }
+
+				// If we don't have a valid map loaded but we have tile world size and default dimensions, create an empty map so the game can still run with a blank tilemap
+                if (!entry.Map) {
+                    entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+                    entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
+                }
+                
+				// Log the result of the loading attempt
+                if (entry.Map) {
+                    LOG_INFO("[TileMap] (Runtime) Loaded tilemap: " << mapPath << " layers=" << entry.Map->LayerCount());
+                }
+            }
+
+			// Next, resolve tileset paths and determine if we need to rebuild tilesets
+            std::vector<std::string> tilesetPaths;
+
+			// If the map loaded successfully, get tileset paths from the map dat
+            // This allows the map to specify multiple tilesets and their paths
+            if (entry.Map) {
+                tilesetPaths = entry.Map->GetTilesetPaths();
+            }
+
+			// Resolve the tileset paths to actual file system paths, and check if they exist
+            std::vector<std::string> resolvedTilesetPaths;
+            resolvedTilesetPaths.reserve(tilesetPaths.size());
+
+			// We prioritize the tileset paths specified in the map data
+            for (const auto& path : tilesetPaths) {
+                const std::string resolvedPath = ResolveProjectPathForLoad(path);
+				// Only add to the list of tilesets if the resolved path is valid and the file exists
+                if (!resolvedPath.empty() && std::filesystem::exists(resolvedPath)) {
+                    resolvedTilesetPaths.push_back(resolvedPath);
+                }
+            }
+
+			// If no valid tileset paths were found from the map data, but a legacy tileset path is provided, attempt to resolve and use that as a fallback
+            if (resolvedTilesetPaths.empty() && legacyTilesetExists) {
+                resolvedTilesetPaths.push_back(legacyTilesetPath);
+            }
+
+			// Determine if we need to rebuild the tilesets based on changes to the tileset paths or tile pixel size
+            const bool tilesetsNeedRebuild = entry.TilePixelSize != comp.TilePixelSize || entry.TilesetPaths != resolvedTilesetPaths;
+
+			// Rebuild tilesets if needed
+            if (tilesetsNeedRebuild) {
+                entry.Tilesets.clear();
+                entry.TilesetPaths = resolvedTilesetPaths;
+                entry.Tilesets.reserve(entry.TilesetPaths.size());
+
+				// Build tilesets from the resolved paths
+                // The BuildTilesetFromTexture function will attempt to load the texture and create a tileset based on the specified tile pixel size
+                for (const auto& tilesetPath : entry.TilesetPaths) {
+                    entry.Tilesets.push_back(BuildTilesetFromTexture(tilesetPath, comp.TilePixelSize));
+                }
+
+				// If we have a map but no valid tilesets, we can still run the game, but the tilemap will not render any tiles since it has 
+                // no tileset to reference for tile definitions
+                entry.TilePixelSize = comp.TilePixelSize;
+
+				// Check if we have at least one valid tileset after attempting to build from the resolved paths
+                bool hasValidTileset = false;
+                for (const auto& tileset : entry.Tilesets) {
+                    if (tileset) {
+                        hasValidTileset = true;
+                        break;
+                    }
+                }
+
+				// If we don't have any valid tilesets from the map data or legacy path, log a warning
+                // The tilemap will still function but won't render any tiles
+                if (!hasValidTileset && legacyTilesetExists) {
+                    entry.Tilesets.clear();
+                    entry.TilesetPaths.clear();
+                    entry.TilesetPaths.push_back(legacyTilesetPath);
+                    entry.Tilesets.push_back(BuildTilesetFromTexture(legacyTilesetPath, comp.TilePixelSize));
+                    hasValidTileset = (entry.Tilesets.back() != nullptr);
+                    LOG_WARNING("[TileMap] (Runtime) Falling back to legacy tileset: " << legacyTilesetPath);
+                }
+
+                // For logging purposes
+                LOG_INFO("[TileMap] (Runtime) Tileset rebuild entity " << entity.Index << " count=" << entry.Tilesets.size() << " valid=" << (hasValidTileset ? "yes" : "no"));
+            }
+
+			// Finally, update visibility and render layer info for this tilemap entry based on the current component state and entity transform
+            glm::vec2 origin(0.0f, 0.0f);
+
+			// If the entity has a LocalTransform, we need to calculate the world position of the tilemap to set the correct origin for rendering
+            if (world.Has<ECS::Components::LocalTransform>(entity)) {
+                const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+                Vector3D position, scale;
+                Quaternion rotation;
+                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                origin = glm::vec2(position.X, position.Y);
+            }
+
+			// Update the runtime entry with the latest visibility and layer information
+            entry.Origin = origin;
+            entry.Visible = comp.Visible && world.IsActiveInHierarchy(entity);
+            entry.RenderLayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
+        });
+
+		// Remove any runtime entries for entities that no longer have a TileMapComponent (i.e. they were destroyed or had the component removed)
+        for (auto it = m_runtimeTileMaps.begin(); it != m_runtimeTileMaps.end(); ) {
+            if (!seen.contains(it->first)) {
+                it = m_runtimeTileMaps.erase(it);
+            } 
+            else {
+                ++it;
+            }
+        }
+    }
+
+	// Submit tilemaps for rendering for a specific layer
+	// Called after RefreshRuntimeTileMaps()
+    void RendererSystem::SubmitRuntimeTileMaps(int layer) {
+		// Tilemaps are only relevant in Game mode since in Editor mode the editor manages tilemap loading and rendering separately from the runtime logic
+        if (Engine::CORE->GetMode() != Engine::EngineMode::Game) {
+            return;
+        }
+
+        // Usual checks
+        if (!m_renderer) {
+            return;
+        }
+
+		// Log the number of tilemaps being submitted, but only once to avoid spamming the log every frame
+        static bool logged = false;
+        if (!logged) {
+            LOG_INFO("[TileMap] (Runtime) Submitting tilemaps: " << m_runtimeTileMaps.size());
+            logged = true;
+        }
+
+		// Iterate through all runtime tilemap entries and submit those that are visible, have a valid map and tileset and match the current render layer
+        for (const auto& entryPair : m_runtimeTileMaps) {
+            const RuntimeTileMapEntry& entry = entryPair.second;
+            if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
+                continue;
+            }
+
+            if (static_cast<int>(entry.RenderLayerId) != layer) {
+                continue;
+            }
+
+            if (entry.Map->LayerCount() == 0) {
+                continue;
+            }
+
+			// The tilemap renderer expects raw pointers for the tilesets, so we need to extract those from the shared_ptrs in our runtime entry
+            std::vector<const Tileset*> rawTilesets;
+            rawTilesets.reserve(entry.Tilesets.size());
+            for (const auto& tileset : entry.Tilesets) {
+                rawTilesets.push_back(tileset.get());
+            }
+
+			// Submit the tilemap for rendering
+            m_tileMapRenderer.Submit(*entry.Map, rawTilesets, *m_renderer, entry.Origin);
+        }
+    }
 
     void RendererSystem::CollectLights(World& world) {
         m_lightManager.BeginFrame();
@@ -1987,8 +2325,8 @@ namespace ECS {
                         });
                 }
             }
-            m_renderer->endFrame();
-        }
+              m_renderer->endFrame();
+          }
 
         // --- Boid Instanced Rendering ---
         if (m_boidSystem && m_boidShader) {
@@ -2020,6 +2358,8 @@ namespace ECS {
                 }
             }
         }
+
+        RenderWorldGUI(viewProj);
 
         // Unbind the current render target.
         Framebuffer::Unbind();
@@ -2136,15 +2476,36 @@ namespace ECS {
         const float h = static_cast<float>(vp.Size.y);
         glm::mat4 screenOrtho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
 
+        // Layout is produced once before render; remap it into the current viewport size so
+        // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
+        GUIViewport layoutViewport = m_guiViewport;
+        if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
+            layoutViewport.Size = m_renderTargetSize;
+        }
+        const float layoutW = std::max(1.0f, layoutViewport.Size.X);
+        const float layoutH = std::max(1.0f, layoutViewport.Size.Y);
+        const float guiScaleX = w / layoutW;
+        const float guiScaleY = h / layoutH;
+        auto scalePos = [&](const Vector2D& p) {
+            return Vector2D{ p.X * guiScaleX, p.Y * guiScaleY };
+        };
+        auto scaleSize = [&](const Vector2D& s) {
+            return Vector2D{ s.X * guiScaleX, s.Y * guiScaleY };
+        };
+
         // Panels
         if (!m_guiPanelQueue.empty()) {
-            m_shader->use();
-            m_shader->setMat4("uViewProj", screenOrtho);
-            m_shader->setUniform("uLightingEnabled", 0);
+            Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+            if (!guiShader) return;
+            guiShader->use();
+            guiShader->setMat4("uViewProj", screenOrtho);
+            guiShader->setUniform("uGamma", 1.5f);
             guiRenderer->beginFrame();
             for (const auto& panel : m_guiPanelQueue) {
-                glm::vec2 center(panel.position.X + panel.size.X * 0.5f, panel.position.Y + panel.size.Y * 0.5f);
-                glm::vec2 size(panel.size.X, panel.size.Y);
+                const Vector2D panelPos = scalePos(panel.position);
+                const Vector2D panelSize = scaleSize(panel.size);
+                glm::vec2 center(panelPos.X + panelSize.X * 0.5f, panelPos.Y + panelSize.Y * 0.5f);
+                glm::vec2 size(panelSize.X, panelSize.Y);
                 glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
                 guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
             }
@@ -2153,13 +2514,17 @@ namespace ECS {
 
         // Images
         if (!m_guiImageQueue.empty()) {
-            m_shader->use();
-            m_shader->setMat4("uViewProj", screenOrtho);
-            m_shader->setUniform("uLightingEnabled", 0);
+            Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
+            if (!guiShader) return;
+            guiShader->use();
+            guiShader->setMat4("uViewProj", screenOrtho);
+            guiShader->setUniform("uGamma", 1.5f);
             guiRenderer->beginFrame();
             for (const auto& image : m_guiImageQueue) {
-                glm::vec2 center(image.position.X + image.size.X * 0.5f, image.position.Y + image.size.Y * 0.5f);
-                glm::vec2 size(image.size.X, image.size.Y);
+                const Vector2D imagePos = scalePos(image.position);
+                const Vector2D imageSize = scaleSize(image.size);
+                glm::vec2 center(imagePos.X + imageSize.X * 0.5f, imagePos.Y + imageSize.Y * 0.5f);
+                glm::vec2 size(imageSize.X, imageSize.Y);
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
                 // GUI projection uses Y-down; flip V to keep textures upright.
                 glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
@@ -2178,19 +2543,96 @@ namespace ECS {
             for (const auto& text : m_guiTextQueue) {
                 if (text.text.empty()) continue;
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
-                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(text.pixelSize)));
+                const Vector2D textPosScaled = scalePos(text.position);
+                const float textPixelSize = text.pixelSize * std::min(guiScaleX, guiScaleY);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(textPixelSize)));
                 if (!font) continue;
-                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float scale = textPixelSize / static_cast<float>(font->getPixelSize());
                 const float ascent = font->getAscent() * scale;
-                glm::vec2 pos(text.position.X, h - text.position.Y - ascent);
+                glm::vec2 pos(textPosScaled.X, h - textPosScaled.Y - ascent);
                 glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
-                guiRenderer->submitText(*font, text.text, pos, color, text.pixelSize);
+                guiRenderer->submitText(*font, text.text, pos, color, textPixelSize);
             }
             guiRenderer->endFrame();
         }
 
         // Unbind the current render target.
         Framebuffer::Unbind();
+    }
+
+    void RendererSystem::RenderWorldGUI(const glm::mat4& viewProj) {
+        if (m_worldGuiPanelQueue.empty() && m_worldGuiTextQueue.empty() && m_worldGuiImageQueue.empty()) return;
+        if (!m_renderer) return;
+
+        GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Panels
+        if (!m_worldGuiPanelQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& panel : m_worldGuiPanelQueue) {
+                const glm::vec2 center(panel.position.X + panel.size.X * 0.5f,
+                                       panel.position.Y + panel.size.Y * 0.5f);
+                const glm::vec2 size(panel.size.X, panel.size.Y);
+                const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
+                m_renderer->submitQuad(center, size, 0, { 0.0f, 0.0f, 1.0f, 1.0f }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Images
+        if (!m_worldGuiImageQueue.empty()) {
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 0);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+            for (const auto& image : m_worldGuiImageQueue) {
+                const glm::vec2 center(image.position.X + image.size.X * 0.5f,
+                                       image.position.Y + image.size.Y * 0.5f);
+                const glm::vec2 size(image.size.X, image.size.Y);
+                const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
+                const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
+                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                    0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
+            }
+            m_renderer->endFrame();
+        }
+
+        // Text
+        if (!m_worldGuiTextQueue.empty()) {
+            if (m_textShader) {
+                m_textShader->use();
+                m_textShader->setMat4("uProjection", viewProj);
+            }
+            m_renderer->beginFrame();
+            for (const auto& text : m_worldGuiTextQueue) {
+                if (text.text.empty()) continue;
+                const std::string fontPath = text.fontPath.empty()
+                    ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
+                    : text.fontPath;
+                const float fontPixelSize = UnitsToPixels(text.pixelSize);
+                auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(std::round(fontPixelSize))));
+                if (!font) continue;
+                const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
+                const float ascent = font->getAscent() * scale;
+                const glm::vec2 textPos(text.position.X, text.position.Y - ascent);
+                const glm::vec4 color(text.color.R, text.color.G, text.color.B, text.color.A);
+                m_renderer->submitText(*font, text.text, textPos, color, text.pixelSize);
+            }
+            m_renderer->endFrame();
+        }
+
+        if (!blendWasEnabled) glDisable(GL_BLEND);
     }
 
     // Render picking.
@@ -2525,7 +2967,7 @@ namespace ECS {
 
     // Submit a GUI text draw call.
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
-                                       const std::string& fontPath, float pixelSize, const Color& color) {
+        const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
 
         // Queue GUI text draw for the GUI pass.
@@ -2536,6 +2978,49 @@ namespace ECS {
         submission.pixelSize = pixelSize;
         submission.color = color;
         m_guiTextQueue.push_back(std::move(submission));
+    }
+
+    // Submit a world-space GUI panel draw call.
+    void RendererSystem::SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
+        const Color& color, float cornerRadius) {
+        (void)cornerRadius;
+        if (!m_renderer) return;
+
+        WorldGUIPanelSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.color = color;
+        submission.cornerRadius = cornerRadius;
+        m_worldGuiPanelQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI image draw call.
+    void RendererSystem::SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
+        uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter) {
+        if (!m_renderer) return;
+
+        WorldGUIImageSubmission submission;
+        submission.position = position;
+        submission.size = size;
+        submission.textureId = textureId;
+        submission.uvRect = uvRect;
+        submission.color = color;
+        submission.textureFilter = textureFilter;
+        m_worldGuiImageQueue.push_back(submission);
+    }
+
+    // Submit a world-space GUI text draw call.
+    void RendererSystem::SubmitWorldGUIText(const Vector2D& position, const std::string& text,
+        const std::string& fontPath, float pixelSize, const Color& color) {
+        if (!m_renderer) return;
+
+        WorldGUITextSubmission submission;
+        submission.position = position;
+        submission.text = text;
+        submission.fontPath = fontPath;
+        submission.pixelSize = pixelSize;
+        submission.color = color;
+        m_worldGuiTextQueue.push_back(std::move(submission));
     }
 
     // Submit collider debug draw geometry.

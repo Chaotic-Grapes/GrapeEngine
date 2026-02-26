@@ -15,6 +15,7 @@ functionality for translating ECS GUI components into draw calls.
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,7 +23,9 @@ functionality for translating ECS GUI components into draw calls.
 #include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
 #include "graphics/font.hpp"
+#include "graphics/renderer.hpp"
 #include "graphics/texture.hpp"
+#include "core/ProjectPaths.h"
 #include "services/ResourceManager.h"
 
 namespace ECS {
@@ -193,6 +196,19 @@ namespace ECS {
             return lines;
         }
 
+        std::string ResolveProjectPathForLoad(const std::string& path) {
+            if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+                return path;
+            }
+
+            std::filesystem::path fsPath(path);
+            if (fsPath.is_absolute()) {
+                return path;
+            }
+
+            return Engine::ProjectPaths::ToAbsolutePath(path);
+        }
+
     }
 
     /**
@@ -268,9 +284,14 @@ namespace ECS {
             }
 
             // Use resolved size to compute per-element scale for padding, icons, and fonts.
-            const float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
-            const float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
             const bool isWorldSpace = (ResolveGUIRenderSpace(world, item.entity) == Components::GUIRenderSpace::World);
+            float scaleX = element.Size.X > 0.0f ? (element.ResolvedSize.X / element.Size.X) : 1.0f;
+            float scaleY = element.Size.Y > 0.0f ? (element.ResolvedSize.Y / element.Size.Y) : 1.0f;
+            const float ySign = isWorldSpace ? -1.0f : 1.0f;
+            if (isWorldSpace) {
+                scaleX = 1.0f;
+                scaleY = 1.0f;
+            }
 
             // Cache common optional components for styling decisions.
             const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
@@ -293,7 +314,11 @@ namespace ECS {
             case RenderItem::Type::Panel: {
                 const auto& panel = world.Get<Components::GUIPanel>(item.entity);
                 const Color panelColor = ResolveStyleColor(style, panel.Color, state);
-                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, panelColor, panel.CornerRadius);
+                }
                 break;
             }
             case RenderItem::Type::Text: {
@@ -308,9 +333,11 @@ namespace ECS {
                 const std::string fontPath = textFontPath.empty()
                                                 ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                                                 : textFontPath;
-                const float pixelSize = text.FontSize * (isWorldSpace ? 1.0f : scaleX);
-                const int fontSize = std::max(1, static_cast<int>(std::round(pixelSize)));
-                auto font = RM.GetFont(fontPath, fontSize);
+                const std::string fontLoadPath = ResolveProjectPathForLoad(fontPath);
+                const float pixelSize = isWorldSpace ? PixelsToUnits(text.FontSize) : (text.FontSize * scaleX);
+                const float fontPixelSize = isWorldSpace ? text.FontSize : pixelSize;
+                const int fontSize = std::max(1, static_cast<int>(std::round(fontPixelSize)));
+                auto font = RM.GetFont(fontLoadPath, fontSize);
 
                 if (!font) break;
 
@@ -323,9 +350,9 @@ namespace ECS {
                 // Adjust start Y based on vertical alignment inside the content rect.
                 float startY = element.ContentPosition.Y;
                 if (text.VAlign == Components::GUIText::VerticalAlign::Middle) {
-                    startY += (element.ContentSize.Y - totalHeight) * 0.5f;
-            } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
-                startY += (element.ContentSize.Y - totalHeight);
+                    startY += ySign * (element.ContentSize.Y - totalHeight) * 0.5f;
+                } else if (text.VAlign == Components::GUIText::VerticalAlign::Bottom) {
+                    startY += ySign * (element.ContentSize.Y - totalHeight);
                 }
 
                 const Color textColor = ResolveStyleColor(style, text.Color, state);
@@ -342,18 +369,23 @@ namespace ECS {
                     }
 
                     // Submit each line as its own text draw.
-                    const Vector2D linePos = { startX, startY + static_cast<float>(i) * lineHeight };
-                    renderer->SubmitGUIText(linePos, line, fontPath, pixelSize, textColor);
+                    const Vector2D linePos = { startX, startY + ySign * static_cast<float>(i) * lineHeight };
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIText(linePos, line, fontLoadPath, pixelSize, textColor);
+                    } else {
+                        renderer->SubmitGUIText(linePos, line, fontLoadPath, pixelSize, textColor);
+                    }
                 }
                 break;
             }
             case RenderItem::Type::Image: {
                 const auto& image = world.Get<Components::GUIImage>(item.entity);
                 const std::string path = ECS::StringTable::Resolve(image.TexturePathId);
+                const std::string loadPath = ResolveProjectPathForLoad(path);
                 uint32_t textureId = image.TextureId;
                 std::shared_ptr<Texture> texture;
-                if (!path.empty()) {
-                    texture = RM.Get<Texture>(path);
+                if (!loadPath.empty()) {
+                    texture = RM.Get<Texture>(loadPath);
                     if (texture) {
                         textureId = texture->ID();
                     }
@@ -368,8 +400,12 @@ namespace ECS {
                 Vector4D uv = image.UVRect;
 
                 if (texture && (image.ScaleMode != Components::GUIImageScaleMode::Stretch)) {
-                    const float texW = static_cast<float>(texture->Width());
-                    const float texH = static_cast<float>(texture->Height());
+                    float texW = static_cast<float>(texture->Width());
+                    float texH = static_cast<float>(texture->Height());
+                    if (isWorldSpace) {
+                        texW = PixelsToUnits(texW);
+                        texH = PixelsToUnits(texH);
+                    }
                     if (texW > 0.0f && texH > 0.0f) {
                         const float scale = (image.ScaleMode == Components::GUIImageScaleMode::Fit)
                             ? std::min(size.X / texW, size.Y / texH)
@@ -387,12 +423,19 @@ namespace ECS {
                     const float texW = static_cast<float>(texture->Width());
                     const float texH = static_cast<float>(texture->Height());
                     Vector4D border = image.SliceBorder;
-                    Vector4D borderScaled = {
-                        border.X * scaleX,
-                        border.Y * scaleY,
-                        border.Z * scaleX,
-                        border.W * scaleY
-                    };
+                    Vector4D borderScaled = isWorldSpace
+                        ? Vector4D{
+                            PixelsToUnits(border.X),
+                            PixelsToUnits(border.Y),
+                            PixelsToUnits(border.Z),
+                            PixelsToUnits(border.W)
+                        }
+                        : Vector4D{
+                            border.X * scaleX,
+                            border.Y * scaleY,
+                            border.Z * scaleX,
+                            border.W * scaleY
+                        };
                     const float left = std::min(borderScaled.X, size.X * 0.5f);
                     const float right = std::min(borderScaled.Z, size.X * 0.5f);
                     const float top = std::min(borderScaled.Y, size.Y * 0.5f);
@@ -441,13 +484,23 @@ namespace ECS {
                         if (slice.size.X <= 0.0f || slice.size.Y <= 0.0f) {
                             continue;
                         }
-                        renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
-                            image.TextureFilter);
+                        if (isWorldSpace) {
+                            renderer->SubmitWorldGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
+                                image.TextureFilter);
+                        } else {
+                            renderer->SubmitGUIImage(slice.pos, slice.size, textureId, slice.uv, imageColor,
+                                image.TextureFilter);
+                        }
                     }
                 } else {
                     // Non-sliced image uses a single quad.
-                    renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor,
-                        image.TextureFilter);
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIImage(pos, size, textureId, uv, imageColor,
+                            image.TextureFilter);
+                    } else {
+                        renderer->SubmitGUIImage(pos, size, textureId, uv, imageColor,
+                            image.TextureFilter);
+                    }
                 }
                 break;
             }
@@ -486,12 +539,16 @@ namespace ECS {
                 }
 
                 // Background panel (button body).
-                renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(element.ResolvedPosition, element.ResolvedSize, bgColor, button.CornerRadius);
+                }
 
                 // Offset content by button padding to keep labels/icons aligned.
                 const Vector2D innerPos = {
                     element.ContentPosition.X + button.Padding.X * scaleX,
-                    element.ContentPosition.Y + button.Padding.Y * scaleY
+                    element.ContentPosition.Y + button.Padding.Y * scaleY * ySign
                 };
                 const Vector2D innerSize = {
                     std::max(0.0f, element.ContentSize.X - (button.Padding.X + button.Padding.Z) * scaleX),
@@ -501,24 +558,35 @@ namespace ECS {
                 const std::string label = button.TextId ? ECS::StringTable::Resolve(button.TextId) : std::string();
                 if (!label.empty()) {
                     // Label text is anchored at the inner content origin.
-                    const float labelSize = button.FontSize * (isWorldSpace ? 1.0f : scaleX);
-                    renderer->SubmitGUIText(innerPos, label, button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : "",
-                        labelSize, button.TextColor);
+                    const float labelSize = isWorldSpace ? PixelsToUnits(button.FontSize) : (button.FontSize * scaleX);
+                    const std::string buttonFontPath = button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : std::string();
+                    const std::string buttonFontLoadPath = ResolveProjectPathForLoad(buttonFontPath);
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIText(innerPos, label, buttonFontLoadPath, labelSize, button.TextColor);
+                    } else {
+                        renderer->SubmitGUIText(innerPos, label, buttonFontLoadPath, labelSize, button.TextColor);
+                    }
                 }
 
                 if (button.IconPathId != 0) {
                     const std::string iconPath = ECS::StringTable::Resolve(button.IconPathId);
-                    if (!iconPath.empty()) {
-                        auto iconTex = RM.Get<Texture>(iconPath);
+                    const std::string iconLoadPath = ResolveProjectPathForLoad(iconPath);
+                    if (!iconLoadPath.empty()) {
+                        auto iconTex = RM.Get<Texture>(iconLoadPath);
                         if (iconTex) {
                             const Vector2D iconSize = { button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
                             const Vector2D iconPos = {
                                 innerPos.X + button.IconOffset.X * scaleX,
-                                innerPos.Y + button.IconOffset.Y * scaleY
+                                innerPos.Y + button.IconOffset.Y * scaleY * ySign
                             };
                             // Icons are drawn as a tinted image over the button.
-                            renderer->SubmitGUIImage(iconPos, iconSize, iconTex->ID(),
-                                Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            if (isWorldSpace) {
+                                renderer->SubmitWorldGUIImage(iconPos, iconSize, iconTex->ID(),
+                                    Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            } else {
+                                renderer->SubmitGUIImage(iconPos, iconSize, iconTex->ID(),
+                                    Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f }, button.IconColor);
+                            }
                         }
                     }
                 }
@@ -537,7 +605,7 @@ namespace ECS {
                 };
                 Vector2D trackPos = {
                     element.ContentPosition.X + padding.X,
-                    element.ContentPosition.Y + padding.Y
+                    element.ContentPosition.Y + padding.Y * ySign
                 };
                 Vector2D trackSize = {
                     std::max(0.0f, element.ContentSize.X - padding.X - paddingOpposite.X),
@@ -545,7 +613,11 @@ namespace ECS {
                 };
 
                 const Color trackColor = ResolveStyleColor(style, slider.TrackColor, state);
-                renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                }
 
                 // Fill length is derived from the normalized slider value.
                 const float range = std::max(0.0001f, slider.Max - slider.Min);
@@ -557,7 +629,11 @@ namespace ECS {
                 } else {
                     fillSize.Y = trackSize.Y * t;
                 }
-                renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                }
 
                 // Knob is centered at the end of the fill for consistent dragging.
                 Vector2D knobSize = { slider.KnobSize.X * scaleX, slider.KnobSize.Y * scaleY };
@@ -569,7 +645,11 @@ namespace ECS {
                     knobPos.X = trackPos.X + (trackSize.X - knobSize.X) * 0.5f;
                     knobPos.Y = trackPos.Y + trackSize.Y * t - knobSize.Y * 0.5f;
                 }
-                renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                } else {
+                    renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                }
                 break;
             }
             }

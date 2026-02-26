@@ -29,9 +29,10 @@ public:
 
     // State change event registration
     void OnStateChanged(std::function<void(EditorState, EditorState)> callback);
-    // External hooks for dirty-state checks and save actions.
+    // External hooks for dirty-state checks and save actions
     void SetUnsavedChangesProvider(std::function<bool()> provider);
     void SetSaveSceneCallback(std::function<void()> callback);
+	void SetHasScenePathProvider(std::function<bool()> provider);  // To check if the current scene has a save path (for prompting on unsaved play)
 
     // Query methods
     bool IsPlaying() const;
@@ -42,16 +43,18 @@ public:
     // World management
     void SetWorld(ECS::World* world, bool preserveState = false);
     bool HasValidWorld() const { return m_world != nullptr; }
-    void ClearSavedState(); // Clears any saved snapshot to avoid stale restores.
+    void ClearSavedState(); // Clears any saved snapshot to avoid stale restores
 
 private:
     void _saveWorldState();
     void _restoreWorldState();
     void _changeState(EditorState newState);
-    // Entry point that can guard play with unsaved-changes checks.
+    // Entry point that can guard play with unsaved-changes checks
     bool _startPlayFromEdit();
-    // Consults external dirty-state provider when available.
+    // Consults external dirty-state provider when available
     bool _hasUnsavedChanges() const;
+	// Consults external scene path provider when available
+    bool _hasScenePath() const;
     
     // Helper methods for in-place entity restoration
     void _restoreEntityState(ECS::Entity entity, const nlohmann::json& entityJson);
@@ -70,15 +73,18 @@ private:
     float m_toolbarHeight = 26.0f;
     // Cached playback speed to restore after Pause/Step.
     float m_userTimeScale = 1.0f;
-    // Optional play-warning flow for unsaved scenes.
-    bool m_warnOnUnsavedPlay = true;
-    bool m_showUnsavedPlayPopup = false;
+    // Prompt when Play is requested for a scene with no save path yet
+    bool m_showSaveScenePrompt = false;
+    // Ensure the first Play frame after a blocking save dialog doesn't use a huge delta time
+    bool m_zeroTimeOnNextPlay = false;
+    int m_restoreTimeScaleFrame = -1;
 
     // Event callback
     std::function<void(EditorState, EditorState)> m_onStateChanged;
-    // Editor callbacks for play-time warnings/actions.
+    // Editor callbacks for play-time warnings/actions
     std::function<bool()> m_hasUnsavedChangesProvider;
     std::function<void()> m_saveSceneCallback;
+    std::function<bool()> m_hasScenePathProvider;
 };
 
 #endif

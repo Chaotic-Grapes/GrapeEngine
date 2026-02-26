@@ -15,6 +15,7 @@ so both entities and prefab files use the same UI drawing path.
 
 #include "ComponentWidgets.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include <imgui.h>
 #include <algorithm>
 #include <unordered_map>
@@ -32,7 +33,7 @@ namespace EditorUI {
     static std::unordered_map<const nlohmann::json*, const nlohmann::json*> s_defaultScopeMap; // Maps data to defaults
     static ImFont* s_symbolsFont = nullptr;                // Symbols font for icon-only buttons
 
-    static const char* kResetIcon = "\xEF\x91\xBF";         // Reset icon (material: restart_alt)
+    static const char* kResetIcon = EditorIcons::Reset;
 
     // Strips "##" suffixes so visible labels don't show internal IDs
     static std::string _displayLabel(const std::string& label) {
@@ -143,11 +144,13 @@ namespace EditorUI {
 
     // Ends a property section
     // Inserts small spacing to ensure blocks of properties don't collapse into each other visually
-    void EndPropertySection() {
-        // Dummy creates invisible spacing (width = available content width)
-        ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));
-        // Additional vertical spacing between sections
-        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    void EndPropertySection(bool addSpacing) {
+        if (addSpacing) {
+            // Dummy creates invisible spacing (width = available content width)
+            ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));
+            // Additional vertical spacing between sections
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        }
         valueStartOffset = 0.0f;
     }
 

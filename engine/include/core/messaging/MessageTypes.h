@@ -416,6 +416,15 @@ namespace Messaging {
         }
     };
 
+    // Request to enter collision edit mode for a tilemap entity
+    struct TileMapCollisionEditRequested {
+        uint32_t EntityId;
+
+        explicit TileMapCollisionEditRequested(uint32_t id)
+            : EntityId(id) {
+        }
+    };
+
     // Notification that a render pass completed (for editor viewport updates)
     struct RenderPassCompleted {
         enum class PassType {

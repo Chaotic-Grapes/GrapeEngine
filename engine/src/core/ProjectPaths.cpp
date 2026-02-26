@@ -45,6 +45,7 @@ namespace Engine {
         
         // Ensure all required directories exist
         EnsureDirectoryExists(GetAssetsPath());
+        EnsureDirectoryExists(GetScenesPath());
         EnsureDirectoryExists(GetLogsPath());
 
         const std::filesystem::path logsPath = GetLogsPath();
@@ -66,9 +67,8 @@ namespace Engine {
     
     std::string ProjectPaths::GetProjectRoot() {
         if (!s_initialized) {
-            // TODO: Remove this fallback when editor is separated, should error instead
-            LOG_WARNING("ProjectPaths not initialized, using default 'EchoesBelow'");
-            return "EchoesBelow";
+            LOG_ERROR("ProjectPaths not initialized");
+            return "";
         }
         return s_projectRoot;
     }
@@ -78,7 +78,9 @@ namespace Engine {
     }
     
     std::string ProjectPaths::GetSettingsPath() {
-        return GetProjectRoot() + "/ProjectSettings.json";
+        std::filesystem::path settingsPath = std::filesystem::path(GetProjectDocumentsRoot()) / "ProjectSettings.json";
+        EnsureDirectoryExists(settingsPath.parent_path().string());
+        return settingsPath.string();
     }
 
     std::string ProjectPaths::GetScenesPath() {
@@ -136,6 +138,13 @@ namespace Engine {
         std::filesystem::path projectDocs = docsRoot / "Grape Engine" / projectName;
         EnsureDirectoryExists(projectDocs.string());
         return projectDocs.string();
+    }
+
+    std::string ProjectPaths::GetEditorDocumentsRoot() {
+        std::filesystem::path docsRoot = GetDocumentsRoot();
+        std::filesystem::path editorDocs = docsRoot / "Grape Engine";
+        EnsureDirectoryExists(editorDocs.string());
+        return editorDocs.string();
     }
 
     std::string ProjectPaths::GetLogsPath() {

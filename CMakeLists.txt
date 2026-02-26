@@ -138,6 +138,15 @@ endif()
 
 # Always build the engine library first
 add_subdirectory(engine)
+# Compiler warnings for engine: keep consistent regardless of editor/game builds.
+if(TARGET GrapeEngineLib)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    elseif (MSVC)
+        # /FS ensures shared PDB access for parallel cl.exe usage.
+        target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
+    endif()
+endif()
 # Build editor if requested
 if(BUILD_EDITOR)
     add_subdirectory(editor)
@@ -183,20 +192,16 @@ if(BUILD_EDITOR)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for editor: apply to the actual editor or engine targets
+    # Compiler warnings for editor: apply to the editor target.
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(TARGET GrapeEditor)
             target_compile_options(GrapeEditor PRIVATE -Wall -Wextra -Wpedantic -Werror)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
         endif()
     elseif (MSVC)
         if(TARGET GrapeEditor)
             # /FS ensures the compiler uses shared PDB access when multiple cl.exe
             # processes write to the same PDB (fixes C1041 in parallel builds).
             target_compile_options(GrapeEditor PRIVATE /W4 /FS)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
         endif()
     endif()
 endif()
@@ -224,23 +229,42 @@ if(BUILD_GAME)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for game: apply to runtime or engine targets
+    # Compiler warnings for game: apply to the runtime target.
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(TARGET GrapeRuntime)
             target_compile_options(GrapeRuntime PRIVATE -Wall -Wextra -Wpedantic -Werror)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
         endif()
     elseif (MSVC)
         if(TARGET GrapeRuntime)
             target_compile_options(GrapeRuntime PRIVATE /W4)
-        elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE /W4)
         endif()
     endif()
 endif()
 
 # ======================= Copy files and assets =========================
+
+# Copy engine DLL to editor/game output
+if(BUILD_ENGINE_SHARED AND TARGET GrapeEngineLib)
+    if(BUILD_EDITOR AND TARGET GrapeEditor)
+        add_custom_target(Copy_Engine_DLL_Editor ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:GrapeEngineLib>"
+                "$<TARGET_FILE_DIR:GrapeEditor>"
+            DEPENDS GrapeEngineLib GrapeEditor
+            COMMENT "Copying GrapeEngineNative.dll to editor output directory"
+        )
+    endif()
+
+    if(BUILD_GAME AND TARGET GrapeRuntime)
+        add_custom_target(Copy_Engine_DLL_Runtime ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:GrapeEngineLib>"
+                "$<TARGET_FILE_DIR:GrapeRuntime>"
+            DEPENDS GrapeEngineLib GrapeRuntime
+            COMMENT "Copying GrapeEngineNative.dll to runtime output directory"
+        )
+    endif()
+endif()
 
 # Copy assets to build directory for editor
 if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
@@ -542,11 +566,23 @@ endif()
 # Stages a standalone game build + project content to a distributable folder.
 if(BUILD_GAME AND TARGET GrapeRuntime)
     set(EXPORT_PROJECT_NAME "" CACHE STRING "Project folder name to export for game packaging")
+    set(EXPORT_PROJECT_DIR "" CACHE PATH "Project directory to export for game packaging")
 
     file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json")
     list(LENGTH PROJECT_SETTINGS_FILES PROJECT_SETTINGS_COUNT)
 
-    if(EXPORT_PROJECT_NAME STREQUAL "")
+    if(EXPORT_PROJECT_DIR)
+        get_filename_component(EXPORT_PROJECT_DIR "${EXPORT_PROJECT_DIR}" ABSOLUTE)
+        if(EXPORT_PROJECT_NAME STREQUAL "")
+            get_filename_component(EXPORT_PROJECT_NAME "${EXPORT_PROJECT_DIR}" NAME)
+        else()
+            get_filename_component(EXPORT_PROJECT_DIR_NAME "${EXPORT_PROJECT_DIR}" NAME)
+            if(NOT EXPORT_PROJECT_NAME STREQUAL EXPORT_PROJECT_DIR_NAME)
+                message(WARNING "Export: EXPORT_PROJECT_NAME does not match EXPORT_PROJECT_DIR name; using directory name '${EXPORT_PROJECT_DIR_NAME}'.")
+                set(EXPORT_PROJECT_NAME "${EXPORT_PROJECT_DIR_NAME}")
+            endif()
+        endif()
+    elseif(EXPORT_PROJECT_NAME STREQUAL "")
         if(PROJECT_SETTINGS_COUNT EQUAL 1)
             list(GET PROJECT_SETTINGS_FILES 0 EXPORT_PROJECT_SETTINGS)
             get_filename_component(EXPORT_PROJECT_DIR "${EXPORT_PROJECT_SETTINGS}" DIRECTORY)
@@ -559,36 +595,41 @@ if(BUILD_GAME AND TARGET GrapeRuntime)
         endif()
     endif()
 
-    if(EXPORT_PROJECT_NAME)
-        set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
-        set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
+      if(EXPORT_PROJECT_NAME)
+          if(NOT EXPORT_PROJECT_DIR)
+              set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
+          endif()
+          set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
+          set(EXPORT_ENGINE_DLL_COMMAND "")
+          set(EXPORT_ENGINE_DLL_DEPENDENCY "")
 
-        add_custom_target(ExportGame
-            COMMAND ${CMAKE_COMMAND} -E echo "Exporting game to ${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E remove_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "$<TARGET_FILE_DIR:GrapeRuntime>"
-                "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${EXPORT_PROJECT_DIR}"
-                "${EXPORT_OUTPUT_DIR}/$<CONFIG>/${EXPORT_PROJECT_NAME}"
-            DEPENDS GrapeRuntime
-            COMMENT "Staging standalone game export"
-        )
+          if(BUILD_ENGINE_SHARED)
+              set(EXPORT_ENGINE_DLL_COMMAND
+                  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                      "$<TARGET_FILE:GrapeEngineLib>"
+                      "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              )
+              set(EXPORT_ENGINE_DLL_DEPENDENCY GrapeEngineLib)
+          endif()
 
-        if(BUILD_ENGINE_SHARED)
-            add_custom_command(TARGET ExportGame POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:GrapeEngineLib>"
-                    "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
-                COMMENT "Copying engine DLL to export output"
-            )
-        endif()
+          add_custom_target(ExportGame
+              COMMAND ${CMAKE_COMMAND} -E echo "Exporting game to ${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E remove_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${CMAKE_COMMAND} -E copy_directory
+                  "$<TARGET_FILE_DIR:GrapeRuntime>"
+                  "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              ${EXPORT_ENGINE_DLL_COMMAND}
+              COMMAND ${CMAKE_COMMAND} -E copy_directory
+                  "${EXPORT_PROJECT_DIR}"
+                  "${EXPORT_OUTPUT_DIR}/$<CONFIG>/${EXPORT_PROJECT_NAME}"
+              DEPENDS GrapeRuntime ${EXPORT_ENGINE_DLL_DEPENDENCY}
+              COMMENT "Staging standalone game export"
+          )
 
-        if(TARGET Copy_Assets_Runtime)
-            add_dependencies(ExportGame Copy_Assets_Runtime)
-        endif()
+          if(TARGET Copy_Assets_Runtime)
+              add_dependencies(ExportGame Copy_Assets_Runtime)
+          endif()
         if(TARGET Copy_FMOD_Runtime)
             add_dependencies(ExportGame Copy_FMOD_Runtime)
         endif()

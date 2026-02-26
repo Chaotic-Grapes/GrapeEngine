@@ -137,6 +137,22 @@ int main(int argc, char** argv) {
     int height = projectSettings.WindowSettings.Height;
     bool vsync = projectSettings.WindowSettings.VSync;
     bool fullscreen = projectSettings.WindowSettings.Fullscreen;
+    Platform::WindowMode windowMode = fullscreen ? Platform::WindowMode::Fullscreen
+                                                 : Platform::WindowMode::Windowed;
+    // Prefer explicit mode if configured.
+    const std::string& configuredMode = projectSettings.WindowSettings.Mode;
+    if (!configuredMode.empty()) {
+        if (configuredMode == "Borderless") {
+            windowMode = Platform::WindowMode::Borderless;
+            fullscreen = false;
+        } else if (configuredMode == "Windowed") {
+            windowMode = Platform::WindowMode::Windowed;
+            fullscreen = false;
+        } else if (configuredMode == "Fullscreen") {
+            windowMode = Platform::WindowMode::Fullscreen;
+            fullscreen = true;
+        }
+    }
 
     // Apply physics settings
     Engine::Physics::SetGravity(Vector2D(0.0f, projectSettings.Physics.Gravity));
@@ -156,7 +172,7 @@ int main(int argc, char** argv) {
     windowInfo.Width = width;
     windowInfo.Height = height;
     windowInfo.VSync = vsync;
-    windowInfo.Mode = fullscreen ? Platform::WindowMode::Fullscreen : Platform::WindowMode::Windowed;
+    windowInfo.Mode = windowMode;
 
     auto* window = platformContext->CreatePlatformWindow(windowInfo);
     if (!window) {
@@ -193,14 +209,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    LOG_INFO("Loading startup scene: " << startupScene);
+    std::filesystem::path startupScenePath = startupScene;
+    if (!startupScenePath.is_absolute()) {
+        startupScenePath = std::filesystem::path(projectRoot) / startupScenePath;
+    }
+
+    LOG_INFO("Loading startup scene: " << startupScenePath.string());
 
     auto& sceneManager = engine.GetSceneManager();
     auto* scene = new Scenes::Scene();
     size_t sceneIndex = sceneManager.AddScene(scene);
 
-    if (!sceneManager.LoadScene(sceneIndex, startupScene)) {
-        LOG_ERROR("Failed to load startup scene: " << startupScene);
+    if (!sceneManager.LoadScene(sceneIndex, startupScenePath.string())) {
+        LOG_ERROR("Failed to load startup scene: " << startupScenePath.string());
         engine.Shutdown();
         return 1;
     }
@@ -246,6 +267,29 @@ int main(int argc, char** argv) {
         // ============================
         // END FRAME
         // ============================
+    }
+
+    // Persist window settings back to ProjectSettings.json on exit.
+    if (window) {
+        auto& settings = engine.GetProjectSettings();
+        settings.WindowSettings.Width = window->GetWidth();
+        settings.WindowSettings.Height = window->GetHeight();
+        settings.WindowSettings.VSync = window->IsVSync();
+
+        if (window->HasMode(Platform::WindowMode::Fullscreen)) {
+            settings.WindowSettings.Mode = "Fullscreen";
+            settings.WindowSettings.Fullscreen = true;
+        } else if (window->HasMode(Platform::WindowMode::Borderless)) {
+            settings.WindowSettings.Mode = "Borderless";
+            settings.WindowSettings.Fullscreen = false;
+        } else {
+            settings.WindowSettings.Mode = "Windowed";
+            settings.WindowSettings.Fullscreen = false;
+        }
+
+        if (!engine.SaveProjectSettings(projectRoot)) {
+            LOG_WARNING("Failed to save ProjectSettings.json on exit");
+        }
     }
 
     // Shutdown

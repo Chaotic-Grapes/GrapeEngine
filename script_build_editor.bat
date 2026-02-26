@@ -48,19 +48,4 @@ echo ----------------------------------------------------------
 echo  Engine DLL: build\engine\%CONFIG%\GrapeEngineNative.dll
 echo  Editor EXE: build\editor\%CONFIG%\GrapeEngine.exe
 echo ==========================================================
-echo.
-echo NOTE: Engine DLL should be copied to editor directory.
-echo       Checking if copy is needed (copy only if source is newer)...
-echo   Attempting to copy build\engine\%CONFIG%\GrapeEngineNative.dll -> build\editor\%CONFIG%\
-xcopy /Y /D "build\engine\%CONFIG%\GrapeEngineNative.dll" "build\editor\%CONFIG%\" >nul
-if %errorlevel% equ 0 (
-    echo   Copy successful!
-) else (
-    if %errorlevel% equ 1 (
-        echo   DLL already up-to-date in editor directory.
-    ) else (
-        echo   WARNING: Failed to copy DLL - editor may not run!
-    )
-)
-echo ==========================================================
 pause

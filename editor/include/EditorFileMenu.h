@@ -22,6 +22,9 @@ active scene.
 
 #include <string>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
 #include <imgui.h>
 #include "serialization/ConfigurationSerializer.h"
 #include "EditorState.h"
@@ -47,6 +50,11 @@ public:
     void SetFonts(ImFont* mainFont, ImFont* boldFont) {
         m_mainFont = mainFont;
         m_boldFont = boldFont;
+    }
+    
+    // Set symbols font for icon-only buttons.
+    void SetSymbolsFont(ImFont* symbolsFont) {
+        m_symbolsFont = symbolsFont;
     }
 
     // Set hierarchy panel for entity order management during save/load
@@ -74,6 +82,11 @@ public:
         m_preSaveCallback = std::move(callback);
     }
 
+    // Request opening the project browser (project selection UI).
+    void SetProjectBrowserRequestCallback(std::function<void()> callback) {
+        m_requestProjectBrowser = std::move(callback);
+    }
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -96,6 +109,8 @@ public:
 
     // Shows a file dialog allowing the user to pick a .scene file to load
     void OpenSceneDialog();
+    // Opens a scene directly from a provided path (e.g., asset browser double-click).
+    void OpenSceneFromPath(const std::string& path);
 
     // Shows a Save As dialog and writes the current scene to disk
     void SaveSceneAsDialog();
@@ -105,6 +120,16 @@ public:
 
     // Expose the current scene path for editor systems.
     const std::string& GetCurrentScenePath() const { return m_currentScenePath; }
+
+    // Sync the current scene path when scenes are activated outside the file menu
+    void SyncActiveScenePath(const std::string& path) {
+        if (path.empty()) {
+            return;
+        }
+        if (m_currentScenePath != path) {
+            m_currentScenePath = path;
+        }
+    }
 
     // Mark the scene as having unsaved changes (only if it was loaded from a file)
     void MarkSceneDirty() {
@@ -123,6 +148,13 @@ public:
     void HandleShortcuts(float& uiScale);
 
 private:
+    struct ExportStepResult {
+        std::string Name;
+        bool Success = false;
+        std::string Message;
+        std::string Output;
+    };
+
     // -------------------------------------------------------------------------
     // Internal Helpers
     // -------------------------------------------------------------------------
@@ -132,6 +164,12 @@ private:
 
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
+    void _exportProject();
+    void _renderExportSummaryPopup();
+#ifdef _WIN32
+    std::string _pickExportFolder();
+#endif
+    void _finalizeExportIfDone();
 
     // -------------------------------------------------------------------------
     // State
@@ -149,18 +187,33 @@ private:
     std::function<void()> m_clearPlaybackSnapshot;
     // Optional callback to sync external assets before scene serialization.
     std::function<void(const std::string&)> m_preSaveCallback;
+    // Optional callback to open the project browser.
+    std::function<void()> m_requestProjectBrowser;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes
     bool m_hasUnsavedChanges = false;
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     // Project settings editor state
     bool m_showProjectSettings = false;
     bool m_projectSettingsDirty = false;
     // Helper to render project settings modal
     void _renderProjectSettingsModal();
+
+    // Export state
+    bool m_exportRequested = false;
+    bool m_openExportSummary = false;
+    std::string m_exportDestination;
+    std::vector<ExportStepResult> m_exportResults;
+    std::thread m_exportThread;
+    std::mutex m_exportMutex;
+    std::atomic<bool> m_exportInProgress{ false };
+    std::atomic<bool> m_exportDone{ false };
+    std::atomic<int> m_exportCurrentStep{ -1 };
+    std::vector<std::string> m_exportStepNames;
     
 };
 

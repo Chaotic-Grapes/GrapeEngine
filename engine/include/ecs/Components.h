@@ -628,6 +628,8 @@ namespace ECS {
             Vector2D ResolvedSize{ 0.0f, 0.0f };     // size after scale/margins
             Vector2D ContentPosition{ 0.0f, 0.0f };  // top-left after padding
             Vector2D ContentSize{ 0.0f, 0.0f };      // size after padding
+            Vector2D ScreenPosition{ 0.0f, 0.0f };   // top-left in screen space (world GUI input)
+            Vector2D ScreenSize{ 0.0f, 0.0f };       // size in screen space (world GUI input)
         };
         static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
