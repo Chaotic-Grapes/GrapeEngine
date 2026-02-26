@@ -15,10 +15,15 @@
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include <memory>
+#include <string>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
+
+// Forward declaration
+class TileMap;
 
 namespace ECS {
     struct PackedEntityPair {
@@ -57,8 +62,28 @@ namespace ECS {
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
     private:
+		// Helper struct to track runtime tilemap data for physics synchronization
+        struct RuntimeTileMapEntry {
+			std::shared_ptr<TileMap> Map;  // Pointer to the active tilemap asset
+			std::string MapPath;           // Tileset paths are stored in the tilemap asset, but we cache them here for quick access during physics updates
+            float TileWorldSize = 1.0f;
+            uint32_t DefaultWidth = 0;
+            uint32_t DefaultHeight = 0;
+            Vector2D Origin{0.0f, 0.0f};
+            uint16_t LayerId = 0;
+            bool Enabled = false;
+			uint32_t Generation = 0;       // Used to track changes to the tilemap for efficient updates
+        };
+
+		// Refreshes the runtime tilemap cache by comparing current tilemap components in the world to the cached entries
+        void RefreshRuntimeTileMaps(World& world);
+
+		// Performs broad-phase collision detection using spatial partitioning (e.g. uniform grid) to find potential collision pairs
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousCollisions;
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousTriggerOverlaps;
+
+		// Cache of runtime tilemap data for physics synchronization, keyed by entity ID
+        std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;  
     };
 }
 
