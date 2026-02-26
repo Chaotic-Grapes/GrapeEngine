@@ -1,17 +1,43 @@
 # ======================= Project Configuration =========================
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.24)
 
 # Set the CMake policy version (ensures consistent behavior)
-cmake_policy(VERSION 3.13)
+cmake_policy(VERSION 3.24)
 
 project(GrapeEngine)
+
+# ======================= CUDA Configuration =========================
+option(ENABLE_CUDA "Enable CUDA GPU acceleration" ON)
+
+if(ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_ARCHITECTURES native)
+        find_package(CUDAToolkit REQUIRED)
+        set(GRAPE_HAS_CUDA TRUE)
+        message(STATUS "CUDA enabled: ${CMAKE_CUDA_COMPILER}")
+        message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+    else()
+        set(GRAPE_HAS_CUDA FALSE)
+        message(WARNING "CUDA compiler not found - CUDA features disabled")
+    endif()
+else()
+    set(GRAPE_HAS_CUDA FALSE)
+    message(STATUS "CUDA disabled by option")
+endif()
 
 # Set C++ standard globally
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-    add_compile_options(/EHsc /bigobj)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/EHsc>
+                        $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
+                        $<$<COMPILE_LANGUAGE:C>:/EHsc>
+                        $<$<COMPILE_LANGUAGE:C>:/bigobj>)
 endif()
 
 # Set the directory where custom CMake modules are stored

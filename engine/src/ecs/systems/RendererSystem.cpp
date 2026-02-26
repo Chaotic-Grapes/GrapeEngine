@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 // Engine Systems
 // ============================================================================
+#include "ecs/systems/BoidSystem.h"
 #include "ecs/systems/RendererSystem.h"
 
 // ============================================================================
@@ -245,6 +246,11 @@ namespace ECS {
             "assets/shaders/bloom_combine.frag");
 
         m_blitShader = RM.Get<Shader>("assets/shaders/blit");
+
+        // Compute-related shaders
+        m_boidShader = RM.Get<Shader>("assets/shaders/boid");
+
+        m_boidSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::BoidSystem>();
 
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
@@ -797,6 +803,38 @@ namespace ECS {
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
                 }
+
+                // --- Boid Instanced Rendering ---
+                if (m_boidSystem && m_boidShader) {
+                    const auto& flockData = m_boidSystem->GetFlockRenderData();
+                    if (!flockData.empty()) {
+                        m_boidShader->use();
+                        m_boidShader->setMat4("uViewProj", viewProj);
+
+                        for (const auto& [entityId, flock] : flockData) {
+                            if (flock.count <= 0 || flock.vao == 0) continue;
+
+                            m_boidShader->setUniform("uBoidSize", flock.boidSize);
+
+                            if (flock.textureId != 0) {
+                                m_boidShader->setUniform("uHasTexture", 1);
+                                m_boidShader->setUniform("uTexture", 0);
+                                glActiveTexture(GL_TEXTURE0);
+                                glBindTexture(GL_TEXTURE_2D, flock.textureId);
+                            }
+                            else {
+                                m_boidShader->setUniform("uHasTexture", 0);
+                            }
+
+                            m_boidShader->setUniform("uColor", glm::vec4(1.0f));
+
+                            glBindVertexArray(flock.vao);
+                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+                            glBindVertexArray(0);
+                        }
+                    }
+                }
+
                 // Unbind the current render target.
                 Framebuffer::Unbind();
             });
@@ -1950,6 +1988,37 @@ namespace ECS {
                 }
             }
             m_renderer->endFrame();
+        }
+
+        // --- Boid Instanced Rendering ---
+        if (m_boidSystem && m_boidShader) {
+            const auto& flockData = m_boidSystem->GetFlockRenderData();
+            if (!flockData.empty()) {
+                m_boidShader->use();
+                m_boidShader->setMat4("uViewProj", viewProj);
+
+                for (const auto& [entityId, flock] : flockData) {
+                    if (flock.count <= 0 || flock.vao == 0) continue;
+
+                    m_boidShader->setUniform("uBoidSize", flock.boidSize);
+
+                    if (flock.textureId != 0) {
+                        m_boidShader->setUniform("uHasTexture", 1);
+                        m_boidShader->setUniform("uTexture", 0);
+                        glActiveTexture(GL_TEXTURE0);
+                        glBindTexture(GL_TEXTURE_2D, flock.textureId);
+                    }
+                    else {
+                        m_boidShader->setUniform("uHasTexture", 0);
+                    }
+
+                    m_boidShader->setUniform("uColor", glm::vec4(1.0f));
+
+                    glBindVertexArray(flock.vao);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+                    glBindVertexArray(0);
+                }
+            }
         }
 
         // Unbind the current render target.

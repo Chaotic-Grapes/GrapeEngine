@@ -65,6 +65,7 @@ namespace {
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
+    const uint32_t kHashBoidFlock = Editor::ECSUtils::FNV1aHash("BoidFlock");
     const uint32_t kHashGUICanvas = Editor::ECSUtils::FNV1aHash("GUICanvas");
     const uint32_t kHashGUIRenderMode = Editor::ECSUtils::FNV1aHash("GUIRenderMode");
     const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
@@ -1030,6 +1031,35 @@ static void _initializeDefaultRegistry() {
                 { "Flags", 0 }
             }; }),
             COMPONENT_OPS_HASH(Material2D, kHashMaterial2D)
+        },
+        // Boid Flock
+        {
+            "Boid Flock",                    // DisplayName
+            "BoidFlock",                     // TypeName
+            "ECS::Components::BoidFlock",    // FullTypeName
+            GetComponentIdFromHashOrWarn(kHashBoidFlock, "BoidFlock"),
+            kHashBoidFlock,
+            true,                            // CanDelete
+            true,                            // IsBuiltin (C++ component)
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>(
+                [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) {
+                    ui.RenderBoidFlock(d, e, w);
+                }
+            ),
+            static_cast<std::function<nlohmann::json()>>([]() {
+                return nlohmann::json{
+                    {"count", 5000},
+                    {"separationWeight", 1.5f},
+                    {"alignmentWeight", 1.0f},
+                    {"cohesionWeight", 1.0f},
+                    {"visualRange", 50.0f},
+                    {"maxSpeed", 200.0f},
+                    {"maxForce", 10.0f},
+                    {"boidSize", 0.3f},
+                    {"TexturePath", ""}
+                };
+            }),
+            COMPONENT_OPS_HASH(BoidFlock, kHashBoidFlock)
         },
         // GUI Canvas
         {

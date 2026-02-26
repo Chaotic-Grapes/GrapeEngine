@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/BoidSystem.h"
 #include "ecs/systems/GUILayoutSystem.h"
 #include "ecs/systems/GUIInputSystem.h"
 #include "ecs/systems/GUIRenderSystem.h"
@@ -38,6 +39,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <filesystem>
 #include "platform/glfw/GLFWPlatformContext.h"
 
+#ifdef GRAPE_HAS_CUDA
+#include "cuda/CudaTest.cuh"
+#endif
+
 // Undefine potential Windows macros that conflict with enum names
 #ifdef ERROR
 #undef ERROR
@@ -48,6 +53,10 @@ namespace Engine {
     Application* CORE = nullptr;
 
     void Application::Initialize(EngineMode mode, bool enableConsole) {
+        #ifdef GRAPE_HAS_CUDA
+                CudaTestRun();
+        #endif
+
         if (m_initialized) {
             LOG_WARNING("Application already initialized");
             return;
@@ -344,7 +353,8 @@ namespace Engine {
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         m_sceneManager.SetAudioSystem(audioSystem);
-        
+        m_systemManager.RegisterSystem<ECS::BoidSystem>();
+
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
         m_systemManager.RegisterSystem<ECS::TransformSystem>();

@@ -2336,3 +2336,81 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
     // End property section.
     EditorUI::EndPropertySection();
 }
+
+// Renders the BoidFlock component properties
+void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS::World* world)
+{
+    (void)entity;
+    (void)world;
+
+    ImGuiIdScope id("BoidFlock");
+
+    // Ensure required keys exist
+    if (!data.contains("count"))              data["count"] = 5000;
+    if (!data.contains("separationWeight"))  data["separationWeight"] = 1.5f;
+    if (!data.contains("alignmentWeight"))   data["alignmentWeight"] = 1.0f;
+    if (!data.contains("cohesionWeight"))    data["cohesionWeight"] = 1.0f;
+    if (!data.contains("visualRange"))       data["visualRange"] = 50.0f;
+    if (!data.contains("maxSpeed"))          data["maxSpeed"] = 200.0f;
+    if (!data.contains("maxForce"))          data["maxForce"] = 10.0f;
+    if (!data.contains("boidSize"))          data["boidSize"] = 0.3f;
+    if (!data.contains("TexturePath"))       data["TexturePath"] = "";
+
+    EditorUI::BeginPropertySection({
+        "Count",
+        "Separation Weight",
+        "Alignment Weight",
+        "Cohesion Weight",
+        "Visual Range",
+        "Max Speed",
+        "Max Force",
+        "Boid Size",
+        "Texture"
+        });
+
+    // Flock size
+    EditorUI::RenderIntProperty("Count", data, "count");
+
+    ImGui::SeparatorText("Behavior Weights");
+
+    EditorUI::RenderFloatRow("Separation Weight", "", data, "separationWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Alignment Weight", "", data, "alignmentWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Cohesion Weight", "", data, "cohesionWeight", 0.1f, 0.0f, 10.0f);
+
+    ImGui::SeparatorText("Movement");
+
+    EditorUI::RenderFloatRow("Visual Range", "", data, "visualRange", 1.0f, 0.0f, 1000.0f);
+    EditorUI::RenderFloatRow("Max Speed", "", data, "maxSpeed", 1.0f, 0.0f, 10000.0f);
+    EditorUI::RenderFloatRow("Max Force", "", data, "maxForce", 0.1f, 0.0f, 1000.0f);
+
+    ImGui::SeparatorText("Rendering");
+
+    EditorUI::RenderFloatRow("Boid Size", "", data, "boidSize", 0.01f, 0.0f, 100.0f);
+
+    // Texture drag-drop (like SpriteRenderer2D)
+    std::string texPath = data.value("TexturePath", "");
+    std::string label = texPath.empty()
+        ? "None (drag texture here)"
+        : std::filesystem::path(texPath).filename().string();
+
+    EditorUI::RenderStaticValueRow("Texture", label, texPath.empty());
+
+    HandleAssetDragDropTarget(kImageExtensions,
+        [&](const std::string& droppedPath)
+        {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex)
+            {
+                data["TexturePath"] = droppedPath;
+                data["textureId"] = static_cast<uint32_t>(tex->ID());
+                return true;
+            }
+            return false;
+        },
+        [&](const std::string& rejectedPath)
+        {
+            QueueAssetDropError(rejectedPath, kImageExtensions);
+        });
+
+    EditorUI::EndPropertySection();
+}

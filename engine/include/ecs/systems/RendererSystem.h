@@ -46,9 +46,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "graphics/TileMapRenderer.hpp"
 
+// Forward declarations
 class TileMap;
 class Tileset;
 class TileMapRenderer;
+
+namespace ECS {
+    class BoidSystem;
+}
 
 namespace ECS {
     /**
@@ -349,6 +354,9 @@ namespace ECS {
 
         TileMapRenderer m_tileMapRenderer; // value member, no pointer
 
+        // Compute systems
+        BoidSystem* m_boidSystem = nullptr;
+
         // ====================================================================
         // Member Variables - Wireframe Submissions
         // ====================================================================
@@ -422,6 +430,9 @@ namespace ECS {
         std::shared_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
         std::shared_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
         std::shared_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+
+        // Compute shaders
+        std::shared_ptr<Shader> m_boidShader;
 
         // ====================================================================
         // Member Variables - Object Picking

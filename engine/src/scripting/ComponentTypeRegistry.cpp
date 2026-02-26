@@ -97,6 +97,9 @@ namespace ECS {
         REGISTER_COMPONENT(BoxCollider2D);
         REGISTER_COMPONENT(CircleCollider2D);
 
+        // Compute
+        REGISTER_COMPONENT(BoidFlock);
+
         // Rendering
         REGISTER_COMPONENT(SpriteRenderer2D);
         REGISTER_COMPONENT(SpriteFlip2D);

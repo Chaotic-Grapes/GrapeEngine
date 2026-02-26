@@ -354,6 +354,54 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraEditor3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabInstanceMetadata, PrefabHash, Flags)
+
+		// Custom serialization for BoidFlock
+		inline void to_json(nlohmann::json& j, const BoidFlock& b)
+		{
+			std::string path = ECS::StringTable::Resolve(b.TexturePath);
+
+			j = nlohmann::json{
+				{"count", b.count},
+				{"separationWeight", b.separationWeight},
+				{"alignmentWeight", b.alignmentWeight},
+				{"cohesionWeight", b.cohesionWeight},
+				{"visualRange", b.visualRange},
+				{"maxSpeed", b.maxSpeed},
+				{"maxForce", b.maxForce},
+				{"boidSize", b.boidSize},
+				{"TexturePath", path}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, BoidFlock& b)
+		{
+			b.count = j.value("count", 5000);
+			b.separationWeight = j.value("separationWeight", 1.5f);
+			b.alignmentWeight = j.value("alignmentWeight", 1.0f);
+			b.cohesionWeight = j.value("cohesionWeight", 1.0f);
+			b.visualRange = j.value("visualRange", 50.0f);
+			b.maxSpeed = j.value("maxSpeed", 200.0f);
+			b.maxForce = j.value("maxForce", 10.0f);
+			b.boidSize = j.value("boidSize", 0.3f);
+
+			// Texture path handling
+			std::string path = j.value("TexturePath", std::string());
+			b.TexturePath = path.empty() ? 0 : ECS::StringTable::Intern(path);
+
+			// Reload runtime texture
+			if (!path.empty())
+			{
+				auto tex = RM.Get<Texture>(path);
+				if (tex)
+					b.textureId = static_cast<uint32_t>(tex->ID());
+				else
+					b.textureId = 0;
+			}
+			else
+			{
+				b.textureId = 0;
+			}
+		}
 		
 		// Custom serialization for PrefabLink component (StringId path needs special handling)
 		// [DEPRECATED] Kept for backward compatibility during migration to PrefabInstanceMetadata
@@ -1149,6 +1197,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(GUIStateStyle, ECS::Components::GUIStateStyle, "GUIStateStyle");
 	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton");
 	REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider");
+	REGISTER_COMPONENT_SERIALIZER(BoidFlock, ECS::Components::BoidFlock, "BoidFlock");
 }
 
 #endif

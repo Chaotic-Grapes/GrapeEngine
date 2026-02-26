@@ -560,6 +560,22 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Material2D>, "Material2D must be trivially copyable");
 
+        struct BoidFlock {
+            int count = 5000;
+            float separationWeight = 1.5f;
+            float alignmentWeight = 1.0f;
+            float cohesionWeight = 1.0f;
+            float visualRange = 50.0f;
+            float maxSpeed = 200.0f;
+            float maxForce = 10.0f;
+            float boidSize = 0.3f;     // world-space size of each boid quad
+            uint32_t textureId = 0;   // runtime only
+
+            // Persistent texture path IDs (StringTable). 0 = invalid.
+            uint32_t TexturePath = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<BoidFlock>, "BoidFlock must be trivially copyable");
+
         // ---------- GUI ----------
 
         enum class GUIScaleMode : uint8_t {
