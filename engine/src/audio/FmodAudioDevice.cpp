@@ -195,6 +195,10 @@ namespace Audio {
 
         // Apply channel settings.
         ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+        if (s.Spatial3D) {
+            // Default falloff tuned for small scenes; adjust if needed.
+            ch->set3DMinMaxDistance(1.0f, 25.0f);
+        }
         ch->setVolume(s.Volume);
         ch->setPitch(s.Pitch);
         if (!s.Spatial3D) {
@@ -228,6 +232,10 @@ namespace Audio {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
                     ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    if (s.Spatial3D) {
+                        // Default falloff tuned for small scenes; adjust if needed.
+                        ch->set3DMinMaxDistance(1.0f, 25.0f);
+                    }
                     if (!s.Spatial3D) {
                         ch->setPan(s.Pan);
                     }
@@ -239,6 +247,10 @@ namespace Audio {
                     if (!playing && !s.StartPaused) ch->setPaused(false);
                     if (s.StartPaused) ch->setPaused(true);
                     ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    if (s.Spatial3D) {
+                        // Default falloff tuned for small scenes; adjust if needed.
+                        ch->set3DMinMaxDistance(1.0f, 25.0f);
+                    }
                     if (!s.Spatial3D) {
                         ch->setPan(s.Pan);
                     }
