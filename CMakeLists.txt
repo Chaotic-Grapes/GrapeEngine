@@ -341,13 +341,16 @@ if(DOTNET_EXECUTABLE)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     
-    # Find all .NET SDK versions and select the highest one
+    # Find all .NET SDK versions and select the highest one.
+    # Guard empty lists so configure doesn't fail on runtime-only dotnet installs.
     string(REGEX MATCHALL "([0-9]+\\.[0-9]+\\.[0-9]+)" DOTNET_SDK_VERSIONS "${DOTNET_SDK_LIST}")
-    
-    # Sort versions and pick the highest (last in sorted list)
-    list(SORT DOTNET_SDK_VERSIONS COMPARE NATURAL ORDER DESCENDING)
-    list(GET DOTNET_SDK_VERSIONS 0 DOTNET_SDK_VERSION)
-    
+    if(DOTNET_SDK_VERSIONS)
+        list(SORT DOTNET_SDK_VERSIONS COMPARE NATURAL ORDER DESCENDING)
+        list(GET DOTNET_SDK_VERSIONS 0 DOTNET_SDK_VERSION)
+    else()
+        set(DOTNET_SDK_VERSION "")
+    endif()
+
     if(DOTNET_SDK_VERSION)
         message(STATUS "  Detected .NET SDK version: ${DOTNET_SDK_VERSION}")
         

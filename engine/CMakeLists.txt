@@ -95,18 +95,25 @@ endif()
 
 # ======================= Link Dependencies =========================
 # CoreCLR / .NET Hosting
-set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../lib/CoreCLR")
-find_library(NETHOST_LIB 
-    NAMES nethost
-    PATHS ${CORECLR_LIB_DIR}
-    NO_DEFAULT_PATH
-    REQUIRED
-)
+if(NOT NETHOST_LIB)
+    set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../externals/lib/CoreCLR")
+    set(CORECLR_FALLBACK_DIR "${CMAKE_CURRENT_LIST_DIR}/../lib/CoreCLR")
+    set(NETHOST_ENV_DIR $ENV{NETHOST_DIR})
+
+    find_library(NETHOST_LIB
+        NAMES nethost
+        PATHS
+            ${CORECLR_LIB_DIR}
+            ${CORECLR_FALLBACK_DIR}
+            ${NETHOST_ENV_DIR}
+        REQUIRED
+    )
+endif()
 
 if(NETHOST_LIB)
     message(STATUS "Engine: Found nethost library: ${NETHOST_LIB}")
 else()
-    message(FATAL_ERROR "Engine: nethost.lib not found in ${CORECLR_LIB_DIR}")
+    message(FATAL_ERROR "Engine: nethost.lib not found. Searched: ${CORECLR_LIB_DIR}; ${CORECLR_FALLBACK_DIR}; ${NETHOST_ENV_DIR}")
 endif()
 
 # Link core dependencies (NO ImGui - that's editor-only)
