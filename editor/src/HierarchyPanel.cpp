@@ -53,6 +53,30 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "UndoSystem.h"
 
 namespace {
+    bool IsEditorCameraEntity(ECS::World* world, ECS::Entity entity) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity)) {
+            return false;
+        }
+
+        if (!Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D")) {
+            return false;
+        }
+
+        // Extra name check prevents false positives if component-name lookup regresses.
+        const auto* nameComp = Editor::ECSUtils::GetNamePtr(world, entity);
+        if (!nameComp) {
+            return true;
+        }
+
+        std::string name = ECS::StringTable::Resolve(nameComp->Value);
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+
+        return name.find("editor") != std::string::npos &&
+            name.find("camera") != std::string::npos;
+    }
+
     // Helper template function to safely add components during deserialization
     // Checks if the component type matches expected name before adding
     template <typename T>
@@ -80,7 +104,7 @@ namespace {
     // Returns true if entity should be filtered out (hidden)
     bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
         // Also hide entities that are not alive or null, or the camera editor entity
-        if (!world || entity.IsNull() || !world->IsAlive(entity) || Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
+        if (!world || entity.IsNull() || !world->IsAlive(entity) || IsEditorCameraEntity(world, entity))
             return true;
 
         return false;
@@ -100,7 +124,7 @@ namespace {
             return false;
 
         // Protect editor cameras from modification
-        if (Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
+        if (IsEditorCameraEntity(world, entity))
             return true;
 
         return false;
@@ -236,6 +260,14 @@ void HierarchyPanel::Render() {
         ImGui::End();
         return;
     }
+    // If the renamed entity no longer exists, clear rename mode so interactions remain usable.
+    if (m_renamingEntityId != ECS::Entity::NPOS32) {
+        ECS::Entity renamed = m_world->Resolve(m_renamingEntityId);
+        if (renamed.IsNull() || !m_world->IsAlive(renamed)) {
+            m_renamingEntityId = ECS::Entity::NPOS32;
+            m_focusRenameInput = false;
+        }
+    }
 
     // Render the main UI sections
     _renderHeader();           // Header with entity creation controls
@@ -336,7 +368,14 @@ void HierarchyPanel::Render() {
         m_contextMenuTarget = ECS::Entity::NPOS32;
     }
 
-    if (Input::IsKeyDown(KEY_DELETE) && !m_selectedEntityIds.empty()) {
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool hierarchyDeleteShortcut =
+        Input::IsKeyPressed(KEY_DELETE) &&
+        !io.WantTextInput &&
+        !io.WantCaptureKeyboard &&
+        !ImGui::IsAnyItemActive();
+
+    if (hierarchyDeleteShortcut && !m_selectedEntityIds.empty()) {
         // Delete all selected entities (except protected ones)
         std::vector<EntityId> toDelete;
         for (EntityId id : m_selectedEntityIds) {
