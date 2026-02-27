@@ -86,22 +86,15 @@ STEP 2: CLONE THE REPOSITORY
 STEP 3: GENERATE VISUAL STUDIO SOLUTION
 ================================================================================
 
-METHOD 1: Using the Provided Script Menu (Easiest)
--------------------------------------------------
-1. In the GrapeEngine directory, double-click: `script_build_menu.bat`
-   OR run from command line: `script_build_menu.bat`
+METHOD 1: Using the Batch Files (Recommended)
+---------------------------------------------
+1. In the GrapeEngine directory, run:
+   run.bat
 
-The menu script provides quick access to all common tasks:
-- Clean build folders
-- Build/Run the Editor (Debug/Release)
-- Build/Run the Standalone Game (Debug/Release)
-- Build both targets
-
-Each option will configure and build into separate folders:
-- Editor builds use the `build` folder (e.g. `build\Debug`)
-- Game builds use the `build_game\export\<ProjectName>` folder (e.g. `build_game\export\EchoesBelow\Release`)
-
-You can still use `script_build_editor.bat`, and `script_build_game.bat` directly if you prefer.
+`run.bat` will:
+- Configure the editor build in `build\`
+- Build Editor Debug (`build\Debug`)
+- Build Editor Release (`build\Release`)
 
 METHOD 2: Manual CMake Commands
 -------------------------------
@@ -137,10 +130,10 @@ OPTION A: From Visual Studio
 - Press F5 to run with debugging
 - Press Ctrl+F5 to run without debugging
 
-OPTION B: Using the Run Script
-------------------------------
- - Double-click: script_run_editor.bat
- - OR run from command line: script_run_editor.bat
+OPTION B: Using run.bat
+-----------------------
+ - Run: run.bat
+ - Then run the editor executable from `build\Debug\` or `build\Release\`
 
 OPTION C: Direct Execution
 --------------------------
@@ -171,12 +164,12 @@ ADDITIONAL COMMANDS
 ================================================================================
 
 CLEAN BUILD:
-- Run: script_clean.bat (removes build directory)
-- Or manually delete the 'build' folder
+- Run: clean.bat (removes `build` and `build_game` directories)
+- Or manually delete generated build folders
 
 REGENERATE SOLUTION:
 - Delete the 'build' folder
- - Run script_build_editor.bat again
+ - Run run.bat again
 - Or use the manual CMake commands above
 
 ================================================================================
@@ -195,7 +188,8 @@ PROJECT STRUCTURE
    ├── runtime/        # Runtime assets/binaries for game export
    ├── TestSuite/      # Sample project (To add in editor for testing)
    ├── CMakeLists.txt  # Main CMake configuration
-   └── script_*.bat    # Build, run and clean scripts
+   ├── run.bat         # Configure/build editor (Debug + Release)
+   └── clean.bat       # Remove generated build folders
 
 ================================================================================
 PROJECT SETTINGS AND CONFIGURATION
@@ -227,13 +221,12 @@ TARGETS (Editor vs Standalone Game)
 
 The project produces two targets:
 - Editor: interactive level editor, built into `build\Debug` / `build\Release`
-- Standalone Game: gameplay-only executable, built via scripts into `build_game\export\<ProjectName>\<Config>`
+- Standalone Game: gameplay-only executable, built into `build_game\export\<ProjectName>\<Config>`
 
 How to select targets:
-- Use 'script_build_editor.bat' / 'script_run_editor.bat' for the Editor
-- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game (editor needs to be built first!)
-  - If no project is provided, the scripts prompt you to pick from `Documents\Grape Engine\EditorSettings.json`
-- In Visual Studio, open the solution in 'build\' and run the Editor; game builds are produced by scripts
+- Use `run.bat` to configure and build the Editor in both Debug and Release
+- Use Visual Studio or direct executable launch to run the desired Editor config
+- In Visual Studio, open the solution in 'build\' and run the Editor
 
 APPLICATION CONFIGURATION (EditorSettings.json / ProjectSettings.json)
 ---------------------------------------------------------------------
@@ -258,11 +251,11 @@ LEVEL EDITOR MODES
 ------------------
 
 Real-time Editor (recommended):
-- Run the Editor target using 'script_run_editor.bat' or from Visual Studio
+- Run the Editor target from Visual Studio or by launching `build\Debug\GrapeEngine.exe` / `build\Release\GrapeEngine.exe`
 - Use the playback toolbar (Play/Pause/Stop) to control simulation
 
 Turn Editor Off (gameplay-only):
-- Run the Standalone Game target using 'script_run_game.bat' (no editor overlay)
+- Run the Standalone Game target executable directly (no editor overlay)
 - Alternatively, close the editor and run the game exe from 'build_game\Debug\' or 'build_game\Release\'
 
 Offline Editing:
@@ -285,9 +278,9 @@ Build Configuration Issues:
 REGENERATE VISUAL STUDIO 2022 SOLUTION
 --------------------------------------
 
-Quick scripts (recommended):
-- Editor: 'script_build_editor.bat' (creates/refreshes 'build\' and generates the solution)
-- Game: 'script_build_game.bat' (creates/refreshes 'build_game\' and generates the game build)
+Quick batch files (recommended):
+- Clean: `clean.bat` (removes generated build folders)
+- Rebuild solution + editor binaries: `run.bat` (creates/refreshes `build\` and builds Debug + Release)
 
 Manual CMake:
 - Regenerate Editor solution:
