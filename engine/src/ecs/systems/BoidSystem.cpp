@@ -46,7 +46,7 @@ namespace ECS {
     }
 
     void BoidSystem::OnUpdate(World& world) {
-        const float dt = TimeSystem::Instance().GetDeltaTime();
+        // const double dt = TimeSystem::Instance().GetDeltaTime();
 
         // ----------------------------------------------------------
         // 1. Discover flocks: init new ones, detect removed ones

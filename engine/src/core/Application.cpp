@@ -187,6 +187,7 @@ namespace Engine {
             auto& world = currentScene->GetWorld();
 
             uint32_t pickedEntityID = 0;  // TODO: Get from renderer
+			(void)pickedEntityID;
 
             double mouseX, mouseY;
             Input::GetMousePosition(mouseX, mouseY);
@@ -442,7 +443,7 @@ namespace Engine {
 #endif
     }
 
-    void Application::_updatePhysics(ECS::World& world) {
+    void Application::_updatePhysics(ECS::World& /*world*/) {
         // Handle fixed timestep accumulation for physics
         // Only called in Game mode - always accumulates
         
@@ -459,7 +460,7 @@ namespace Engine {
 
     // ==================== Device Management ====================
 
-    bool Application::SetResolution(int width, int height, int refreshRate) {
+    bool Application::SetResolution(int width, int height, int /*refreshRate*/) {
         if (!m_platformContext) {
             LOG_ERROR("Platform context unavailable");
             return false;

@@ -201,13 +201,11 @@ int main() {
                 
                 if (!wasInEdit && isInEdit) {
                     // Transitioning to Edit: stop PlayOnly systems
-                    auto& systemManager = engine.GetSystemManager();
                     systemManager.OnSceneStop(world);
                     systemManager.DestroySystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                 }
                 else if (wasInEdit && !isInEdit) {
                     // Transitioning from Edit to any active state: start PlayOnly systems
-                    auto& systemManager = engine.GetSystemManager();
                     systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }

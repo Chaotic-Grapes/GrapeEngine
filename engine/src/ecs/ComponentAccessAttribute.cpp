@@ -109,7 +109,7 @@ namespace ECS {
         return false;
     }
 
-    std::string ComponentAccessValidator::GetConflictMessage(ComponentTypeId component,
+    std::string ComponentAccessValidator::GetConflictMessage(ComponentTypeId /*component*/,
                                                             ComponentAccessMode currentMode,
                                                             ComponentAccessMode conflictMode) {
         std::stringstream ss;

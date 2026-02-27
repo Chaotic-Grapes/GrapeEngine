@@ -35,9 +35,9 @@ namespace ECS {
         TransformSystem() = default;
         ~TransformSystem() override = default;
 
-        void OnCreate(World& world) override {}
+        void OnCreate(World& world) override { (void)world; }
         void OnUpdate(World& world) override;
-        void OnDestroy(World& world) override {}
+        void OnDestroy(World& world) override { (void)world; }
 
         SystemMetadata GetMetadata() const override;
         SystemGroup GetSystemGroup() const override { return SystemGroup::PrePhysics; }

@@ -53,7 +53,7 @@ namespace ECS {
         ~PhysicsSystem() override = default;
 
         // ISystem interface
-        void OnCreate(World& world) override {}
+        void OnCreate(World& world) override { (void)world; }
         void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
         

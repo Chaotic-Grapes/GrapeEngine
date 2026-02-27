@@ -69,7 +69,7 @@ void TimeSystem::SetMaxFixedStepsPerFrame(int maxSteps) { m_maxFixedSteps = std:
 void TimeSystem::SetSmoothingWindowSize(size_t frames) { m_smoothWindowSize = std::max<size_t>(1, frames); }
 size_t TimeSystem::GetSmoothingWindowSize() const { return m_smoothWindowSize; }
 
-void TimeSystem::Advance(double rawDeltaSeconds, double nowSeconds) {
+void TimeSystem::Advance(double rawDeltaSeconds, double /*nowSeconds*/) {
     if (!m_running)
         Start();
 

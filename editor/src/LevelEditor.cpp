@@ -1657,6 +1657,11 @@ void LevelEditor::_saveActiveTileMapAsset(const std::string& scenePath) {
 // -------------------------------------------------------------------------
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
+    if (m_gameViewport.IsImmersiveModeEnabled()) {
+        m_gameViewport.ShowEditorWindows();
+        return;
+    }
+
     if (ImGui::BeginMainMenuBar()) {
         m_fileMenu.RenderFileMenu();
         m_fileMenu.RenderEditMenu();

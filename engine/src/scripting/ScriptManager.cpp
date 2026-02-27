@@ -55,39 +55,6 @@ extern "C" void __cdecl Native_OnScriptsChanged(const char* scriptsDir) {
 
 namespace ECS {
 
-    // Helper: produce a single-line summary from possibly multi-line diagnostics
-    static std::string SummarizeDiagnostics(const std::string& diags) {
-        if (diags.empty())
-            return std::string();
-
-        // Trim leading newlines/spaces
-        size_t pos = 0;
-        while (pos < diags.size() && (diags[pos] == '\r' || diags[pos] == '\n'))
-            ++pos;
-
-        // Find end of first line
-        size_t end = diags.find_first_of('\r', pos);
-        size_t nl = diags.find_first_of('\n', pos);
-
-        // Take the earliest line ending
-        if (end == std::string::npos || (nl != std::string::npos && nl < end))
-            end = nl;
-        std::string firstLine = (end == std::string::npos)
-            ? diags.substr(pos)
-            : diags.substr(pos, end - pos);
-
-        // Trim trailing whitespace
-        while (!firstLine.empty() && (firstLine.back() == '\r' || firstLine.back() == '\n'))
-            firstLine.pop_back();
-
-        // If there are additional lines, indicate truncation
-        if (diags.find_first_of('\n', pos) != std::string::npos || diags.find_first_of('\r', pos) != std::string::npos) {
-            return firstLine + " ...";
-        }
-
-        return firstLine;
-    }
-
     // ============================================================================
     // ScriptManager Implementation
     // ============================================================================
