@@ -2367,7 +2367,7 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
     if (!data.contains("visualRange"))       data["visualRange"] = 50.0f;
     if (!data.contains("maxSpeed"))          data["maxSpeed"] = 200.0f;
     if (!data.contains("maxForce"))          data["maxForce"] = 10.0f;
-    if (!data.contains("boidSize"))          data["boidSize"] = 0.3f;
+    if (!data.contains("boidSize"))          data["boidSize"] = 1.0f;
     if (!data.contains("TexturePath"))       data["TexturePath"] = "";
 
     EditorUI::BeginPropertySection({

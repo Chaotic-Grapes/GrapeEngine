@@ -144,7 +144,12 @@ if(TARGET GrapeEngineLib)
         target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
     elseif (MSVC)
         # /FS ensures shared PDB access for parallel cl.exe usage.
-        target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
+	target_compile_options(GrapeEngineLib PRIVATE 
+    		$<$<COMPILE_LANGUAGE:CXX>:/W4>
+    		$<$<COMPILE_LANGUAGE:CXX>:/FS>
+    		$<$<COMPILE_LANGUAGE:C>:/W4>
+    		$<$<COMPILE_LANGUAGE:C>:/FS>
+	)
     endif()
 endif()
 # Build editor if requested
