@@ -444,6 +444,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PopStyleVar(3);
 
     m_dockspaceId = ImGui::GetID("MainDockSpace");                         // Stable ID for this dockspace
+    m_sceneViewport.SetDefaultDockspaceId(m_dockspaceId);
     constexpr ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Let central node pass content
     // Create the dock space for editor panels.
     ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);        // Create dockspace filling the host window

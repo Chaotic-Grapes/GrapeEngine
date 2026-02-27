@@ -32,6 +32,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "EditorECSUtils.h"
 #include "graphics/Viewport.hpp"
 #include "helpers/TransformUtils.h"
+#include "services/Input.h"
 #include <algorithm>
 
 namespace {
@@ -54,6 +55,20 @@ GameViewport::~GameViewport() {
 // Update
 // -------------------------------------------------------------------------
 void GameViewport::HandleInWorldInteraction() {
+    if (Input::IsKeyPressed(KEY_F12)) {
+        if (m_immersiveMode) {
+            m_immersiveMode = false;
+            m_requestRestore = true;
+        } else {
+            m_immersiveMode = true;
+            m_requestRestore = false;
+        }
+    }
+    if (m_immersiveMode && Input::IsKeyPressed(KEY_ESCAPE)) {
+        m_immersiveMode = false;
+        m_requestRestore = true;
+    }
+
     if (!HasValidWorld()) return;
 
     // Game viewport doesn't handle entity dragging or editor camera input
@@ -107,8 +122,9 @@ void GameViewport::PrepareFrame() {
         return;
     }
 
+    const bool useFreeAspect = m_freeAspect || m_immersiveMode;
     float targetRatio = 1.0f;
-    if (m_freeAspect) {
+    if (useFreeAspect) {
         targetRatio = (vp->Size.y > 0) ? static_cast<float>(vp->Size.x) / static_cast<float>(vp->Size.y) : 1.0f;
     } else {
         switch (m_selectedAspectRatio) {
@@ -189,8 +205,37 @@ bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Ca
 }
 
 void GameViewport::_renderViewport() {
+    ImGuiWindowFlags windowFlags = 0;
+    const bool renderImmersive = m_immersiveMode;
+    if (!renderImmersive && m_requestRestore && m_restoreDockValid) {
+        if (m_restoreDockId != 0) {
+            ImGui::SetNextWindowDockID(m_restoreDockId, ImGuiCond_Always);
+        } else {
+            ImGui::SetNextWindowPos(m_restorePos, ImGuiCond_Always);
+            ImGui::SetNextWindowSize(m_restoreSize, ImGuiCond_Always);
+        }
+        m_requestRestore = false;
+    } else if (renderImmersive) {
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->Pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(vp->Size, ImGuiCond_Always);
+        ImGui::SetNextWindowViewport(vp->ID);
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        windowFlags |= ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                       ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                       ImGuiWindowFlags_NoScrollWithMouse;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    }
+
     // Begin game viewport window
-    ImGui::Begin("Game", nullptr);
+    ImGui::Begin("Game", nullptr, windowFlags);
+    if (!renderImmersive) {
+        m_restoreDockId = ImGui::GetWindowDockID();
+        m_restoreDockValid = true;
+        m_restorePos = ImGui::GetWindowPos();
+        m_restoreSize = ImGui::GetWindowSize();
+    }
 
     bool hasCameraComponent = false;
     bool hasActiveCamera = false;
@@ -243,11 +288,11 @@ void GameViewport::_renderViewport() {
             m_isViewportHovered = false;
         }
         else {
-            // Aspect ratio selector panel
-            {
+            if (!renderImmersive) {
+                // Aspect ratio selector panel
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 4));
-                
+
                 const char* aspectRatios[] = {
                     "Free Aspect",
                     "16:9",
@@ -262,7 +307,13 @@ void GameViewport::_renderViewport() {
                 if (ImGui::Combo("##AspectRatio", &m_selectedAspectRatio, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
                     m_freeAspect = (m_selectedAspectRatio == 0);
                 }
-                
+
+                ImGui::SameLine();
+                if (ImGui::Button("Fullscreen (F12)")) {
+                    m_immersiveMode = true;
+                    m_requestRestore = false;
+                }
+
                 ImGui::PopStyleVar(2);
                 ImGui::Separator();
             }
@@ -273,7 +324,7 @@ void GameViewport::_renderViewport() {
             ImVec2 displaySize = availableSize;
             float targetRatio = availableSize.x / availableSize.y;
             
-            if (!m_freeAspect) {
+            if (!m_freeAspect && !renderImmersive) {
                 switch (m_selectedAspectRatio) {
                     case 1: targetRatio = 16.0f / 9.0f; break;   // 16:9
                     case 2: targetRatio = 16.0f / 10.0f; break;  // 16:10
@@ -337,4 +388,7 @@ void GameViewport::_renderViewport() {
     }
 
     ImGui::End();
+    if (renderImmersive) {
+        ImGui::PopStyleVar();
+    }
 }

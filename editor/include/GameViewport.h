@@ -28,6 +28,7 @@ public:
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
     void EndFrame() override {}
+    bool IsImmersiveModeEnabled() const { return m_immersiveMode; }
 
 private:
     void _renderViewport();
@@ -36,6 +37,12 @@ private:
     // Game window aspect ratio settings
     int m_selectedAspectRatio = 0; // Index into aspect ratio list
     bool m_freeAspect = true;      // Whether to use free aspect or fixed ratio
+    bool m_immersiveMode = false;  // True while rendering game-only fullscreen view
+    ImGuiID m_restoreDockId = 0;
+    ImVec2 m_restorePos = ImVec2(0.0f, 0.0f);
+    ImVec2 m_restoreSize = ImVec2(0.0f, 0.0f);
+    bool m_restoreDockValid = false;
+    bool m_requestRestore = false;
     Engine::Camera m_gameCamera;
 };
 

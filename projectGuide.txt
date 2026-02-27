@@ -30,6 +30,12 @@ PREREQUISITES
    - Download: https://www.doxygen.nl/download.html
    - Optional, but required for documentation
 
+6. CUDA TOOLKIT
+   - Download: https://developer.nvidia.com/cuda-downloads
+     - Choose the proper OS, architecture and OS version
+   - Required for building
+   - May need to restart computer
+
 ================================================================================
 STEP 1: INSTALL CMAKE (Build System)
 ================================================================================
@@ -133,11 +139,12 @@ OPTION A: From Visual Studio
 OPTION B: Using run.bat
 -----------------------
  - Run: run.bat
- - Then run the editor executable from `build\Debug\` or `build\Release\`
+ - Then run the editor executable from `build\<Config>\`, or use Visual Studio
+   to run the GrapeEditor. The `.sln` file exists in `build` folder.
 
 OPTION C: Direct Execution
 --------------------------
-- Navigate to: build\Debug\
+- Navigate to: build\<Config>\
 - Run: GrapeEngine.exe
 
 ================================================================================
@@ -250,17 +257,28 @@ TROUBLESHOOTING:
 LEVEL EDITOR MODES
 ------------------
 
-Real-time Editor (recommended):
-- Run the Editor target from Visual Studio or by launching `build\Debug\GrapeEngine.exe` / `build\Release\GrapeEngine.exe`
-- Use the playback toolbar (Play/Pause/Stop) to control simulation
+This section describes the viewport fullscreen workflow inside the Level Editor.
 
-Turn Editor Off (gameplay-only):
-- Run the Standalone Game target executable directly (no editor overlay)
-- Alternatively, close the editor and run the game exe from 'build_game\Debug\' or 'build_game\Release\'
+Scene viewport fullscreen (editor-focused):
+1. Open the Editor (`build\Debug\GrapeEngine.exe` or `build\Release\GrapeEngine.exe`).
+2. Focus the `Scene` viewport.
+3. Press `F11` (or click the Scene maximize button) to enter fullscreen Scene mode.
+4. Press `F11` again to restore normal layout.
 
-Offline Editing:
-- Use the Editor to edit scenes/prefabs without pressing Play; save changes to JSON
-- Scenes/prefabs are deserialized at runtime, so no recompilation is needed
+Game viewport fullscreen (immersive, no editor controls):
+1. Open the Editor and focus the `Game` viewport.
+2. Press `F12` (or click `Fullscreen (F12)` inside the Game viewport).
+3. The editor dockspace/menu panels are hidden and only the Game view is shown.
+4. Press `Esc` or `F12` to exit immersive mode and return to normal editor layout.
+
+Viewport sizing/aspect in fullscreen:
+1. In Game immersive mode, the viewport resizes to fill the fullscreen area.
+2. Camera aspect ratio updates from the fullscreen viewport dimensions.
+3. Fixed-aspect letterboxing is skipped while immersive mode is active.
+
+Dock restore behavior after exiting fullscreen:
+1. `Game` restores to its previous dock/tab location.
+2. `Scene` restores and prefers docking into the same panel/tab stack as `Game`.
 
 TROUBLESHOOTING CONFIGURATION ISSUES
 ------------------------------------

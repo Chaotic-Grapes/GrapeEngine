@@ -29,6 +29,7 @@ public:
     void ShowEditorWindows() override;
     void EndFrame() override;
     void SetTilePalette(TilePalettePanel* panel) { m_tilePalettePanel = panel; }
+    void SetDefaultDockspaceId(ImGuiID dockspaceId) { m_defaultDockspaceId = dockspaceId; }
 
 private:
     void _renderViewport();
@@ -51,6 +52,7 @@ private:
     ImVec2 m_restoreSize = ImVec2(0.0f, 0.0f);
     bool m_restoreDockValid = false;
     bool m_requestRestore = false;
+    ImGuiID m_defaultDockspaceId = 0;
     // Gizmo snapping configuration.
     bool m_snapEnabled = false;
     float m_snapTranslate = 1.0f;
