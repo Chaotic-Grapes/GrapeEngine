@@ -185,6 +185,10 @@ void HierarchyPanel::SetWorld(ECS::World* world) {
     // Reset selection when scene changes
     m_selectedEntityIds.clear();
     m_anchorEntityId = ECS::Entity::NPOS32;
+    m_pendingClickSelectionId = ECS::Entity::NPOS32;
+    m_renamingEntityId = ECS::Entity::NPOS32;
+    m_focusRenameInput = false;
+    m_contextMenuTarget = ECS::Entity::NPOS32;
     // Clear expanded nodes so tree redraws cleanly
     m_expandedNodes.clear();
     // Reset persistent root order for the new world
@@ -272,6 +276,18 @@ void HierarchyPanel::Render() {
     // Render the main UI sections
     _renderHeader();           // Header with entity creation controls
     _renderEntityTree();       // Main entity tree with drag-drop
+
+    // Apply deferred single-click selection only when no drag operation is active.
+    if (m_pendingClickSelectionId != ECS::Entity::NPOS32 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        if (ImGui::GetDragDropPayload() == nullptr) {
+            m_selectedEntityIds.clear();
+            m_selectedEntityIds.insert(m_pendingClickSelectionId);
+            m_anchorEntityId = m_pendingClickSelectionId;
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(m_pendingClickSelectionId));
+            if (m_selectionCallback) m_selectionCallback(m_pendingClickSelectionId);
+        }
+        m_pendingClickSelectionId = ECS::Entity::NPOS32;
+    }
 
     // Process deferred deletions AFTER tree rendering is complete
     // This prevents crashes from modifying the hierarchy while iterating it
@@ -401,6 +417,7 @@ void HierarchyPanel::Render() {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             m_selectedEntityIds.clear();
             m_anchorEntityId = ECS::Entity::NPOS32;
+            m_pendingClickSelectionId = ECS::Entity::NPOS32;
 
             if (m_selectionCallback)
                 m_selectionCallback(ECS::Entity::NPOS32);
@@ -626,6 +643,7 @@ void HierarchyPanel::_renderEntityTree() {
         m_anchorEntityId = ECS::Entity::NPOS32;
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
+    _renderBackgroundContextMenu();
 
     // End child.
     ImGui::EndChild();
@@ -846,6 +864,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
         _handleNodeInteraction(entityId);
         _handleNodeDragDrop(entityId);
+        _renderEntityContextMenu(entityId);
 
         if (isSelected) {
             ImGui::PopStyleColor(3);
@@ -856,9 +875,6 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     if (isPrefabInstance) {
         ImGui::PopStyleColor();
     }
-
-    // Render context menu if opened
-    _renderEntityContextMenu();
 
     // If node is open, render children recursively
     if (nodeOpen) {
@@ -896,23 +912,6 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
     bool shiftPressed = ImGui::GetIO().KeyShift;
 
-    // Right-click context menu: select and open context menu
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-        // If right-clicked entity is not in selection, make it the only selection
-        if (m_selectedEntityIds.find(entityId) == m_selectedEntityIds.end()) {
-            m_selectedEntityIds.clear();
-            m_selectedEntityIds.insert(entityId);
-            m_anchorEntityId = entityId;
-            // Publish selection change to sync with viewport
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
-        }
-        // Trigger callback with first selected entity
-        if (m_selectionCallback) m_selectionCallback(entityId);
-        m_contextMenuTarget = entityId;
-        // Open a context popup.
-        ImGui::OpenPopup("EntityContextMenu");
-    }
-
     // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (m_viewport) { 
@@ -930,6 +929,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         // Update click tracking
         m_lastClickedEntity = entityId;
         m_lastClickTime = currentTime;
+        m_pendingClickSelectionId = ECS::Entity::NPOS32;
     }
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
@@ -939,13 +939,14 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             isAlreadySelected &&
             m_selectedEntityIds.size() == 1 &&
             (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
-            (currentTime - m_lastClickTime) < 1.0f);
+            (currentTime - m_lastClickTime) < RENAME_DELAY_MAX);
 
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
             // Start rename mode (only for single selection, no modifiers)
             _startRename(entityId);
         }
         else if (shiftPressed && m_anchorEntityId != ECS::Entity::NPOS32) {
+            m_pendingClickSelectionId = ECS::Entity::NPOS32;
             // Shift+Click: Range selection from anchor to clicked entity
             m_selectedEntityIds.clear();
 
@@ -980,6 +981,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else if (ctrlPressed) {
+            m_pendingClickSelectionId = ECS::Entity::NPOS32;
             // Ctrl+Click: Toggle selection
             if (isAlreadySelected) {
                 m_selectedEntityIds.erase(entityId);
@@ -999,20 +1001,15 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         }
         else {
             // Normal click: handle based on whether entity is already selected
-            if (isAlreadySelected && m_selectedEntityIds.size() > 1) {
+            if (isAlreadySelected) {
                 // Clicking on an already-selected entity in a multi-selection
-                // Don't clear selection yet - could be starting a drag
-                // Selection will only change if we detect it's not a drag
-                // (This preserves multi-selection for drag-and-drop)
+                // or single-selection should not churn selection/callbacks.
+                // This preserves drag start behavior.
+                m_pendingClickSelectionId = ECS::Entity::NPOS32;
             }
             else {
-                // Normal single selection
-                m_selectedEntityIds.clear();
-                m_selectedEntityIds.insert(entityId);
-                m_anchorEntityId = entityId;
-                // Publish selection change to sync with viewport
-                Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
-                if (m_selectionCallback) m_selectionCallback(entityId);
+                // Defer single selection until mouse release so first click can start dragging.
+                m_pendingClickSelectionId = entityId;
             }
         }
 
@@ -1029,6 +1026,9 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 
     // Drag source: make this entity draggable
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+        // Drag started; do not apply deferred click selection.
+        m_pendingClickSelectionId = ECS::Entity::NPOS32;
+
         // If dragging a selected entity, drag all selected entities (multi-select support)
         bool isDraggingSelection = m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end() &&
             m_selectedEntityIds.size() > 1;
@@ -1421,18 +1421,75 @@ void HierarchyPanel::_handleTreeDragDrop() {
 // Context Menu
 // -------------------------------------------------------------------------
 
+void HierarchyPanel::_renderBackgroundContextMenu() {
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
+        !ImGui::IsAnyItemHovered() &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    {
+        ImGui::OpenPopup("HierarchyBackgroundMenu");
+    }
+
+    // Only show "Create Empty" when right-clicking on empty space (not on an entity)
+    if (ImGui::BeginPopup("HierarchyBackgroundMenu")) {
+        if (ImGui::Selectable("Create Empty")) {
+            _addRootEntity();
+            if (m_fileMenu) {
+                m_fileMenu->MarkSceneDirty();
+            }
+        }
+
+        // Show Clone/Delete options if there is at least one entity selected (same as entity context menu)
+        if (!m_selectedEntityIds.empty()) {
+            ImGui::Separator();
+
+            // Show count in label if multiple selected, but still operate on all selected entities
+            const size_t selectionCount = m_selectedEntityIds.size();
+            std::string cloneLabel = (selectionCount > 1) ? "Clone (" + std::to_string(selectionCount) + ")" : "Clone";
+            if (ImGui::Selectable(cloneLabel.c_str())) {
+                for (EntityId id : m_selectedEntityIds) {
+                    if (!IsProtectedEntity(m_world, id)) {
+                        _cloneEntity(id);
+                    }
+                }
+            }
+
+            // Delete option should also show count if multiple selected, but still operate on all selected entities
+            std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
+            if (ImGui::Selectable(deleteLabel.c_str())) {
+                std::vector<EntityId> toDelete(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
+                for (EntityId id : toDelete) {
+                    if (!IsProtectedEntity(m_world, id)) {
+                        _deleteEntity(id);
+                    }
+                }
+            }
+        }
+        ImGui::EndPopup();
+    }
+}
+
 // Render the entity context menu with entity operations
-void HierarchyPanel::_renderEntityContextMenu() {
-    if (ImGui::BeginPopup("EntityContextMenu")) {
-        ECS::Entity entity = m_world->Resolve(m_contextMenuTarget);
+void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
+    if (ImGui::BeginPopupContextItem("EntityContextMenu")) {
+        m_pendingClickSelectionId = ECS::Entity::NPOS32;
+        if (m_selectedEntityIds.find(entityId) == m_selectedEntityIds.end()) {
+            m_selectedEntityIds.clear();
+            m_selectedEntityIds.insert(entityId);
+            m_anchorEntityId = entityId;
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
+            if (m_selectionCallback) m_selectionCallback(entityId);
+        }
+
+        m_contextMenuTarget = entityId;
+        ECS::Entity entity = m_world->Resolve(entityId);
         size_t selectionCount = m_selectedEntityIds.size();
 
         // Only show menu options if entity is valid AND not protected
-        if (!entity.IsNull() && m_world->IsAlive(entity) && !IsProtectedEntity(m_world, m_contextMenuTarget)) {
+        if (!entity.IsNull() && m_world->IsAlive(entity) && !IsProtectedEntity(m_world, entityId)) {
             // Add Child only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Add Child")) {
-                    _addChildEntity(m_contextMenuTarget);
+                    _addChildEntity(entityId);
                 }
             }
 
@@ -1450,7 +1507,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
             // Rename only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Rename")) {
-                    _startRename(m_contextMenuTarget);
+                    _startRename(entityId);
                 }
             }
 
@@ -1484,7 +1541,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
             ImGui::Separator();
             if (ImGui::BeginMenu("Add Component")) {
                 // You can add other component types (Renderer, Rigidbody, etc.) here later
-                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                ECS::Entity targetEntity = m_world->Resolve(entityId);
                 const auto& registry = ComponentRegistryUI::GetAll();
                 for (const auto& meta : registry) {
                     bool hasComponent = meta.HasComponent(m_world, targetEntity);
@@ -1850,6 +1907,7 @@ void HierarchyPanel::_rebuildEntityOrderRecursive(EntityId entityId) {
 void HierarchyPanel::ClearUIState() {
     m_selectedEntityIds.clear();
     m_anchorEntityId = ECS::Entity::NPOS32;
+    m_pendingClickSelectionId = ECS::Entity::NPOS32;
     m_renamingEntityId = ECS::Entity::NPOS32;
     m_contextMenuTarget = ECS::Entity::NPOS32;
     m_searchFilter.clear();

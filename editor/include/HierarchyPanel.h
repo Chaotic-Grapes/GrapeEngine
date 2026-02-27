@@ -126,7 +126,7 @@ private:
     // -------------------------------------------------------------------------
 
     // Render the right-click context menu for entity operations
-    void _renderEntityContextMenu();
+    void _renderEntityContextMenu(EntityId entityId);
 
     // Render context menu when right-clicking empty space in the hierarchy
     void _renderBackgroundContextMenu();
@@ -209,6 +209,7 @@ private:
     std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)
     EntityId m_anchorEntityId = ECS::Entity::NPOS32;    // Anchor entity for shift-selection range
     EntityId m_contextMenuTarget = ECS::Entity::NPOS32; // Entity targeted for context menu operations
+    EntityId m_pendingClickSelectionId = ECS::Entity::NPOS32; // Deferred single-click select to allow immediate drag.
 
     // UI state
     std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded
@@ -226,7 +227,8 @@ private:
     // Click timing for distinguishing fast double-click from slow double-click
     EntityId m_lastClickedEntity = ECS::Entity::NPOS32; // Last entity that was clicked
     float m_lastClickTime = 0.0f;                       // Time of last click
-    static constexpr float RENAME_DELAY_THRESHOLD = 0.75f; // Delay threshold for rename (in seconds)
+    static constexpr float RENAME_DELAY_THRESHOLD = 0.45f; // Min delay for slow double-click rename (fast double-click still focuses).
+    static constexpr float RENAME_DELAY_MAX = 0.90f;       // Max delay to still treat as intentional second click for rename.
 
     // Reorder undo coalescing
     EntityId m_lastReorderParentId = ECS::Entity::NPOS32; // Parent id for coalescing reorder undo.
