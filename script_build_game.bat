@@ -34,7 +34,7 @@ REM Engine is built as a library (GrapeEngineNative.dll)
 REM Runtime links against it and outputs game executable
 set "EXTRA_ARGS="
 if not "%PROJECT_PATH%"=="" (
-    set "EXTRA_ARGS=-DEXPORT_PROJECT_DIR=\"%PROJECT_PATH%\""
+    set "EXTRA_ARGS=-DEXPORT_PROJECT_DIR=""%PROJECT_PATH%"""
 ) else if not "%PROJECT%"=="" (
     set "EXTRA_ARGS=-DEXPORT_PROJECT_NAME=%PROJECT%"
 )

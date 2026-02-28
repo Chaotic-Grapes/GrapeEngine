@@ -45,6 +45,7 @@ centralized and consistent with the currently active scene.
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
+#include <chrono>
 #include <thread>
 #include <cstdio>
 #include <unordered_map>
@@ -260,8 +261,8 @@ void EditorFileMenu::_exportProject() {
 
     std::filesystem::path destinationRoot = std::filesystem::path(destFolder);
     std::error_code ec;
-    const std::filesystem::path projectRootAbs = std::filesystem::weakly_canonical(projectRoot, ec);
-    const std::filesystem::path destAbs = std::filesystem::weakly_canonical(destinationRoot, ec);
+    const std::filesystem::path projectRootAbs = std::filesystem::absolute(projectRoot, ec);
+    const std::filesystem::path destAbs = std::filesystem::absolute(destinationRoot, ec);
 
     if (!projectRootAbs.empty() && !destAbs.empty()) {
         const auto projStr = projectRootAbs.string();
@@ -290,18 +291,20 @@ void EditorFileMenu::_exportProject() {
         return {};
     };
 
-    const std::filesystem::path repoRoot = findRepoRoot(projectRoot);
+    std::filesystem::path repoRoot;
+    {
+        std::error_code cwdEc;
+        const std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
+        if (!cwdEc) {
+            repoRoot = findRepoRoot(cwd);
+        }
+    }
+    if (repoRoot.empty()) {
+        repoRoot = findRepoRoot(projectRoot);
+    }
     if (repoRoot.empty()) {
         std::lock_guard<std::mutex> lock(m_exportMutex);
-        m_exportResults.push_back({ "Locate repo root", false, "Could not find CMakeLists.txt above project root.", "" });
-        m_openExportSummary = true;
-        return;
-    }
-    const std::filesystem::path expectedProjectDir = repoRoot / projectName;
-    const std::filesystem::path expectedProjectAbs = std::filesystem::weakly_canonical(expectedProjectDir, ec);
-    if (!projectRootAbs.empty() && !expectedProjectAbs.empty() && projectRootAbs != expectedProjectAbs) {
-        std::lock_guard<std::mutex> lock(m_exportMutex);
-        m_exportResults.push_back({ "Validate project location", false, "Project must live under the repo root for export.", "" });
+        m_exportResults.push_back({ "Locate repo root", false, "Could not locate engine repo root.", "" });
         m_openExportSummary = true;
         return;
     }
@@ -328,10 +331,6 @@ void EditorFileMenu::_exportProject() {
     m_exportDone = false;
     m_openExportSummary = true;
 
-    if (m_exportThread.joinable()) {
-        m_exportThread.join();
-    }
-
     m_exportThread = std::thread([this, projectRoot, repoRoot, projectName, buildRoot, exportRoot, destinationRoot]() {
         auto pushResult = [&](const ExportStepResult& result) {
             std::lock_guard<std::mutex> lock(m_exportMutex);
@@ -341,6 +340,7 @@ void EditorFileMenu::_exportProject() {
         try {
             auto runCommand = [&](const std::string& command, const std::string& stepName) {
                 std::string output;
+                const auto start = std::chrono::steady_clock::now();
                 {
                     std::lock_guard<std::mutex> lock(m_exportMutex);
                     const auto it = std::find(m_exportStepNames.begin(), m_exportStepNames.end(), stepName);
@@ -350,22 +350,27 @@ void EditorFileMenu::_exportProject() {
                 }
                 const std::string fullCmd = "cmd /C " + command + " 2>&1";
                 FILE* pipe = _popen(fullCmd.c_str(), "r");
-                if (!pipe) {
+                const bool started = (pipe != nullptr);
+                int result = 1;
+                if (started) {
+                    char buffer[512] = {};
+                    while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe)) {
+                        output.append(buffer);
+                    }
+                    result = _pclose(pipe);
+                }
+                const auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - start).count();
+
+                if (!started) {
                     pushResult({ stepName, false, "Failed to start command.", "" });
                     return false;
                 }
-
-                char buffer[512] = {};
-                while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe)) {
-                    output.append(buffer);
-                }
-
-                const int result = _pclose(pipe);
                 if (result != 0) {
-                    pushResult({ stepName, false, "Command failed.", output });
+                    pushResult({ stepName, false, "Command failed after " + std::to_string(elapsedSeconds) + "s.", output });
                     return false;
                 }
-                pushResult({ stepName, true, "OK", "" });
+                pushResult({ stepName, true, "OK (" + std::to_string(elapsedSeconds) + "s)", "" });
                 return true;
             };
 
@@ -383,6 +388,7 @@ void EditorFileMenu::_exportProject() {
                 "cmake -S \"" + repoRoot.string() + "\" -B \"" + buildRoot.string() + "\" "
                 "-G \"Visual Studio 17 2022\" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON "
                 "-DEXPORT_PROJECT_NAME=\"" + projectName + "\" "
+                "-DEXPORT_PROJECT_DIR=\"" + projectRoot.string() + "\" "
                 "-DGAME_OUTPUT_NAME=\"" + projectName + "\"";
 
             if (!runCommand(configureCmd, "Configure game build")) {
