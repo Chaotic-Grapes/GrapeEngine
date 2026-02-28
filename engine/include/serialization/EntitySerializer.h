@@ -417,6 +417,8 @@ namespace ECS {
 				{"maxSpeed", b.maxSpeed},
 				{"maxForce", b.maxForce},
 				{"boidSize", b.boidSize},
+				{"collisionAvoidWeight", b.collisionAvoidWeight},
+				{"collisionAvoidRadius", b.collisionAvoidRadius},
 				{"TexturePath", path}
 			};
 		}
@@ -430,7 +432,9 @@ namespace ECS {
 			b.visualRange = j.value("visualRange", 50.0f);
 			b.maxSpeed = j.value("maxSpeed", 200.0f);
 			b.maxForce = j.value("maxForce", 10.0f);
-			b.boidSize = j.value("boidSize", 0.3f);
+			b.boidSize = j.value("boidSize", 1.0f);
+			b.collisionAvoidWeight = j.value("collisionAvoidWeight", 2.0f);
+			b.collisionAvoidRadius = j.value("collisionAvoidRadius", 3.0f);
 
 			// Texture path handling
 			std::string path = j.value("TexturePath", std::string());

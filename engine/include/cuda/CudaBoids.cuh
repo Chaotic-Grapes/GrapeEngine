@@ -20,6 +20,17 @@ struct BoidParams {
     float boundsMinY;
     float boundsMaxX;
     float boundsMaxY;
+
+    // Tile avoidance params
+    const uint8_t* collisionMasks;
+    int32_t collisionWidth;
+    int32_t collisionHeight;
+    int32_t collisionOriginX;
+    int32_t collisionOriginY;
+    float   tileSize;
+    float   collisionAvoidWeight;
+    float   collisionAvoidRadius;
+    unsigned int frameCount;  // set from TimeSystem::Instance().GetFrameCount()
 };
 
 namespace CudaBoids {

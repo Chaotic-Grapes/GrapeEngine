@@ -2360,21 +2360,25 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
     ImGuiIdScope id("BoidFlock");
 
     // Ensure required keys exist
-    if (!data.contains("count"))              data["count"] = 5000;
-    if (!data.contains("separationWeight"))  data["separationWeight"] = 1.5f;
-    if (!data.contains("alignmentWeight"))   data["alignmentWeight"] = 1.0f;
-    if (!data.contains("cohesionWeight"))    data["cohesionWeight"] = 1.0f;
-    if (!data.contains("visualRange"))       data["visualRange"] = 50.0f;
-    if (!data.contains("maxSpeed"))          data["maxSpeed"] = 200.0f;
-    if (!data.contains("maxForce"))          data["maxForce"] = 10.0f;
-    if (!data.contains("boidSize"))          data["boidSize"] = 1.0f;
-    if (!data.contains("TexturePath"))       data["TexturePath"] = "";
+    if (!data.contains("count"))                            data["count"] = 5000;
+    if (!data.contains("separationWeight"))                 data["separationWeight"] = 1.5f;
+    if (!data.contains("alignmentWeight"))                  data["alignmentWeight"] = 1.0f;
+    if (!data.contains("cohesionWeight"))                   data["cohesionWeight"] = 1.0f;
+    if (!data.contains("visualRange"))                      data["visualRange"] = 50.0f;
+    if (!data.contains("maxSpeed"))                         data["maxSpeed"] = 200.0f;
+    if (!data.contains("maxForce"))                         data["maxForce"] = 10.0f;
+    if (!data.contains("boidSize"))                         data["boidSize"] = 1.0f;
+    if (!data.contains("collisionAvoidWeight"))             data["collisionAvoidWeight"] = 2.0f;
+    if (!data.contains("collisionAvoidRadius"))             data["collisionAvoidRadius"] = 3.0f;
+    if (!data.contains("TexturePath"))                      data["TexturePath"] = "";
 
     EditorUI::BeginPropertySection({
         "Count",
         "Separation Weight",
         "Alignment Weight",
         "Cohesion Weight",
+        "Collision Avoid Weight",
+        "Collision Avoid Radius",
         "Visual Range",
         "Max Speed",
         "Max Force",
@@ -2390,6 +2394,8 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
     EditorUI::RenderFloatRow("Separation Weight", "", data, "separationWeight", 0.1f, 0.0f, 10.0f);
     EditorUI::RenderFloatRow("Alignment Weight", "", data, "alignmentWeight", 0.1f, 0.0f, 10.0f);
     EditorUI::RenderFloatRow("Cohesion Weight", "", data, "cohesionWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Collision Avoid Weight", "", data, "collisionAvoidWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Collision Avoid Radius", "", data, "collisionAvoidRadius", 0.1f, 0.0f, 50.0f);
 
     ImGui::SeparatorText("Movement");
 

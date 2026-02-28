@@ -6,6 +6,80 @@
 #include <cstdio>
 
 // ============================================================
+// Predictive ray-based collision avoidance (replaces ComputeCollisionAvoidance)
+// ============================================================
+__device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidParams& p)
+{
+    float2 steer = make_float2(0.0f, 0.0f);
+    if (!p.collisionMasks || p.tileSize <= 0.0f) return steer;
+
+    float speed = sqrtf(vel.x * vel.x + vel.y * vel.y);
+    if (speed < 1e-4f) return steer;
+
+    float avoidRadius = p.tileSize * p.collisionAvoidRadius;
+
+    // 1) Proximity repulsion (existing approach, kept)
+    int tx = (int)floorf(pos.x / p.tileSize) - p.collisionOriginX;
+    int ty = (int)floorf(pos.y / p.tileSize) - p.collisionOriginY;
+    int searchRadius = (int)ceilf(p.collisionAvoidRadius);
+
+    for (int dy = -searchRadius; dy <= searchRadius; dy++) {
+        for (int dx = -searchRadius; dx <= searchRadius; dx++) {
+            int nx = tx + dx;
+            int ny = ty + dy;
+            if (nx < 0 || ny < 0 || nx >= p.collisionWidth || ny >= p.collisionHeight) continue;
+            if (p.collisionMasks[ny * p.collisionWidth + nx] == 0) continue;
+
+            float tcx = ((nx + p.collisionOriginX) + 0.5f) * p.tileSize;
+            float tcy = ((ny + p.collisionOriginY) + 0.5f) * p.tileSize;
+
+            float2 away = make_float2(pos.x - tcx, pos.y - tcy);
+            float dist = sqrtf(away.x * away.x + away.y * away.y);
+            if (dist < 1e-4f || dist > avoidRadius) continue;
+
+            float weight = 1.0f - (dist / avoidRadius);
+            weight *= weight; // quadratic falloff — stronger close up
+            steer.x += (away.x / dist) * weight;
+            steer.y += (away.y / dist) * weight;
+        }
+    }
+
+    // 2) Predictive: sample ahead along velocity direction
+    float2 dir = make_float2(vel.x / speed, vel.y / speed);
+    float lookahead = fminf(speed * p.dt * 3.0f, avoidRadius); // look 3 frames ahead
+
+    for (float t = p.tileSize * 0.5f; t <= lookahead; t += p.tileSize * 0.5f) {
+        float sx = pos.x + dir.x * t;
+        float sy = pos.y + dir.y * t;
+
+        int stx = (int)floorf(sx / p.tileSize) - p.collisionOriginX;
+        int sty = (int)floorf(sy / p.tileSize) - p.collisionOriginY;
+
+        if (stx < 0 || sty < 0 || stx >= p.collisionWidth || sty >= p.collisionHeight) continue;
+        if (p.collisionMasks[sty * p.collisionWidth + stx] == 0) continue;
+
+        // Wall ahead! Steer perpendicular to velocity (choose side away from wall)
+        float2 perp1 = make_float2(-dir.y, dir.x);
+        float2 perp2 = make_float2(dir.y, -dir.x);
+
+        // Pick the perpendicular that points away from the wall center
+        float tcx = ((stx + p.collisionOriginX) + 0.5f) * p.tileSize;
+        float tcy = ((sty + p.collisionOriginY) + 0.5f) * p.tileSize;
+        float dot1 = (pos.x - tcx) * perp1.x + (pos.y - tcy) * perp1.y;
+
+        float2 chosen = (dot1 >= 0.0f) ? perp1 : perp2;
+        float urgency = 1.0f - (t / lookahead); // more urgent when closer
+        urgency *= urgency;
+
+        steer.x += chosen.x * urgency * 2.0f;
+        steer.y += chosen.y * urgency * 2.0f;
+        break; // first hit is most important
+    }
+
+    return steer;
+}
+
+// ============================================================
 // Boids simulation kernel (brute force)
 // Each thread = one boid. Reads all other boids from prev buffer,
 // computes three rules, writes updated pos+vel to output buffer.
@@ -28,8 +102,14 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
 
     int neighborCount = 0;
     float visualRangeSq = params.visualRange * params.visualRange;
-    float separationRange = params.visualRange * 0.4f;  // separation acts at closer range
+    float jitter = 0.3f + 0.4f * ((idx * 2654435761u) % 1000u) / 1000.0f; // 0.3 to 0.7, unique per boid
+    float separationRange = params.visualRange * jitter;
     float separationRangeSq = separationRange * separationRange;
+
+    // After computing separation, before applying weights, add in boidsKernel:
+    float noiseSeed = (float)((idx * 1234567u + (unsigned int)(params.dt * 1000)) % 1000u) / 1000.0f;
+    separation.x += (noiseSeed - 0.5f) * 0.3f;
+    separation.y += (noiseSeed - 0.5f) * 0.3f;
 
     // Brute force: check all other boids
     for (int j = 0; j < params.count; ++j) {
@@ -108,11 +188,45 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
     vel.x += force.x * params.dt;
     vel.y += force.y * params.dt;
 
-    // Clamp speed
+    // Speed burst: occasional individual bursts
+    unsigned int burstHash = (idx * 2654435761u) ^ (params.frameCount * 2246822519u);
+    unsigned int cycle = 200u + (idx * 7919u) % 100u;       // 200-300 frame period, varies per boid
+    unsigned int phase = burstHash % cycle;
+    unsigned int burstDuration = 15u + (idx * 1237u) % 10u;  // 15-25 frames
+
+    float burstMultiplier = 1.0f;
+    if (phase < burstDuration) {
+        float t = (float)phase / (float)burstDuration;
+        float envelope = (t < 0.3f) ? (t / 0.3f) : (1.0f - (t - 0.3f) / 0.7f);
+        burstMultiplier = 1.0f + envelope * 0.8f; // up to 1.8x speed
+
+        float spd = sqrtf(vel.x * vel.x + vel.y * vel.y);
+        if (spd > 0.001f) {
+            float impulse = params.maxSpeed * envelope * 0.5f;
+            vel.x += (vel.x / spd) * impulse * params.dt;
+            vel.y += (vel.y / spd) * impulse * params.dt;
+        }
+    }
+
+    // Tile collision avoidance - applied directly to vel, bypasses maxForce
+    if (params.collisionAvoidWeight > 0.0f) {
+        float2 avoid = ComputeCollisionAvoidance(pos, vel, params);
+        vel.x += avoid.x * params.collisionAvoidWeight * params.dt;
+        vel.y += avoid.y * params.collisionAvoidWeight * params.dt;
+
+        float avoidSpeed = sqrtf(vel.x * vel.x + vel.y * vel.y);
+        if (avoidSpeed > params.maxSpeed * 1.5f) {
+            vel.x = (vel.x / avoidSpeed) * params.maxSpeed * 1.5f;
+            vel.y = (vel.y / avoidSpeed) * params.maxSpeed * 1.5f;
+        }
+    }
+
+    // Clamp speed (with burst allowance)
+    float effectiveMaxSpeed = params.maxSpeed * burstMultiplier;
     float speed = sqrtf(vel.x * vel.x + vel.y * vel.y);
-    if (speed > params.maxSpeed) {
-        vel.x = (vel.x / speed) * params.maxSpeed;
-        vel.y = (vel.y / speed) * params.maxSpeed;
+    if (speed > effectiveMaxSpeed) {
+        vel.x = (vel.x / speed) * effectiveMaxSpeed;
+        vel.y = (vel.y / speed) * effectiveMaxSpeed;
     }
 
     // Enforce minimum speed so boids don't stall
@@ -125,6 +239,69 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
     // Update position
     pos.x += vel.x * params.dt;
     pos.y += vel.y * params.dt;
+
+    // Hard collision resolution — don't let boids exist inside walls
+    if (params.collisionMasks && params.tileSize > 0.0f) {
+        int tx = (int)floorf(pos.x / params.tileSize) - params.collisionOriginX;
+        int ty = (int)floorf(pos.y / params.tileSize) - params.collisionOriginY;
+
+        if (tx >= 0 && ty >= 0 && tx < params.collisionWidth && ty < params.collisionHeight) {
+            if (params.collisionMasks[ty * params.collisionWidth + tx] != 0) {
+                // Step 1: Revert position
+                pos.x = self.x;
+                pos.y = self.y;
+
+                // Step 2: Slide along wall instead of reflecting
+                // Try moving only on X axis
+                float2 tryPos = make_float2(self.x + vel.x * params.dt, self.y);
+                int ttx = (int)floorf(tryPos.x / params.tileSize) - params.collisionOriginX;
+                int tty = (int)floorf(tryPos.y / params.tileSize) - params.collisionOriginY;
+                bool xOk = (ttx >= 0 && tty >= 0 && ttx < params.collisionWidth && tty < params.collisionHeight)
+                    ? (params.collisionMasks[tty * params.collisionWidth + ttx] == 0) : true;
+
+                // Try moving only on Y axis
+                tryPos = make_float2(self.x, self.y + vel.y * params.dt);
+                ttx = (int)floorf(tryPos.x / params.tileSize) - params.collisionOriginX;
+                tty = (int)floorf(tryPos.y / params.tileSize) - params.collisionOriginY;
+                bool yOk = (ttx >= 0 && tty >= 0 && ttx < params.collisionWidth && tty < params.collisionHeight)
+                    ? (params.collisionMasks[tty * params.collisionWidth + ttx] == 0) : true;
+
+                if (xOk && !yOk) {
+                    // Slide along X, zero Y velocity
+                    pos.x = self.x + vel.x * params.dt;
+                    vel.y = 0.0f;
+                }
+                else if (yOk && !xOk) {
+                    // Slide along Y, zero X velocity
+                    pos.y = self.y + vel.y * params.dt;
+                    vel.x = 0.0f;
+                }
+                else if (xOk && yOk) {
+                    // Both axes free — pick the one with more velocity
+                    if (fabsf(vel.x) > fabsf(vel.y)) {
+                        pos.x = self.x + vel.x * params.dt;
+                        vel.y *= -0.3f; // dampen, slight bounce
+                    }
+                    else {
+                        pos.y = self.y + vel.y * params.dt;
+                        vel.x *= -0.3f;
+                    }
+                }
+                else {
+                    // Stuck in a corner — stay put, dampen velocity
+                    vel.x *= -0.1f;
+                    vel.y *= -0.1f;
+                }
+
+                // Re-clamp speed
+                float s = sqrtf(vel.x * vel.x + vel.y * vel.y);
+                if (s > params.maxSpeed) {
+                    vel.x = (vel.x / s) * params.maxSpeed;
+                    vel.y = (vel.y / s) * params.maxSpeed;
+                }
+            }
+        }
+    }
 
     // Wrap around bounds
     float w = params.boundsMaxX - params.boundsMinX;

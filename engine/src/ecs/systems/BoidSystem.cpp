@@ -17,8 +17,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/BoidSystem.h"
 #include "ecs/Components.h"
+#include "services/TimeSystem.h"
 #include "core/Logger.h"
 #include "services/TimeSystem.h"
+#include "Core/World/TileMap.hpp"
 
 #ifdef GRAPE_HAS_CUDA
 #include "cuda/CudaBoids.cuh"
@@ -106,12 +108,32 @@ namespace ECS {
                 params.dt = dt;
                 params.count = flock.count;
 
+                // TileMap collision avoidance
+                params.collisionMasks = m_collisionGrid.d_masks;
+                params.collisionWidth = m_collisionGrid.width;
+                params.collisionHeight = m_collisionGrid.height;
+                params.collisionOriginX = m_collisionGrid.originX;
+                params.collisionOriginY = m_collisionGrid.originY;
+                params.tileSize = m_collisionGrid.tileSize;
+                params.collisionAvoidWeight = flock.collisionAvoidWeight;
+                params.collisionAvoidRadius = flock.collisionAvoidRadius;
+                params.frameCount = (unsigned int)TimeSystem::Instance().GetFrameCount();
+
                 // World bounds — use a generous default for now
                 // TODO: make configurable per flock or derive from camera
                 params.boundsMinX = -500.0f;
                 params.boundsMinY = -500.0f;
                 params.boundsMaxX = 500.0f;
                 params.boundsMaxY = 500.0f;
+
+                LOG_INFO("[BoidSystem] BoidParams collision:"
+                    << " masks=" << (params.collisionMasks ? "valid" : "NULL")
+                    << " w=" << params.collisionWidth
+                    << " h=" << params.collisionHeight
+                    << " originX=" << params.collisionOriginX
+                    << " originY=" << params.collisionOriginY
+                    << " tileSize=" << params.tileSize
+                    << " avoidWeight=" << params.collisionAvoidWeight);
 
                 // Launch: reads from prev, writes to current
                 CudaBoids::Launch(d_posVel, gpu.d_prevPosVel, params);
@@ -139,7 +161,7 @@ namespace ECS {
 
     void BoidSystem::OnDestroy(World&)
     {
-        LOG_INFO("[BoidSystem] OnDestroy — freeing all GPU resources");
+        LOG_INFO("[BoidSystem] OnDestroy - freeing all GPU resources");
 
         for (auto& [id, gpu] : m_flocks)
         {
@@ -149,6 +171,11 @@ namespace ECS {
 
             if (gpu.d_prevPosVel)
                 cudaFree(gpu.d_prevPosVel);
+
+            if (m_collisionGrid.d_masks) {
+                cudaFree(m_collisionGrid.d_masks);
+                m_collisionGrid.d_masks = nullptr;
+            }
 #endif
 
             if (gpu.vao) glDeleteVertexArrays(1, &gpu.vao);
@@ -279,4 +306,42 @@ namespace ECS {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    void BoidSystem::UpdateCollisionGrid(const TileMap& tileMap)
+    {
+#ifdef GRAPE_HAS_CUDA
+        const auto& masks = tileMap.GetCollisionMasks();
+
+        // Count non-zero masks to verify collision data exists
+        int nonZeroCount = 0;
+        for (auto m : masks) if (m != 0) nonZeroCount++;
+
+        LOG_INFO("[BoidSystem] UpdateCollisionGrid:"
+            << " masks=" << masks.size()
+            << " nonZero=" << nonZeroCount
+            << " width=" << tileMap.CollisionWidth()
+            << " height=" << tileMap.CollisionHeight()
+            << " originX=" << tileMap.OriginX()
+            << " originY=" << tileMap.OriginY()
+            << " tileSize=" << tileMap.TileSize());
+
+        if (masks.empty()) return;
+
+        const size_t byteCount = masks.size();
+        const uint32_t newWidth = tileMap.CollisionWidth();
+
+        // Reallocate if size changed
+        if (!m_collisionGrid.d_masks || m_collisionGrid.width != (int32_t)newWidth) {
+            cudaFree(m_collisionGrid.d_masks);
+            cudaMalloc(&m_collisionGrid.d_masks, byteCount);
+        }
+
+        cudaMemcpy(m_collisionGrid.d_masks, masks.data(), byteCount, cudaMemcpyHostToDevice);
+
+        m_collisionGrid.width = (int32_t)tileMap.CollisionWidth();
+        m_collisionGrid.height = (int32_t)tileMap.CollisionHeight();
+        m_collisionGrid.originX = tileMap.OriginX();
+        m_collisionGrid.originY = tileMap.OriginY();
+        m_collisionGrid.tileSize = tileMap.TileSize();
+#endif
+    }
 } // namespace ECS

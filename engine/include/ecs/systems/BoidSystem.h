@@ -13,6 +13,9 @@
 #include <cuda_gl_interop.h>
 #endif
 
+// Forward declare so we don't need to include TileMap.hpp in the header
+class TileMap;
+
 namespace ECS {
 
     class GRAPEENGINE_API BoidSystem : public ISystem {
@@ -42,6 +45,9 @@ namespace ECS {
             return m_renderData;
         }
 
+        // Collision grid management
+        void UpdateCollisionGrid(const TileMap& tileMap);
+
     private:
         // Per-flock GPU state
         struct FlockGPUData {
@@ -56,8 +62,19 @@ namespace ECS {
             bool     initialized = false;
         };
 
+        // Shared collision grid uploaded once per tilemap change
+        struct CollisionGridGPU {
+            uint8_t* d_masks = nullptr;  // device pointer, owned by BoidSystem
+            int32_t  width = 0;
+            int32_t  height = 0;
+            int32_t  originX = 0;
+            int32_t  originY = 0;
+            float    tileSize = 0.0f;
+        };
+
         std::unordered_map<uint32_t, FlockGPUData>   m_flocks;
         std::unordered_map<uint32_t, FlockRenderData> m_renderData;
+        CollisionGridGPU                              m_collisionGrid;
 
         void InitFlock(uint32_t entityIndex, int count);
         void DestroyFlock(uint32_t entityIndex);

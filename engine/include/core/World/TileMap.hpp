@@ -86,6 +86,11 @@ public:
     uint8_t GetCollisionMaskSigned(int32_t tileX, int32_t tileY) const;
     void SetCollisionMaskSigned(int32_t tileX, int32_t tileY, uint8_t mask);
 
+    // Collision grid accessors for GPU upload (BoidSystem)
+    const std::vector<uint8_t>& GetCollisionMasks() const { return m_collisionMasks; }
+    uint32_t CollisionWidth()  const { return m_collisionWidth; }
+    uint32_t CollisionHeight() const { return m_collisionHeight; }
+
     // Tileset list stored in the tilemap asset.
     uint8_t AddTilesetPath(const std::string& path);
     int32_t FindTilesetPath(const std::string& path) const;

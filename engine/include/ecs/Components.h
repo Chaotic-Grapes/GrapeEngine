@@ -569,6 +569,11 @@ namespace ECS {
             float maxSpeed          = 200.0f;
             float maxForce          = 10.0f;
             float boidSize          = 1.0f;     // world-space size of each boid quad
+
+			// Avoidance stuff (not used in basic Boids, but can be added as an extra behavior)
+            float collisionAvoidWeight = 2.0f;  // tune to taste
+            float collisionAvoidRadius = 3.0f;  // in tiles
+
             uint32_t textureId      = 0;   // runtime only
 
             // Persistent texture path IDs (StringTable). 0 = invalid.
