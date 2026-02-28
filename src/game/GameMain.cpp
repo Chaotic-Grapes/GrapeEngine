@@ -244,8 +244,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    engine.GetSystemManager().OnSceneStart(scene->GetWorld());
-
     // Game main loop
     while (engine.IsRunning()) {
         // ============================

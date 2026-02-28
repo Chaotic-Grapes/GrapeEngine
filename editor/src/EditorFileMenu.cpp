@@ -48,6 +48,7 @@ centralized and consistent with the currently active scene.
 #include <chrono>
 #include <thread>
 #include <cstdio>
+#include <fstream>
 #include <unordered_map>
 #include "serialization/ConfigurationSerializer.h"
 #include <filesystem>
@@ -460,24 +461,97 @@ void EditorFileMenu::_exportProject() {
 
             m_exportCurrentStep = 5;
             const std::filesystem::path exportProjectDir = exportRoot / projectName;
-            const std::filesystem::path docSettingsPath = Engine::ProjectPaths::GetSettingsPath();
+            const std::filesystem::path localSettingsPath = projectRoot / "ProjectSettings.json";
+            const std::filesystem::path docsSettingsPath = Engine::ProjectPaths::GetSettingsPath();
+            std::filesystem::path settingsSourcePath;
 
-            // Copy the ProjectSettings.json from the project directory to the export output
-            if (std::filesystem::exists(docSettingsPath)) {
-                std::error_code settingsCopyEc;
-                std::filesystem::copy_file(docSettingsPath, exportProjectDir / "ProjectSettings.json",
-                    std::filesystem::copy_options::overwrite_existing, settingsCopyEc);
-                // If the copy fails, log an error but continue with the export since the game can still run with default settings
-                // We just won't have the user's custom settings applied
-                if (settingsCopyEc) {
-                    pushResult({ "Copy project settings", false, "Failed to copy ProjectSettings.json from Documents.", "" });
-                } else {
-                    pushResult({ "Copy project settings", true, "OK", "" });
-                }
+            if (std::filesystem::exists(localSettingsPath)) {
+                settingsSourcePath = localSettingsPath;
+            } else if (std::filesystem::exists(docsSettingsPath)) {
+                settingsSourcePath = docsSettingsPath;
             } else {
-                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in Documents; skipped.", "" });
+                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in project root or Documents.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
             }
 
+            std::error_code createProjectDirEc;
+            std::filesystem::create_directories(exportProjectDir, createProjectDirEc);
+            if (createProjectDirEc) {
+                pushResult({ "Copy project settings", false, "Failed to prepare export project folder.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            // Copy the ProjectSettings.json to the export output
+            const std::filesystem::path exportSettingsPath = exportProjectDir / "ProjectSettings.json";
+            std::error_code settingsCopyEc;
+            std::filesystem::copy_file(settingsSourcePath, exportSettingsPath,
+                std::filesystem::copy_options::overwrite_existing, settingsCopyEc);
+            if (settingsCopyEc) {
+                pushResult({ "Copy project settings", false, "Failed to copy ProjectSettings.json.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            // After copying the ProjectSettings.json, we need to ensure that the StartupScene path is valid for the exported project
+            try {
+                std::ifstream settingsIn(exportSettingsPath);
+                nlohmann::json settingsJson;
+                settingsIn >> settingsJson;
+
+                // If there is no StartupScene setting or it's empty, we can't validate it, so we will just warn the user but continue with the export since they may not be using a startup scene at all
+                // But if there is a StartupScene setting, we will attempt to validate and fix it for the exported project, but if it's missing or empty then we can skip this step entirely
+                std::string startupSceneSetting = settingsJson.value("StartupScene", std::string{});
+                if (startupSceneSetting.empty()) {
+                    pushResult({ "Copy project settings", false, "StartupScene is empty in ProjectSettings.json.", "" });
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+
+                // If the StartupScene path is absolute, we will check if it can be made relative to the project root
+                // If it can, we will convert it to a relative path and update the settings for the exported project
+                std::filesystem::path startupScenePath(startupSceneSetting);
+                if (startupScenePath.is_absolute()) {
+                    std::error_code relEc;
+                    const std::filesystem::path rel = std::filesystem::relative(startupScenePath, projectRoot, relEc);
+                    if (!relEc && !rel.empty() && rel.begin() != rel.end() && *rel.begin() != "..") {
+                        startupScenePath = rel;
+                        settingsJson["StartupScene"] = startupScenePath.generic_string();
+                    }
+                }
+
+                // Now we will validate that the StartupScene path (whether originally relative or converted to relative) actually exists in the exported project
+                std::filesystem::path startupSceneResolved = startupScenePath;
+                if (!startupSceneResolved.is_absolute()) {
+                    startupSceneResolved = exportProjectDir / startupSceneResolved;
+                }
+
+                // If the resolved StartupScene path does not exist in the exported project, we will fail the export since the exported game would not be able to 
+                // find its startup scene and would be effectively broken, but if it does exist then we can proceed with the export as normal
+                if (!std::filesystem::exists(startupSceneResolved)) {
+                    pushResult({ "Copy project settings", false, "StartupScene path does not exist in exported project.", "" });
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+
+                std::ofstream settingsOut(exportSettingsPath, std::ios::trunc);
+                settingsOut << settingsJson.dump(4);
+            } catch (const std::exception& ex) {
+                pushResult({ "Copy project settings", false, std::string("Invalid ProjectSettings.json: ") + ex.what(), "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            pushResult({ "Copy project settings", true, "OK", "" });
+
+            // Error code to remove existing destination if it exists, create destination directory, and copy export output to destination
             std::error_code removeDestEc;
             if (std::filesystem::exists(destinationRoot)) {
                 m_exportCurrentStep = 6;
@@ -490,6 +564,7 @@ void EditorFileMenu::_exportProject() {
                 }
             }
 
+            // Create the destination directory if it doesn't exist (it should be removed by the previous step if it already exists, but we will create it here just in case it didn't exist before or there was an error removing it)
             std::error_code createEc;
             std::filesystem::create_directories(destinationRoot, createEc);
             if (createEc) {

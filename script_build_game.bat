@@ -105,7 +105,7 @@ powershell -NoProfile -Command ^
   "  $projects = $projects | Where-Object { $_ -and (Test-Path $_) };" ^
   "  $resolved = @();" ^
   "  foreach ($p in $projects) { try { $resolved += (Resolve-Path $p).Path } catch {} }" ^
-  "  $projects = $resolved | Sort-Object -Unique;" ^
+  "  $projects = @($resolved | Sort-Object -Unique);" ^
   "  if ($projects.Count -eq 0) { Write-Host 'No projects defined. Run the editor and add a project first before exporting.'; exit 1 }" ^
   "  if ($projects.Count -gt 1) {" ^
   "    Write-Host 'Choose project to export:';" ^

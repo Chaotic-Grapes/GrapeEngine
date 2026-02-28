@@ -78,6 +78,7 @@ namespace Engine {
 
         m_mode = mode;
         m_shouldStop = false;
+        m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
 
         // Set global pointer to this application instance
         CORE = this;
@@ -179,6 +180,24 @@ namespace Engine {
         // --- Scene Update ---
         m_sceneManager.Update();
 
+        // In game mode, broadcast scene lifecycle callbacks when active scene changes.
+        // Editor mode handles scene lifecycle from the editor playback state machine.
+        const size_t currentActiveSceneIndex = m_sceneManager.GetActiveIndex();
+        if (m_mode == EngineMode::Game && currentActiveSceneIndex != m_notifiedActiveSceneIndex) {
+            if (m_notifiedActiveSceneIndex != static_cast<size_t>(-1)) {
+                const Scenes::Scene* previousScene = m_sceneManager.GetScene(m_notifiedActiveSceneIndex);
+                if (previousScene) {
+                    m_systemManager.OnSceneStop(const_cast<Scenes::Scene*>(previousScene)->GetWorld());
+                }
+            }
+
+            if (auto* nextScene = m_sceneManager.GetActive()) {
+                m_systemManager.OnSceneStart(nextScene->GetWorld());
+            }
+
+            m_notifiedActiveSceneIndex = currentActiveSceneIndex;
+        }
+
         // --- Update Services ---
         m_audio->Update();
         auto* currentScene = m_sceneManager.GetActive();
@@ -258,6 +277,7 @@ namespace Engine {
         }
 
         m_initialized = false;
+        m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
         CORE = nullptr;
 
         LOG_INFO("Engine shutdown complete");
