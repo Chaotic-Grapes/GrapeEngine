@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+ï»¿/* Start Header *****************************************************************/
 /*!
 \file   BoidSystem.cpp
 \author Choi Meng Yew
@@ -48,7 +48,7 @@ namespace ECS {
     }
 
     void BoidSystem::OnUpdate(World& world) {
-        const float dt = TimeSystem::Instance().GetDeltaTime();
+        const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
 
         // ----------------------------------------------------------
         // 1. Discover flocks: init new ones, detect removed ones
@@ -66,7 +66,7 @@ namespace ECS {
 
                 auto it = m_flocks.find(id);
                 if (it == m_flocks.end()) {
-                    // New flock — allocate GPU resources
+                    // New flock ï¿½ allocate GPU resources
                     InitFlock(id, flock.count);
                     it = m_flocks.find(id);
                 }
@@ -119,7 +119,7 @@ namespace ECS {
                 params.collisionAvoidRadius = flock.collisionAvoidRadius;
                 params.frameCount = (unsigned int)TimeSystem::Instance().GetFrameCount();
 
-                // World bounds — use a generous default for now
+                // World bounds â€” use a generous default for now
                 // TODO: make configurable per flock or derive from camera
                 params.boundsMinX = -500.0f;
                 params.boundsMinY = -500.0f;

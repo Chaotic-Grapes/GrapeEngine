@@ -261,6 +261,7 @@ namespace Engine {
         
         // Device management
         std::string m_currentAudioDeviceID;
+        size_t m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
         
         // Helper methods for cleaner game loop logic
         void _updatePhysics(ECS::World& world);

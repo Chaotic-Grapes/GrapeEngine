@@ -39,6 +39,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3native.h>
 #include "services/Input.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include <scene/SceneManager.h>
 #include "ecs/systems/RendererSystem.h"
@@ -132,8 +133,27 @@ void SceneViewport::_renderViewport() {
     // Handle maximize/restore state before rendering the window.
     ImGuiWindowFlags windowFlags = 0;
     if (!m_maximizeViewport && m_requestRestore && m_restoreDockValid) {
-        if (m_restoreDockId != 0) {
-            ImGui::SetNextWindowDockID(m_restoreDockId, ImGuiCond_Always);
+        ImGuiID restoreDockId = 0;
+
+        // Prefer docking back into the same panel/tab stack as Game.
+        if (ImGuiWindow* gameWindow = ImGui::FindWindowByName("Game")) {
+            if (gameWindow->DockId != 0 && ImGui::DockBuilderGetNode(gameWindow->DockId) != nullptr) {
+                restoreDockId = gameWindow->DockId;
+            }
+        }
+
+        // Fall back to the previously cached dock node if Game isn't docked/available.
+        if (restoreDockId == 0) {
+            restoreDockId = m_restoreDockId;
+            if (restoreDockId != 0 && ImGui::DockBuilderGetNode(restoreDockId) == nullptr) {
+                restoreDockId = 0;
+            }
+        }
+
+        if (restoreDockId != 0) {
+            ImGui::SetNextWindowDockID(restoreDockId, ImGuiCond_Always);
+        } else if (m_defaultDockspaceId != 0) {
+            ImGui::SetNextWindowDockID(m_defaultDockspaceId, ImGuiCond_Always);
         } else {
             ImGui::SetNextWindowPos(m_restorePos, ImGuiCond_Always);
             ImGui::SetNextWindowSize(m_restoreSize, ImGuiCond_Always);

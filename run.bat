@@ -8,7 +8,7 @@ call :check_tool cmake || exit /b 1
 
 echo.
 echo ==========================================================
-echo          GrapeEngine Build (Release + Config)
+echo           GrapeEngine Build (Release + Debug)
 echo ----------------------------------------------------------
 echo   Jobs: %JOBS%
 echo ==========================================================

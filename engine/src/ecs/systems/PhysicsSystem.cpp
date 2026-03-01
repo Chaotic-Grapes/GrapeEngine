@@ -242,7 +242,7 @@ namespace ECS {
         return builder.Build();
     }
 
-    void PhysicsSystem::OnDestroy(World& world) {
+    void PhysicsSystem::OnDestroy(World& /*world*/) {
         m_previousCollisions.clear();
         m_previousTriggerOverlaps.clear();
         m_runtimeTileMaps.clear();

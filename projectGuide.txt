@@ -30,6 +30,12 @@ PREREQUISITES
    - Download: https://www.doxygen.nl/download.html
    - Optional, but required for documentation
 
+6. CUDA TOOLKIT
+   - Download: https://developer.nvidia.com/cuda-downloads
+     - Choose the proper OS, architecture and OS version
+   - Required for building
+   - May need to restart computer
+
 ================================================================================
 STEP 1: INSTALL CMAKE (Build System)
 ================================================================================
@@ -86,22 +92,15 @@ STEP 2: CLONE THE REPOSITORY
 STEP 3: GENERATE VISUAL STUDIO SOLUTION
 ================================================================================
 
-METHOD 1: Using the Provided Script Menu (Easiest)
--------------------------------------------------
-1. In the GrapeEngine directory, double-click: `script_build_menu.bat`
-   OR run from command line: `script_build_menu.bat`
+METHOD 1: Using the Batch Files (Recommended)
+---------------------------------------------
+1. In the GrapeEngine directory, run:
+   run.bat
 
-The menu script provides quick access to all common tasks:
-- Clean build folders
-- Build/Run the Editor (Debug/Release)
-- Build/Run the Standalone Game (Debug/Release)
-- Build both targets
-
-Each option will configure and build into separate folders:
-- Editor builds use the `build` folder (e.g. `build\Debug`)
-- Game builds use the `build_game\export\<ProjectName>` folder (e.g. `build_game\export\EchoesBelow\Release`)
-
-You can still use `script_build_editor.bat`, and `script_build_game.bat` directly if you prefer.
+`run.bat` will:
+- Configure the editor build in `build\`
+- Build Editor Debug (`build\Debug`)
+- Build Editor Release (`build\Release`)
 
 METHOD 2: Manual CMake Commands
 -------------------------------
@@ -137,14 +136,15 @@ OPTION A: From Visual Studio
 - Press F5 to run with debugging
 - Press Ctrl+F5 to run without debugging
 
-OPTION B: Using the Run Script
-------------------------------
- - Double-click: script_run_editor.bat
- - OR run from command line: script_run_editor.bat
+OPTION B: Using run.bat
+-----------------------
+ - Run: run.bat
+ - Then run the editor executable from `build\<Config>\`, or use Visual Studio
+   to run the GrapeEditor. The `.sln` file exists in `build` folder.
 
 OPTION C: Direct Execution
 --------------------------
-- Navigate to: build\Debug\
+- Navigate to: build\<Config>\
 - Run: GrapeEngine.exe
 
 ================================================================================
@@ -171,12 +171,12 @@ ADDITIONAL COMMANDS
 ================================================================================
 
 CLEAN BUILD:
-- Run: script_clean.bat (removes build directory)
-- Or manually delete the 'build' folder
+- Run: clean.bat (removes `build` and `build_game` directories)
+- Or manually delete generated build folders
 
 REGENERATE SOLUTION:
 - Delete the 'build' folder
- - Run script_build_editor.bat again
+ - Run run.bat again
 - Or use the manual CMake commands above
 
 ================================================================================
@@ -195,7 +195,8 @@ PROJECT STRUCTURE
    ├── runtime/        # Runtime assets/binaries for game export
    ├── TestSuite/      # Sample project (To add in editor for testing)
    ├── CMakeLists.txt  # Main CMake configuration
-   └── script_*.bat    # Build, run and clean scripts
+   ├── run.bat         # Configure/build editor (Debug + Release)
+   └── clean.bat       # Remove generated build folders
 
 ================================================================================
 PROJECT SETTINGS AND CONFIGURATION
@@ -227,13 +228,12 @@ TARGETS (Editor vs Standalone Game)
 
 The project produces two targets:
 - Editor: interactive level editor, built into `build\Debug` / `build\Release`
-- Standalone Game: gameplay-only executable, built via scripts into `build_game\export\<ProjectName>\<Config>`
+- Standalone Game: gameplay-only executable, built into `build_game\export\<ProjectName>\<Config>`
 
 How to select targets:
-- Use 'script_build_editor.bat' / 'script_run_editor.bat' for the Editor
-- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game (editor needs to be built first!)
-  - If no project is provided, the scripts prompt you to pick from `Documents\Grape Engine\EditorSettings.json`
-- In Visual Studio, open the solution in 'build\' and run the Editor; game builds are produced by scripts
+- Use `run.bat` to configure and build the Editor in both Debug and Release
+- Use Visual Studio or direct executable launch to run the desired Editor config
+- In Visual Studio, open the solution in 'build\' and run the Editor
 
 APPLICATION CONFIGURATION (EditorSettings.json / ProjectSettings.json)
 ---------------------------------------------------------------------
@@ -257,17 +257,28 @@ TROUBLESHOOTING:
 LEVEL EDITOR MODES
 ------------------
 
-Real-time Editor (recommended):
-- Run the Editor target using 'script_run_editor.bat' or from Visual Studio
-- Use the playback toolbar (Play/Pause/Stop) to control simulation
+This section describes the viewport fullscreen workflow inside the Level Editor.
 
-Turn Editor Off (gameplay-only):
-- Run the Standalone Game target using 'script_run_game.bat' (no editor overlay)
-- Alternatively, close the editor and run the game exe from 'build_game\Debug\' or 'build_game\Release\'
+Scene viewport fullscreen (editor-focused):
+1. Open the Editor (`build\Debug\GrapeEngine.exe` or `build\Release\GrapeEngine.exe`).
+2. Focus the `Scene` viewport.
+3. Press `F11` (or click the Scene maximize button) to enter fullscreen Scene mode.
+4. Press `F11` again to restore normal layout.
 
-Offline Editing:
-- Use the Editor to edit scenes/prefabs without pressing Play; save changes to JSON
-- Scenes/prefabs are deserialized at runtime, so no recompilation is needed
+Game viewport fullscreen (immersive, no editor controls):
+1. Open the Editor and focus the `Game` viewport.
+2. Press `F12` (or click `Fullscreen (F12)` inside the Game viewport).
+3. The editor dockspace/menu panels are hidden and only the Game view is shown.
+4. Press `Esc` or `F12` to exit immersive mode and return to normal editor layout.
+
+Viewport sizing/aspect in fullscreen:
+1. In Game immersive mode, the viewport resizes to fill the fullscreen area.
+2. Camera aspect ratio updates from the fullscreen viewport dimensions.
+3. Fixed-aspect letterboxing is skipped while immersive mode is active.
+
+Dock restore behavior after exiting fullscreen:
+1. `Game` restores to its previous dock/tab location.
+2. `Scene` restores and prefers docking into the same panel/tab stack as `Game`.
 
 TROUBLESHOOTING CONFIGURATION ISSUES
 ------------------------------------
@@ -285,9 +296,9 @@ Build Configuration Issues:
 REGENERATE VISUAL STUDIO 2022 SOLUTION
 --------------------------------------
 
-Quick scripts (recommended):
-- Editor: 'script_build_editor.bat' (creates/refreshes 'build\' and generates the solution)
-- Game: 'script_build_game.bat' (creates/refreshes 'build_game\' and generates the game build)
+Quick batch files (recommended):
+- Clean: `clean.bat` (removes generated build folders)
+- Rebuild solution + editor binaries: `run.bat` (creates/refreshes `build\` and builds Debug + Release)
 
 Manual CMake:
 - Regenerate Editor solution:

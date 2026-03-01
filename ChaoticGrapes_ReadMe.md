@@ -21,27 +21,15 @@ cd GrapeEngine
 
 ### Building the Engine
 
-You can build using the provided per-target scripts or the interactive menu.
-
-Interactive Menu (recommended):
-1. Run `script_build_menu.bat` and choose Editor, Game, Build All, or Clean.
-2. The menu supports Debug and Release builds and will pause so you can
-   inspect output.
-
-Per-target scripts:
-- Editor: `script_build_editor.bat` -> outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
-- Game: `script_build_game.bat` -> outputs to `build_game\export\<ProjectName>\<Config>` (e.g. `build_game\export\EchoesBelow\Release`)
+Use the root batch files for the standard workflow:
+1. Run `clean.bat` when you need a full cleanup of generated build folders.
+2. Run `run.bat` to configure and build the editor in both Debug and Release.
 
 Notes:
 - The CMake configuration requests **C++23**.
-- `script_build_game.bat` will prompt you to pick a project if more than one is listed in
-  `Documents\Grape Engine\EditorSettings.json`. You can also pass a project name as the
-  second argument.
-- You can export projects outside the repo by passing `-DEXPORT_PROJECT_DIR="C:\Path\To\Project"`
-  to CMake (the batch script passes this automatically when a path is selected).
-- The standalone game executable name may be auto-detected from the first game project
-  folder found (a folder containing `ProjectSettings.json`). You can override this with
-  the CMake cache variable `GAME_OUTPUT_NAME`.
+- `run.bat` outputs editor binaries to `build\Debug\GrapeEngine.exe` and `build\Release\GrapeEngine.exe`.
+- You can pass an optional jobs argument: `run.bat 16`.
+- For custom standalone game/export workflows, use direct CMake commands.
 
 ## Project Structure
 
@@ -58,7 +46,8 @@ Notes:
    ├── runtime/        # Runtime assets/binaries for game export
    ├── TestSuite/      # Sample project (To add in editor for testing)
    ├── CMakeLists.txt  # Main CMake configuration
-   └── script_*.bat    # Build, run and clean scripts
+   ├── run.bat         # Configure/build editor in Debug + Release
+   └── clean.bat       # Remove generated build folders
 ```
 
 ## Game Concept

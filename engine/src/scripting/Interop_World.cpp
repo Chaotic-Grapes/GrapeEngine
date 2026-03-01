@@ -695,7 +695,7 @@ INTEROP_API void* WorldInterop_QueryGetOptionalComponent(QueryIterator* iterator
         return nullptr;
     }
 
-    ECS::World* world = GetWorld(iterator->worldPtr);
+    // ECS::World* world = GetWorld(iterator->worldPtr);
     const auto& archetypes = *static_cast<const std::vector<ECS::Archetype*>*>(iterator->archetypes);
 
     // Get current archetype and chunk (iterator was already advanced, so we need previous positions)

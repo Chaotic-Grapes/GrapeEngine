@@ -247,32 +247,6 @@ namespace ECS {
         }
     }
 
-    // Helper function to convert screen coordinates to world coordinates
-    static glm::vec2 ScreenToWorld(
-        const glm::dvec2& screenPos,
-        const glm::mat4& view,
-        const glm::mat4& projection,
-        const glm::vec2& viewportMin,    // NEW: viewport offset
-        const glm::vec2& viewportSize)   // NEW: viewport size
-    {
-        // Convert to viewport-local coordinates first
-        glm::vec2 localPos = glm::vec2(screenPos) - viewportMin;
-
-        // Normalize device coordinates (-1 to 1) using viewport dimensions
-        glm::vec4 ndc;
-        ndc.x = (2.0f * localPos.x) / viewportSize.x - 1.0f;
-        ndc.y = 1.0f - (2.0f * localPos.y) / viewportSize.y;
-        ndc.z = 0.0f;
-        ndc.w = 1.0f;
-
-        // Inverse projection and view
-        glm::mat4 invViewProj = glm::inverse(projection * view);
-        glm::vec4 worldPos = invViewProj * ndc;
-
-        // Convert to a 2D vector.
-        return glm::vec2(worldPos.x, worldPos.y);
-    }
-
     // Return metadata.
     SystemMetadata RendererSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Renderer");
@@ -287,7 +261,7 @@ namespace ECS {
     }
 
     // Initialize system state.
-    void RendererSystem::OnCreate(World& world) {
+    void RendererSystem::OnCreate(World& /*world*/) {
         if (m_initialized)
             return;
 

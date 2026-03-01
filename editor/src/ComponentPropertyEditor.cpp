@@ -2125,7 +2125,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
         "AudioClipClear", "Clear audio clip", m_symbolsFont, kAudioExtensions, [&](const std::string& droppedPath) {
             const std::string storedPath = ECS::Components::NormalizeProjectPathForStorage(droppedPath);
             const std::string registerPath = ECS::Components::ResolveProjectPathForLoad(storedPath);
-            const auto& clipInfo = lib.Register(registerPath);
+            const auto& clipInfo = lib.Register(registerPath); (void)clipInfo;
             data["CuePath"] = storedPath;
             data.erase("CueId");
             return true;
