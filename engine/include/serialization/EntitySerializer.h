@@ -425,25 +425,31 @@ namespace ECS {
 
 		inline void from_json(const nlohmann::json& j, BoidFlock& b)
 		{
+			// Match struct defaults exactly
 			b.count = j.value("count", 5000);
-			b.separationWeight = j.value("separationWeight", 1.5f);
-			b.alignmentWeight = j.value("alignmentWeight", 1.0f);
-			b.cohesionWeight = j.value("cohesionWeight", 1.0f);
-			b.visualRange = j.value("visualRange", 50.0f);
-			b.maxSpeed = j.value("maxSpeed", 200.0f);
-			b.maxForce = j.value("maxForce", 10.0f);
-			b.boidSize = j.value("boidSize", 1.0f);
-			b.collisionAvoidWeight = j.value("collisionAvoidWeight", 2.0f);
+			b.separationWeight = j.value("separationWeight", 2.5f);
+			b.alignmentWeight = j.value("alignmentWeight", 3.0f);
+			b.cohesionWeight = j.value("cohesionWeight", 0.4f);
+
+			b.collisionAvoidWeight = j.value("collisionAvoidWeight", 2.5f);
 			b.collisionAvoidRadius = j.value("collisionAvoidRadius", 3.0f);
 
-			// Texture path handling
+			b.visualRange = j.value("visualRange", 4.0f);
+			b.maxSpeed = j.value("maxSpeed", 4.0f);
+			b.maxForce = j.value("maxForce", 1.2f);
+			b.boidSize = j.value("boidSize", 1.0f);
+
+			// Texture path
 			std::string path = j.value("TexturePath", std::string());
+			path = NormalizeProjectPathForStorage(path);
+
 			b.TexturePath = path.empty() ? 0 : ECS::StringTable::Intern(path);
 
-			// Reload runtime texture
 			if (!path.empty())
 			{
-				auto tex = RM.Get<Texture>(path);
+				const std::string loadPath = ResolveProjectPathForLoad(path);
+				auto tex = RM.Get<Texture>(loadPath);
+
 				if (tex)
 					b.textureId = static_cast<uint32_t>(tex->ID());
 				else
@@ -452,6 +458,88 @@ namespace ECS {
 			else
 			{
 				b.textureId = 0;
+			}
+		}
+
+		inline void to_json(nlohmann::json& j, const ParticleEmitter& e)
+		{
+			std::string path = ECS::StringTable::Resolve(e.TexturePath);
+			path = NormalizeProjectPathForStorage(path);
+			j = nlohmann::json{
+				{"presetId", e.presetId},
+				{"maxParticles", e.maxParticles},
+				{"emissionRate", e.emissionRate},
+				{"burstCount", e.burstCount},
+				{"particleSize", e.particleSize},
+				{"active", e.active},
+				{"TexturePath", path},
+				{"speedMin", e.speedMin},           {"speedMax", e.speedMax},
+				{"gravityX", e.gravityX},           {"gravityY", e.gravityY},
+				{"drag", e.drag},                   {"turbulence", e.turbulence},
+				{"wobbleFrequency", e.wobbleFrequency}, {"wobbleAmplitude", e.wobbleAmplitude},
+				{"sizeStart", e.sizeStart},         {"sizeEnd", e.sizeEnd},
+				{"lifetimeMin", e.lifetimeMin},     {"lifetimeMax", e.lifetimeMax},
+				{"emissionAngle", e.emissionAngle}, {"emissionSpread", e.emissionSpread},
+				{"emissionRadius", e.emissionRadius},{"emissionShape", e.emissionShape},
+				{"colorStartR", e.colorStartR},     {"colorStartG", e.colorStartG},
+				{"colorStartB", e.colorStartB},     {"colorStartA", e.colorStartA},
+				{"colorEndR", e.colorEndR},         {"colorEndG", e.colorEndG},
+				{"colorEndB", e.colorEndB},         {"colorEndA", e.colorEndA},
+				{"dieOnCollision", e.dieOnCollision},{"bounciness", e.bounciness},
+				{"killOutOfBounds", e.killOutOfBounds},
+				{"rotationSpeedMin", e.rotationSpeedMin},{"rotationSpeedMax", e.rotationSpeedMax}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, ParticleEmitter& e)
+		{
+			e.presetId = j.value("presetId", 0u);
+			e.maxParticles = j.value("maxParticles", 1000);
+			e.emissionRate = j.value("emissionRate", 50.0f);
+			e.burstCount = j.value("burstCount", 0);
+			e.particleSize = j.value("particleSize", 0.3f);
+			e.active = j.value("active", true);
+
+			e.speedMin = j.value("speedMin", 0.5f);
+			e.speedMax = j.value("speedMax", 1.5f);
+			e.gravityX = j.value("gravityX", 0.0f);
+			e.gravityY = j.value("gravityY", 0.3f);
+			e.drag = j.value("drag", 0.3f);
+			e.turbulence = j.value("turbulence", 0.0f);
+			e.wobbleFrequency = j.value("wobbleFrequency", 0.0f);
+			e.wobbleAmplitude = j.value("wobbleAmplitude", 0.0f);
+			e.sizeStart = j.value("sizeStart", 0.2f);
+			e.sizeEnd = j.value("sizeEnd", 0.5f);
+			e.lifetimeMin = j.value("lifetimeMin", 1.0f);
+			e.lifetimeMax = j.value("lifetimeMax", 3.0f);
+			e.emissionAngle = j.value("emissionAngle", 1.5708f);
+			e.emissionSpread = j.value("emissionSpread", 0.5f);
+			e.emissionRadius = j.value("emissionRadius", 0.5f);
+			e.emissionShape = j.value("emissionShape", (uint8_t)0);
+			e.colorStartR = j.value("colorStartR", 1.0f);
+			e.colorStartG = j.value("colorStartG", 1.0f);
+			e.colorStartB = j.value("colorStartB", 1.0f);
+			e.colorStartA = j.value("colorStartA", 1.0f);
+			e.colorEndR = j.value("colorEndR", 1.0f);
+			e.colorEndG = j.value("colorEndG", 1.0f);
+			e.colorEndB = j.value("colorEndB", 1.0f);
+			e.colorEndA = j.value("colorEndA", 0.0f);
+			e.dieOnCollision = j.value("dieOnCollision", false);
+			e.bounciness = j.value("bounciness", 0.0f);
+			e.killOutOfBounds = j.value("killOutOfBounds", false);
+			e.rotationSpeedMin = j.value("rotationSpeedMin", 0.0f);
+			e.rotationSpeedMax = j.value("rotationSpeedMax", 0.0f);
+
+			// Texture (runtime only)
+			std::string path = j.value("TexturePath", std::string());
+			path = NormalizeProjectPathForStorage(path);
+			e.TexturePath = path.empty() ? 0 : ECS::StringTable::Intern(path);
+			if (!path.empty()) {
+				auto tex = RM.Get<Texture>(ResolveProjectPathForLoad(path));
+				e.textureId = tex ? (uint32_t)tex->ID() : 0;
+			}
+			else {
+				e.textureId = 0;
 			}
 		}
 		
@@ -1285,6 +1373,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton");
 	REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider");
 	REGISTER_COMPONENT_SERIALIZER(BoidFlock, ECS::Components::BoidFlock, "BoidFlock");
+	REGISTER_COMPONENT_SERIALIZER(ParticleEmitter, ECS::Components::ParticleEmitter, "ParticleEmitter");
 }
 
 #endif

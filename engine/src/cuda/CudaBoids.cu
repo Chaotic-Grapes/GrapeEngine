@@ -370,14 +370,15 @@ namespace CudaBoids {
                     int count,
                     float minX, float minY,
                     float maxX, float maxY,
-                    float maxSpeed) {
+                    float maxSpeed,
+                    uint32_t entitySeed) {
         if (count <= 0) return;
 
         int threads = 256;
         int blocks = (count + threads - 1) / threads;
 
-        // Use time-based seed for variety
-        unsigned long long seed = 42ull; // deterministic for debugging; use clock() for variety
+        // Mix entity index into seed so different flocks diverge
+        unsigned long long seed = 42ull ^ ((unsigned long long)entitySeed * 2654435761ull);
 
         initRandomKernel<<<blocks, threads>>>(d_posVel, count, minX, minY, maxX, maxY, maxSpeed, seed);
         cudaDeviceSynchronize();

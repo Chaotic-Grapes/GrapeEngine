@@ -101,6 +101,7 @@ namespace ECS {
         REGISTER_COMPONENT(BoidFlock);
 
         // Rendering
+        REGISTER_COMPONENT(ParticleEmitter);
         REGISTER_COMPONENT(SpriteRenderer2D);
         REGISTER_COMPONENT(SpriteFlip2D);
         REGISTER_COMPONENT(SpriteShader2D);
@@ -179,6 +180,8 @@ namespace ECS {
         LogComponentTypeIds("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));
         LogComponentTypeIds("SpriteShader2D", FNV1a_Hash("SpriteShader2D"));
         LogComponentTypeIds("TileMapComponent", FNV1a_Hash("TileMapComponent"));
+        LogComponentTypeIds("ParticleEmitter", FNV1a_Hash("ParticleEmitter"));
+        LogComponentTypeIds("BoidFlock", FNV1a_Hash("BoidFlock"));
 
         LogComponentTypeIds("SpriteSheetAnimation2D", FNV1a_Hash("SpriteSheetAnimation2D"));
         LogComponentTypeIds("AnimationState2D", FNV1a_Hash("AnimationState2D"));

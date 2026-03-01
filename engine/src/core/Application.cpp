@@ -18,6 +18,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/CrashDumping.h"
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
+#include "ecs/systems/ParticleSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/BoidSystem.h"
 #include "ecs/systems/GUILayoutSystem.h"
@@ -413,6 +414,7 @@ namespace Engine {
         m_systemManager.RegisterSystem<ECS::PhysicsSystem>();
         
         // Render Phase Systems
+        m_systemManager.RegisterSystem<ECS::ParticleSystem>();
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
         m_systemManager.RegisterSystem<ECS::GUIInputSystem>();

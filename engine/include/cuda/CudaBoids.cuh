@@ -53,7 +53,8 @@ namespace CudaBoids {
                     int count,
                     float minX, float minY,
                     float maxX, float maxY,
-                    float maxSpeed);
+                    float maxSpeed,
+                    uint32_t entitySeed = 0);
 
 } // namespace CudaBoids
 

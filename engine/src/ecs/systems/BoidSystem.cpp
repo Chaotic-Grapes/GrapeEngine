@@ -171,17 +171,19 @@ namespace ECS {
 
             if (gpu.d_prevPosVel)
                 cudaFree(gpu.d_prevPosVel);
-
-            if (m_collisionGrid.d_masks) {
-                cudaFree(m_collisionGrid.d_masks);
-                m_collisionGrid.d_masks = nullptr;
-            }
 #endif
 
             if (gpu.vao) glDeleteVertexArrays(1, &gpu.vao);
             if (gpu.quadVBO) glDeleteBuffers(1, &gpu.quadVBO);
             if (gpu.instanceVBO) glDeleteBuffers(1, &gpu.instanceVBO);
         }
+
+#ifdef GRAPE_HAS_CUDA
+        if (m_collisionGrid.d_masks) {
+            cudaFree(m_collisionGrid.d_masks);
+            m_collisionGrid.d_masks = nullptr;
+        }
+#endif
 
         m_flocks.clear();
         m_renderData.clear();
@@ -219,7 +221,8 @@ namespace ECS {
             CudaBoids::InitRandom(d_posVel, count,
                 -200.0f, -200.0f,
                 200.0f, 200.0f,
-                100.0f);
+                100.0f,
+                entityIndex);
             // Copy initial state to prev buffer
             cudaMemcpy(gpu.d_prevPosVel, d_posVel,
                 sizeof(float4) * count,
