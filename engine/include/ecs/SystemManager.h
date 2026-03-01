@@ -951,11 +951,41 @@ namespace ECS {
          * @brief Update a group (dependency-aware sequential execution).
          */
         void _updateGroupWithDependencies(SystemGroup group, World& world) {
+            // Helper lambda to update a single system with checks and profiling
+            auto updateSystem = [&](ISystem* system) {
+                if (!system || !system->IsEnabled() || !IsSystemCreated(system)) {
+                    return;
+                }
+                if (!IsRunModeActive(GetSystemMetadataRunMode(system))) {
+                    return;
+                }
+
+                // Use cached name to avoid expensive P/Invoke metadata lookups.
+                auto sysIt = m_systemNameCache.find(system);
+                const char* systemName = (sysIt != m_systemNameCache.end()) ?
+                    sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
+                TimeSystem::Instance().ProfileBegin(systemName);
+                system->OnUpdate(world);
+                TimeSystem::Instance().ProfileEnd();
+            };
+
             // Get dependency graph for this group
             auto it = m_dependencyGraphs.find(group);
             if (it == m_dependencyGraphs.end() || it->second.GetSystemCount() == 0) {
-                // No dependency info - fall back to sequential update
-                _updateGroup(group, world);
+                // No dependency info - fall back to sequential update with run-mode filtering.
+                auto itOwned = m_systemGroups.find(group);
+                if (itOwned != m_systemGroups.end()) {
+                    for (auto& system : itOwned->second) {
+                        updateSystem(system.get());
+                    }
+                }
+
+                auto itScripted = m_scriptedSystemGroups.find(group);
+                if (itScripted != m_scriptedSystemGroups.end()) {
+                    for (auto* system : itScripted->second) {
+                        updateSystem(system);
+                    }
+                }
                 return;
             }
 
@@ -967,15 +997,7 @@ namespace ECS {
             for (const auto& level : levels) {
                 // Execute all systems in this level sequentially
                 for (auto* system : level) {
-                    if (!system->IsEnabled()) continue;
-                    
-                    // Use cached name to avoid expensive P/Invoke metadata lookups
-                    auto sysIt = m_systemNameCache.find(system);
-                    const char* systemName = (sysIt != m_systemNameCache.end()) ? 
-                        sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
-                    TimeSystem::Instance().ProfileBegin(systemName);
-                    system->OnUpdate(world);
-                    TimeSystem::Instance().ProfileEnd();
+                    updateSystem(system);
                 }
             }
         }

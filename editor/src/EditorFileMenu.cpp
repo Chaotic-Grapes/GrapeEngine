@@ -522,6 +522,11 @@ void EditorFileMenu::_exportProject() {
                     if (!relEc && !rel.empty() && rel.begin() != rel.end() && *rel.begin() != "..") {
                         startupScenePath = rel;
                         settingsJson["StartupScene"] = startupScenePath.generic_string();
+                    } else {
+                        pushResult({ "Copy project settings", false, "StartupScene must be inside the project folder for export.", "" });
+                        m_exportDone = true;
+                        m_exportInProgress = false;
+                        return;
                     }
                 }
 
