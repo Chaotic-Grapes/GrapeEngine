@@ -1,3 +1,42 @@
+/* Start Header *****************************************************************/
+/*!
+\file   CudaBoids.cu
+\author Choi Meng Yew
+\date   03/03/2026 DD/MM/YYYY
+\brief
+Implements the CUDA-accelerated Boid flock simulation for GrapeEngine.
+
+This module contains GPU kernels and host-side launch wrappers for
+updating large-scale boid simulations entirely on the GPU. Each thread
+simulates one boid using a double-buffered position+velocity layout.
+
+Features:
+    - Brute-force neighbor evaluation (O(n²))
+    - Separation, Alignment, Cohesion steering rules
+    - Per-boid jitter for natural spacing variation
+    - Predictive tile-based collision avoidance
+    - Hard collision resolution with wall sliding
+    - Periodic speed burst behavior for organic motion
+    - World-space wraparound bounds
+    - GPU-based random initialization using cuRAND
+
+Responsibilities:
+    - Compute steering forces per boid
+    - Integrate velocity and position
+    - Enforce force and speed constraints
+    - Handle tile collision avoidance and resolution
+    - Write updated state to output buffer
+    - Provide host launch wrappers for engine systems
+
+Used by:
+    - BoidSystem (GPU simulation path)
+    - CudaGLInterop (for mapped VBO access)
+    - Editor-controlled BoidParams
+
+This module forms the compute core of the GPU Boid pipeline.
+*/
+/* End Header *******************************************************************/
+
 #include "cuda/CudaBoids.cuh"
 
 #ifdef GRAPE_HAS_CUDA
@@ -5,9 +44,30 @@
 #include <curand_kernel.h>
 #include <cstdio>
 
-// ============================================================
-// Predictive ray-based collision avoidance (replaces ComputeCollisionAvoidance)
-// ============================================================
+/*!
+\brief
+Device-side helper that computes tile-based collision avoidance steering.
+
+This is a __device__ function, meaning it runs on the GPU and may only be
+called from other CUDA kernels or device functions. It executes once per
+boid thread and contributes a steering vector used inside the main
+simulation kernel.
+
+The function combines:
+
+    - Proximity-based repulsion from nearby solid tiles
+    - Predictive lookahead sampling along velocity direction
+    - Perpendicular steering when a wall is detected ahead
+
+Returns a steering vector that pushes the boid away from obstacles.
+No memory is written; the result is accumulated into velocity by
+the calling kernel.
+
+\param pos    Current world-space position of the boid
+\param vel    Current velocity of the boid
+\param p      BoidParams containing tile grid and collision data
+\return       Avoidance steering force (float2)
+*/
 __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidParams& p)
 {
     float2 steer = make_float2(0.0f, 0.0f);

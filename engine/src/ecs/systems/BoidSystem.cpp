@@ -4,10 +4,25 @@
 \author Choi Meng Yew
 \date   26th February 2026
 \brief
-GPU-accelerated boid flocking simulation using CUDA-OpenGL interop.
-Each BoidFlock entity spawns a separate GPU flock. CUDA kernels compute
-separation/alignment/cohesion; results live in an OpenGL VBO that the
-RendererSystem draws with instanced rendering.
+GPU-accelerated boid flocking simulation using CUDA–OpenGL interop.
+Each BoidFlock entity owns a separate GPU-backed flock. Simulation
+is executed entirely on the GPU via CUDA kernels implementing
+separation, alignment, and cohesion rules.
+
+Per-frame workflow:
+    - Map OpenGL instance VBO for CUDA access
+    - Launch boid simulation kernel (reads previous state, writes current)
+    - Synchronize and unmap VBO
+    - RendererSystem draws instances using the updated buffer
+
+The system maintains a double-buffered position/velocity layout
+(previous + current) to ensure deterministic updates. Results live
+directly in an OpenGL VBO, enabling zero CPU copies and fully
+GPU-resident simulation-to-rendering flow.
+
+ISSUES TO DO:
+1) Remove the Device-to-Device cudaMemcpy
+2) Use CUDA Streams
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

@@ -17,6 +17,9 @@ Particle layout (3 x float4 per particle, SoA):
   lifeColor[i]: { life,  maxLife, colorR, colorG }
   sizeRot[i]:   { colorB, colorA, size, rotation }
 
+TO-DO:
+Please add ping-pong buffers!!!
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
