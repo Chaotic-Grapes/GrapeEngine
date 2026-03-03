@@ -219,6 +219,9 @@ public:
     // Notify LevelEditor when the active tileset changes.
     void SetActiveTilesetCallback(std::function<void(uint8_t)> callback) { m_activeTilesetCallback = std::move(callback); }
 
+    // Register paint mode toggle callback.
+    void SetPaintModeChangedCallback(std::function<void(bool)> callback) { m_onPaintModeChanged = std::move(callback); }
+
     /*------------------------------------------------------------------*/
     /*!
     \brief Updates world origin without resetting palette state.
@@ -228,7 +231,7 @@ public:
 
 private:
     bool m_active = true;           //!< Palette enabled state
-    bool m_paintMode = true;        //!< Viewport painting enabled
+    bool m_paintMode = false;       //!< Viewport painting enabled
     
         //! Active tilemap and tilesets
     std::shared_ptr<TileMap> m_tileMap;
@@ -246,6 +249,7 @@ private:
     std::function<void(const std::string&)> m_assetDropCallback;
     std::function<void(EntityId)> m_activeTileMapCallback;
     std::function<void(uint8_t)> m_activeTilesetCallback;
+    std::function<void(bool)> m_onPaintModeChanged;
 
     //! External systems
     ECS::World* m_world = nullptr;

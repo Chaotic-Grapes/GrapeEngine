@@ -293,7 +293,11 @@ void TilePalettePanel::Render()
 
         // Toolbar: Eraser, Rotate
         if (ImGui::Button(m_paintMode ? "Paint Mode: ON" : "Paint Mode: OFF")) {
+            bool old = m_paintMode;
             m_paintMode = !m_paintMode;
+            if (old && !m_paintMode && m_onPaintModeChanged) {
+                m_onPaintModeChanged(false);
+            }
         }
         ImGui::SameLine();
         if (ImGui::Button(m_isEraser ? "Eraser [ON]" : "Eraser"))

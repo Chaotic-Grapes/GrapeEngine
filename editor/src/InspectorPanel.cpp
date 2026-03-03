@@ -325,6 +325,7 @@ void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
 
     // Forward fonts into the smaller ComponentUI helper so it can draw fields
     m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
+    m_componentUI.SetUndoSystem(m_undoSystem);
     
     // NOTE: Do NOT call RebuildFromNativeRegistry() here!
     // The native registry won't have C# components yet (they're loaded on a background thread)
@@ -874,13 +875,15 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         // Record undo when editing finishes
         if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
             if (m_undoSystem && m_editState.hasSnapshot) {
-                // Capture post-edit state and push a generic snapshot command.
-                auto endSnapshot = m_world->CaptureEntityComponents(entity);
-                if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
-                    auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
-                        m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)
-                    );
-                    m_undoSystem->ExecuteCommand(std::move(command));
+                const bool hadPropertyEdits = m_undoSystem->ConsumePropertyEditEmission();
+                if (!hadPropertyEdits) {
+                    auto endSnapshot = m_world->CaptureEntityComponents(entity);
+                    if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
+                        auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                            m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)
+                        );
+                        m_undoSystem->ExecuteCommand(std::move(command));
+                    }
                 }
             }
 

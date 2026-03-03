@@ -647,6 +647,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
     m_sceneViewport.SetTilePalette(&m_tilePalette);
+    m_tilePalette.SetPaintModeChangedCallback([this](bool enabled) {
+        if (!enabled) {
+            m_sceneViewport.SetGridVisible(false);
+        }
+    });
     m_tilePalette.SetActiveTileMapCallback([this](const EntityId id) { _setActiveTileMap(id); });
     // Set active tileset callback.
     m_tilePalette.SetActiveTilesetCallback([this](const uint8_t index) {

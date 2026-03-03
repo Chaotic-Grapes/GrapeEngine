@@ -82,6 +82,8 @@ namespace Editor::ECSUtils {
     inline bool HasComponent(ECS::World* world, ECS::Entity entity, const char* name) {
         if (!world)
             return false;
+        if (!world->IsAlive(entity))
+            return false;
 
         const ECS::ComponentTypeId id = GetComponentIdFromName(name);
 

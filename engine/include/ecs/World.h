@@ -632,6 +632,7 @@ namespace ECS {
          */
         // Check for by id.
         inline bool HasById(Entity e, ComponentTypeId componentId) const {
+            assert(IsAlive(e));
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr)
                 return false;

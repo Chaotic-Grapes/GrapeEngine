@@ -29,6 +29,7 @@ public:
     void ShowEditorWindows() override;
     void EndFrame() override;
     void SetTilePalette(TilePalettePanel* panel) { m_tilePalettePanel = panel; }
+    void SetGridVisible(bool v) { m_showGrid = v; }
 
 private:
     void _renderViewport();

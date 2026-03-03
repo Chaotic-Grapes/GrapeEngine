@@ -23,6 +23,7 @@ to C++ components.
 #include <imgui.h>
 #include "ecs/Entity.h"
 #include "ecs/World.h"
+namespace Editor { class UndoSystem; }
 
 // Handles rendering of all component UIs in the inspector
 class ComponentUI {
@@ -34,6 +35,7 @@ public:
     // Sets fonts for component UI rendering to maintain visual consistency across 
     // all inspectors
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+    void SetUndoSystem(Editor::UndoSystem* undo) { m_undo = undo; }
 
     // -------------------------------------------------------------------------
     // Component Rendering
@@ -138,6 +140,7 @@ private:
     ImFont* m_mainFont;
     ImFont* m_boldFont;
     ImFont* m_symbolsFont;
+    Editor::UndoSystem* m_undo = nullptr;
 };
 
 #endif
