@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 #include <string>
 #include <cstring>
+#include <algorithm>
 #include <iostream>
 #include <filesystem>
 #include "ecs/Entity.h"
@@ -271,6 +272,17 @@ namespace ECS {
 			std::string normalTexturePath = ECS::StringTable::Resolve(anim.NormalTexturePath);
 			texturePath = NormalizeProjectPathForStorage(texturePath);
 			normalTexturePath = NormalizeProjectPathForStorage(normalTexturePath);
+
+			nlohmann::json segments = nlohmann::json::array();
+			const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, SpriteSheetAnimation2D::MaxSegments);
+			for (int i = 0; i < segCount; ++i) {
+				segments.push_back({
+					{"Row", anim.SegmentRows[i]},
+					{"FrameOffset", anim.SegmentOffsets[i]},
+					{"FrameLength", anim.SegmentLengths[i]}
+				});
+			}
+
 			j = nlohmann::json{
 				{"TextureId", anim.TextureId},
 				{"TexturePath", texturePath},
@@ -289,6 +301,8 @@ namespace ECS {
 				{"Loop", anim.Loop},
 				{"Playing", anim.Playing},
 				{"UseRow", anim.UseRow},
+				{"UseSegments", anim.UseSegments},
+				{"Segments", segments},
 				{"TextureFilter", static_cast<uint8_t>(anim.TextureFilter)}
 			};
 		}
@@ -356,6 +370,27 @@ namespace ECS {
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
 			anim.UseRow = j.value("UseRow", false);
+			anim.UseSegments = j.value("UseSegments", false);
+			anim.SegmentCount = 0;
+			for (int i = 0; i < SpriteSheetAnimation2D::MaxSegments; ++i) {
+				anim.SegmentRows[i] = 0;
+				anim.SegmentOffsets[i] = 0;
+				anim.SegmentLengths[i] = 0;
+			}
+
+			if (j.contains("Segments") && j["Segments"].is_array()) {
+				const auto& segs = j["Segments"];
+				const int count = std::min(static_cast<int>(segs.size()), SpriteSheetAnimation2D::MaxSegments);
+				for (int i = 0; i < count; ++i) {
+					const auto& seg = segs[i];
+					if (!seg.is_object()) continue;
+					anim.SegmentRows[i] = seg.value("Row", 0);
+					anim.SegmentOffsets[i] = seg.value("FrameOffset", 0);
+					anim.SegmentLengths[i] = seg.value("FrameLength", 0);
+					++anim.SegmentCount;
+				}
+			}
+
 			anim.TextureFilter = static_cast<Graphics::TextureFilter>(
 				j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
 		}

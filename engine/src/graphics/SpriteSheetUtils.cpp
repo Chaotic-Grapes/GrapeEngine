@@ -43,19 +43,24 @@ namespace SpriteSheetUtils {
         if (totalCols <= 0 || totalRows <= 0)
             return window;
 
+        const int totalFrames = totalCols * totalRows;
+
         // Ensure start frame is non-negative
-        window.Start = std::max(0, startFrame);
+        window.Start = std::clamp(startFrame, 0, totalFrames - 1);
         window.Count = frameCount;
 
         // If count is not specified or negative, auto-expand to include remaining frames from start position
         if (window.Count <= 0) {
-            const int totalFrames = totalCols * totalRows;
             window.Count = std::max(1, totalFrames - window.Start);
+        }
+        else {
+            window.Count = std::min(window.Count, totalFrames - window.Start);
         }
         return window;
     }
 
-    // Define a range of consecutive frames within a specific row of the sprite sheet
+    // Define a range of consecutive frames starting from a row/column position.
+    // Row index is interpreted directly in sheet row-major order.
     Window ComputeRowWindow(int rowIndex, int rowStartCol, int rowFrameCount, int totalCols, int totalRows) {
         Window window{};
 
@@ -63,20 +68,29 @@ namespace SpriteSheetUtils {
         if (totalCols <= 0 || totalRows <= 0)
             return window;
 
-        // Clamp row/column indices; row index is top-down (0 = top row)
+        // Clamp row/column indices directly in row-major index space.
         const int row = std::clamp(rowIndex, 0, totalRows - 1);
         const int startCol = std::clamp(rowStartCol, 0, totalCols - 1);
+        const int start = row * totalCols + startCol;
+        const int totalFrames = totalCols * totalRows;
 
-        // Calculate how many frames are available from the start column to the end of the row
-        const int available = totalCols - startCol;
+        // Frames available from start to end-of-row; used by FrameLength=0 default.
+        const int rowAvailable = totalCols - startCol;
+        const int maxFromStart = totalFrames - start;
 
-        // Use requested frame count or limit to available frames in the row
+        // FrameLength semantics:
+        // - <= 0 : consume only the rest of the selected row
+        // - > 0  : allow spanning into following rows, clamped to sheet end
         int count = rowFrameCount;
-        if (count <= 0 || count > available)
-            count = available;
+        if (count <= 0) {
+            count = rowAvailable;
+        }
+        else {
+            count = std::clamp(count, 1, maxFromStart);
+        }
 
-        // Calculate the absolute frame index (row-major layout) and frame count
-        window.Start = row * totalCols + startCol;
+        // Calculate the absolute frame index (row-major layout) and frame count.
+        window.Start = start;
         window.Count = count;
         return window;
     }
@@ -89,18 +103,20 @@ namespace SpriteSheetUtils {
 
         // Calculate number of columns; return zero if invalid
         const int totalCols = sheetWidth / frameWidth;
-        if (totalCols <= 0)
+        const int totalRows = sheetHeight / frameHeight;
+        if (totalCols <= 0 || totalRows <= 0)
             return glm::vec4(0.0f);
 
-        // Determine row and column from absolute frame index (row-major layout)
+        // Determine row/column from absolute frame index in top-first row-major layout.
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        const int rowTop = absoluteFrame / totalCols;
+        const int rowBottom = (totalRows - 1) - rowTop;
 
         // Convert pixel coordinates to normalized UV coordinates (0.0 to 1.0)
         const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
-        const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
+        const float v0 = (rowBottom * frameHeight) / static_cast<float>(sheetHeight);
         const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
-        const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
+        const float v1 = ((rowBottom + 1) * frameHeight) / static_cast<float>(sheetHeight);
 
         // Return UV bounds: (u_min, v_min, u_max, v_max)
         return glm::vec4(u0, v0, u1, v1);

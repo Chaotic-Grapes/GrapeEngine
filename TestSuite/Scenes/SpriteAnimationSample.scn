@@ -5,6 +5,133 @@
                 {
                     "Data": {
                         "Position": {
+                            "X": -6.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 5.0,
+                            "Y": 5.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Anim Test A - Row0 Top"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "CurrentFrame": 0,
+                        "Finished": false,
+                        "TimeAccumulator": 0.0
+                    },
+                    "TypeName": "AnimationState2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.800000011920929
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 11,
+                        "TexturePath": "",
+                        "Tiling": {
+                            "X": 0.0625,
+                            "Y": 0.19999998807907104
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "FrameCount": 16,
+                        "FrameHeight": 32,
+                        "FrameLength": 8,
+                        "FrameOffset": 0,
+                        "FrameWidth": 32,
+                        "FramesPerSecond": 16.0,
+                        "Loop": true,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Playing": true,
+                        "Row": 0,
+                        "Segments": [],
+                        "SheetHeight": 160,
+                        "SheetWidth": 512,
+                        "StartFrame": 0,
+                        "TextureFilter": 0,
+                        "TextureId": 11,
+                        "TexturePath": "Assets\\Sprites\\FishfolkSheet.png",
+                        "UseRow": true,
+                        "UseSegments": false
+                    },
+                    "TypeName": "SpriteSheetAnimation2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 5.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -6.0,
+                            "m10": 0.0,
+                            "m11": 5.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
                             "X": 0.0,
                             "Y": 0.0,
                             "Z": 0.0
@@ -25,7 +152,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Fishfolk Animation"
+                        "Value": "Anim Test B - Row0 Spill"
                     },
                     "TypeName": "Name"
                 },
@@ -67,11 +194,11 @@
                             "Y": 0.0
                         },
                         "TextureFilter": 0,
-                        "TextureId": 20,
+                        "TextureId": 11,
                         "TexturePath": "",
                         "Tiling": {
                             "X": 0.0625,
-                            "Y": 0.10000000149011612
+                            "Y": 0.20000000298023224
                         }
                     },
                     "TypeName": "SpriteRenderer2D"
@@ -79,8 +206,8 @@
                 {
                     "Data": {
                         "FrameCount": 16,
-                        "FrameHeight": 16,
-                        "FrameLength": 16,
+                        "FrameHeight": 32,
+                        "FrameLength": 8,
                         "FrameOffset": 0,
                         "FrameWidth": 32,
                         "FramesPerSecond": 16.0,
@@ -88,14 +215,16 @@
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
                         "Playing": true,
-                        "Row": 0,
+                        "Row": 4,
+                        "Segments": [],
                         "SheetHeight": 160,
                         "SheetWidth": 512,
                         "StartFrame": 0,
                         "TextureFilter": 0,
-                        "TextureId": 20,
-                        "TexturePath": "C:/Users/kille/source/repos/GrapeEngine/TestSuite\\Assets\\Sprites\\FishfolkSheet.png",
-                        "UseRow": true
+                        "TextureId": 11,
+                        "TexturePath": "Assets\\Sprites\\FishfolkSheet.png",
+                        "UseRow": true,
+                        "UseSegments": false
                     },
                     "TypeName": "SpriteSheetAnimation2D"
                 },
@@ -107,6 +236,144 @@
                             "m01": 0.0,
                             "m02": 0.0,
                             "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 5.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 6.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 5.0,
+                            "Y": 5.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Anim Test C - Segments"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "CurrentFrame": 0,
+                        "Finished": false,
+                        "TimeAccumulator": 0.0
+                    },
+                    "TypeName": "AnimationState2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.20000000298023224
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 11,
+                        "TexturePath": "",
+                        "Tiling": {
+                            "X": 0.0625,
+                            "Y": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "FrameCount": 1,
+                        "FrameHeight": 32,
+                        "FrameLength": 0,
+                        "FrameOffset": 0,
+                        "FrameWidth": 32,
+                        "FramesPerSecond": 16.0,
+                        "Loop": true,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Playing": true,
+                        "Row": 0,
+                        "Segments": [
+                            {
+                                "FrameLength": 8,
+                                "FrameOffset": 0,
+                                "Row": 3
+                            },
+                            {
+                                "FrameLength": 16,
+                                "FrameOffset": 0,
+                                "Row": 4
+                            }
+                        ],
+                        "SheetHeight": 160,
+                        "SheetWidth": 512,
+                        "StartFrame": 0,
+                        "TextureFilter": 0,
+                        "TextureId": 11,
+                        "TexturePath": "Assets\\Sprites\\FishfolkSheet.png",
+                        "UseRow": false,
+                        "UseSegments": true
+                    },
+                    "TypeName": "SpriteSheetAnimation2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 5.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 6.0,
                             "m10": 0.0,
                             "m11": 5.0,
                             "m12": 0.0,
@@ -163,7 +430,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.3412127494812012,
+                        "AspectRatio": 2.003412961959839,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -209,8 +476,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -2.0024423599243164,
-                            "Y": 2.4617180824279785,
+                            "X": -7.5,
+                            "Y": 3.799999952316284,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -229,7 +496,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Text"
+                        "Value": "Test Instructions"
                     },
                     "TypeName": "Name"
                 },
@@ -275,10 +542,10 @@
                             "G": 1.0,
                             "R": 1.0
                         },
-                        "FontPath": "",
-                        "FontSize": 50.0,
+                        "FontPath": "Assets\\Fonts\\Roboto\\static\\Roboto-Thin.ttf",
+                        "FontSize": 28.0,
                         "HAlign": 0,
-                        "Text": "Wow an animation!",
+                        "Text": "A: UseRow Row=0 Offset=0 Length=6 (row clip)\nB: UseRow Row=0 Offset=14 Length=10 (contiguous spill)\nC: UseSegments [(0,14,2),(1,0,8)] (explicit row chain)",
                         "VAlign": 0,
                         "Wrap": false
                     },
@@ -297,11 +564,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -2.0024423599243164,
+                            "m03": -7.5,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 2.4617180824279785,
+                            "m13": 3.799999952316284,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -317,7 +584,7 @@
             ]
         }
     ],
-    "EntityCount": 3,
+    "EntityCount": 5,
     "Hierarchy": [],
     "Layers": [
         {

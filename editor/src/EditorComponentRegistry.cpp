@@ -399,7 +399,7 @@ Without these, the macro would end early and break the expansion
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
                 {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
-                {"Loop", true}, {"Playing", false}, {"UseRow", false},
+                {"Loop", true}, {"Playing", false}, {"UseRow", false}, {"UseSegments", false}, {"Segments", nlohmann::json::array()},
                 {"TextureFilter", 0}
             }; 
             };
@@ -819,7 +819,7 @@ static void _initializeDefaultRegistry() {
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
                 {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0},
-                {"Loop", true}, {"Playing", false}, {"UseRow", false},
+                {"Loop", true}, {"Playing", false}, {"UseRow", false}, {"UseSegments", false}, {"Segments", nlohmann::json::array()},
                 {"TextureFilter", 0}
             }; }),
             COMPONENT_OPS_HASH(SpriteSheetAnimation2D, kHashSpriteSheetAnimation2D)

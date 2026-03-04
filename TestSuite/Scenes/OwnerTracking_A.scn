@@ -1,67 +1,225 @@
 {
-    "SceneName": "OwnerTracking_A",
     "Entities": [
         {
-            "EntityId": 0,
             "Components": [
                 {
-                    "TypeName": "LocalTransform",
                     "Data": {
-                        "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-                        "Rotation": { "W": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0 },
-                        "Scale": { "X": 1.0, "Y": 1.0, "Z": 1.0 }
-                    }
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
                 },
                 {
-                    "TypeName": "Camera3D",
                     "Data": {
-                        "AspectRatio": 1.7777777910232544,
+                        "Value": "OwnerTrackingCamera"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Active": true,
+                        "AspectRatio": 2.003412961959839,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
                         "OrthoSize": 10.0,
-                        "UsePerspective": false,
-                        "Active": true
-                    }
+                        "UsePerspective": false
+                    },
+                    "TypeName": "Camera3D"
                 },
                 {
-                    "TypeName": "Name",
-                    "Data": { "Value": "OwnerTrackingCamera" }
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         },
         {
-            "EntityId": 1,
             "Components": [
                 {
-                    "TypeName": "LocalTransform",
                     "Data": {
-                        "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-                        "Rotation": { "W": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0 },
-                        "Scale": { "X": 1.0, "Y": 1.0, "Z": 1.0 }
-                    }
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
                 },
                 {
-                    "TypeName": "SpriteRenderer2D",
                     "Data": {
-                        "TextureId": 0,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "Value": "OwnerTrackingSpriteA"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
                         "NormalTextureId": 0,
                         "NormalTexturePath": "",
-                        "Color": { "R": 1.0, "G": 1.0, "B": 1.0, "A": 1.0 },
-                        "Tiling": { "X": 1.0, "Y": 1.0 },
-                        "Offset": { "X": 0.0, "Y": 0.0 }
-                    }
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureFilter": 0,
+                        "TextureId": 22,
+                        "TexturePath": "Assets\\Sprites\\fishBoy.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
                 },
                 {
-                    "TypeName": "Layer",
-                    "Data": { "Id": 0 }
-                },
-                {
-                    "TypeName": "Name",
-                    "Data": { "Value": "OwnerTrackingSpriteA" }
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         }
-    ]
+    ],
+    "EntityCount": 2,
+    "Hierarchy": [],
+    "Layers": [
+        {
+            "id": 0,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Background",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 1,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "World",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 2,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Gameplay",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 3,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Foreground",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 98,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "UI",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 99,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Debug",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        }
+    ],
+    "SceneName": "OwnerTracking_A",
+    "Version": "1.0"
 }

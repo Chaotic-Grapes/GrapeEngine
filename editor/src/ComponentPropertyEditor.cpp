@@ -39,6 +39,61 @@ prefab assets use the same UI path.
 #include "core/Application.h"
 
 namespace {
+    constexpr int kMaxAnimSegments = 8;
+
+    int BuildSegmentSpansFromJson(const nlohmann::json& animData, int totalCols, int totalRows,
+        int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+        if (!animData.contains("Segments") || !animData["Segments"].is_array() || totalCols <= 0 || totalRows <= 0) {
+            return 0;
+        }
+
+        const auto& segs = animData["Segments"];
+        const int segCount = std::min(static_cast<int>(segs.size()), kMaxAnimSegments);
+        int totalCount = 0;
+
+        for (int i = 0; i < segCount; ++i) {
+            if (!segs[i].is_object()) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            const int row = std::clamp(segs[i].value("Row", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(segs[i].value("FrameOffset", 0), 0, totalCols - 1);
+            const int available = totalCols - startCol;
+
+            int count = segs[i].value("FrameLength", 0);
+            if (count <= 0 || count > available) {
+                count = available;
+            }
+            if (count <= 0) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            starts[i] = row * totalCols + startCol;
+            counts[i] = count;
+            totalCount += count;
+        }
+
+        return totalCount;
+    }
+
+    int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
+        int segmentCount, int localFrame) {
+        int cursor = 0;
+        for (int i = 0; i < segmentCount; ++i) {
+            const int count = counts[i];
+            if (count <= 0) continue;
+            if (localFrame < cursor + count) {
+                return starts[i] + (localFrame - cursor);
+            }
+            cursor += count;
+        }
+        return -1;
+    }
+
     // Return component id from hash or warn.
     ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
         const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
@@ -270,25 +325,49 @@ namespace {
         if (totalCols <= 0 || totalRows <= 0)
             return;
 
-        const bool useRow = animData.value("UseRow", false);
+        const bool useSegments = animData.value("UseSegments", false);
+        const bool useRow = animData.value("UseRow", false) && !useSegments;
         int windowStart = 0;
         int windowCount = 0;
+        int absoluteFrame = -1;
+        int segmentStarts[kMaxAnimSegments] = { 0 };
+        int segmentCounts[kMaxAnimSegments] = { 0 };
+        int segmentCount = 0;
 
-        if (useRow) {
-            const int rowIndex = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
+        if (useSegments) {
+            windowCount = BuildSegmentSpansFromJson(animData, totalCols, totalRows, segmentStarts, segmentCounts);
+            segmentCount = std::min(
+                static_cast<int>(animData.contains("Segments") && animData["Segments"].is_array() ? animData["Segments"].size() : 0),
+                kMaxAnimSegments);
+        }
+        else if (useRow) {
+            const int row = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
             const int startCol = std::clamp(animData.value("FrameOffset", 0), 0, totalCols - 1);
-            const int available = totalCols - startCol;
-            int rowCount = animData.value("FrameLength", 0);
-            if (rowCount <= 0 || rowCount > available)
-                rowCount = available;
-            windowStart = rowIndex * totalCols + startCol;
-            windowCount = rowCount;
-        } else {
-            windowStart = std::max(0, animData.value("StartFrame", 0));
+            const int start = row * totalCols + startCol;
+            const int totalFrames = totalCols * totalRows;
+            const int rowAvailable = totalCols - startCol;
+            const int maxFromStart = totalFrames - start;
+
+            int count = animData.value("FrameLength", 0);
+            if (count <= 0) {
+                count = rowAvailable;
+            }
+            else {
+                count = std::clamp(count, 1, maxFromStart);
+            }
+
+            windowStart = start;
+            windowCount = count;
+        }
+        else {
+            const int totalFrames = totalCols * totalRows;
+            windowStart = std::clamp(animData.value("StartFrame", 0), 0, totalFrames - 1);
             windowCount = animData.value("FrameCount", 0);
             if (windowCount <= 0) {
-                const int totalFrames = totalCols * totalRows;
                 windowCount = std::max(1, totalFrames - windowStart);
+            }
+            else {
+                windowCount = std::min(windowCount, totalFrames - windowStart);
             }
         }
 
@@ -303,14 +382,23 @@ namespace {
             }
         }
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
-        const int absoluteFrame = windowStart + localFrame;
+        if (useSegments) {
+            absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segmentCount, localFrame);
+            if (absoluteFrame < 0) {
+                return;
+            }
+        }
+        else {
+            absoluteFrame = windowStart + localFrame;
+        }
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        const int rowTop = absoluteFrame / totalCols;
+        const int rowBottom = (totalRows - 1) - rowTop;
 
         const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
-        const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
+        const float v0 = (rowBottom * frameHeight) / static_cast<float>(sheetHeight);
         const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
-        const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
+        const float v1 = ((rowBottom + 1) * frameHeight) / static_cast<float>(sheetHeight);
 
         auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
         if (!sprite) {
@@ -1300,20 +1388,78 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderIntProperty("Sheet Width", data, "SheetWidth");
     EditorUI::RenderIntProperty("Sheet Height", data, "SheetHeight");
 
-    int mode = data.value("UseRow", false) ? 1 : 0;
-    const char* modes[] = { "Frame Window", "Row" };
+    int mode = 0;
+    if (data.value("UseSegments", false)) mode = 2;
+    else if (data.value("UseRow", false)) mode = 1;
+    const char* modes[] = { "Frame Window", "Row", "Segments" };
     // Render label text.
     ImGui::Text("Mode");
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::Combo("##AnimMode", &mode, modes, 2)) {
+    if (ImGui::Combo("##AnimMode", &mode, modes, 3)) {
         data["UseRow"] = (mode == 1);
+        data["UseSegments"] = (mode == 2);
+        if (!data.contains("Segments") || !data["Segments"].is_array()) {
+            data["Segments"] = nlohmann::json::array();
+        }
     }
 
-    const bool useRow = data.value("UseRow", false);
-    if (!useRow) {
+    const bool useSegments = data.value("UseSegments", false);
+    const bool useRow = data.value("UseRow", false) && !useSegments;
+    if (useSegments) {
+        if (!data.contains("Segments") || !data["Segments"].is_array()) {
+            data["Segments"] = nlohmann::json::array();
+        }
+
+        auto& segs = data["Segments"];
+        while (segs.size() > kMaxAnimSegments) {
+            segs.erase(segs.end() - 1);
+        }
+
+        ImGui::Text("Segments");
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%d max)", kMaxAnimSegments);
+
+        if (segs.size() < kMaxAnimSegments) {
+            if (ImGui::Button("Add Segment")) {
+                segs.push_back({ {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0} });
+            }
+        }
+
+        for (size_t i = 0; i < segs.size(); ++i) {
+            if (!segs[i].is_object()) {
+                segs[i] = nlohmann::json{ {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0} };
+            }
+
+            int segRow = segs[i].value("Row", 0);
+            int segOffset = segs[i].value("FrameOffset", 0);
+            int segLength = segs[i].value("FrameLength", 0);
+
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::Separator();
+            ImGui::Text("Segment %d", static_cast<int>(i));
+            ImGui::SameLine();
+            if (ImGui::Button("Remove")) {
+                segs.erase(segs.begin() + static_cast<int>(i));
+                ImGui::PopID();
+                break;
+            }
+
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Row", &segRow);
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Frame Offset", &segOffset);
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Frame Length", &segLength);
+            ImGui::PopID();
+
+            segs[i]["Row"] = segRow;
+            segs[i]["FrameOffset"] = segOffset;
+            segs[i]["FrameLength"] = segLength;
+        }
+    } else if (!useRow) {
         // Which frame to start the animation from
         EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
 
