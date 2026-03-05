@@ -310,6 +310,9 @@ namespace ECS {
         inline auto GetCallSystemOnDestroy() const { return m_callSystemOnDestroy; }
         inline auto GetCallSystemOnSceneStart() const { return m_callSystemOnSceneStart; }
         inline auto GetCallSystemOnSceneStop() const { return m_callSystemOnSceneStop; }
+        inline auto GetCallSystemShouldRun() const { return m_callSystemShouldRun; }
+        inline auto GetCallSystemOnStartRunning() const { return m_callSystemOnStartRunning; }
+        inline auto GetCallSystemOnStopRunning() const { return m_callSystemOnStopRunning; }
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
         inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
@@ -327,6 +330,9 @@ namespace ECS {
         void CallSystemOnDestroy(uint64_t handle, void* worldPtr);
         void CallSystemOnSceneStart(uint64_t handle);
         void CallSystemOnSceneStop(uint64_t handle);
+        bool CallSystemShouldRun(uint64_t handle, void* worldPtr);
+        void CallSystemOnStartRunning(uint64_t handle, void* worldPtr);
+        void CallSystemOnStopRunning(uint64_t handle, void* worldPtr);
 
     private:
         // ====================================================================
@@ -367,6 +373,9 @@ namespace ECS {
         using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
         using CallSystemOnSceneStartFn          = void(*)(uint64_t handle);
         using CallSystemOnSceneStopFn           = void(*)(uint64_t handle);
+        using CallSystemShouldRunFn             = int(*)(uint64_t handle, void* worldPtr);
+        using CallSystemOnStartRunningFn        = void(*)(uint64_t handle, void* worldPtr);
+        using CallSystemOnStopRunningFn         = void(*)(uint64_t handle, void* worldPtr);
         using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
         using GetLastDiagnosticsCountFn         = int(*)();
@@ -396,6 +405,9 @@ namespace ECS {
         CallSystemOnDestroyFn               m_callSystemOnDestroy = nullptr;
         CallSystemOnSceneStartFn            m_callSystemOnSceneStart = nullptr;
         CallSystemOnSceneStopFn             m_callSystemOnSceneStop = nullptr;
+        CallSystemShouldRunFn               m_callSystemShouldRun = nullptr;
+        CallSystemOnStartRunningFn          m_callSystemOnStartRunning = nullptr;
+        CallSystemOnStopRunningFn           m_callSystemOnStopRunning = nullptr;
         CompileDirectoryFn                  m_compileDirectory = nullptr;
         CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
         GetLastDiagnosticsCountFn           m_getLastDiagnosticsCount = nullptr;
@@ -478,6 +490,9 @@ namespace ECS {
         void OnDestroy(World& world) override;
         void OnSceneStart() override;
         void OnSceneStop() override;
+        bool ShouldRun(World& world) override;
+        void OnStartRunning(World& world) override;
+        void OnStopRunning(World& world) override;
 
         SystemMetadata GetMetadata() const override;
         SystemGroup GetSystemGroup() const override;

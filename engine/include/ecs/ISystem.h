@@ -265,6 +265,34 @@ namespace ECS {
         virtual void OnSceneStop() {}
 
         /**
+         * @brief Determine whether this system should run on this frame.
+         * @param world The active scene's World
+         * @return True if OnUpdate should execute, false to skip this frame
+         *
+         * Use this for lightweight run gating (DOTS-style "has work to do").
+         * The default implementation always runs.
+         */
+        virtual bool ShouldRun(World& world) { (void)world; return true; }
+
+        /**
+         * @brief Called when the system transitions from not-running to running.
+         * @param world The active scene's World
+         *
+         * This can fire multiple times during a system's lifetime.
+         * Default: no-op.
+         */
+        virtual void OnStartRunning(World& world) { (void)world; }
+
+        /**
+         * @brief Called when the system transitions from running to not-running.
+         * @param world The active scene's World
+         *
+         * This can fire multiple times during a system's lifetime.
+         * Default: no-op.
+         */
+        virtual void OnStopRunning(World& world) { (void)world; }
+
+        /**
          * @brief Get system metadata (name, dependencies, execution order).
          * @return SystemMetadata by value
          * 

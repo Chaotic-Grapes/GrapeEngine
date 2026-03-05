@@ -218,6 +218,7 @@ namespace ECS {
          * Within each group, systems are sorted by execution order (lower = earlier).
          */
         void Update(World& world) {
+            _applyPendingEnabledChanges();
             _updateGroup(SystemGroup::PreUpdate, world);
             _updateGroup(SystemGroup::Update, world);
             _updateGroup(SystemGroup::PostUpdate, world);
@@ -236,6 +237,7 @@ namespace ECS {
          * @param deltaTime Time since last frame
          */
         void UpdateGroup(SystemGroup group, World& world) {
+            _applyPendingEnabledChanges();
             _updateGroup(group, world);
         }
 
@@ -249,17 +251,21 @@ namespace ECS {
         void DestroyAll(World& world) {
             for (auto& [group, systems] : m_systemGroups) {
                 for (auto& system : systems) {
+                    _stopIfRunning(system.get(), world);
                     system->OnDestroy(world);
                 }
             }
 
             for (auto& [group, systems] : m_scriptedSystemGroups) {
                 for (auto* system : systems) {
+                    _stopIfRunning(system, world);
                     system->OnDestroy(world);
                 }
             }
 
             m_createdSystems.clear();
+            m_runningSystems.clear();
+            m_pendingEnabledByName.clear();
         }
 
         /**
@@ -292,6 +298,7 @@ namespace ECS {
             for (auto& [group, systems] : m_scriptedSystemGroups) {
                 for (auto* system : systems) {
                     if (system) {
+                        _stopIfRunning(system, world);
                         system->OnDestroy(world);
                         // Remove from name map
                         const auto& metadata = system->GetMetadata();
@@ -357,7 +364,7 @@ namespace ECS {
         bool SetSystemEnabled(const std::string& name, bool enabled) {
             ISystem* system = GetSystem(name);
             if (system) {
-                system->SetEnabled(enabled);
+                m_pendingEnabledByName[name] = enabled;
                 return true;
             }
             return false;
@@ -400,6 +407,7 @@ namespace ECS {
          * @endcode
          */
         void UpdateSystemsForMode(SystemRunMode mode, World& world) {
+            _applyPendingEnabledChanges();
             _updateAllGroupsForMode(mode, world);
         }
 
@@ -535,6 +543,7 @@ namespace ECS {
          * @param deltaTime Time since last frame
          */
         void UpdateWithJobs(World& world) {
+            _applyPendingEnabledChanges();
             _updateGroupWithJobs(SystemGroup::PreUpdate, world);
             _updateGroupWithJobs(SystemGroup::Update, world);
             _updateGroupWithJobs(SystemGroup::PostUpdate, world);
@@ -553,6 +562,7 @@ namespace ECS {
          * @param deltaTime Time since last frame
          */
         void UpdateGroupWithJobs(SystemGroup group, World& world) {
+            _applyPendingEnabledChanges();
             _updateGroupWithJobs(group, world);
         }
 
@@ -677,6 +687,7 @@ namespace ECS {
          * @param deltaTime Time since last frame
          */
         void UpdateGroupWithDependencies(SystemGroup group, World& world) {
+            _applyPendingEnabledChanges();
             _updateGroupWithDependencies(group, world);
         }
 
@@ -687,6 +698,7 @@ namespace ECS {
          * @param deltaTime Time since last frame
          */
         void UpdateWithDependencies(World& world) {
+            _applyPendingEnabledChanges();
             _updateGroupWithDependencies(SystemGroup::PreUpdate, world);
             _updateGroupWithDependencies(SystemGroup::Update, world);
             _updateGroupWithDependencies(SystemGroup::PostUpdate, world);
@@ -717,6 +729,12 @@ namespace ECS {
 
         // Track created systems to avoid duplicate OnCreate calls
         std::unordered_set<ISystem*> m_createdSystems;
+
+        // Track systems that are currently in the "running" state.
+        std::unordered_set<ISystem*> m_runningSystems;
+
+        // Deferred enabled-state writes applied at update frame boundaries.
+        std::unordered_map<std::string, bool> m_pendingEnabledByName;
 
         // Active run mode bitmask (used for registration-time OnCreate)
         uint32_t m_activeRunModesMask =
@@ -760,12 +778,7 @@ namespace ECS {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    if (system->IsEnabled()) {
-                        // Profile this system's execution
-                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
-                        system->OnUpdate(world);
-                        TimeSystem::Instance().ProfileEnd();
-                    }
+                    _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
                 }
             }
 
@@ -773,16 +786,11 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    if (system->IsEnabled()) {
-                        // Profile this system's execution
-                        // Use cached name to avoid expensive P/Invoke metadata lookups
-                        auto it = m_systemNameCache.find(system);
-                        const char* systemName = (it != m_systemNameCache.end()) ? 
-                            it->second.c_str() : "Unknown";
-                        TimeSystem::Instance().ProfileBegin(systemName);
-                        system->OnUpdate(world);
-                        TimeSystem::Instance().ProfileEnd();
-                    }
+                    // Use cached name to avoid expensive P/Invoke metadata lookups.
+                    auto it = m_systemNameCache.find(system);
+                    const char* systemName = (it != m_systemNameCache.end()) ?
+                        it->second.c_str() : "Unknown";
+                    _updateSystemWithRunState(system, world, systemName, true);
                 }
             }
         }
@@ -818,6 +826,67 @@ namespace ECS {
 
         bool IsSystemCreated(const ISystem* system) const {
             return system && (m_createdSystems.find(const_cast<ISystem*>(system)) != m_createdSystems.end());
+        }
+
+        bool IsSystemRunning(const ISystem* system) const {
+            return system && (m_runningSystems.find(const_cast<ISystem*>(system)) != m_runningSystems.end());
+        }
+
+        void _stopIfRunning(ISystem* system, World& world) {
+            if (!IsSystemRunning(system)) {
+                return;
+            }
+            system->OnStopRunning(world);
+            m_runningSystems.erase(system);
+        }
+
+        void _applyPendingEnabledChanges() {
+            if (m_pendingEnabledByName.empty()) {
+                return;
+            }
+
+            // Apply all pending enabled state changes
+            for (const auto& [name, enabled] : m_pendingEnabledByName) {
+                auto it = m_systemsByName.find(name);
+
+                if (it == m_systemsByName.end() || !it->second) {
+                    continue;
+                }
+                it->second->SetEnabled(enabled);
+            }
+            m_pendingEnabledByName.clear();
+        }
+
+        void _updateSystemWithRunState(ISystem* system, World& world, const char* profileName, bool runModeEligible) {
+            if (!system) {
+                return;
+            }
+            if (!IsSystemCreated(system)) {
+                m_runningSystems.erase(system);
+                return;
+            }
+
+            // Determine if the system should be running based on its enabled state and run mode eligibility
+            const bool isRunning = IsSystemRunning(system);
+            const bool shouldRunNow = system->IsEnabled() &&
+                runModeEligible &&
+                system->ShouldRun(world);
+
+            // Handle state transitions for starting/stopping systems
+            if (!isRunning && shouldRunNow) {
+                system->OnStartRunning(world);
+                m_runningSystems.insert(system);
+            } else if (isRunning && !shouldRunNow) {
+                system->OnStopRunning(world);
+                m_runningSystems.erase(system);
+                return;
+            } else if (!shouldRunNow) {
+                return;
+            }
+
+            TimeSystem::Instance().ProfileBegin(profileName);
+            system->OnUpdate(world);
+            TimeSystem::Instance().ProfileEnd();
         }
 
         void _createAllGroupsForMode(SystemRunMode mode, World& world) {
@@ -890,6 +959,7 @@ namespace ECS {
                         continue;
                     if (!IsSystemCreated(system.get()))
                         continue;
+                    _stopIfRunning(system.get(), world);
                     system->OnDestroy(world);
                     m_createdSystems.erase(system.get());
                 }
@@ -902,6 +972,7 @@ namespace ECS {
                         continue;
                     if (!IsSystemCreated(system))
                         continue;
+                    _stopIfRunning(system, world);
                     system->OnDestroy(world);
                     m_createdSystems.erase(system);
                 }
@@ -913,12 +984,8 @@ namespace ECS {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    if (system->IsEnabled() && IsSystemCreated(system.get()) &&
-                        GetSystemMetadataRunMode(system.get()) == mode) {
-                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
-                        system->OnUpdate(world);
-                        TimeSystem::Instance().ProfileEnd();
-                    }
+                    const bool eligible = (GetSystemMetadataRunMode(system.get()) == mode);
+                    _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), eligible);
                 }
             }
 
@@ -926,15 +993,11 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    if (system->IsEnabled() && IsSystemCreated(system) &&
-                        GetSystemMetadataRunMode(system) == mode) {
-                        auto it = m_systemNameCache.find(system);
-                        const char* systemName = (it != m_systemNameCache.end()) ? 
-                            it->second.c_str() : "Unknown";
-                        TimeSystem::Instance().ProfileBegin(systemName);
-                        system->OnUpdate(world);
-                        TimeSystem::Instance().ProfileEnd();
-                    }
+                    auto it = m_systemNameCache.find(system);
+                    const char* systemName = (it != m_systemNameCache.end()) ?
+                        it->second.c_str() : "Unknown";
+                    const bool eligible = (GetSystemMetadataRunMode(system) == mode);
+                    _updateSystemWithRunState(system, world, systemName, eligible);
                 }
             }
         }
@@ -953,20 +1016,15 @@ namespace ECS {
         void _updateGroupWithDependencies(SystemGroup group, World& world) {
             // Helper lambda to update a single system with checks and profiling
             auto updateSystem = [&](ISystem* system) {
-                if (!system || !system->IsEnabled() || !IsSystemCreated(system)) {
+                if (!system) {
                     return;
                 }
-                if (!IsRunModeActive(GetSystemMetadataRunMode(system))) {
-                    return;
-                }
-
                 // Use cached name to avoid expensive P/Invoke metadata lookups.
                 auto sysIt = m_systemNameCache.find(system);
                 const char* systemName = (sysIt != m_systemNameCache.end()) ?
                     sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
-                TimeSystem::Instance().ProfileBegin(systemName);
-                system->OnUpdate(world);
-                TimeSystem::Instance().ProfileEnd();
+                const bool eligible = IsRunModeActive(GetSystemMetadataRunMode(system));
+                _updateSystemWithRunState(system, world, systemName, eligible);
             };
 
             // Get dependency graph for this group

@@ -34,6 +34,13 @@ public interface ISystem
     void OnUpdate(World world);
 
     /// <summary>
+    /// Determines whether this system should run this frame.
+    /// </summary>
+    /// <param name="world">The ECS World instance</param>
+    /// <returns>True to run OnUpdate, false to skip.</returns>
+    bool ShouldRun(World world) => true;
+
+    /// <summary>
     /// Called when the system is being destroyed.
     /// Use this for cleanup logic.
     /// </summary>
@@ -49,5 +56,17 @@ public interface ISystem
     /// Called when a scene stops playing (editor: transitioning away from Play mode).
     /// </summary>
     void OnSceneStop() { }
+
+    /// <summary>
+    /// Called when the system transitions from not running to running.
+    /// </summary>
+    /// <param name="world">The ECS World instance</param>
+    void OnStartRunning(World world) { }
+
+    /// <summary>
+    /// Called when the system transitions from running to not running.
+    /// </summary>
+    /// <param name="world">The ECS World instance</param>
+    void OnStopRunning(World world) { }
 }
 
