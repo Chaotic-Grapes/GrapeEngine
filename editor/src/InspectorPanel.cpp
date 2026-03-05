@@ -45,6 +45,53 @@ through a unified system shared by both entities and prefab templates.
 #include "scene/SceneManager.h"
 
 namespace {
+    constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
+
+    int BuildSegmentSpans(const ECS::Components::SpriteSheetAnimation2D& anim,
+        int totalCols, int totalRows,
+        int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+        if (totalCols <= 0 || totalRows <= 0) {
+            return 0;
+        }
+
+        const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+        int totalCount = 0;
+        for (int i = 0; i < segCount; ++i) {
+            const int row = std::clamp(anim.SegmentRows[i], 0, totalRows - 1);
+            const int startCol = std::clamp(anim.SegmentOffsets[i], 0, totalCols - 1);
+            const int available = totalCols - startCol;
+
+            int count = anim.SegmentLengths[i];
+            if (count <= 0 || count > available) {
+                count = available;
+            }
+            if (count <= 0) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            starts[i] = row * totalCols + startCol;
+            counts[i] = count;
+            totalCount += count;
+        }
+        return totalCount;
+    }
+
+    int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
+        int segmentCount, int localFrame) {
+        int cursor = 0;
+        for (int i = 0; i < segmentCount; ++i) {
+            const int count = counts[i];
+            if (count <= 0) continue;
+            if (localFrame < cursor + count) {
+                return starts[i] + (localFrame - cursor);
+            }
+            cursor += count;
+        }
+        return -1;
+    }
+
     // Helper template function to safely add components during deserialization
     // Checks if the component type matches expected name before adding
     template <typename T>
@@ -117,24 +164,47 @@ namespace {
         if (totalCols <= 0 || totalRows <= 0)
             return;
 
+        const bool useSegments = anim->UseSegments && anim->SegmentCount > 0;
+        const bool useRow = anim->UseRow && !useSegments;
+
         int windowStart = 0;
         int windowCount = 0;
-
-        if (anim->UseRow) {
-            const int rowIndex = std::clamp(anim->Row, 0, totalRows - 1);
+        int absoluteFrame = -1;
+        int segmentStarts[kMaxAnimSegments] = { 0 };
+        int segmentCounts[kMaxAnimSegments] = { 0 };
+        int segmentCount = 0;
+        if (useSegments) {
+            windowCount = BuildSegmentSpans(*anim, totalCols, totalRows, segmentStarts, segmentCounts);
+            segmentCount = std::clamp(static_cast<int>(anim->SegmentCount), 0, kMaxAnimSegments);
+        }
+        else if (useRow) {
+            const int row = std::clamp(anim->Row, 0, totalRows - 1);
             const int startCol = std::clamp(anim->FrameOffset, 0, totalCols - 1);
-            const int available = totalCols - startCol;
-            int rowCount = anim->FrameLength;
-            if (rowCount <= 0 || rowCount > available)
-                rowCount = available;
-            windowStart = rowIndex * totalCols + startCol;
-            windowCount = rowCount;
-        } else {
-            windowStart = std::max(0, anim->StartFrame);
+            const int start = row * totalCols + startCol;
+            const int totalFrames = totalCols * totalRows;
+            const int rowAvailable = totalCols - startCol;
+            const int maxFromStart = totalFrames - start;
+
+            int count = anim->FrameLength;
+            if (count <= 0) {
+                count = rowAvailable;
+            }
+            else {
+                count = std::clamp(count, 1, maxFromStart);
+            }
+
+            windowStart = start;
+            windowCount = count;
+        }
+        else {
+            const int totalFrames = totalCols * totalRows;
+            windowStart = std::clamp(anim->StartFrame, 0, totalFrames - 1);
             windowCount = anim->FrameCount;
             if (windowCount <= 0) {
-                const int totalFrames = totalCols * totalRows;
                 windowCount = std::max(1, totalFrames - windowStart);
+            }
+            else {
+                windowCount = std::min(windowCount, totalFrames - windowStart);
             }
         }
 
@@ -149,14 +219,23 @@ namespace {
             }
         }
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
-        const int absoluteFrame = windowStart + localFrame;
+        if (useSegments) {
+            absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segmentCount, localFrame);
+            if (absoluteFrame < 0) {
+                return;
+            }
+        }
+        else {
+            absoluteFrame = windowStart + localFrame;
+        }
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        const int rowTop = absoluteFrame / totalCols;
+        const int rowBottom = (totalRows - 1) - rowTop;
 
         const float u0 = (col * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
-        const float v0 = (row * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
+        const float v0 = (rowBottom * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
         const float u1 = ((col + 1) * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
-        const float v1 = ((row + 1) * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
+        const float v1 = ((rowBottom + 1) * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
 
         if (anim->TextureId != 0)
             sprite->TextureId = anim->TextureId;

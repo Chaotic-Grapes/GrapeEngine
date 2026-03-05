@@ -1717,6 +1717,13 @@ void EditorFileMenu::SaveScene() {
 // Processes keyboard shortcuts for common editor operations (save, open, zoom, etc.)
 // Called every frame to check if user pressed Ctrl+S, Ctrl+O, Ctrl+N, etc.
 void EditorFileMenu::HandleShortcuts(float& uiScale) {
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput) {
+        uiScale = std::clamp(uiScale, 0.75f, 2.0f);
+        EditorStyle::FontScale = uiScale;
+        return;
+    }
+
     // Check if Control key (either left or right) is currently held down
     bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
     // Check if Shift key (either left or right) is currently held down

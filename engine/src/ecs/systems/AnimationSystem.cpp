@@ -27,6 +27,54 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include "services/TimeSystem.h"
 
+namespace {
+    constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
+
+    int BuildSegmentSpans(const ECS::Components::SpriteSheetAnimation2D& anim,
+        int totalCols, int totalRows,
+        int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+        if (totalCols <= 0 || totalRows <= 0)
+            return 0;
+
+        const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+        int totalCount = 0;
+        for (int i = 0; i < segCount; ++i) {
+            const int row = std::clamp(anim.SegmentRows[i], 0, totalRows - 1);
+            const int startCol = std::clamp(anim.SegmentOffsets[i], 0, totalCols - 1);
+            const int available = totalCols - startCol;
+
+            int count = anim.SegmentLengths[i];
+            if (count <= 0 || count > available) {
+                count = available;
+            }
+            if (count <= 0) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            starts[i] = row * totalCols + startCol;
+            counts[i] = count;
+            totalCount += count;
+        }
+        return totalCount;
+    }
+
+    int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
+        int segmentCount, int localFrame) {
+        int cursor = 0;
+        for (int i = 0; i < segmentCount; ++i) {
+            const int count = counts[i];
+            if (count <= 0) continue;
+            if (localFrame < cursor + count) {
+                return starts[i] + (localFrame - cursor);
+            }
+            cursor += count;
+        }
+        return -1;
+    }
+}
+
 namespace ECS {
     SystemMetadata AnimationSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Animation");
@@ -69,23 +117,38 @@ namespace ECS {
                 if (layout.TotalCols <= 0 || layout.TotalRows <= 0)
                     return;
 
-                // Determine which frames to play based on animation mode (row-based or frame-range based)
+                const bool useSegments = anim.UseSegments && anim.SegmentCount > 0;
+                int clipCount = 0;
+                int absoluteFrame = 0;
+
+                // Determine which frames to play based on animation mode (segment list, row-based, or frame-range)
                 SpriteSheetUtils::Window window{};
-                if (anim.UseRow) {
+                int segmentStarts[kMaxAnimSegments] = { 0 };
+                int segmentCounts[kMaxAnimSegments] = { 0 };
+                if (useSegments) {
+                    clipCount = BuildSegmentSpans(anim, layout.TotalCols, layout.TotalRows, segmentStarts, segmentCounts);
+                    if (clipCount <= 0)
+                        return;
+                }
+                else if (anim.UseRow) {
                     window = SpriteSheetUtils::ComputeRowWindow(
                         anim.Row, anim.FrameOffset, anim.FrameLength,
                         layout.TotalCols, layout.TotalRows);
-                } else {
+                    if (window.Count <= 0)
+                        return;
+                    clipCount = window.Count;
+                }
+                else {
                     window = SpriteSheetUtils::ComputeWindow(
                         anim.StartFrame, anim.FrameCount,
                         layout.TotalCols, layout.TotalRows);
+                    if (window.Count <= 0)
+                        return;
+                    clipCount = window.Count;
                 }
 
-                if (window.Count <= 0)
-                    return;
-
                 // Reset frame index if it's out of bounds
-                if (state.CurrentFrame < 0 || state.CurrentFrame >= window.Count)
+                if (state.CurrentFrame < 0 || state.CurrentFrame >= clipCount)
                     state.CurrentFrame = 0;
 
                 // Reset finished flag if animation is set to loop
@@ -109,13 +172,13 @@ namespace ECS {
                         state.CurrentFrame++;
 
                         // Wrap frame index or stop animation when reaching the end
-                        if (state.CurrentFrame >= window.Count) {
+                        if (state.CurrentFrame >= clipCount) {
                             if (anim.Loop) {
                                 state.CurrentFrame = 0;
                                 state.Finished = false;
                             }
                             else {
-                                state.CurrentFrame = window.Count - 1;
+                                state.CurrentFrame = clipCount - 1;
                                 state.Finished = true;
                                 state.TimeAccumulator = 0.0f;
                                 break;
@@ -125,7 +188,15 @@ namespace ECS {
                 }
 
                 // Calculate the absolute frame index in the sprite sheet and compute UV coordinates for rendering
-                const int absoluteFrame = window.Start + state.CurrentFrame;
+                if (useSegments) {
+                    const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+                    absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segCount, state.CurrentFrame);
+                    if (absoluteFrame < 0)
+                        return;
+                }
+                else {
+                    absoluteFrame = window.Start + state.CurrentFrame;
+                }
                 const glm::vec4 uv = SpriteSheetUtils::ComputeUV(
                     absoluteFrame, anim.FrameWidth, anim.FrameHeight, anim.SheetWidth, anim.SheetHeight);
 

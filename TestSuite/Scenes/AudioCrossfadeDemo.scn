@@ -25,32 +25,21 @@
                 },
                 {
                     "Data": {
-                        "Value": "CrossfadeDemoBGM"
+                        "Value": "AudioCrossfadeTargetCamera"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
-                        "Enabled": true
+                        "Active": true,
+                        "AspectRatio": 2.003412961959839,
+                        "FOV": 45.0,
+                        "FarPlane": 100.0,
+                        "NearPlane": 0.10000000149011612,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": false
                     },
-                    "TypeName": "Active"
-                },
-                {
-                    "Data": {
-                        "Bus": 1,
-                        "CuePath": "C:/Users/kille/source/repos/GrapeEngine/TestSuite/Assets/Audio/Obelisk_Chapter_5&6_BGM_Loop.wav",
-                        "EnableFadeIn": true,
-                        "EnableFadeOut": true,
-                        "FadeInDuration": 2.0,
-                        "FadeOutDuration": 5.0,
-                        "Loop": true,
-                        "Pan": 0.0,
-                        "Pitch": 1.0,
-                        "PlayOnStart": true,
-                        "Spatial3D": true,
-                        "Volume": 1.0
-                    },
-                    "TypeName": "AudioSource"
+                    "TypeName": "Camera3D"
                 },
                 {
                     "Data": {
@@ -109,21 +98,32 @@
                 },
                 {
                     "Data": {
-                        "Value": "AudioCrossfadeTargetCamera"
+                        "Value": "CrossfadeDemoBGM"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
-                        "Active": true,
-                        "AspectRatio": 1.3412127494812012,
-                        "FOV": 45.0,
-                        "FarPlane": 100.0,
-                        "NearPlane": 0.10000000149011612,
-                        "OrthoSize": 10.0,
-                        "UsePerspective": false
+                        "Enabled": true
                     },
-                    "TypeName": "Camera3D"
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Bus": 1,
+                        "CuePath": "Assets/Audio/Obelisk_Chapter_1&2_BGM_Loop.wav",
+                        "EnableFadeIn": true,
+                        "EnableFadeOut": true,
+                        "FadeInDuration": 2.0,
+                        "FadeOutDuration": 5.0,
+                        "Loop": true,
+                        "Pan": 0.0,
+                        "Pitch": 1.0,
+                        "PlayOnStart": true,
+                        "Spatial3D": true,
+                        "Volume": 1.0
+                    },
+                    "TypeName": "AudioSource"
                 },
                 {
                     "Data": {

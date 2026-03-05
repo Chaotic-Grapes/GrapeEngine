@@ -39,6 +39,61 @@ prefab assets use the same UI path.
 #include "core/Application.h"
 
 namespace {
+    constexpr int kMaxAnimSegments = 8;
+
+    int BuildSegmentSpansFromJson(const nlohmann::json& animData, int totalCols, int totalRows,
+        int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+        if (!animData.contains("Segments") || !animData["Segments"].is_array() || totalCols <= 0 || totalRows <= 0) {
+            return 0;
+        }
+
+        const auto& segs = animData["Segments"];
+        const int segCount = std::min(static_cast<int>(segs.size()), kMaxAnimSegments);
+        int totalCount = 0;
+
+        for (int i = 0; i < segCount; ++i) {
+            if (!segs[i].is_object()) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            const int row = std::clamp(segs[i].value("Row", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(segs[i].value("FrameOffset", 0), 0, totalCols - 1);
+            const int available = totalCols - startCol;
+
+            int count = segs[i].value("FrameLength", 0);
+            if (count <= 0 || count > available) {
+                count = available;
+            }
+            if (count <= 0) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            starts[i] = row * totalCols + startCol;
+            counts[i] = count;
+            totalCount += count;
+        }
+
+        return totalCount;
+    }
+
+    int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
+        int segmentCount, int localFrame) {
+        int cursor = 0;
+        for (int i = 0; i < segmentCount; ++i) {
+            const int count = counts[i];
+            if (count <= 0) continue;
+            if (localFrame < cursor + count) {
+                return starts[i] + (localFrame - cursor);
+            }
+            cursor += count;
+        }
+        return -1;
+    }
+
     // Return component id from hash or warn.
     ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
         const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
@@ -270,25 +325,49 @@ namespace {
         if (totalCols <= 0 || totalRows <= 0)
             return;
 
-        const bool useRow = animData.value("UseRow", false);
+        const bool useSegments = animData.value("UseSegments", false);
+        const bool useRow = animData.value("UseRow", false) && !useSegments;
         int windowStart = 0;
         int windowCount = 0;
+        int absoluteFrame = -1;
+        int segmentStarts[kMaxAnimSegments] = { 0 };
+        int segmentCounts[kMaxAnimSegments] = { 0 };
+        int segmentCount = 0;
 
-        if (useRow) {
-            const int rowIndex = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
+        if (useSegments) {
+            windowCount = BuildSegmentSpansFromJson(animData, totalCols, totalRows, segmentStarts, segmentCounts);
+            segmentCount = std::min(
+                static_cast<int>(animData.contains("Segments") && animData["Segments"].is_array() ? animData["Segments"].size() : 0),
+                kMaxAnimSegments);
+        }
+        else if (useRow) {
+            const int row = std::clamp(animData.value("Row", 0), 0, totalRows - 1);
             const int startCol = std::clamp(animData.value("FrameOffset", 0), 0, totalCols - 1);
-            const int available = totalCols - startCol;
-            int rowCount = animData.value("FrameLength", 0);
-            if (rowCount <= 0 || rowCount > available)
-                rowCount = available;
-            windowStart = rowIndex * totalCols + startCol;
-            windowCount = rowCount;
-        } else {
-            windowStart = std::max(0, animData.value("StartFrame", 0));
+            const int start = row * totalCols + startCol;
+            const int totalFrames = totalCols * totalRows;
+            const int rowAvailable = totalCols - startCol;
+            const int maxFromStart = totalFrames - start;
+
+            int count = animData.value("FrameLength", 0);
+            if (count <= 0) {
+                count = rowAvailable;
+            }
+            else {
+                count = std::clamp(count, 1, maxFromStart);
+            }
+
+            windowStart = start;
+            windowCount = count;
+        }
+        else {
+            const int totalFrames = totalCols * totalRows;
+            windowStart = std::clamp(animData.value("StartFrame", 0), 0, totalFrames - 1);
             windowCount = animData.value("FrameCount", 0);
             if (windowCount <= 0) {
-                const int totalFrames = totalCols * totalRows;
                 windowCount = std::max(1, totalFrames - windowStart);
+            }
+            else {
+                windowCount = std::min(windowCount, totalFrames - windowStart);
             }
         }
 
@@ -303,14 +382,23 @@ namespace {
             }
         }
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
-        const int absoluteFrame = windowStart + localFrame;
+        if (useSegments) {
+            absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segmentCount, localFrame);
+            if (absoluteFrame < 0) {
+                return;
+            }
+        }
+        else {
+            absoluteFrame = windowStart + localFrame;
+        }
         const int col = absoluteFrame % totalCols;
-        const int row = absoluteFrame / totalCols;
+        const int rowTop = absoluteFrame / totalCols;
+        const int rowBottom = (totalRows - 1) - rowTop;
 
         const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
-        const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
+        const float v0 = (rowBottom * frameHeight) / static_cast<float>(sheetHeight);
         const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
-        const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
+        const float v1 = ((rowBottom + 1) * frameHeight) / static_cast<float>(sheetHeight);
 
         auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
         if (!sprite) {
@@ -1300,20 +1388,78 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderIntProperty("Sheet Width", data, "SheetWidth");
     EditorUI::RenderIntProperty("Sheet Height", data, "SheetHeight");
 
-    int mode = data.value("UseRow", false) ? 1 : 0;
-    const char* modes[] = { "Frame Window", "Row" };
+    int mode = 0;
+    if (data.value("UseSegments", false)) mode = 2;
+    else if (data.value("UseRow", false)) mode = 1;
+    const char* modes[] = { "Frame Window", "Row", "Segments" };
     // Render label text.
     ImGui::Text("Mode");
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::Combo("##AnimMode", &mode, modes, 2)) {
+    if (ImGui::Combo("##AnimMode", &mode, modes, 3)) {
         data["UseRow"] = (mode == 1);
+        data["UseSegments"] = (mode == 2);
+        if (!data.contains("Segments") || !data["Segments"].is_array()) {
+            data["Segments"] = nlohmann::json::array();
+        }
     }
 
-    const bool useRow = data.value("UseRow", false);
-    if (!useRow) {
+    const bool useSegments = data.value("UseSegments", false);
+    const bool useRow = data.value("UseRow", false) && !useSegments;
+    if (useSegments) {
+        if (!data.contains("Segments") || !data["Segments"].is_array()) {
+            data["Segments"] = nlohmann::json::array();
+        }
+
+        auto& segs = data["Segments"];
+        while (segs.size() > kMaxAnimSegments) {
+            segs.erase(segs.end() - 1);
+        }
+
+        ImGui::Text("Segments");
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%d max)", kMaxAnimSegments);
+
+        if (segs.size() < kMaxAnimSegments) {
+            if (ImGui::Button("Add Segment")) {
+                segs.push_back({ {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0} });
+            }
+        }
+
+        for (size_t i = 0; i < segs.size(); ++i) {
+            if (!segs[i].is_object()) {
+                segs[i] = nlohmann::json{ {"Row", 0}, {"FrameOffset", 0}, {"FrameLength", 0} };
+            }
+
+            int segRow = segs[i].value("Row", 0);
+            int segOffset = segs[i].value("FrameOffset", 0);
+            int segLength = segs[i].value("FrameLength", 0);
+
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::Separator();
+            ImGui::Text("Segment %d", static_cast<int>(i));
+            ImGui::SameLine();
+            if (ImGui::Button("Remove")) {
+                segs.erase(segs.begin() + static_cast<int>(i));
+                ImGui::PopID();
+                break;
+            }
+
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Row", &segRow);
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Frame Offset", &segOffset);
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputInt("Frame Length", &segLength);
+            ImGui::PopID();
+
+            segs[i]["Row"] = segRow;
+            segs[i]["FrameOffset"] = segOffset;
+            segs[i]["FrameLength"] = segLength;
+        }
+    } else if (!useRow) {
         // Which frame to start the animation from
         EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
 
@@ -2433,208 +2579,4 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
         });
 
     EditorUI::EndPropertySection();
-}
-
-void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity, ECS::World* world)
-{
-    (void)entity;
-    (void)world;
-    ImGuiIdScope id("ParticleEmitter");
-
-    // Defaults
-    if (!data.contains("presetId"))          data["presetId"] = 0;
-    if (!data.contains("maxParticles"))      data["maxParticles"] = 1000;
-    if (!data.contains("emissionRate"))      data["emissionRate"] = 50.0f;
-    if (!data.contains("burstCount"))        data["burstCount"] = 0;
-    if (!data.contains("particleSize"))      data["particleSize"] = 0.3f;
-    if (!data.contains("active"))            data["active"] = true;
-    if (!data.contains("TexturePath"))       data["TexturePath"] = "";
-    if (!data.contains("speedMin"))          data["speedMin"] = 0.5f;
-    if (!data.contains("speedMax"))          data["speedMax"] = 1.5f;
-    if (!data.contains("gravityX"))          data["gravityX"] = 0.0f;
-    if (!data.contains("gravityY"))          data["gravityY"] = 0.3f;
-    if (!data.contains("drag"))              data["drag"] = 0.3f;
-    if (!data.contains("turbulence"))        data["turbulence"] = 0.0f;
-    if (!data.contains("wobbleFrequency"))   data["wobbleFrequency"] = 0.0f;
-    if (!data.contains("wobbleAmplitude"))   data["wobbleAmplitude"] = 0.0f;
-    if (!data.contains("sizeStart"))         data["sizeStart"] = 0.2f;
-    if (!data.contains("sizeEnd"))           data["sizeEnd"] = 0.5f;
-    if (!data.contains("lifetimeMin"))       data["lifetimeMin"] = 1.0f;
-    if (!data.contains("lifetimeMax"))       data["lifetimeMax"] = 3.0f;
-    if (!data.contains("emissionAngle"))     data["emissionAngle"] = 1.5708f;
-    if (!data.contains("emissionSpread"))    data["emissionSpread"] = 0.5f;
-    if (!data.contains("emissionRadius"))    data["emissionRadius"] = 0.5f;
-    if (!data.contains("emissionShape"))     data["emissionShape"] = 0;
-    if (!data.contains("colorStartR"))       data["colorStartR"] = 1.0f;
-    if (!data.contains("colorStartG"))       data["colorStartG"] = 1.0f;
-    if (!data.contains("colorStartB"))       data["colorStartB"] = 1.0f;
-    if (!data.contains("colorStartA"))       data["colorStartA"] = 1.0f;
-    if (!data.contains("colorEndR"))         data["colorEndR"] = 1.0f;
-    if (!data.contains("colorEndG"))         data["colorEndG"] = 1.0f;
-    if (!data.contains("colorEndB"))         data["colorEndB"] = 1.0f;
-    if (!data.contains("colorEndA"))         data["colorEndA"] = 0.0f;
-    if (!data.contains("dieOnCollision"))    data["dieOnCollision"] = false;
-    if (!data.contains("bounciness"))        data["bounciness"] = 0.0f;
-    if (!data.contains("killOutOfBounds"))   data["killOutOfBounds"] = false;
-    if (!data.contains("rotationSpeedMin"))  data["rotationSpeedMin"] = 0.0f;
-    if (!data.contains("rotationSpeedMax"))  data["rotationSpeedMax"] = 0.0f;
-
-    EditorUI::BeginPropertySection({
-        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active", "Texture",
-        "Speed Min", "Speed Max", "Gravity X", "Gravity Y", "Drag", "Turbulence",
-        "Wobble Frequency", "Wobble Amplitude", "Size Start", "Size End",
-        "Lifetime Min", "Lifetime Max", "Emission Angle", "Emission Spread",
-        "Emission Radius", "Emission Shape",
-        "Color Start", "Color End",
-        "Die On Collision", "Bounciness", "Kill Out Of Bounds",
-        "Rotation Speed Min", "Rotation Speed Max"
-        });
-
-    // --- Emitter ---
-    ImGui::SeparatorText("Emitter");
-
-    // Preset dropdown — applies preset values as template
-    static const char* presetNames[] = { "Bubbles", "Geyser", "Smoke", "Explosion", "Sediment" };
-    int presetId = data.value("presetId", 0);
-    ImGui::Text("Preset");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::Combo("##Preset", &presetId, presetNames, IM_ARRAYSIZE(presetNames))) {
-        data["presetId"] = presetId;
-        // Apply preset as template — overwrites simulation fields
-        _ApplyPresetToJson(data, presetId);
-    }
-
-    EditorUI::RenderIntProperty("Max Particles", data, "maxParticles");
-    EditorUI::RenderFloatRow("Emission Rate", "pps", data, "emissionRate", 1.0f, 0.0f, 100000.0f);
-    EditorUI::RenderIntProperty("Burst Count", data, "burstCount");
-    if (ImGui::Button("Fire Burst"))
-        data["burstCount"] = data.value("maxParticles", 200);
-    EditorUI::RenderFloatRow("Particle Size", "", data, "particleSize", 0.01f, 0.0f, 100.0f);
-    EditorUI::RenderCheckboxProperty("Active", data, "active");
-
-    // Texture
-    std::string texPath = data.value("TexturePath", "");
-    std::string valueText = texPath.empty()
-        ? "None (drag texture here)"
-        : std::filesystem::path(texPath).filename().string();
-    RenderAssetDropRow("Texture", valueText, texPath.empty(),
-        "ParticleEmitterTextureClear", "Clear particle texture", m_symbolsFont, kImageExtensions,
-        [&](const std::string& droppedPath) {
-            auto tex = RM.Get<Texture>(droppedPath);
-            if (tex) { data["TexturePath"] = droppedPath; data["textureId"] = (uint32_t)tex->ID(); return true; }
-            return false;
-        }, [&]() { data["TexturePath"] = ""; data["textureId"] = 0; });
-    if (EditorUI::PropertyFilterAllows("Texture"))
-        RenderInlineTexturePreview(data.value("textureId", 0u), "Particle texture preview");
-
-    // --- Simulation ---
-    ImGui::SeparatorText("Physics");
-    EditorUI::RenderFloatRow("Speed Min", "", data, "speedMin", 0.05f, 0.0f, 100.0f);
-    EditorUI::RenderFloatRow("Speed Max", "", data, "speedMax", 0.05f, 0.0f, 100.0f);
-    EditorUI::RenderFloatRow("Gravity X", "", data, "gravityX", 0.1f, -50.0f, 50.0f);
-    EditorUI::RenderFloatRow("Gravity Y", "", data, "gravityY", 0.1f, -50.0f, 50.0f);
-    EditorUI::RenderFloatRow("Drag", "", data, "drag", 0.01f, 0.0f, 10.0f);
-    EditorUI::RenderFloatRow("Turbulence", "", data, "turbulence", 0.05f, 0.0f, 20.0f);
-    EditorUI::RenderFloatRow("Wobble Frequency", "", data, "wobbleFrequency", 0.05f, 0.0f, 20.0f);
-    EditorUI::RenderFloatRow("Wobble Amplitude", "", data, "wobbleAmplitude", 0.05f, 0.0f, 20.0f);
-
-    ImGui::SeparatorText("Appearance");
-    EditorUI::RenderFloatRow("Size Start", "", data, "sizeStart", 0.01f, 0.0f, 50.0f);
-    EditorUI::RenderFloatRow("Size End", "", data, "sizeEnd", 0.01f, 0.0f, 50.0f);
-    EditorUI::RenderFloatRow("Rotation Speed Min", "", data, "rotationSpeedMin", 0.1f, -20.0f, 20.0f);
-    EditorUI::RenderFloatRow("Rotation Speed Max", "", data, "rotationSpeedMax", 0.1f, -20.0f, 20.0f);
-
-    // Color start/end as RGBA rows
-    ImGui::Text("Color Start");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    float cs[4] = { data.value("colorStartR",1.f), data.value("colorStartG",1.f),
-                    data.value("colorStartB",1.f), data.value("colorStartA",1.f) };
-    if (ImGui::ColorEdit4("##ColorStart", cs))
-    {
-        data["colorStartR"] = cs[0]; data["colorStartG"] = cs[1]; data["colorStartB"] = cs[2]; data["colorStartA"] = cs[3];
-    }
-
-    ImGui::Text("Color End");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    float ce[4] = { data.value("colorEndR",1.f), data.value("colorEndG",1.f),
-                    data.value("colorEndB",1.f), data.value("colorEndA",0.f) };
-    if (ImGui::ColorEdit4("##ColorEnd", ce))
-    {
-        data["colorEndR"] = ce[0]; data["colorEndG"] = ce[1]; data["colorEndB"] = ce[2]; data["colorEndA"] = ce[3];
-    }
-
-    ImGui::SeparatorText("Emission");
-    EditorUI::RenderFloatRow("Lifetime Min", "", data, "lifetimeMin", 0.1f, 0.0f, 60.0f);
-    EditorUI::RenderFloatRow("Lifetime Max", "", data, "lifetimeMax", 0.1f, 0.0f, 60.0f);
-    EditorUI::RenderFloatRow("Emission Angle", "", data, "emissionAngle", 0.05f, -6.28f, 6.28f);
-    EditorUI::RenderFloatRow("Emission Spread", "", data, "emissionSpread", 0.05f, 0.0f, 6.28f);
-    EditorUI::RenderFloatRow("Emission Radius", "", data, "emissionRadius", 0.05f, 0.0f, 100.0f);
-
-    static const char* shapeNames[] = { "Point", "Circle", "Cone", "Line" };
-    int shape = data.value("emissionShape", 0);
-    ImGui::Text("Emission Shape");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(120.0f);
-    if (ImGui::Combo("##EmissionShape", &shape, shapeNames, 4))
-        data["emissionShape"] = shape;
-
-    ImGui::SeparatorText("Collision");
-    EditorUI::RenderCheckboxProperty("Die On Collision", data, "dieOnCollision");
-    EditorUI::RenderFloatRow("Bounciness", "", data, "bounciness", 0.05f, 0.0f, 1.0f);
-    EditorUI::RenderCheckboxProperty("Kill Out Of Bounds", data, "killOutOfBounds");
-
-    EditorUI::EndPropertySection();
-}
-
-void ComponentUI::_ApplyPresetToJson(nlohmann::json& data, int presetId)
-{
-    // Mirror of ParticlePreset factory methods, directly writes into JSON
-    // so the editor shows the template values immediately
-    struct P {
-        float sm, sx, gx, gy, drag, turb, wf, wa, ss, se, lm, lx, ea, esp, er; int shape;
-        float cr, cg, cb, ca, er2, eg, eb, ea2; bool die, kob; float bounce, rsm, rsx;
-    };
-
-    // Indices match presetNames[] order: Bubbles=0 Geyser=1 Smoke=2 Explosion=3 Sediment=4
-    static const P presets[] = {
-        // Bubbles
-        {0.5f,1.5f, 0,0.3f, 0.3f,0,1.5f,0.5f, 0.2f,0.5f, 2,5, 1.5708f,0.5f,0,   0,
-         1,1,1,0.6f, 1,1,1,0, false,false,0,0,0},
-         // Geyser
-         {3,6, 0,-1.5f, 0.1f,0.8f,0,0, 0.2f,0.5f, 1,3, 1.5708f,0.15f,0, 2,
-          0.8f,0.9f,1,0.9f, 0.6f,0.7f,0.9f,0, false,false,0,0,0},
-          // Smoke
-          {0.2f,0.6f, 0,0.1f, 0.5f,0.3f,0,0, 0.3f,1.0f, 3,8, 1.5708f,0.8f,0.5f, 1,
-           0.4f,0.4f,0.4f,0.5f, 0.2f,0.2f,0.2f,0, false,false,0,0,0},
-           // Explosion
-           {3,10, 0,1.0f, 1.0f,0,0,0, 0.4f,0.05f, 0.3f,1.5f, 0,3.14159f,0, 0,
-            1,0.8f,0.3f,1, 0.8f,0.2f,0.1f,0, false,false,0,0,0},
-            // Sediment
-            {0.1f,0.3f, 0,0.2f, 0.8f,0,0,0, 0.1f,0.1f, 2,6, 1.5708f,0.3f,1.0f, 3,
-             0.6f,0.5f,0.3f,0.4f, 0.6f,0.5f,0.3f,0, false,false,0,0,0},
-    };
-
-    if (presetId < 0 || presetId > 4) return;
-    const P& p = presets[presetId];
-
-    data["speedMin"] = p.sm;   data["speedMax"] = p.sx;
-    data["gravityX"] = p.gx;   data["gravityY"] = p.gy;
-    data["drag"] = p.drag; data["turbulence"] = p.turb;
-    data["wobbleFrequency"] = p.wf;   data["wobbleAmplitude"] = p.wa;
-    data["sizeStart"] = p.ss;   data["sizeEnd"] = p.se;
-    data["lifetimeMin"] = p.lm;   data["lifetimeMax"] = p.lx;
-    data["emissionAngle"] = p.ea;   data["emissionSpread"] = p.esp;
-    data["emissionRadius"] = p.er;   data["emissionShape"] = p.shape;
-    data["colorStartR"] = p.cr;   data["colorStartG"] = p.cg;
-    data["colorStartB"] = p.cb;   data["colorStartA"] = p.ca;
-    data["colorEndR"] = p.er2;  data["colorEndG"] = p.eg;
-    data["colorEndB"] = p.eb;   data["colorEndA"] = p.ea2;
-    data["dieOnCollision"] = p.die;  data["killOutOfBounds"] = p.kob;
-    data["bounciness"] = p.bounce;
-    data["rotationSpeedMin"] = p.rsm;  data["rotationSpeedMax"] = p.rsx;
 }

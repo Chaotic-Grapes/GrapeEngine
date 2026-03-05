@@ -365,6 +365,8 @@ namespace ECS {
         // Sprite sheet animation configuration (POD)
         struct SpriteSheetAnimation2D {
         public:
+            static constexpr int MaxSegments = 8;
+
             uint32_t TextureId = 0;           // Texture containing the sprite sheet
             uint32_t NormalTextureId = 0;     // Optional normal map sprite sheet
             int FrameWidth = 0;               // Width of a single frame in pixels
@@ -380,6 +382,16 @@ namespace ECS {
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
             bool UseRow = false;              // Use row-based window instead of StartFrame
+            bool UseSegments = false;         // Use segment-list mode instead of Frame Window/Row
+            uint8_t SegmentCount = 0;         // Number of active segments in arrays below
+            uint8_t _paddingSegments[2] = { 0, 0 };
+
+            // Segment-list mode data (index 0..SegmentCount-1)
+            // Each segment is row-local and does not spill into the next row:
+            // Row + FrameOffset + FrameLength(<=0 = rest of row)
+            int SegmentRows[MaxSegments] = { 0 };
+            int SegmentOffsets[MaxSegments] = { 0 };
+            int SegmentLengths[MaxSegments] = { 0 };
 
             // Persistent texture path IDs (StringTable). 0 = invalid.
             uint32_t TexturePath = 0;

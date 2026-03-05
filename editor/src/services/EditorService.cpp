@@ -453,27 +453,97 @@ void EditorService::Render() {
     io.KeyAlt = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
     io.KeySuper = Input::IsKeyDown(KEY_LEFT_SUPER) || Input::IsKeyDown(KEY_RIGHT_SUPER);
 
-    // Feed key presses to ImGui for input handling
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Tab, Input::IsKeyDown(KEY_TAB));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_LeftArrow, Input::IsKeyDown(KEY_LEFT));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_RightArrow, Input::IsKeyDown(KEY_RIGHT));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_UpArrow, Input::IsKeyDown(KEY_UP));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_DownArrow, Input::IsKeyDown(KEY_DOWN));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_PageUp, Input::IsKeyDown(KEY_PAGE_UP));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_PageDown, Input::IsKeyDown(KEY_PAGE_DOWN));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Home, Input::IsKeyDown(KEY_HOME));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_End, Input::IsKeyDown(KEY_END));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Insert, Input::IsKeyDown(KEY_INSERT));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Delete, Input::IsKeyDown(KEY_DELETE));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Backspace, Input::IsKeyDown(KEY_BACKSPACE));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, Input::IsKeyDown(KEY_ENTER));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, Input::IsKeyDown(KEY_ESCAPE));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_A, Input::IsKeyDown(KEY_A));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_C, Input::IsKeyDown(KEY_C));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_V, Input::IsKeyDown(KEY_V));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_X, Input::IsKeyDown(KEY_X));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Y, Input::IsKeyDown(KEY_Y));
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Z, Input::IsKeyDown(KEY_Z));
+    // Feed key presses to ImGui for input handling.
+    auto feedKey = [&](ImGuiKey imguiKey, int engineKey) {
+        io.AddKeyEvent(imguiKey, Input::IsKeyDown(engineKey));
+    };
+
+    feedKey(ImGuiKey_Tab, KEY_TAB);
+    feedKey(ImGuiKey_LeftArrow, KEY_LEFT);
+    feedKey(ImGuiKey_RightArrow, KEY_RIGHT);
+    feedKey(ImGuiKey_UpArrow, KEY_UP);
+    feedKey(ImGuiKey_DownArrow, KEY_DOWN);
+    feedKey(ImGuiKey_PageUp, KEY_PAGE_UP);
+    feedKey(ImGuiKey_PageDown, KEY_PAGE_DOWN);
+    feedKey(ImGuiKey_Home, KEY_HOME);
+    feedKey(ImGuiKey_End, KEY_END);
+    feedKey(ImGuiKey_Insert, KEY_INSERT);
+    feedKey(ImGuiKey_Delete, KEY_DELETE);
+    feedKey(ImGuiKey_Backspace, KEY_BACKSPACE);
+    feedKey(ImGuiKey_Space, KEY_SPACE);
+    feedKey(ImGuiKey_Enter, KEY_ENTER);
+    feedKey(ImGuiKey_Escape, KEY_ESCAPE);
+    feedKey(ImGuiKey_Apostrophe, KEY_APOSTROPHE);
+    feedKey(ImGuiKey_Comma, KEY_COMMA);
+    feedKey(ImGuiKey_Minus, KEY_MINUS);
+    feedKey(ImGuiKey_Period, KEY_PERIOD);
+    feedKey(ImGuiKey_Slash, KEY_SLASH);
+    feedKey(ImGuiKey_Semicolon, KEY_SEMICOLON);
+    feedKey(ImGuiKey_Equal, KEY_EQUAL);
+    feedKey(ImGuiKey_LeftBracket, KEY_LEFT_BRACKET);
+    feedKey(ImGuiKey_Backslash, KEY_BACKSLASH);
+    feedKey(ImGuiKey_RightBracket, KEY_RIGHT_BRACKET);
+    feedKey(ImGuiKey_GraveAccent, KEY_GRAVE_ACCENT);
+    feedKey(ImGuiKey_CapsLock, KEY_CAPS_LOCK);
+    feedKey(ImGuiKey_LeftShift, KEY_LEFT_SHIFT);
+    feedKey(ImGuiKey_LeftCtrl, KEY_LEFT_CONTROL);
+    feedKey(ImGuiKey_LeftAlt, KEY_LEFT_ALT);
+    feedKey(ImGuiKey_LeftSuper, KEY_LEFT_SUPER);
+    feedKey(ImGuiKey_RightShift, KEY_RIGHT_SHIFT);
+    feedKey(ImGuiKey_RightCtrl, KEY_RIGHT_CONTROL);
+    feedKey(ImGuiKey_RightAlt, KEY_RIGHT_ALT);
+    feedKey(ImGuiKey_RightSuper, KEY_RIGHT_SUPER);
+
+    feedKey(ImGuiKey_0, KEY_0);
+    feedKey(ImGuiKey_1, KEY_1);
+    feedKey(ImGuiKey_2, KEY_2);
+    feedKey(ImGuiKey_3, KEY_3);
+    feedKey(ImGuiKey_4, KEY_4);
+    feedKey(ImGuiKey_5, KEY_5);
+    feedKey(ImGuiKey_6, KEY_6);
+    feedKey(ImGuiKey_7, KEY_7);
+    feedKey(ImGuiKey_8, KEY_8);
+    feedKey(ImGuiKey_9, KEY_9);
+
+    feedKey(ImGuiKey_A, KEY_A);
+    feedKey(ImGuiKey_B, KEY_B);
+    feedKey(ImGuiKey_C, KEY_C);
+    feedKey(ImGuiKey_D, KEY_D);
+    feedKey(ImGuiKey_E, KEY_E);
+    feedKey(ImGuiKey_F, KEY_F);
+    feedKey(ImGuiKey_G, KEY_G);
+    feedKey(ImGuiKey_H, KEY_H);
+    feedKey(ImGuiKey_I, KEY_I);
+    feedKey(ImGuiKey_J, KEY_J);
+    feedKey(ImGuiKey_K, KEY_K);
+    feedKey(ImGuiKey_L, KEY_L);
+    feedKey(ImGuiKey_M, KEY_M);
+    feedKey(ImGuiKey_N, KEY_N);
+    feedKey(ImGuiKey_O, KEY_O);
+    feedKey(ImGuiKey_P, KEY_P);
+    feedKey(ImGuiKey_Q, KEY_Q);
+    feedKey(ImGuiKey_R, KEY_R);
+    feedKey(ImGuiKey_S, KEY_S);
+    feedKey(ImGuiKey_T, KEY_T);
+    feedKey(ImGuiKey_U, KEY_U);
+    feedKey(ImGuiKey_V, KEY_V);
+    feedKey(ImGuiKey_W, KEY_W);
+    feedKey(ImGuiKey_X, KEY_X);
+    feedKey(ImGuiKey_Y, KEY_Y);
+    feedKey(ImGuiKey_Z, KEY_Z);
+
+    feedKey(ImGuiKey_F1, KEY_F1);
+    feedKey(ImGuiKey_F2, KEY_F2);
+    feedKey(ImGuiKey_F3, KEY_F3);
+    feedKey(ImGuiKey_F4, KEY_F4);
+    feedKey(ImGuiKey_F5, KEY_F5);
+    feedKey(ImGuiKey_F6, KEY_F6);
+    feedKey(ImGuiKey_F7, KEY_F7);
+    feedKey(ImGuiKey_F8, KEY_F8);
+    feedKey(ImGuiKey_F9, KEY_F9);
+    feedKey(ImGuiKey_F10, KEY_F10);
+    feedKey(ImGuiKey_F11, KEY_F11);
+    feedKey(ImGuiKey_F12, KEY_F12);
 
     // Feed character input to ImGui
     const std::string& charInput = Input::GetCharInput();

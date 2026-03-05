@@ -70,9 +70,17 @@ void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont, float toolbarHe
 // Process keyboard input for play/stop, pause/resume, and step.
 // Maps Ctrl+P, Ctrl+Shift+P, and Alt+P into state changes/flags.
 void Playback::ProcessInput() {
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput) {
+        return;
+    }
+
+    const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+    const bool shiftDown = Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
+    const bool altDown = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
+
     // Play/Stop: Ctrl + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
-        !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT))
+    if (Input::IsKeyPressed(KEY_P) && ctrlDown && !shiftDown && !altDown)
     {
         if (m_editorState == EditorState::Edit) {
             if (_startPlayFromEdit()) {
@@ -88,8 +96,7 @@ void Playback::ProcessInput() {
     }
 
     // Pause/Resume: Ctrl + Shift + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
-        Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT))
+    if (Input::IsKeyPressed(KEY_P) && ctrlDown && shiftDown)
     {
         if (m_editorState == EditorState::Play) {
             _changeState(EditorState::Paused);
@@ -102,7 +109,7 @@ void Playback::ProcessInput() {
     }
 
     // Step: Alt + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) {
+    if (Input::IsKeyPressed(KEY_P) && altDown) {
         if (m_editorState == EditorState::Paused) {
             _changeState(EditorState::Step);
             m_stepRequested = true;

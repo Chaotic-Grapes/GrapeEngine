@@ -32,7 +32,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.3412127494812012,
+                        "AspectRatio": 2.003412961959839,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -105,7 +105,7 @@
                 {
                     "Data": {
                         "Bus": 1,
-                        "CuePath": "C:/Users/kille/source/repos/GrapeEngine/TestSuite/Assets/Audio/Obelisk_Chapter_1&2_BGM_Loop.wav",
+                        "CuePath": "Assets/Audio/Obelisk_Chapter_5&6_BGM_Loop.wav",
                         "EnableFadeIn": true,
                         "EnableFadeOut": true,
                         "FadeInDuration": 2.0,
