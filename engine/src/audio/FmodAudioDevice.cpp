@@ -34,7 +34,8 @@ namespace Audio {
         // Create system and initialize.
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
-        if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init"))
+        constexpr unsigned int kInitFlags = FMOD_INIT_NORMAL | FMOD_INIT_CHANNEL_LOWPASS;
+        if (!FMOD_OK_OR_LOG(m_system->init(512, kInitFlags, nullptr), "init"))
             return false;
         // Grab master channel group.
         if (!FMOD_OK_OR_LOG(m_system->getMasterChannelGroup(&m_master), "getMasterChannelGroup")) {
@@ -79,7 +80,8 @@ namespace Audio {
             return false;
 
         // Initialize FMOD with the selected driver.
-        if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init")) {
+        constexpr unsigned int kInitFlags = FMOD_INIT_NORMAL | FMOD_INIT_CHANNEL_LOWPASS;
+        if (!FMOD_OK_OR_LOG(m_system->init(512, kInitFlags, nullptr), "init")) {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
@@ -302,6 +304,13 @@ namespace Audio {
 
     void FmodAudioDevice::SetInstancePan(PlaybackHandle handle, float pan) {
         if (auto* ch = _channelFromHandle(handle)) ch->setPan(pan);
+    }
+
+    void FmodAudioDevice::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
+        if (auto* ch = _channelFromHandle(handle)) {
+            const float clamped = (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+            FMOD_OK_OR_LOG(ch->setLowPassGain(clamped), "Channel::setLowPassGain");
+        }
     }
 
     void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {

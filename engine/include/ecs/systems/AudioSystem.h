@@ -119,10 +119,22 @@ namespace ECS {
         float m_crossfadeInDuration = 0.0f;
         float m_crossfadeInRemaining = 0.0f;
         bool m_crossfadeFadeInActive = false;
+        
+        // Master low-pass DSP inserted into FMOD's master channel group.
+        // Owned by AudioSystem and released in _shutdownMasterDsp().
+        FMOD::DSP* m_masterLowPassDsp = nullptr;
+        // Tracks whether the DSP has been inserted into the master chain.
+        bool m_masterLowPassAttached = false;
 
-        // Helper methods
+        // Generic helpers
         void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
+
+        // DSP lifecycle helpers (called from OnCreate / OnDestroy)
+        // Creates low-pass DSP and adds it to FMOD master group.
+        bool _initializeMasterDsp();
+        // Removes low-pass DSP from FMOD graph and releases it.
+        void _shutdownMasterDsp();
 
         // Fade helper methods (delegated to AudioEngine)
         void _fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume);

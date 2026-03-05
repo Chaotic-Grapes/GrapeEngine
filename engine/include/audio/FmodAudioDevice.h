@@ -35,21 +35,21 @@
 #include "Export.h"
 
 namespace Audio {
-    // Opaque handle for a playing sound instance (maps to FMOD::Channel).
+    // Opaque ID used by gameplay code to reference an active FMOD channel.
     struct PlaybackHandle {
-        uint64_t Id = 0;                                    // Means invalid
-        explicit operator bool() const { return Id != 0; }  // allow if handle
+        uint64_t Id = 0;                                    // 0 means "invalid / no playback"
+        explicit operator bool() const { return Id != 0; }  // true when a valid handle was returned
         bool operator==(const PlaybackHandle& o) const { return Id == o.Id; }
     };
    
-    // Struct for cache to keep loaded path that hit previously
+    // Cached cue data: FMOD sound object + original settings + source path.
     struct CueEntry {
         FMOD::Sound* Sound = nullptr;
         SoundParams  Params{};
-        std::string  SourcePath;   // NEW: keep original file path (for display / reload)
+        std::string  SourcePath;   // Preserved for debug display and device-reload recovery.
     };
 
-    // Policy for PlaySingle behavior
+    // Policy used by PlaySingle when the same cue is already active.
     enum class PlayPolicy {
         NewInstance,             // do not enforce single-instance
         SingleInstanceRestart,   // if playing, restart from time 0 on same channel
@@ -87,6 +87,7 @@ namespace Audio {
         void SetInstanceVolume(PlaybackHandle handle, float volume);
         void SetInstancePitch(PlaybackHandle handle, float pitch);
         void SetInstancePan(PlaybackHandle handle, float pan);
+        void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
         bool IsHandlePlaying(PlaybackHandle handle) const;
 
@@ -99,8 +100,12 @@ namespace Audio {
         void PauseAll();
         void ResumeAll();
 
-        // Introspection
+        // Introspection / low-level FMOD access for systems that need graph setup.
         void GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const;
+        // Raw FMOD System pointer. Non-owning; valid only while device is initialized.
+        FMOD::System* GetSystem() const { return m_system; }
+        // Raw FMOD master channel group pointer. Non-owning; valid only while initialized.
+        FMOD::ChannelGroup* GetMasterChannelGroup() const { return m_master; }
 
     private:
         // FMOD objects

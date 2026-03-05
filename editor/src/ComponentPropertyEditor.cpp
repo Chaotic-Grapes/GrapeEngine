@@ -2243,10 +2243,13 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     if (!data.contains("Loop"))        data["Loop"] = false;
     if (!data.contains("PlayOnStart")) data["PlayOnStart"] = false;
     if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
+    if (!data.contains("EnableLowPass")) data["EnableLowPass"] = false;
+    if (!data.contains("LowPassGain")) data["LowPassGain"] = 1.0f;
 
     // SINGLE BeginPropertySection call with ALL field names for proper alignment
     // Note: Fade duration fields are conditionally shown, so we include all possible fields
     EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D", "Bus", "Pan",
+                                     "Enable Low Pass", "Low Pass Gain",
                                      "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
@@ -2318,6 +2321,12 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     if (!spatial3D) {
         // Render float row.
         EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f);
+    }
+
+    // Per-source low-pass filter settings
+    EditorUI::RenderCheckboxProperty("Enable Low Pass", data, "EnableLowPass");
+    if (data.value("EnableLowPass", false)) {
+        EditorUI::RenderFloatRow("Low Pass Gain", "", data, "LowPassGain", 0.01f, 0.0f, 1.0f);
     }
 
     // Fade settings

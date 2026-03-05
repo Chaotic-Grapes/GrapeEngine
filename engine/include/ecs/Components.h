@@ -525,6 +525,8 @@ namespace ECS {
             bool Spatial3D = true;
             uint8_t Bus = static_cast<uint8_t>(Audio::Bus::SFX);
             float Pan = 0.0f;
+            bool EnableLowPass = false;
+            float LowPassGain = 1.0f; // 1.0 = no filtering, 0.0 = strongest low-pass
 
             // Fade flags
 			bool EnableFadeIn = false;
