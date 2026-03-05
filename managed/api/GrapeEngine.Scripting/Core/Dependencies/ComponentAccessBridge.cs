@@ -95,6 +95,21 @@ public static class ComponentAccessBridge
     }
 
     /// <summary>
+    /// Get the required-for-update component hashes for a system type.
+    /// </summary>
+    public static List<uint> ExtractRequireForUpdateComponentHashes(Type systemType)
+    {
+        var hashes = new List<uint>();
+
+        foreach (var compType in SystemMetadataExtractor.GetRequireForUpdateComponents(systemType))
+        {
+            hashes.Add(GetComponentTypeHash(compType));
+        }
+
+        return hashes;
+    }
+
+    /// <summary>
     /// Get the FNV-1a hash for a component type.
     /// Must match the C++ hashing algorithm for proper dependency detection.
     /// </summary>

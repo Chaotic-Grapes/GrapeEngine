@@ -350,6 +350,32 @@ namespace ECS {
         } catch (...) {}
     }
 
+    bool ScriptManager::CallSystemShouldRun(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemShouldRun) return true;
+        try {
+            return m_callSystemShouldRun(handle, worldPtr) != 0;
+        } catch (...) {
+            return true;
+        }
+    }
+
+    void ScriptManager::CallSystemOnStartRunning(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnStartRunning) return;
+        try {
+            m_callSystemOnStartRunning(handle, worldPtr);
+        } catch (...) {}
+    }
+
+    void ScriptManager::CallSystemOnStopRunning(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnStopRunning) return;
+        try {
+            m_callSystemOnStopRunning(handle, worldPtr);
+        } catch (...) {}
+    }
+
     /**
      * @brief Register discovered scripted systems with the SystemManager.
      * @param systemManager Reference to the SystemManager
@@ -786,6 +812,9 @@ namespace ECS {
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
         success &= loadMethod("CallSystemOnSceneStart",           scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStart));
         success &= loadMethod("CallSystemOnSceneStop",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStop));
+        success &= loadMethod("CallSystemShouldRun",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemShouldRun));
+        success &= loadMethod("CallSystemOnStartRunning",         scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnStartRunning));
+        success &= loadMethod("CallSystemOnStopRunning",          scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnStopRunning));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -966,6 +995,36 @@ namespace ECS {
         auto callOnSceneStop = m_scriptManager->GetCallSystemOnSceneStop();
         if (callOnSceneStop) {
             callOnSceneStop(m_managedHandle);
+        }
+    }
+
+    bool ScriptSystemWrapper::ShouldRun(World& world) {
+        if (!m_scriptManager) {
+            return true;
+        }
+
+        auto callShouldRun = m_scriptManager->GetCallSystemShouldRun();
+        if (!callShouldRun) {
+            return true;
+        }
+        return callShouldRun(m_managedHandle, &world) != 0;
+    }
+
+    void ScriptSystemWrapper::OnStartRunning(World& world) {
+        if (!m_scriptManager) return;
+
+        auto callOnStartRunning = m_scriptManager->GetCallSystemOnStartRunning();
+        if (callOnStartRunning) {
+            callOnStartRunning(m_managedHandle, &world);
+        }
+    }
+
+    void ScriptSystemWrapper::OnStopRunning(World& world) {
+        if (!m_scriptManager) return;
+
+        auto callOnStopRunning = m_scriptManager->GetCallSystemOnStopRunning();
+        if (callOnStopRunning) {
+            callOnStopRunning(m_managedHandle, &world);
         }
     }
 

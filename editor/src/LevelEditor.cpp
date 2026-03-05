@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/BoidSystem.h"
 #include "EditorStyle.h"
 #include "EditorIcons.h"
 #include "EditorECSUtils.h"
@@ -533,6 +534,13 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             if (Engine::CORE->GetSceneManager().GetActive()) {
                 LOG_DEBUG("[LevelEditor] Scene modified: " << evt.Reason);
                 m_fileMenu.MarkSceneDirty();
+            }
+
+            // Push updated collision grid to BoidSystem when tilemap collision changes
+            if (evt.Reason == "Tilemap collision" && m_activeTileMap) {
+                if (auto* boidSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::BoidSystem>()) {
+                    boidSystem->UpdateCollisionGrid(*m_activeTileMap);
+                }
             }
         }
     );
@@ -1554,6 +1562,12 @@ void LevelEditor::_setActiveTileMap(EntityId id) {
         m_activeTileMapPath = entry.MapPath;
         m_activeTilesetPath = (activeTilesetIndex < entry.TilesetPaths.size()) ? entry.TilesetPaths[activeTilesetIndex] : std::string();
         m_tilePalette.SetEditingContext(m_activeTileMap, entry.Tilesets, entry.TilesetPaths, activeTilesetIndex, m_activeTileMapPath, entry.Origin);
+
+        // Sync collision grid to BoidSystem on tilemap switch
+        if (auto* boidSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::BoidSystem>()) {
+            boidSystem->UpdateCollisionGrid(*it->second.Map);
+        }
+
         return;
     }
 

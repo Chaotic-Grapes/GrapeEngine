@@ -66,6 +66,7 @@ namespace {
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
     const uint32_t kHashBoidFlock = Editor::ECSUtils::FNV1aHash("BoidFlock");
+    const uint32_t kHashParticleEmitter = Editor::ECSUtils::FNV1aHash("ParticleEmitter");
     const uint32_t kHashGUICanvas = Editor::ECSUtils::FNV1aHash("GUICanvas");
     const uint32_t kHashGUIRenderMode = Editor::ECSUtils::FNV1aHash("GUIRenderMode");
     const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
@@ -1054,17 +1055,61 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<nlohmann::json()>>([]() {
                 return nlohmann::json{
                     {"count", 5000},
-                    {"separationWeight", 1.5f},
-                    {"alignmentWeight", 1.0f},
-                    {"cohesionWeight", 1.0f},
-                    {"visualRange", 50.0f},
-                    {"maxSpeed", 200.0f},
-                    {"maxForce", 10.0f},
-                    {"boidSize", 0.3f},
+                    {"separationWeight", 2.5f},
+                    {"alignmentWeight", 3.0f},
+                    {"cohesionWeight", 0.4f},
+                    {"collisionAvoidWeight", 2.5f},
+                    {"collisionAvoidRadius", 3.0f},
+                    {"visualRange", 4.0f},
+                    {"maxSpeed", 4.0f},
+                    {"maxForce", 1.2f},
+                    {"boidSize", 1.0f},
                     {"TexturePath", ""}
                 };
             }),
             COMPONENT_OPS_HASH(BoidFlock, kHashBoidFlock)
+        },
+		// Particle Emitter
+        {
+        "Particle Emitter",                 // DisplayName
+        "ParticleEmitter",                  // TypeName
+        "ECS::Components::ParticleEmitter", // FullTypeName
+        GetComponentIdFromHashOrWarn(kHashParticleEmitter, "ParticleEmitter"),
+        kHashParticleEmitter,
+        true,   // CanDelete
+        true,   // IsBuiltin (C++ component)
+        static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>(
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) {
+                ui.RenderParticleEmitter(d, e, w);
+            }
+        ),
+        static_cast<std::function<nlohmann::json()>>([]() {
+            return nlohmann::json{
+                {"presetId", 0},
+                {"maxParticles", 1000},
+                {"emissionRate", 50.0f},
+                {"burstCount", 0},
+                {"particleSize", 0.3f},
+                {"active", true},
+                {"TexturePath", ""},
+                {"speedMin", 0.5f},       {"speedMax", 1.5f},
+                {"gravityX", 0.0f},       {"gravityY", 0.3f},
+                {"drag", 0.3f},           {"turbulence", 0.0f},
+                {"wobbleFrequency", 0.0f},{"wobbleAmplitude", 0.0f},
+                {"sizeStart", 0.2f},      {"sizeEnd", 0.5f},
+                {"lifetimeMin", 1.0f},    {"lifetimeMax", 3.0f},
+                {"emissionAngle", 1.5708f},{"emissionSpread", 0.5f},
+                {"emissionRadius", 0.5f}, {"emissionShape", 0},
+                {"colorStartR", 1.0f},    {"colorStartG", 1.0f},
+                {"colorStartB", 1.0f},    {"colorStartA", 1.0f},
+                {"colorEndR",   1.0f},    {"colorEndG",   1.0f},
+                {"colorEndB",   1.0f},    {"colorEndA",   0.0f},
+                {"dieOnCollision", false},{"bounciness", 0.0f},
+                {"killOutOfBounds", false},
+                {"rotationSpeedMin", 0.0f},{"rotationSpeedMax", 0.0f}
+            };
+        }),
+        COMPONENT_OPS_HASH(ParticleEmitter, kHashParticleEmitter)
         },
         // GUI Canvas
         {

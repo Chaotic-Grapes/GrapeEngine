@@ -2515,21 +2515,25 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
     ImGuiIdScope id("BoidFlock");
 
     // Ensure required keys exist
-    if (!data.contains("count"))              data["count"] = 5000;
-    if (!data.contains("separationWeight"))  data["separationWeight"] = 1.5f;
-    if (!data.contains("alignmentWeight"))   data["alignmentWeight"] = 1.0f;
-    if (!data.contains("cohesionWeight"))    data["cohesionWeight"] = 1.0f;
-    if (!data.contains("visualRange"))       data["visualRange"] = 50.0f;
-    if (!data.contains("maxSpeed"))          data["maxSpeed"] = 200.0f;
-    if (!data.contains("maxForce"))          data["maxForce"] = 10.0f;
-    if (!data.contains("boidSize"))          data["boidSize"] = 1.0f;
-    if (!data.contains("TexturePath"))       data["TexturePath"] = "";
+    if (!data.contains("count"))                    data["count"] = 5000;
+    if (!data.contains("separationWeight"))         data["separationWeight"] = 2.5f;
+    if (!data.contains("alignmentWeight"))          data["alignmentWeight"] = 3.0f;
+    if (!data.contains("cohesionWeight"))           data["cohesionWeight"] = 0.4f;
+    if (!data.contains("collisionAvoidWeight"))     data["collisionAvoidWeight"] = 2.5f;
+    if (!data.contains("collisionAvoidRadius"))     data["collisionAvoidRadius"] = 3.0f;
+    if (!data.contains("visualRange"))              data["visualRange"] = 4.0f;
+    if (!data.contains("maxSpeed"))                 data["maxSpeed"] = 4.0f;
+    if (!data.contains("maxForce"))                 data["maxForce"] = 1.2f;
+    if (!data.contains("boidSize"))                 data["boidSize"] = 1.0f;
+    if (!data.contains("TexturePath"))              data["TexturePath"] = "";
 
     EditorUI::BeginPropertySection({
         "Count",
         "Separation Weight",
         "Alignment Weight",
         "Cohesion Weight",
+        "Collision Avoid Weight",
+        "Collision Avoid Radius",
         "Visual Range",
         "Max Speed",
         "Max Force",
@@ -2545,6 +2549,8 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
     EditorUI::RenderFloatRow("Separation Weight", "", data, "separationWeight", 0.1f, 0.0f, 10.0f);
     EditorUI::RenderFloatRow("Alignment Weight", "", data, "alignmentWeight", 0.1f, 0.0f, 10.0f);
     EditorUI::RenderFloatRow("Cohesion Weight", "", data, "cohesionWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Collision Avoid Weight", "", data, "collisionAvoidWeight", 0.1f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Collision Avoid Radius", "", data, "collisionAvoidRadius", 0.1f, 0.0f, 50.0f);
 
     ImGui::SeparatorText("Movement");
 
@@ -2582,4 +2588,208 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
         });
 
     EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity, ECS::World* world)
+{
+    (void)entity;
+    (void)world;
+    ImGuiIdScope id("ParticleEmitter");
+
+    // Defaults
+    if (!data.contains("presetId"))          data["presetId"] = 0;
+    if (!data.contains("maxParticles"))      data["maxParticles"] = 1000;
+    if (!data.contains("emissionRate"))      data["emissionRate"] = 50.0f;
+    if (!data.contains("burstCount"))        data["burstCount"] = 0;
+    if (!data.contains("particleSize"))      data["particleSize"] = 0.3f;
+    if (!data.contains("active"))            data["active"] = true;
+    if (!data.contains("TexturePath"))       data["TexturePath"] = "";
+    if (!data.contains("speedMin"))          data["speedMin"] = 0.5f;
+    if (!data.contains("speedMax"))          data["speedMax"] = 1.5f;
+    if (!data.contains("gravityX"))          data["gravityX"] = 0.0f;
+    if (!data.contains("gravityY"))          data["gravityY"] = 0.3f;
+    if (!data.contains("drag"))              data["drag"] = 0.3f;
+    if (!data.contains("turbulence"))        data["turbulence"] = 0.0f;
+    if (!data.contains("wobbleFrequency"))   data["wobbleFrequency"] = 0.0f;
+    if (!data.contains("wobbleAmplitude"))   data["wobbleAmplitude"] = 0.0f;
+    if (!data.contains("sizeStart"))         data["sizeStart"] = 0.2f;
+    if (!data.contains("sizeEnd"))           data["sizeEnd"] = 0.5f;
+    if (!data.contains("lifetimeMin"))       data["lifetimeMin"] = 1.0f;
+    if (!data.contains("lifetimeMax"))       data["lifetimeMax"] = 3.0f;
+    if (!data.contains("emissionAngle"))     data["emissionAngle"] = 1.5708f;
+    if (!data.contains("emissionSpread"))    data["emissionSpread"] = 0.5f;
+    if (!data.contains("emissionRadius"))    data["emissionRadius"] = 0.5f;
+    if (!data.contains("emissionShape"))     data["emissionShape"] = 0;
+    if (!data.contains("colorStartR"))       data["colorStartR"] = 1.0f;
+    if (!data.contains("colorStartG"))       data["colorStartG"] = 1.0f;
+    if (!data.contains("colorStartB"))       data["colorStartB"] = 1.0f;
+    if (!data.contains("colorStartA"))       data["colorStartA"] = 1.0f;
+    if (!data.contains("colorEndR"))         data["colorEndR"] = 1.0f;
+    if (!data.contains("colorEndG"))         data["colorEndG"] = 1.0f;
+    if (!data.contains("colorEndB"))         data["colorEndB"] = 1.0f;
+    if (!data.contains("colorEndA"))         data["colorEndA"] = 0.0f;
+    if (!data.contains("dieOnCollision"))    data["dieOnCollision"] = false;
+    if (!data.contains("bounciness"))        data["bounciness"] = 0.0f;
+    if (!data.contains("killOutOfBounds"))   data["killOutOfBounds"] = false;
+    if (!data.contains("rotationSpeedMin"))  data["rotationSpeedMin"] = 0.0f;
+    if (!data.contains("rotationSpeedMax"))  data["rotationSpeedMax"] = 0.0f;
+
+    EditorUI::BeginPropertySection({
+        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active", "Texture",
+        "Speed Min", "Speed Max", "Gravity X", "Gravity Y", "Drag", "Turbulence",
+        "Wobble Frequency", "Wobble Amplitude", "Size Start", "Size End",
+        "Lifetime Min", "Lifetime Max", "Emission Angle", "Emission Spread",
+        "Emission Radius", "Emission Shape",
+        "Color Start", "Color End",
+        "Die On Collision", "Bounciness", "Kill Out Of Bounds",
+        "Rotation Speed Min", "Rotation Speed Max"
+        });
+
+    // --- Emitter ---
+    ImGui::SeparatorText("Emitter");
+
+    // Preset dropdown — applies preset values as template
+    static const char* presetNames[] = { "Bubbles", "Geyser", "Smoke", "Explosion", "Sediment" };
+    int presetId = data.value("presetId", 0);
+    ImGui::Text("Preset");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##Preset", &presetId, presetNames, IM_ARRAYSIZE(presetNames))) {
+        data["presetId"] = presetId;
+        // Apply preset as template — overwrites simulation fields
+        _ApplyPresetToJson(data, presetId);
+    }
+
+    EditorUI::RenderIntProperty("Max Particles", data, "maxParticles");
+    EditorUI::RenderFloatRow("Emission Rate", "pps", data, "emissionRate", 1.0f, 0.0f, 100000.0f);
+    EditorUI::RenderIntProperty("Burst Count", data, "burstCount");
+    if (ImGui::Button("Fire Burst"))
+        data["burstCount"] = data.value("maxParticles", 200);
+    EditorUI::RenderFloatRow("Particle Size", "", data, "particleSize", 0.01f, 0.0f, 100.0f);
+    EditorUI::RenderCheckboxProperty("Active", data, "active");
+
+    // Texture
+    std::string texPath = data.value("TexturePath", "");
+    std::string valueText = texPath.empty()
+        ? "None (drag texture here)"
+        : std::filesystem::path(texPath).filename().string();
+    RenderAssetDropRow("Texture", valueText, texPath.empty(),
+        "ParticleEmitterTextureClear", "Clear particle texture", m_symbolsFont, kImageExtensions,
+        [&](const std::string& droppedPath) {
+            auto tex = RM.Get<Texture>(droppedPath);
+            if (tex) { data["TexturePath"] = droppedPath; data["textureId"] = (uint32_t)tex->ID(); return true; }
+            return false;
+        }, [&]() { data["TexturePath"] = ""; data["textureId"] = 0; });
+    if (EditorUI::PropertyFilterAllows("Texture"))
+        RenderInlineTexturePreview(data.value("textureId", 0u), "Particle texture preview");
+
+    // --- Simulation ---
+    ImGui::SeparatorText("Physics");
+    EditorUI::RenderFloatRow("Speed Min", "", data, "speedMin", 0.05f, 0.0f, 100.0f);
+    EditorUI::RenderFloatRow("Speed Max", "", data, "speedMax", 0.05f, 0.0f, 100.0f);
+    EditorUI::RenderFloatRow("Gravity X", "", data, "gravityX", 0.1f, -50.0f, 50.0f);
+    EditorUI::RenderFloatRow("Gravity Y", "", data, "gravityY", 0.1f, -50.0f, 50.0f);
+    EditorUI::RenderFloatRow("Drag", "", data, "drag", 0.01f, 0.0f, 10.0f);
+    EditorUI::RenderFloatRow("Turbulence", "", data, "turbulence", 0.05f, 0.0f, 20.0f);
+    EditorUI::RenderFloatRow("Wobble Frequency", "", data, "wobbleFrequency", 0.05f, 0.0f, 20.0f);
+    EditorUI::RenderFloatRow("Wobble Amplitude", "", data, "wobbleAmplitude", 0.05f, 0.0f, 20.0f);
+
+    ImGui::SeparatorText("Appearance");
+    EditorUI::RenderFloatRow("Size Start", "", data, "sizeStart", 0.01f, 0.0f, 50.0f);
+    EditorUI::RenderFloatRow("Size End", "", data, "sizeEnd", 0.01f, 0.0f, 50.0f);
+    EditorUI::RenderFloatRow("Rotation Speed Min", "", data, "rotationSpeedMin", 0.1f, -20.0f, 20.0f);
+    EditorUI::RenderFloatRow("Rotation Speed Max", "", data, "rotationSpeedMax", 0.1f, -20.0f, 20.0f);
+
+    // Color start/end as RGBA rows
+    ImGui::Text("Color Start");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    float cs[4] = { data.value("colorStartR",1.f), data.value("colorStartG",1.f),
+                    data.value("colorStartB",1.f), data.value("colorStartA",1.f) };
+    if (ImGui::ColorEdit4("##ColorStart", cs))
+    {
+        data["colorStartR"] = cs[0]; data["colorStartG"] = cs[1]; data["colorStartB"] = cs[2]; data["colorStartA"] = cs[3];
+    }
+
+    ImGui::Text("Color End");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    float ce[4] = { data.value("colorEndR",1.f), data.value("colorEndG",1.f),
+                    data.value("colorEndB",1.f), data.value("colorEndA",0.f) };
+    if (ImGui::ColorEdit4("##ColorEnd", ce))
+    {
+        data["colorEndR"] = ce[0]; data["colorEndG"] = ce[1]; data["colorEndB"] = ce[2]; data["colorEndA"] = ce[3];
+    }
+
+    ImGui::SeparatorText("Emission");
+    EditorUI::RenderFloatRow("Lifetime Min", "", data, "lifetimeMin", 0.1f, 0.0f, 60.0f);
+    EditorUI::RenderFloatRow("Lifetime Max", "", data, "lifetimeMax", 0.1f, 0.0f, 60.0f);
+    EditorUI::RenderFloatRow("Emission Angle", "", data, "emissionAngle", 0.05f, -6.28f, 6.28f);
+    EditorUI::RenderFloatRow("Emission Spread", "", data, "emissionSpread", 0.05f, 0.0f, 6.28f);
+    EditorUI::RenderFloatRow("Emission Radius", "", data, "emissionRadius", 0.05f, 0.0f, 100.0f);
+
+    static const char* shapeNames[] = { "Point", "Circle", "Cone", "Line" };
+    int shape = data.value("emissionShape", 0);
+    ImGui::Text("Emission Shape");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(120.0f);
+    if (ImGui::Combo("##EmissionShape", &shape, shapeNames, 4))
+        data["emissionShape"] = shape;
+
+    ImGui::SeparatorText("Collision");
+    EditorUI::RenderCheckboxProperty("Die On Collision", data, "dieOnCollision");
+    EditorUI::RenderFloatRow("Bounciness", "", data, "bounciness", 0.05f, 0.0f, 1.0f);
+    EditorUI::RenderCheckboxProperty("Kill Out Of Bounds", data, "killOutOfBounds");
+
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::_ApplyPresetToJson(nlohmann::json& data, int presetId)
+{
+    // Mirror of ParticlePreset factory methods, directly writes into JSON
+    // so the editor shows the template values immediately
+    struct P {
+        float sm, sx, gx, gy, drag, turb, wf, wa, ss, se, lm, lx, ea, esp, er; int shape;
+        float cr, cg, cb, ca, er2, eg, eb, ea2; bool die, kob; float bounce, rsm, rsx;
+    };
+
+    // Indices match presetNames[] order: Bubbles=0 Geyser=1 Smoke=2 Explosion=3 Sediment=4
+    static const P presets[] = {
+        // Bubbles
+        {0.5f,1.5f, 0,0.3f, 0.3f,0,1.5f,0.5f, 0.2f,0.5f, 2,5, 1.5708f,0.5f,0,   0,
+         1,1,1,0.6f, 1,1,1,0, false,false,0,0,0},
+         // Geyser
+         {3,6, 0,-1.5f, 0.1f,0.8f,0,0, 0.2f,0.5f, 1,3, 1.5708f,0.15f,0, 2,
+          0.8f,0.9f,1,0.9f, 0.6f,0.7f,0.9f,0, false,false,0,0,0},
+          // Smoke
+          {0.2f,0.6f, 0,0.1f, 0.5f,0.3f,0,0, 0.3f,1.0f, 3,8, 1.5708f,0.8f,0.5f, 1,
+           0.4f,0.4f,0.4f,0.5f, 0.2f,0.2f,0.2f,0, false,false,0,0,0},
+           // Explosion
+           {3,10, 0,1.0f, 1.0f,0,0,0, 0.4f,0.05f, 0.3f,1.5f, 0,3.14159f,0, 0,
+            1,0.8f,0.3f,1, 0.8f,0.2f,0.1f,0, false,false,0,0,0},
+            // Sediment
+            {0.1f,0.3f, 0,0.2f, 0.8f,0,0,0, 0.1f,0.1f, 2,6, 1.5708f,0.3f,1.0f, 3,
+             0.6f,0.5f,0.3f,0.4f, 0.6f,0.5f,0.3f,0, false,false,0,0,0},
+    };
+
+    if (presetId < 0 || presetId > 4) return;
+    const P& p = presets[presetId];
+
+    data["speedMin"] = p.sm;   data["speedMax"] = p.sx;
+    data["gravityX"] = p.gx;   data["gravityY"] = p.gy;
+    data["drag"] = p.drag; data["turbulence"] = p.turb;
+    data["wobbleFrequency"] = p.wf;   data["wobbleAmplitude"] = p.wa;
+    data["sizeStart"] = p.ss;   data["sizeEnd"] = p.se;
+    data["lifetimeMin"] = p.lm;   data["lifetimeMax"] = p.lx;
+    data["emissionAngle"] = p.ea;   data["emissionSpread"] = p.esp;
+    data["emissionRadius"] = p.er;   data["emissionShape"] = p.shape;
+    data["colorStartR"] = p.cr;   data["colorStartG"] = p.cg;
+    data["colorStartB"] = p.cb;   data["colorStartA"] = p.ca;
+    data["colorEndR"] = p.er2;  data["colorEndG"] = p.eg;
+    data["colorEndB"] = p.eb;   data["colorEndA"] = p.ea2;
+    data["dieOnCollision"] = p.die;  data["killOutOfBounds"] = p.kob;
+    data["bounciness"] = p.bounce;
+    data["rotationSpeedMin"] = p.rsm;  data["rotationSpeedMax"] = p.rsx;
 }

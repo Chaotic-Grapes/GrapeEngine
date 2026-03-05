@@ -89,6 +89,36 @@ public abstract class SystemBase : ISystem
         OnSceneStop();
     }
 
+    bool ISystem.ShouldRun(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        return ShouldRun();
+    }
+
+    void ISystem.OnStartRunning(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        OnStartRunning();
+    }
+
+    void ISystem.OnStopRunning(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        OnStopRunning();
+    }
+
     /// <summary>
     /// Log a message at the specified level.
     /// </summary>
@@ -147,6 +177,21 @@ public abstract class SystemBase : ISystem
     /// Called when a scene stops playing (editor: transitioning away from Play mode).
     /// </summary>
     protected virtual void OnSceneStop() { }
+
+    /// <summary>
+    /// Determines whether this system should run this frame.
+    /// </summary>
+    protected virtual bool ShouldRun() => true;
+
+    /// <summary>
+    /// Called when this system transitions to running state.
+    /// </summary>
+    protected virtual void OnStartRunning() { }
+
+    /// <summary>
+    /// Called when this system transitions out of running state.
+    /// </summary>
+    protected virtual void OnStopRunning() { }
 
     // ------------------------ Query helpers ------------------------
 

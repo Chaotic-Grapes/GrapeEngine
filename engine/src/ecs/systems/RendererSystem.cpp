@@ -302,8 +302,11 @@ namespace ECS {
 
         // Compute-related shaders
         m_boidShader = RM.Get<Shader>("assets/shaders/boid");
-
         m_boidSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::BoidSystem>();
+
+        // Particle-stuff
+        m_particleShader = RM.Get<Shader>("assets/shaders/particle");
+        m_particleSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::ParticleSystem>();
 
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
@@ -898,6 +901,82 @@ namespace ECS {
 
                             glBindVertexArray(flock.vao);
                             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+                            glBindVertexArray(0);
+                        }
+                    }
+                }
+
+                // --- Particle Instanced Rendering ---
+                if (m_particleSystem && m_particleShader) {
+                    const auto& emitterData = m_particleSystem->GetRenderData();
+                    if (!emitterData.empty()) {
+                        m_particleShader->use();
+                        m_particleShader->setMat4("uViewProj", viewProj);
+                        m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
+
+                        glEnable(GL_BLEND);
+                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                        for (const auto& [entityId, emitter] : emitterData) {
+                            if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
+
+                            m_particleShader->setUniform("uParticleSize", emitter.particleSize);
+
+                            // --- Material2D gate: same opt-in as sprites ---
+                            ECS::Entity e{ entityId };
+                            bool hasMaterial = world.Has<Components::Material2D>(e);
+
+                            if (hasMaterial) {
+                                const auto& mat = world.Get<Components::Material2D>(e);
+                                m_particleShader->setUniform("uLightingEnabled", 1);
+                                m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
+                                m_particleShader->setUniform("uMetallic", mat.Metallic);
+                                m_particleShader->setUniform("uSmoothness", mat.Smoothness);
+                                m_particleShader->setUniform("uAOStrength", mat.AOStrength);
+                                m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
+
+                                // Normal map (texture unit 1)
+                                if (mat.NormalTextureId != 0) {
+                                    m_particleShader->setUniform("uHasNormalMap", 1);
+                                    m_particleShader->setUniform("uNormalMap", 1);
+                                    glActiveTexture(GL_TEXTURE1);
+                                    glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
+                                }
+                                else {
+                                    m_particleShader->setUniform("uHasNormalMap", 0);
+                                }
+
+                                // MRA map (texture unit 2)
+                                if (mat.MRA_TextureId != 0) {
+                                    m_particleShader->setUniform("uHasMRAMap", 1);
+                                    m_particleShader->setUniform("uMRAMap", 2);
+                                    glActiveTexture(GL_TEXTURE2);
+                                    glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
+                                }
+                                else {
+                                    m_particleShader->setUniform("uHasMRAMap", 0);
+                                }
+                            }
+                            else {
+                                m_particleShader->setUniform("uLightingEnabled", 0);
+                                m_particleShader->setUniform("uMaterialFlags", 0);
+                                m_particleShader->setUniform("uHasNormalMap", 0);
+                                m_particleShader->setUniform("uHasMRAMap", 0);
+                            }
+
+                            // Albedo/particle texture (texture unit 0)
+                            if (emitter.textureId != 0) {
+                                m_particleShader->setUniform("uHasTexture", 1);
+                                m_particleShader->setUniform("uTexture", 0);
+                                glActiveTexture(GL_TEXTURE0);
+                                glBindTexture(GL_TEXTURE_2D, emitter.textureId);
+                            }
+                            else {
+                                m_particleShader->setUniform("uHasTexture", 0);
+                            }
+
+                            glBindVertexArray(emitter.vao);
+                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
                             glBindVertexArray(0);
                         }
                     }
@@ -2328,6 +2407,82 @@ namespace ECS {
 
                     glBindVertexArray(flock.vao);
                     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+                    glBindVertexArray(0);
+                }
+            }
+        }
+
+        // --- Particle Instanced Rendering ---
+        if (m_particleSystem && m_particleShader) {
+            const auto& emitterData = m_particleSystem->GetRenderData();
+            if (!emitterData.empty()) {
+                m_particleShader->use();
+                m_particleShader->setMat4("uViewProj", viewProj);
+                m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
+
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                for (const auto& [entityId, emitter] : emitterData) {
+                    if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
+
+                    m_particleShader->setUniform("uParticleSize", emitter.particleSize);
+
+                    // --- Material2D gate: same opt-in as sprites ---
+                    ECS::Entity e{ entityId };
+                    bool hasMaterial = world.Has<Components::Material2D>(e);
+
+                    if (hasMaterial) {
+                        const auto& mat = world.Get<Components::Material2D>(e);
+                        m_particleShader->setUniform("uLightingEnabled", 1);
+                        m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
+                        m_particleShader->setUniform("uMetallic", mat.Metallic);
+                        m_particleShader->setUniform("uSmoothness", mat.Smoothness);
+                        m_particleShader->setUniform("uAOStrength", mat.AOStrength);
+                        m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
+
+                        // Normal map (texture unit 1)
+                        if (mat.NormalTextureId != 0) {
+                            m_particleShader->setUniform("uHasNormalMap", 1);
+                            m_particleShader->setUniform("uNormalMap", 1);
+                            glActiveTexture(GL_TEXTURE1);
+                            glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
+                        }
+                        else {
+                            m_particleShader->setUniform("uHasNormalMap", 0);
+                        }
+
+                        // MRA map (texture unit 2)
+                        if (mat.MRA_TextureId != 0) {
+                            m_particleShader->setUniform("uHasMRAMap", 1);
+                            m_particleShader->setUniform("uMRAMap", 2);
+                            glActiveTexture(GL_TEXTURE2);
+                            glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
+                        }
+                        else {
+                            m_particleShader->setUniform("uHasMRAMap", 0);
+                        }
+                    }
+                    else {
+                        m_particleShader->setUniform("uLightingEnabled", 0);
+                        m_particleShader->setUniform("uMaterialFlags", 0);
+                        m_particleShader->setUniform("uHasNormalMap", 0);
+                        m_particleShader->setUniform("uHasMRAMap", 0);
+                    }
+
+                    // Albedo/particle texture (texture unit 0)
+                    if (emitter.textureId != 0) {
+                        m_particleShader->setUniform("uHasTexture", 1);
+                        m_particleShader->setUniform("uTexture", 0);
+                        glActiveTexture(GL_TEXTURE0);
+                        glBindTexture(GL_TEXTURE_2D, emitter.textureId);
+                    }
+                    else {
+                        m_particleShader->setUniform("uHasTexture", 0);
+                    }
+
+                    glBindVertexArray(emitter.vao);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
                     glBindVertexArray(0);
                 }
             }
