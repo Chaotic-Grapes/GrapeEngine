@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include "ecs/systems/ParticleSystem.h"
 #include "ecs/World.h"
 #include "Color.h"
 #include "Math/Vector2D.h"
@@ -487,6 +488,10 @@ namespace ECS {
 
         // Compute shaders
         std::shared_ptr<Shader> m_boidShader;
+
+        // Particle
+        std::shared_ptr<Shader> m_particleShader;
+        ECS::ParticleSystem* m_particleSystem = nullptr;
 
         // ====================================================================
         // Member Variables - Object Picking

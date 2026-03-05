@@ -120,6 +120,10 @@ public:
 
     void RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    void RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    void _ApplyPresetToJson(nlohmann::json& data, int presetId);
+
     void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
