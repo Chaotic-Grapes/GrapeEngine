@@ -1744,14 +1744,15 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTilesetPath.clear();
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
-    m_tileMapList.clear(); // Drop tilemap list for the new scene.
+    m_tileMapList.clear();  // Drop tilemap list for the new scene.
+    m_tilePalette.ClearTilePreviewSizeCache(); // Reset per-scene tile preview size cache.
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
     const std::vector<std::string> emptyPaths;
     m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 
     if (auto* renderer = ECS::RendererSystem::GetInstance()) {
         renderer->ClearDebugTileMaps(); // Remove any previous debug tilemaps.
-        renderer->ClearDebugTileMap(); // Clear the legacy single debug map as well.
+        renderer->ClearDebugTileMap();  // Clear the legacy single debug map as well.
     }
 }
 
