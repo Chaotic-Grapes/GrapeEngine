@@ -385,6 +385,84 @@ void HierarchyPanel::Render() {
     }
 
     const ImGuiIO& io = ImGui::GetIO();
+    const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    const bool hierarchyHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+    const bool hierarchyInputContext = hierarchyFocused || hierarchyHovered;
+    const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+
+    const bool hierarchyCopyShortcut =
+        hierarchyInputContext &&
+        ctrlDown &&
+        Input::IsKeyPressed(KEY_C) &&
+        !io.WantTextInput;
+
+    if (hierarchyCopyShortcut) {
+        m_copiedEntityIds.clear();
+
+        // Copy only top-level selected entities to avoid duplicate nested clones on paste.
+        for (EntityId id : m_selectedEntityIds) {
+            ECS::Entity entity = m_world->Resolve(id);
+            if (entity.IsNull() || !m_world->IsAlive(entity) || IsProtectedEntity(m_world, id)) {
+                continue;
+            }
+
+            bool hasSelectedAncestor = false;
+            ECS::Entity parent = m_world->ParentOf(entity);
+            while (!parent.IsNull()) {
+                if (m_selectedEntityIds.find(parent.Index) != m_selectedEntityIds.end()) {
+                    hasSelectedAncestor = true;
+                    break;
+                }
+                parent = m_world->ParentOf(parent);
+            }
+
+            if (!hasSelectedAncestor) {
+                m_copiedEntityIds.push_back(id);
+            }
+        }
+    }
+
+    const bool hierarchyPasteShortcut =
+        hierarchyInputContext &&
+        ctrlDown &&
+        Input::IsKeyPressed(KEY_V) &&
+        !io.WantTextInput;
+
+    if (hierarchyPasteShortcut && !m_copiedEntityIds.empty()) {
+        std::unordered_set<EntityId> pastedIds;
+        for (EntityId id : m_copiedEntityIds) {
+            ECS::Entity source = m_world->Resolve(id);
+            if (source.IsNull() || !m_world->IsAlive(source) || IsProtectedEntity(m_world, id)) {
+                continue;
+            }
+
+            const EntityId clonedId = m_entityActions ? m_entityActions->CloneEntity(id) : ECS::Entity::NPOS32;
+            if (clonedId != ECS::Entity::NPOS32) {
+                ECS::Entity cloned = m_world->Resolve(clonedId);
+                if (m_world->IsAlive(cloned)) {
+                    ECS::Entity parent = m_world->ParentOf(cloned);
+                    if (parent.IsNull()) {
+                        _appendToOrderList(m_rootOrder, clonedId);
+                    }
+                    else {
+                        _appendToOrderList(m_childOrder[parent.Index], clonedId);
+                    }
+                }
+                pastedIds.insert(clonedId);
+            }
+        }
+
+        if (!pastedIds.empty()) {
+            m_selectedEntityIds = pastedIds;
+            m_anchorEntityId = *pastedIds.begin();
+            m_pendingClickSelectionId = ECS::Entity::NPOS32;
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(m_anchorEntityId));
+            if (m_selectionCallback) {
+                m_selectionCallback(m_anchorEntityId);
+            }
+        }
+    }
+
     const bool hierarchyDeleteShortcut =
         Input::IsKeyPressed(KEY_DELETE) &&
         !io.WantTextInput &&
@@ -738,8 +816,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Configure tree node flags for proper behavior and appearance
-    ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow   // Open when clicking arrow
-        | ImGuiTreeNodeFlags_OpenOnDoubleClick                      // Open when double-clicking
+    ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow   // Open only when clicking the arrow
         | ImGuiTreeNodeFlags_SpanAvailWidth;                        // Make entire row hoverable/selectable
 
     // Mark as leaf if no children (changes arrow behavior)

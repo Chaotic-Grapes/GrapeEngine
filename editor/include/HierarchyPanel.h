@@ -240,6 +240,7 @@ private:
     std::vector<EntityId> m_entityOrder;            // Ordered list for serialization.
     std::vector<EntityId> m_rootOrder;              // Persistent root order for stable hierarchy display.
     std::unordered_map<EntityId, std::vector<EntityId>> m_childOrder; // Persistent per-parent child order.
+    std::vector<EntityId> m_copiedEntityIds;        // Internal clipboard for hierarchy Ctrl+C/Ctrl+V.
 
     // DON'T REMOVE: IMPORTANT
     std::vector<EntityId> m_deferredDeletions;
