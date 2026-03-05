@@ -21,8 +21,6 @@ Provides:
 #include "AssetBrowserPanel.h"
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
-#include "core/messaging/MessageSystem.h"
-#include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
 #include "ecs/PrefabManager.h"
@@ -120,12 +118,7 @@ void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* s
     // Initialize helper modules
     m_assetLibrary.Initialize(mainFont, boldFont, symbolsFont);
 
-    // Subscribe to file drop events
-    Messaging::MessageSystem::Subscribe<Messaging::FileDropped>(
-        [this](const Messaging::FileDropped& msg) {
-            m_assetLibrary._handleFileDrop(msg.filePath, m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
-        }
-    );
+    // OS file drops are consumed via Input::ConsumeDroppedFiles() during Render()
 }
 
 // Update the world reference when scene changes
@@ -149,6 +142,15 @@ void AssetBrowserPanel::SetInspector(InspectorPanel* inspector) {
 // Render the Asset Browser window with breadcrumbs, actions and panels
 // Uses child regions to split file list and file info side-by-side
 void AssetBrowserPanel::Render() {
+    // Consume OS drop queue from Input directly
+    // This is module-safe even when message-bus subscriptions are split across engine/editor binaries
+    const std::vector<std::string> droppedFiles = Input::ConsumeDroppedFiles();
+
+	// Handle each dropped file
+    for (const auto& droppedPath : droppedFiles) {
+        m_assetLibrary._handleFileDrop(droppedPath, m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
+    }
+
     ImGui::PushFont(m_mainFont);
     // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling
     ImGui::Begin("Asset Browser", nullptr, ImGuiWindowFlags_NoScrollbar);
@@ -159,8 +161,8 @@ void AssetBrowserPanel::Render() {
     _renderContentArea();
     _renderCreateDialog();
 
-    // Handle keyboard shortcuts - ONLY when Asset Browser window is focused
-    // This prevents conflicts with other panels (e.g., Hierarchy) that also use DELETE key
+    // Handle keyboard shortcuts ONLY when Asset Browser window is focused
+    // This prevents conflicts with other panels (e.g. Hierarchy) that also use DELETE key
     if (!m_selectedAssets.empty() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
         // DELETE key: delete selected assets
         if (Input::IsKeyDown(KEY_DELETE)) {

@@ -89,6 +89,11 @@ private:
     void _handleFileDrop(const std::string& sourcePath, const std::string& currentPath,
         std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
+    // Shared import path used by both file dialog import and OS drag-drop import
+    // Validates destination and resolves name conflicts before copying
+    void _importFromSourcePath(const std::filesystem::path& sourcePath, const std::string& currentPath,
+        std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
+
     // This removes the chosen file or folder
     // It updates status and clears selection
     void _deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer);

@@ -29,6 +29,7 @@ Features:
 #include <GLFW/glfw3.h>
 #include <unordered_map>
 #include <string>
+#include <vector>
 
 namespace Engine { class Application; }
 
@@ -104,6 +105,9 @@ public:
     // Clear the character input buffer (call once per frame after processing)
     static void ClearCharInput() { m_charInput.clear(); }
 
+    // Retrieve and clear any file paths dropped from the OS since the last consume
+    static std::vector<std::string> ConsumeDroppedFiles();
+
     // Print OpenGL system specifications to the log
     static void PrintSpecs();
 
@@ -127,6 +131,9 @@ private:
 
     // Character input buffer
     static std::string m_charInput;   // Characters typed this frame
+
+    // OS file drop queue populated by GLFW drop callback and consumed by editor UI
+    static std::vector<std::string> m_droppedFiles;
 
     // GLFW callback functions
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod);
