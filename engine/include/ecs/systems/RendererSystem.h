@@ -290,6 +290,7 @@ namespace ECS {
             std::vector<std::shared_ptr<const Tileset>> Tilesets;
             
             glm::vec2 Offset;
+            Entity SourceEntity = NULL_ENTITY; // Editor entity that owns this debug tilemap
         };
 
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);

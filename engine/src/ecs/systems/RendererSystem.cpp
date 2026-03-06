@@ -720,9 +720,29 @@ namespace ECS {
 
                     if (!m_debugTileMaps.empty())
                     {
-                        // Render all tilemaps requested by the editor.
+                        // Render all tilemaps requested by the editor
                         TileMapRenderer tileRenderer;
+
+						// For each debug tilemap entry...
                         for (const auto& entry : m_debugTileMaps) {
+							// Skip if source entity is specified but not active/alive (e.g. deleted map)
+                            if (!entry.SourceEntity.IsNull()) {
+								// Check if the source entity is still alive and active in the world
+                                if (!world.IsAlive(entry.SourceEntity) || !world.IsActiveInHierarchy(entry.SourceEntity)) {
+                                    continue;
+                                }
+								// If the source entity has a TileMapComponent, check if it's still marked as visible (the editor may toggle 
+                                // visibility without deleting the entity)
+                                if (world.Has<Components::TileMapComponent>(entry.SourceEntity)) {
+                                    const auto& comp = world.Get<Components::TileMapComponent>(entry.SourceEntity);
+                                    
+									// Skip if the component is not visible
+                                    if (!comp.Visible) {
+                                        continue;
+                                    }
+                                }
+                            }
+
 							// Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
                             std::vector<const Tileset*> rawTilesets;
 
@@ -2286,6 +2306,18 @@ namespace ECS {
                 TileMapRenderer tileRenderer;
 				// Same thing here, but for multiple tilemaps
                 for (const auto& entry : m_debugTileMaps) {
+                    if (!entry.SourceEntity.IsNull()) {
+                        if (!world.IsAlive(entry.SourceEntity) || !world.IsActiveInHierarchy(entry.SourceEntity)) {
+                            continue;
+                        }
+                        if (world.Has<Components::TileMapComponent>(entry.SourceEntity)) {
+                            const auto& comp = world.Get<Components::TileMapComponent>(entry.SourceEntity);
+                            if (!comp.Visible) {
+                                continue;
+                            }
+                        }
+                    }
+
                     std::vector<const Tileset*> rawTilesets;
                     rawTilesets.reserve(entry.Tilesets.size());
                     for (const auto& ts : entry.Tilesets) {

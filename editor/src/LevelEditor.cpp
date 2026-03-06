@@ -1392,7 +1392,7 @@ void LevelEditor::_refreshTileMapCache() {
         }
 
         entry.Origin = origin; // Update origin every frame to follow entity transforms.
-        entry.Visible = comp.Visible; // Cache visibility so debug rendering matches component state.
+        entry.Visible = comp.Visible && m_world->IsActiveInHierarchy(entity); // Match runtime visibility gating
         entry.DisplayName = displayName;
 
         if (addedLegacyTileset && !entry.MapPath.empty()) {
@@ -1477,7 +1477,7 @@ void LevelEditor::_refreshTileMapCache() {
         for (const auto& tileset : entry.Tilesets) {
             tilesets.push_back(tileset);
         }
-        debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
+        debugMaps.push_back({ *entry.Map, tilesets, entry.Origin, m_world->Resolve(id) });
     }
 
         renderer->SetDebugTileMaps(debugMaps);
