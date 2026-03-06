@@ -147,6 +147,18 @@ private:
     // Add a new root entity (no parent)
     void _addRootEntity();
 
+    // Collect top-level selected entities into hierarchy clipboard
+    void _copySelectedEntities();
+
+    // Clone entities from hierarchy clipboard and select pasted entities
+    void _pasteCopiedEntities();
+
+    // Queue deletion for all selected entities except protected ones
+    void _deleteSelectedEntities();
+
+    // Ctrl+X behavior: delete selected entities without touching clipboard
+    void _cutSelectedEntities();
+
     // Start renaming an entity (prepare rename state and buffers)
     void _startRename(EntityId entityId);
 
@@ -227,26 +239,29 @@ private:
     // Click timing for distinguishing fast double-click from slow double-click
     EntityId m_lastClickedEntity = ECS::Entity::NPOS32; // Last entity that was clicked
     float m_lastClickTime = 0.0f;                       // Time of last click
-    static constexpr float RENAME_DELAY_THRESHOLD = 0.45f; // Min delay for slow double-click rename (fast double-click still focuses).
-    static constexpr float RENAME_DELAY_MAX = 0.90f;       // Max delay to still treat as intentional second click for rename.
+    static constexpr float RENAME_DELAY_THRESHOLD = 0.45f; // Min delay for slow double-click rename (fast double-click still focuses)
+    static constexpr float RENAME_DELAY_MAX = 0.90f;       // Max delay to still treat as intentional second click for rename
 
     // Reorder undo coalescing
-    EntityId m_lastReorderParentId = ECS::Entity::NPOS32; // Parent id for coalescing reorder undo.
-    float m_lastReorderTime = -1000.0f;                   // Timestamp for coalescing reorder undo.
-    static constexpr float REORDER_COALESCE_WINDOW = 0.6f; // Time window to merge reorder commands.
+    EntityId m_lastReorderParentId = ECS::Entity::NPOS32;  // Parent id for coalescing reorder undo
+    float m_lastReorderTime = -1000.0f;                    // Timestamp for coalescing reorder undo
+    static constexpr float REORDER_COALESCE_WINDOW = 0.6f; // Time window to merge reorder commands
 
     // Entity order for scene serialization (preserves visual hierarchy order)
-    // This is a HINT for saving - the ECS World's HierarchyIndex is the source of truth for rendering
-    std::vector<EntityId> m_entityOrder;            // Ordered list for serialization.
-    std::vector<EntityId> m_rootOrder;              // Persistent root order for stable hierarchy display.
-    std::unordered_map<EntityId, std::vector<EntityId>> m_childOrder; // Persistent per-parent child order.
-    std::vector<EntityId> m_copiedEntityIds;        // Internal clipboard for hierarchy Ctrl+C/Ctrl+V.
+    // This is a HINT for saving: the ECS World's HierarchyIndex is the source of truth for rendering
+    std::vector<EntityId> m_entityOrder;            // Ordered list for serialization
+    std::vector<EntityId> m_rootOrder;              // Persistent root order for stable hierarchy display
+    std::unordered_map<EntityId, std::vector<EntityId>> m_childOrder; // Persistent per-parent child order
+    std::vector<EntityId> m_copiedEntityIds;        // Internal clipboard for hierarchy Ctrl+C/Ctrl+V
 
     // DON'T REMOVE: IMPORTANT
     std::vector<EntityId> m_deferredDeletions;
 
     // Message subscription for viewport entity selection
     Messaging::SubscriptionHandle m_entitySelectedSubscription;
+
+    // Prevent internal notify loops from collapsing multiselect
+    bool m_suppressSelectionSync = false;
 };
 
 #endif

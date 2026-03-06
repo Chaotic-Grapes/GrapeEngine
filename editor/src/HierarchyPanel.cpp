@@ -155,6 +155,9 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
                 if (!m_world) {
                     return;
                 }
+                if (m_suppressSelectionSync) {
+                    return;
+                }
 
                 // When viewport selects an entity, update hierarchy selection and expand parent nodes
                 if (event.EntityId != ECS::Entity::NPOS32) {
@@ -283,7 +286,6 @@ void HierarchyPanel::Render() {
             m_selectedEntityIds.clear();
             m_selectedEntityIds.insert(m_pendingClickSelectionId);
             m_anchorEntityId = m_pendingClickSelectionId;
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(m_pendingClickSelectionId));
             if (m_selectionCallback) m_selectionCallback(m_pendingClickSelectionId);
         }
         m_pendingClickSelectionId = ECS::Entity::NPOS32;
@@ -396,30 +398,10 @@ void HierarchyPanel::Render() {
         Input::IsKeyPressed(KEY_C) &&
         !io.WantTextInput;
 
+	// Only trigger copy if we have a valid selection and we're not focused on a text input 
+    // (to avoid conflicts with renaming)
     if (hierarchyCopyShortcut) {
-        m_copiedEntityIds.clear();
-
-        // Copy only top-level selected entities to avoid duplicate nested clones on paste.
-        for (EntityId id : m_selectedEntityIds) {
-            ECS::Entity entity = m_world->Resolve(id);
-            if (entity.IsNull() || !m_world->IsAlive(entity) || IsProtectedEntity(m_world, id)) {
-                continue;
-            }
-
-            bool hasSelectedAncestor = false;
-            ECS::Entity parent = m_world->ParentOf(entity);
-            while (!parent.IsNull()) {
-                if (m_selectedEntityIds.find(parent.Index) != m_selectedEntityIds.end()) {
-                    hasSelectedAncestor = true;
-                    break;
-                }
-                parent = m_world->ParentOf(parent);
-            }
-
-            if (!hasSelectedAncestor) {
-                m_copiedEntityIds.push_back(id);
-            }
-        }
+        _copySelectedEntities();
     }
 
     const bool hierarchyPasteShortcut =
@@ -428,60 +410,31 @@ void HierarchyPanel::Render() {
         Input::IsKeyPressed(KEY_V) &&
         !io.WantTextInput;
 
+	// Only trigger paste if we have something in the clipboard
     if (hierarchyPasteShortcut && !m_copiedEntityIds.empty()) {
-        std::unordered_set<EntityId> pastedIds;
-        for (EntityId id : m_copiedEntityIds) {
-            ECS::Entity source = m_world->Resolve(id);
-            if (source.IsNull() || !m_world->IsAlive(source) || IsProtectedEntity(m_world, id)) {
-                continue;
-            }
-
-            const EntityId clonedId = m_entityActions ? m_entityActions->CloneEntity(id) : ECS::Entity::NPOS32;
-            if (clonedId != ECS::Entity::NPOS32) {
-                ECS::Entity cloned = m_world->Resolve(clonedId);
-                if (m_world->IsAlive(cloned)) {
-                    ECS::Entity parent = m_world->ParentOf(cloned);
-                    if (parent.IsNull()) {
-                        _appendToOrderList(m_rootOrder, clonedId);
-                    }
-                    else {
-                        _appendToOrderList(m_childOrder[parent.Index], clonedId);
-                    }
-                }
-                pastedIds.insert(clonedId);
-            }
-        }
-
-        if (!pastedIds.empty()) {
-            m_selectedEntityIds = pastedIds;
-            m_anchorEntityId = *pastedIds.begin();
-            m_pendingClickSelectionId = ECS::Entity::NPOS32;
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(m_anchorEntityId));
-            if (m_selectionCallback) {
-                m_selectionCallback(m_anchorEntityId);
-            }
-        }
+        _pasteCopiedEntities();
     }
 
     const bool hierarchyDeleteShortcut =
+        hierarchyInputContext &&
         Input::IsKeyPressed(KEY_DELETE) &&
         !io.WantTextInput &&
-        !io.WantCaptureKeyboard &&
         !ImGui::IsAnyItemActive();
 
     if (hierarchyDeleteShortcut && !m_selectedEntityIds.empty()) {
-        // Delete all selected entities (except protected ones)
-        std::vector<EntityId> toDelete;
-        for (EntityId id : m_selectedEntityIds) {
-            if (!IsProtectedEntity(m_world, id)) {
-                toDelete.push_back(id);
-            }
-        }
-        for (EntityId id : toDelete) {
-            _deleteEntity(id);
-        }
+        _deleteSelectedEntities();
     }
 
+	// Ctrl+X for cut (copy + mark for deletion after paste)
+    const bool hierarchyCutShortcut = hierarchyInputContext && ctrlDown && Input::IsKeyPressed(KEY_X) &&
+        !io.WantTextInput && !ImGui::IsAnyItemActive();
+
+	// Only trigger cut if we have a valid selection
+    if (hierarchyCutShortcut && !m_selectedEntityIds.empty()) {
+        _cutSelectedEntities();
+    }
+
+	// F2 for rename (single selection only)
     if (ImGui::IsKeyPressed(ImGuiKey_F2) && m_selectedEntityIds.size() == 1) {
         EntityId selected = *m_selectedEntityIds.begin();
         if (!IsProtectedEntity(m_world, selected)) {
@@ -985,9 +938,9 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     // Get current time for click timing
     float currentTime = static_cast<float>(ImGui::GetTime());
 
-    // Check modifier keys
-    bool ctrlPressed = ImGui::GetIO().KeyCtrl;
-    bool shiftPressed = ImGui::GetIO().KeyShift;
+	// Check modifier keys (shift and ctrl) for selection behavior
+    const bool ctrlPressed = ImGui::GetIO().KeyCtrl || Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+    const bool shiftPressed = ImGui::GetIO().KeyShift || Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
 
     // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -1054,7 +1007,6 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             }
 
             // Publish selection change to sync with viewport (send primary selected)
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else if (ctrlPressed) {
@@ -1071,23 +1023,17 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 m_selectedEntityIds.insert(entityId);
                 m_anchorEntityId = entityId;
             }
+
             // Publish selection change to sync with viewport
             EntityId selectedId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(selectedId));
-            if (m_selectionCallback) m_selectionCallback(entityId);
+
+			// Send primary selected entity (for viewport sync)
+            if (m_selectionCallback) m_selectionCallback(selectedId);
         }
         else {
-            // Normal click: handle based on whether entity is already selected
-            if (isAlreadySelected) {
-                // Clicking on an already-selected entity in a multi-selection
-                // or single-selection should not churn selection/callbacks.
-                // This preserves drag start behavior.
-                m_pendingClickSelectionId = ECS::Entity::NPOS32;
-            }
-            else {
-                // Defer single selection until mouse release so first click can start dragging.
-                m_pendingClickSelectionId = entityId;
-            }
+            // Normal click (no modifiers): collapse to the clicked entity
+            // Deferred until release so a drag start can still cancel this change
+            m_pendingClickSelectionId = entityId;
         }
 
         // Update click tracking for next time
@@ -1515,12 +1461,26 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
             }
         }
 
-        // Show Clone/Delete options if there is at least one entity selected (same as entity context menu)
-        if (!m_selectedEntityIds.empty()) {
-            ImGui::Separator();
+		// Paste option should be available even without any selection, as long as there are copied entities
+        if (m_copiedEntityIds.empty()) ImGui::BeginDisabled();
 
+		// Show Paste option if there are copied entities, even if nothing is currently selected
+        if (ImGui::Selectable("Paste")) {
+            _pasteCopiedEntities();
+        }
+        if (m_copiedEntityIds.empty()) ImGui::EndDisabled();
+
+        // Show Copy/Clone/Delete options if there is at least one entity selected (same as entity context menu)
+        if (!m_selectedEntityIds.empty()) {
             // Show count in label if multiple selected, but still operate on all selected entities
             const size_t selectionCount = m_selectedEntityIds.size();
+            const std::string copyLabel = (selectionCount > 1) ? "Copy (" + std::to_string(selectionCount) + ")" : "Copy";
+            
+			// Copy should operate on all selected entities, even when triggered from background menu
+            if (ImGui::Selectable(copyLabel.c_str())) {
+                _copySelectedEntities();
+            }
+
             std::string cloneLabel = (selectionCount > 1) ? "Clone (" + std::to_string(selectionCount) + ")" : "Clone";
             if (ImGui::Selectable(cloneLabel.c_str())) {
                 for (EntityId id : m_selectedEntityIds) {
@@ -1533,12 +1493,7 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
             // Delete option should also show count if multiple selected, but still operate on all selected entities
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
             if (ImGui::Selectable(deleteLabel.c_str())) {
-                std::vector<EntityId> toDelete(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
-                for (EntityId id : toDelete) {
-                    if (!IsProtectedEntity(m_world, id)) {
-                        _deleteEntity(id);
-                    }
-                }
+                _deleteSelectedEntities();
             }
         }
         ImGui::EndPopup();
@@ -1553,7 +1508,6 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
             m_selectedEntityIds.clear();
             m_selectedEntityIds.insert(entityId);
             m_anchorEntityId = entityId;
-            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
 
@@ -1581,6 +1535,20 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
                 }
             }
 
+			// Copy should operate on all selected entities, even when triggered from entity context menu
+            const std::string copyLabel = (selectionCount > 1) ? "Copy (" + std::to_string(selectionCount) + ")" : "Copy";
+            if (ImGui::Selectable(copyLabel.c_str())) {
+                _copySelectedEntities();
+            }
+            if (m_copiedEntityIds.empty()) ImGui::BeginDisabled();
+
+			// Paste should operate on all copied entities, even when triggered from entity context menu and 
+            // regardless of current selection
+            if (ImGui::Selectable("Paste")) {
+                _pasteCopiedEntities();
+            }
+            if (m_copiedEntityIds.empty()) ImGui::EndDisabled();
+
             // Rename only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Rename")) {
@@ -1606,13 +1574,7 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
             if (ImGui::Selectable(deleteLabel.c_str())) {
-                // Delete all selected entities
-                std::vector<EntityId> toDelete(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
-                for (EntityId id : toDelete) {
-                    if (!IsProtectedEntity(m_world, id)) {
-                        _deleteEntity(id);
-                    }
-                }
+                _deleteSelectedEntities();
             }
             // Insert a visual separator.
             ImGui::Separator();
@@ -1668,6 +1630,140 @@ void HierarchyPanel::_cloneEntity(EntityId entityId) {
             }
         }
     }
+}
+
+// Copy selected entities: stores their IDs for later pasting
+void HierarchyPanel::_copySelectedEntities() {
+	// Block copying if any selected entity is protected
+    m_copiedEntityIds.clear();
+
+    // Copy only top-level selected entities to avoid duplicate nested clones on paste
+    for (EntityId id : m_selectedEntityIds) {
+		// Skip if entity is protected
+        ECS::Entity entity = m_world->Resolve(id);
+
+		// Also skip if entity is invalid or dead, to avoid issues on paste
+        if (entity.IsNull() || !m_world->IsAlive(entity) || IsProtectedEntity(m_world, id)) {
+            continue;
+        }
+
+		// Check if any ancestor of this entity is also selected, to avoid copying nested entities 
+        // multiple times
+        bool hasSelectedAncestor = false;
+        ECS::Entity parent = m_world->ParentOf(entity);
+
+		// Traverse up the hierarchy to check for selected ancestors
+        while (!parent.IsNull()) {
+			// If we find an ancestor that is also selected, we skip copying this entity because it 
+            // will be included in the clone of the ancestor
+            if (m_selectedEntityIds.find(parent.Index) != m_selectedEntityIds.end()) {
+                hasSelectedAncestor = true;
+                break;
+            }
+			// Move up to the next ancestor
+            parent = m_world->ParentOf(parent);
+        }
+
+		// If no selected ancestor was found, we add this entity to the copied list
+        if (!hasSelectedAncestor) {
+            m_copiedEntityIds.push_back(id);
+        }
+    }
+}
+
+// Paste copied entities: clones the stored entity IDs and adds them to the hierarchy
+void HierarchyPanel::_pasteCopiedEntities() {
+	// Block pasting if there are no copied entities or if world/entityActions are 
+    // not available
+    if (!m_world || !m_entityActions || m_copiedEntityIds.empty()) {
+        return;
+    }
+
+	// We use a set to track pasted IDs for selection, since we may be pasting multiple entities and 
+    // want to avoid duplicates
+    std::unordered_set<EntityId> pastedIds;
+
+	// Clone each copied entity
+    // The cloning process will also clone all of its children, so we only need to iterate over the 
+    // top-level copied entities
+    for (EntityId id : m_copiedEntityIds) {
+        ECS::Entity source = m_world->Resolve(id);
+
+		// Skip if source entity is invalid, dead or protected, to avoid issues on paste
+        if (source.IsNull() || !m_world->IsAlive(source) || IsProtectedEntity(m_world, id)) {
+            continue;
+        }
+
+		// Clone the entity and get the new ID
+        const EntityId clonedId = m_entityActions->CloneEntity(id);
+
+		// If cloning was successful, we need to add the cloned entity to the correct order 
+        // list based on its new parent
+        if (clonedId != ECS::Entity::NPOS32) {
+			// After cloning, we check the parent of the cloned entity to determine where to insert 
+            // it in the order list
+            ECS::Entity cloned = m_world->Resolve(clonedId);
+
+			// If the cloned entity is valid, we check its parent to determine where to insert it 
+            // in the order list
+            if (m_world->IsAlive(cloned)) {
+                ECS::Entity parent = m_world->ParentOf(cloned);
+
+				// If the parent is null, it means this is a root entity and we add it to the root order list
+                if (parent.IsNull()) {
+                    _appendToOrderList(m_rootOrder, clonedId);
+                }
+				// If the parent is not null, we add it to the child order list of its parent
+                else {
+                    _appendToOrderList(m_childOrder[parent.Index], clonedId);
+                }
+            }
+
+			// Add the cloned ID to the set of pasted IDs for selection
+            pastedIds.insert(clonedId);
+        }
+    }
+
+	// After pasting, we want to select the newly pasted entities
+    // We set the selection to the set of pasted IDs and set the anchor to the first pasted entity for 
+    // shift-click range selection support
+    if (!pastedIds.empty()) {
+        m_selectedEntityIds = pastedIds;
+        m_anchorEntityId = *pastedIds.begin();
+        m_pendingClickSelectionId = ECS::Entity::NPOS32;
+
+		// Trigger selection callback with the anchor entity ID (first pasted entity) so that inspector 
+        // and other UI can update to show the newly pasted entities
+        if (m_selectionCallback) {
+            m_selectionCallback(m_anchorEntityId);
+        }
+    }
+}
+
+// Delete all selected entities, with safety checks to prevent deleting protected entities
+void HierarchyPanel::_deleteSelectedEntities() {
+	// We first gather all entities to delete in a separate list to avoid modifying the selection set while 
+    // iterating it
+    std::vector<EntityId> toDelete;
+    toDelete.reserve(m_selectedEntityIds.size());
+
+	// We check each selected entity to see if it is protected
+    for (EntityId id : m_selectedEntityIds) {
+        // If it is not protected, we add it to the list of entities to delete
+        if (!IsProtectedEntity(m_world, id)) {
+            toDelete.push_back(id);
+        }
+    }
+	// Now we delete all entities in the toDelete list
+    // This will also handle deleting any child entities
+    for (EntityId id : toDelete) {
+        _deleteEntity(id);
+    }
+}
+
+// Cut is just a copy followed by delete, so we can reuse those functions
+void HierarchyPanel::_cutSelectedEntities() {
+    _deleteSelectedEntities();
 }
 
 // Add a child entity to the selected entity
