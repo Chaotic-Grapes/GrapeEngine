@@ -38,7 +38,9 @@ through a unified system shared by both entities and prefab templates.
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <functional>
 #include <unordered_set>
+#include <unordered_map>
 #include "EditorStyle.h"
 #include "EditorIcons.h"
 #include "core/Application.h"
@@ -272,12 +274,285 @@ namespace {
     }
 }
 
+// Helper functions for prefab synchronization and component matching
 namespace {
+    // Some serializers include the namespace in the component type name while others do not, 
+    // so we need to be flexible when matching
+    constexpr const char* kComponentPrefix = "ECS::Components::";
+
+    // Strips known namespace prefixes from component type names for more flexible matching.
+    // e.g. "ECS::Components::LocalTransform" -> "LocalTransform"
+    std::string StripComponentPrefix(const std::string& typeName) {
+        const std::string prefix = kComponentPrefix;
+
+        // If the type name starts with the known prefix, remove it for matching purposes
+        if (typeName.size() >= prefix.size() && typeName.compare(0, prefix.size(), prefix) == 0) {
+            return typeName.substr(prefix.size());
+        }
+
+        // Otherwise, return the original type name unchanged
+        return typeName;
+    }
+
+    // Checks if two component type names refer to the same component type,
+    // ignoring whether or not either includes the "ECS::Components::" namespace prefix
+    bool ComponentTypeMatches(const std::string& lhs, const std::string& rhs) {
+        return lhs == rhs || StripComponentPrefix(lhs) == StripComponentPrefix(rhs);
+    }
+
+    // Retrieves the root node of a prefab JSON structure
+    // Prefabs can appear in two formats:
+    // - Wrapped: { "Entity": { "Components": [...], "Children": [...] } }
+    // - Flat: { "Components": [...], "Children": [...] }
+    const nlohmann::json* GetPrefabRootNode(const nlohmann::json& prefabData) {
+        // Wrapped format: root is the "Entity" object
+        if (prefabData.contains("Entity") && prefabData["Entity"].is_object()) {
+            return &prefabData["Entity"];
+        }
+        // Flat format: root itself contains "Components" directly
+        if (prefabData.contains("Components") && prefabData["Components"].is_array()) {
+            return &prefabData;
+        }
+        // Neither format matched: invalid prefab structure
+        return nullptr;
+    }
+
+    // Returns a pointer to the "Components" array inside a prefab node,
+    // or nullptr if the node doesn't have one
+    const nlohmann::json* GetPrefabNodeComponents(const nlohmann::json& prefabNode) {
+        if (prefabNode.contains("Components") && prefabNode["Components"].is_array()) {
+            return &prefabNode["Components"];
+        }
+        return nullptr;
+    }
+
+    // Checks whether a scene entity is an instance of any prefab in targetHashes
+    // Supports two ways an entity can declare its prefab association:
+    // - PrefabInstanceMetadata: stores the hash directly as "PrefabHash"
+    // - PrefabLink: stores the prefab file path; the hash is computed from it
+    bool SceneEntityMatchesPrefabHash(const nlohmann::json& entity, const std::vector<uint32_t>& targetHashes) {
+		// If the entity doesn't have a Components array, it cannot be a prefab instance
+        if (!entity.contains("Components") || !entity["Components"].is_array()) {
+            return false;
+        }
+
+		// Check each component for prefab association metadata
+        for (const auto& comp : entity["Components"]) {
+			// Basic validation to ensure component has expected structure before accessing fields
+            if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
+            if (!comp["TypeName"].is_string() || !comp["Data"].is_object()) continue;
+
+			// Extract the component type name for matching
+            const std::string typeName = comp["TypeName"].get<std::string>();
+
+			// Check for PrefabInstanceMetadata which directly contains the prefab hash
+            if (ComponentTypeMatches(typeName, "PrefabInstanceMetadata")) {
+                // Hash is stored directly on the component
+                if (!comp["Data"].contains("PrefabHash")) continue;
+                uint32_t hashValue = 0;
+
+				// Attempt to read the hash value, skip if it's not a valid uint32_t
+                try { hashValue = comp["Data"]["PrefabHash"].get<uint32_t>(); }
+                catch (...) { continue; }
+
+				// If the hash matches any of the target hashes, this entity is an instance of a relevant prefab
+                if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
+                    return true;
+                }
+            }
+
+			// Check for PrefabLink which contains the prefab file path; we compute the hash from it
+            else if (ComponentTypeMatches(typeName, "PrefabLink")) {
+                // Hash is derived from the prefab file path
+				// Validate that the prefabPath field exists and is a string before accessing
+                if (!comp["Data"].contains("prefabPath") || !comp["Data"]["prefabPath"].is_string()) continue;
+
+				// Compute the hash from the prefab path using the PrefabManager's hashing function
+                const std::string path = comp["Data"]["prefabPath"].get<std::string>();
+
+				// Normalize the path before hashing to ensure consistent hash values regardless of path formatting
+                uint32_t hashValue = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
+
+				// If the computed hash matches any of the target hashes, this entity is an instance of a relevant prefab
+                if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
+                    return true;
+                }
+            }
+        }
+
+		// No matching prefab association found in any component, so this entity does not match the target prefab hashes
+        return false;
+    }
+
+	// Applies components from a prefab node to a scene entity JSON object, matching by component type name
+    bool ApplyPrefabComponentsToSceneEntity(nlohmann::json& sceneEntity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+		// Validate that the prefab node has a Components array before proceeding
+        const nlohmann::json* prefabComponents = GetPrefabNodeComponents(prefabNode);
+        if (!prefabComponents) {
+            return false;
+        }
+
+		// Ensure the scene entity has a Components array to apply to; if not, create an empty one
+        if (!sceneEntity.contains("Components") || !sceneEntity["Components"].is_array()) {
+            sceneEntity["Components"] = nlohmann::json::array();
+        }
+        auto& sceneComponents = sceneEntity["Components"];
+
+		// We will track whether any modifications are made to the scene entity's components so we can return that information
+        bool modified = false;
+
+		// For each component defined in the prefab node, we will try to find a matching component in the scene entity by type name
+        for (const auto& prefabComp : *prefabComponents) {
+			// Basic validation to ensure the prefab component has expected structure before accessing fields
+            if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
+            if (!prefabComp["TypeName"].is_string() || !prefabComp["Data"].is_object()) continue;
+
+			// Extract the component type name from the prefab component for matching
+            const std::string prefabTypeName = prefabComp["TypeName"].get<std::string>();
+
+			// For matching purposes, we will compare component type names in a flexible way that ignores the presence 
+            // or absence of the "ECS::Components::" namespace prefix
+            const std::string prefabShortType = StripComponentPrefix(prefabTypeName);
+            bool found = false;
+
+			// Search for a matching component in the scene entity's components by type name
+            for (auto& sceneComp : sceneComponents) {
+				// Basic validation to ensure the scene component has expected structure before accessing fields
+                if (!sceneComp.contains("TypeName") || !sceneComp["TypeName"].is_string()) continue;
+
+				// Extract the component type name from the scene component for matching
+                const std::string sceneTypeName = sceneComp["TypeName"].get<std::string>();
+
+				// Check if the component type names match (ignoring namespace prefixes)
+                if (!ComponentTypeMatches(sceneTypeName, prefabTypeName)) continue;
+
+				// If this component type matches, we will update the scene component's data to match the prefab component's data
+                nlohmann::json newData = prefabComp["Data"];
+
+				// If this is the root entity and the component is a transform, we may want to preserve the existing position and 
+                // rotation in the scene to avoid moving the entity unexpectedly when applying the prefab
+                if (preserveRootTransform && prefabShortType == "LocalTransform" && sceneComp.contains("Data") && sceneComp["Data"].is_object()) {
+                    if (sceneComp["Data"].contains("Position")) {
+                        newData["Position"] = sceneComp["Data"]["Position"];
+                    }
+                    if (sceneComp["Data"].contains("Rotation")) {
+                        newData["Rotation"] = sceneComp["Data"]["Rotation"];
+                    }
+                }
+
+				// Only update the scene component's data if it is different from the prefab component's data to avoid unnecessary 
+                // modifications
+                if (!sceneComp.contains("Data") || sceneComp["Data"] != newData) {
+                    sceneComp["Data"] = newData;
+                    modified = true;
+                }
+
+                found = true;
+                break;
+            }
+
+			// If we did not find a matching component in the scene entity, we will add this prefab component to the scene entity's 
+            // components
+            if (!found) {
+                nlohmann::json newComp = nlohmann::json::object();
+                newComp["TypeName"] = prefabShortType;
+                newComp["Data"] = prefabComp["Data"];
+                sceneComponents.push_back(std::move(newComp));
+                modified = true;
+            }
+        }
+
+        return modified;
+    }
+
+	// Builds a mapping of parent entity indices to their child entity indices based on the "Hierarchy" array in the scene JSON
+    std::unordered_map<size_t, std::vector<size_t>> BuildSceneChildrenMap(const nlohmann::json& sceneJson) {
+		// The scene JSON may contain a "Hierarchy" array that defines parent-child relationships between entities by their indices 
+        // in the "Entities" array
+        std::unordered_map<size_t, std::vector<size_t>> childrenByParent;
+        if (!sceneJson.contains("Hierarchy") || !sceneJson["Hierarchy"].is_array()) {
+            return childrenByParent;
+        }
+
+		// Each entry in the "Hierarchy" array should have a "parent" index and a "child" index
+        // We will iterate through this array and build a mapping of parent indices to their child indices for easy lookup when 
+        // applying prefab hierarchies
+        for (const auto& relation : sceneJson["Hierarchy"]) {
+			// Basic validation to ensure the hierarchy relation has expected structure before accessing fields
+            if (!relation.contains("child") || !relation.contains("parent")) continue;
+            if (!relation["child"].is_number_unsigned() || !relation["parent"].is_number_unsigned()) continue;
+
+			// Extract the parent and child indices from the hierarchy relation
+            const size_t child = relation["child"].get<size_t>();
+            const size_t parent = relation["parent"].get<size_t>();
+            childrenByParent[parent].push_back(child);
+        }
+
+		// Return the mapping of parent entity indices to their child entity indices for use in prefab hierarchy application
+        return childrenByParent;
+    }
+
+	// Recursively applies components from a prefab hierarchy to a scene entity and its children, matching by component type name
+    bool ApplyPrefabHierarchyToSceneEntity(nlohmann::json& entities, const std::unordered_map<size_t, std::vector<size_t>>& sceneChildrenByParent,
+        size_t sceneEntityIndex, const nlohmann::json& prefabNode, bool preserveRootTransform)
+    {
+		// Validate that the scene entity index is within bounds and that the target scene entity is an object before proceeding
+        if (sceneEntityIndex >= entities.size()) {
+            return false;
+        }
+        if (!entities[sceneEntityIndex].is_object()) {
+            return false;
+        }
+
+		// First, apply components from the current prefab node to the target scene entity
+        bool modified = ApplyPrefabComponentsToSceneEntity(entities[sceneEntityIndex], prefabNode, preserveRootTransform);
+
+		// Then, if the prefab node has children, we will recursively apply the corresponding child prefab nodes to the child scene entities
+        const bool hasPrefabChildren = prefabNode.contains("Children") && prefabNode["Children"].is_array();
+        if (!hasPrefabChildren) {
+            return modified;
+        }
+
+		// Look up the child scene entities of the current scene entity using the mapping we built from the scene's "Hierarchy" array
+        const auto sceneIt = sceneChildrenByParent.find(sceneEntityIndex);
+        const size_t sceneChildCount = (sceneIt != sceneChildrenByParent.end()) ? sceneIt->second.size() : 0;
+        const size_t prefabChildCount = prefabNode["Children"].size();
+        const size_t applyCount = std::min(prefabChildCount, sceneChildCount);
+
+		// If the prefab and scene child counts do not match, we will log a warning and only apply to the overlapping children to 
+        // avoid out-of-bounds errors
+        if (prefabChildCount != sceneChildCount) {
+            LOG_WARNING("Prefab/scene child count mismatch at scene entity index " << sceneEntityIndex
+                << " (prefab = " << prefabChildCount << ", scene = " << sceneChildCount << "); applying overlapping children only");
+        }
+
+		// Recursively apply each child prefab node to the corresponding child scene entity
+        for (size_t i = 0; i < applyCount; i++) {
+			// Look up the index of the child scene entity from the mapping; if the mapping is missing or malformed we will skip to 
+            // avoid errors
+            const size_t childSceneIndex = sceneIt->second[i];
+            const auto& childPrefabNode = prefabNode["Children"][i];
+
+			// Recursively apply the child prefab node to the child scene entity; if any modifications are made, we will mark the parent as
+			// modified so that the updated scene JSON will be saved back to disk
+            if (ApplyPrefabHierarchyToSceneEntity(entities, sceneChildrenByParent, childSceneIndex, childPrefabNode, false)) {
+                modified = true;
+            }
+        }
+
+        return modified;
+    }
+
+	// Main function to update all instances of a prefab in a scene file by applying the prefab's components to matching entities based on 
+    // prefab hash association
     void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath, const nlohmann::json& prefabData, const std::vector<uint32_t>& targetHashes) {
+		// Open the scene JSON file from disk
         std::ifstream inFile(scenePath);
         if (!inFile.is_open()) {
             return;
         }
+
+		// Read the entire scene JSON from the file; if parsing fails we will close the file and exit to avoid errors
         nlohmann::json sceneJson;
         try {
             inFile >> sceneJson;
@@ -287,100 +562,38 @@ namespace {
             return;
         }
         inFile.close();
+
+		// Validate that the scene JSON has an "Entities" array before proceeding, as we need this to find and update prefab instances; if it's
+		// missing or malformed we will exit to avoid errors
         if (!sceneJson.contains("Entities") || !sceneJson["Entities"].is_array()) {
             return;
         }
-        const nlohmann::json* componentsToApply = nullptr;
-        if (prefabData.contains("Components") && prefabData["Components"].is_array()) {
-            componentsToApply = &prefabData["Components"];
-        } else if (prefabData.contains("Entity") && prefabData["Entity"].contains("Components") && prefabData["Entity"]["Components"].is_array()) {
-            componentsToApply = &prefabData["Entity"]["Components"];
-        }
-        if (!componentsToApply) {
+
+		// Retrieve the root node of the prefab JSON structure, which contains the components and children to apply; if the prefab JSON is missing
+		// the expected structure we will exit to avoid errors
+        const nlohmann::json* prefabRootNode = GetPrefabRootNode(prefabData);
+        if (!prefabRootNode) {
             return;
         }
+
+		// We will iterate through all entities in the scene and look for those that are instances of the target prefab(s) based on their prefab 
+        // hash association
+        auto& entities = sceneJson["Entities"];
+        const auto sceneChildrenByParent = BuildSceneChildrenMap(sceneJson);
         bool sceneModified = false;
-        for (auto& entity : sceneJson["Entities"]) {
-            if (!entity.contains("Components") || !entity["Components"].is_array()) continue;
-            bool isInstance = false;
-            for (const auto& comp : entity["Components"]) {
-                if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
-                std::string typeName = comp["TypeName"].get<std::string>();
-                if (typeName == "PrefabInstanceMetadata" || typeName == "ECS::Components::PrefabInstanceMetadata") {
-                    if (comp["Data"].contains("PrefabHash")) {
-                        uint32_t hashValue = 0;
-                        try { hashValue = comp["Data"]["PrefabHash"].get<uint32_t>(); } catch (...) { }
-                        if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
-                            isInstance = true;
-                            break;
-                        }
-                    }
-                } else if (typeName == "PrefabLink" || typeName == "ECS::Components::PrefabLink") {
-                    if (comp["Data"].contains("prefabPath")) {
-                        std::string path = comp["Data"]["prefabPath"].get<std::string>();
-                        uint32_t hashValue = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
-                        if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
-                            isInstance = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (!isInstance) continue;
-            for (const auto& prefabComp : *componentsToApply) {
-                if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
-                std::string prefabTypeName = prefabComp["TypeName"].get<std::string>();
-                std::string shortTypeName = prefabTypeName;
-                const std::string prefix = "ECS::Components::";
-                if (shortTypeName.size() >= prefix.size() && shortTypeName.compare(0, prefix.size(), prefix) == 0) {
-                    shortTypeName = shortTypeName.substr(prefix.size());
-                }
-                bool found = false;
-                for (auto& entityComp : entity["Components"]) {
-                    if (!entityComp.contains("TypeName")) continue;
-                    std::string typeName = entityComp["TypeName"].get<std::string>();
-                    
-                    // Handle both full and short names for existing components
-                    std::string shortExistingName = typeName;
-                    if (shortExistingName.size() >= prefix.size() && shortExistingName.compare(0, prefix.size(), prefix) == 0) {
-                        shortExistingName = shortExistingName.substr(prefix.size());
-                    }
 
-                    if (typeName == prefabTypeName || shortExistingName == shortTypeName) {
-                        // For LocalTransform, preserve Position and Rotation from the scene file
-                        // unless specifically asked to overwrite (which we assume we don't for root instances)
-                        if (shortTypeName == "LocalTransform") {
-                             nlohmann::json newTransformData = prefabComp["Data"];
-                             
-                             // Restore Position from existing scene data if present
-                             if (entityComp["Data"].contains("Position")) {
-                                 newTransformData["Position"] = entityComp["Data"]["Position"];
-                             }
-                             // Restore Rotation from existing scene data if present
-                             if (entityComp["Data"].contains("Rotation")) {
-                                 newTransformData["Rotation"] = entityComp["Data"]["Rotation"];
-                             }
-                             
-                             entityComp["Data"] = newTransformData;
-                        } 
-                        else {
-                            entityComp["Data"] = prefabComp["Data"];
-                        }
+		// For each entity in the scene, we will check if it is an instance of any of the target prefabs by looking for prefab association metadata in its
+		// components; if it is an instance, we will apply the prefab's components to the scene entity and its children according to the prefab hierarchy
+        for (size_t i = 0; i < entities.size(); i++) {
+            if (!entities[i].is_object()) continue;
+            if (!SceneEntityMatchesPrefabHash(entities[i], targetHashes)) continue;
 
-                        found = true;
-                        sceneModified = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    nlohmann::json newComp = nlohmann::json::object();
-                    newComp["TypeName"] = shortTypeName;
-                    newComp["Data"] = prefabComp["Data"];
-                    entity["Components"].push_back(newComp);
-                    sceneModified = true;
-                }
+            if (ApplyPrefabHierarchyToSceneEntity(entities, sceneChildrenByParent, i, *prefabRootNode, true)) {
+                sceneModified = true;
             }
         }
+
+		// If any modifications were made to the scene JSON, we will write the updated JSON back to disk to save the changes
         if (sceneModified) {
             std::ofstream outFile(scenePath);
             if (!outFile.is_open()) {
@@ -476,6 +689,7 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
     m_editState.entityId = 0;
     m_editState.startComponents.clear();
     m_editState.hasSnapshot = false;
+    m_selectedPrefabNodePath.clear();
 
     // Usual checks
     if (path.empty()) {
@@ -562,6 +776,7 @@ void InspectorPanel::ClearSelection() {
     m_editState.hasSnapshot = false;
     m_prefabPath.clear();
     m_prefabData = {};
+    m_selectedPrefabNodePath.clear();
     m_componentsToDelete.clear();
 }
 
@@ -1137,8 +1352,245 @@ void InspectorPanel::_renderPrefabHeader() {
     ImGui::Separator();
 }
 
+// Check if the loaded prefab JSON has a hierarchical structure (i.e. contains nested entities)
+bool InspectorPanel::_isHierarchicalPrefab() const {
+    return m_prefabData.contains("Entity") && m_prefabData["Entity"].is_object();
+}
+
+// Get a pointer to the currently selected prefab node in the JSON structure based on m_selectedPrefabNodePath
+nlohmann::json* InspectorPanel::_getSelectedPrefabNode() {
+	// If this is a hierarchical prefab, we need to traverse the JSON tree based on the selected path
+    if (_isHierarchicalPrefab()) {
+		// Start at the root "Entity" node
+        nlohmann::json* node = &m_prefabData["Entity"];
+
+		// Traverse down the "Children" arrays according to the indices in m_selectedPrefabNodePath
+        for (size_t idx : m_selectedPrefabNodePath) {
+			// If at any point the expected "Children" array is missing or the index is out of bounds, we 
+            // reset the selection to root
+            if (!node->contains("Children") || !(*node)["Children"].is_array() || idx >= (*node)["Children"].size()) {
+                m_selectedPrefabNodePath.clear();
+                return &m_prefabData["Entity"];
+            }
+			// Move the pointer down to the selected child node
+            node = &(*node)["Children"][idx];
+        }
+
+		// After traversing the path, node points to the currently selected prefab node, which we return
+        return node;
+    }
+
+	// If this is not a hierarchical prefab, we just return the root prefab object for editing
+    if (m_prefabData.is_object()) {
+        return &m_prefabData;
+    }
+    return nullptr;
+}
+
+// Const version of _getSelectedPrefabNode for read-only access
+const nlohmann::json* InspectorPanel::_getSelectedPrefabNode() const {
+	// Same traversal logic as non-const version, but returns a const pointer for read-only access
+    if (_isHierarchicalPrefab()) {
+        const nlohmann::json* node = &m_prefabData["Entity"];
+        for (size_t idx : m_selectedPrefabNodePath) {
+            if (!node->contains("Children") || !(*node)["Children"].is_array() || idx >= (*node)["Children"].size()) {
+                return &m_prefabData["Entity"];
+            }
+            node = &(*node)["Children"][idx];
+        }
+        return node;
+    }
+
+    if (m_prefabData.is_object()) {
+        return &m_prefabData;
+    }
+    return nullptr;
+}
+
+// Get a pointer to the "Components" array of the currently selected prefab node, optionally creating it 
+// if it doesn't exist
+nlohmann::json* InspectorPanel::_getSelectedPrefabComponents(bool createIfMissing) {
+	// First get the currently selected node in the prefab JSON structure
+    nlohmann::json* node = _getSelectedPrefabNode();
+    if (!node || !node->is_object()) {
+        return nullptr;
+    }
+
+	// Ensure there is a "Components" array we can write to; if not, create an empty one (for new nodes)
+    if (!node->contains("Components")) {
+        if (!createIfMissing) return nullptr;
+        (*node)["Components"] = nlohmann::json::array();
+    }
+	// If "Components" exists but is not an array, this is a malformed prefab structure; we log an error and reset it
+    if (!(*node)["Components"].is_array()) {
+        if (!createIfMissing) return nullptr;
+        (*node)["Components"] = nlohmann::json::array();
+    }
+	// Finally return a pointer to the "Components" array of the selected node, which the caller can read from 
+    // or write to
+    return &(*node)["Components"];
+}
+
+// Const version of _getSelectedPrefabComponents for read-only access
+const nlohmann::json* InspectorPanel::_getSelectedPrefabComponents() const {
+    // SAME THING
+    const nlohmann::json* node = _getSelectedPrefabNode();
+    if (!node || !node->is_object()) {
+        return nullptr;
+    }
+    if (!node->contains("Components") || !(*node)["Components"].is_array()) {
+        return nullptr;
+    }
+    return &(*node)["Components"];
+}
+
+// Helper to extract a display name for a prefab node by looking for a Name component in its Components list
+std::string InspectorPanel::_getPrefabNodeDisplayName(const nlohmann::json& node) const {
+	// Look for a Name or ECS::Components::Name component in this node's Components array to use as display name
+    if (node.contains("Components") && node["Components"].is_array()) {
+		// We loop through all components of this prefab node to find a Name component, which we use as the display 
+        // name in the UI
+        for (const auto& comp : node["Components"]) {
+			// Basic validation to make sure this component has the expected structure before we try to read it
+            if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+            if (!comp.contains("Data") || !comp["Data"].is_object()) continue;
+
+			// Check if this component is a Name component (either short or fully-qualified)
+            const std::string typeName = comp["TypeName"].get<std::string>();
+
+			// If this is a Name component, we look for a "Value" field inside its "Data" object, which should be the 
+            // actual name string
+            if (typeName == "Name" || typeName == "ECS::Components::Name") {
+				// If the Value field exists and is a string, we return it as the display name for this prefab node
+                // If it's empty, we fall back to a default name below
+                if (comp["Data"].contains("Value") && comp["Data"]["Value"].is_string()) {
+                    const std::string value = comp["Data"]["Value"].get<std::string>();
+                    if (!value.empty()) {
+                        return value;
+                    }
+                }
+				// If we found a Name component but it doesn't have a valid Value, we stop looking further and return a 
+                // default name
+                break;
+            }
+        }
+    }
+	// If no Name component found, we return a default name based on whether this is the root node or a child node
+    return "Entity";
+}
+
+// Recursively build a flat list of all prefab nodes in the JSON structure for display in the child selector dropdown
+std::vector<InspectorPanel::PrefabNodeSelectionItem> InspectorPanel::_buildPrefabNodeSelectionItems() const {
+    std::vector<PrefabNodeSelectionItem> items;
+
+	// If this prefab doesn't have a hierarchical structure, we just return an empty list and the UI will show a 
+    // single "Root" node
+    if (!_isHierarchicalPrefab()) {
+        return items;
+    }
+    
+	// Start with the root node
+    const nlohmann::json* root = &m_prefabData["Entity"];
+    items.push_back({ {}, "Root", 0 });
+
+	// Recursive lambda to visit each node in the prefab JSON tree and add it to the items list with its path and depth for indentation
+    std::function<void(const nlohmann::json&, const std::vector<size_t>&, const std::string&, int)> visit;
+    visit = [&](const nlohmann::json& node, const std::vector<size_t>& path, const std::string& pathLabel, int depth) {
+        if (!node.contains("Children") || !node["Children"].is_array()) {
+            return;
+        }
+
+		// Loop through each child of this node
+        for (size_t i = 0; i < node["Children"].size(); i++) {
+			// Basic validation to ensure this child is an object before we try to read it
+            const auto& child = node["Children"][i];
+            if (!child.is_object()) continue;
+
+			// Build the path to this child node by appending the current index to the parent's path
+            std::vector<size_t> childPath = path;
+            childPath.push_back(i);
+
+			// Get a display name for this child node (looking for a Name component or defaulting to "Entity")
+            const std::string childName = _getPrefabNodeDisplayName(child);
+            const std::string childPathLabel = pathLabel + "/" + childName;
+            items.push_back({ childPath, childPathLabel, depth + 1 });
+
+			// Recursively visit this child's children to build their paths and labels as well
+            visit(child, childPath, childPathLabel, depth + 1);
+        }
+    };
+
+	// Start the recursive visitation with the root node, an empty path, "Root" label, and depth 0
+    visit(*root, {}, "Root", 0);
+
+	// After this function runs, we have a flat list of all prefab nodes with their corresponding paths and display names, 
+    // which we can use to populate the child selector dropdown in the UI
+    return items;
+}
+
 // Render all component definitions stored inside the prefab JSON
 void InspectorPanel::_renderPrefabComponents() {
+	// First we get a pointer to the currently selected prefab node's "Components" array in the JSON structure
+    if (_isHierarchicalPrefab()) {
+		// For hierarchical prefabs, we render a child selector dropdown to allow selecting which node's components to edit
+        const std::vector<PrefabNodeSelectionItem> nodeItems = _buildPrefabNodeSelectionItems();
+		// We look through the list of nodes to find the currently selected one so we can show its name in the UI
+        std::string currentLabel = "Root";
+        for (const auto& item : nodeItems) {
+            if (item.Path == m_selectedPrefabNodePath) {
+                currentLabel = item.Label;
+                break;
+            }
+        }
+
+		// Button to open the child selector popup
+        if (ImGui::Button("Select Child")) {
+            ImGui::OpenPopup("PrefabChildSelector");
+        }
+
+		// Popup menu to select which child node's components to edit; shows a hierarchical list of all nodes in the prefab with 
+        // indentation
+        if (ImGui::BeginPopup("PrefabChildSelector")) {
+			// Iterate through all prefab nodes and show them in the popup with indentation based on their depth in the hierarchy
+            for (size_t itemIndex = 0; itemIndex < nodeItems.size(); itemIndex++) {
+                const auto& item = nodeItems[itemIndex];
+                const bool isSelected = (item.Path == m_selectedPrefabNodePath);
+                const std::string indent(static_cast<size_t>(std::max(item.Depth - 1, 0) * 2), ' ');
+                const std::string popupLabel = indent + item.Label;
+
+				// We use PushID with the item index to ensure unique IDs for each selectable, since labels can be duplicated in a hierarchy
+                ImGui::PushID(static_cast<int>(itemIndex));
+
+				// Each item is a selectable entry; when clicked, we update m_selectedPrefabNodePath to point to the selected node's path 
+                // in the JSON structure
+                if (ImGui::Selectable(popupLabel.c_str(), isSelected)) {
+                    m_selectedPrefabNodePath = item.Path;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+
+		// If we are not at the root node, show a "Back to Root" button that clears the selection path and goes back to editing the root 
+        // prefab node
+        const bool disableBackToRoot = m_selectedPrefabNodePath.empty();
+        if (disableBackToRoot) {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button("Back to Root")) {
+            m_selectedPrefabNodePath.clear();
+        }
+        if (disableBackToRoot) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("Editing: %s", currentLabel.c_str());
+        ImGui::Dummy(ImVec2(0, 4));
+    }
+
     // Footer needs 2 lines: one for buttons, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
@@ -1147,6 +1599,7 @@ void InspectorPanel::_renderPrefabComponents() {
         ImGui::SetKeyboardFocusHere();
         m_focusComponentFilter = false;
     }
+
     ImGui::SetNextItemWidth(240.0f);
     if (ImGui::InputTextWithHint("##ComponentFilterPrefab", "Filter components/fields...", m_componentFilterBuffer, sizeof(m_componentFilterBuffer))) {
         m_componentFilter = m_componentFilterBuffer;
@@ -1156,17 +1609,12 @@ void InspectorPanel::_renderPrefabComponents() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
 
-    // Determine which components array to use (Flat vs Hierarchical)
-    nlohmann::json* componentsPtr = nullptr;
-    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Components"];
-    } else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Entity"]["Components"];
-    }
+	// Get the Components array for the currently selected prefab node; if it doesn't exist, we won't draw anything
+    nlohmann::json* componentsPtr = _getSelectedPrefabComponents(false);
 
     // Prefab JSON must have a Components array or there is nothing to draw
     if (!componentsPtr) {
-        ImGui::TextDisabled("No components in prefab");
+        ImGui::TextDisabled("No components in selected prefab node");
         ImGui::EndChild();
         ImGui::PopStyleVar();
         return;
@@ -1549,20 +1997,10 @@ bool InspectorPanel::_entityHasComponent(EntityId id, const std::string& compone
 // Add a component entry to the prefab JSON
 // Prefabs are stored and edited entirely through JSON so we modify the data directly
 bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
-    // Determine which components array to use (Flat vs Hierarchical)
-    nlohmann::json* componentsPtr = nullptr;
-    if (m_prefabData.contains("Entity")) {
-        if (!m_prefabData["Entity"].contains("Components")) {
-            m_prefabData["Entity"]["Components"] = nlohmann::json::array();
-        }
-        componentsPtr = &m_prefabData["Entity"]["Components"];
-    } 
-    else {
-        if (!m_prefabData.contains("Components")) {
-            m_prefabData["Components"] = nlohmann::json::array();
-        }
-        componentsPtr = &m_prefabData["Components"];
-    }
+	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure, 
+    // creating it if it doesn't exist
+    nlohmann::json* componentsPtr = _getSelectedPrefabComponents(true);
+    if (!componentsPtr) return false;
 
     // No duplicates allowed
     if (_prefabHasComponent(componentType)) return false;
@@ -1592,15 +2030,9 @@ bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 // Prefabs store components as JSON objects so we search the Components array by TypeName
 // Some entries store the short name while others store the fully qualified ECS type so we check for both
 void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType) {
-    // Determine which components array to use (Flat vs Hierarchical)
-    nlohmann::json* componentsPtr = nullptr;
-    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Components"];
-    } 
-    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Entity"]["Components"];
-    }
-
+	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure; 
+    // if it doesn't exist, there is nothing to remove
+    nlohmann::json* componentsPtr = _getSelectedPrefabComponents(false);
     if (!componentsPtr) return;
     auto& components = *componentsPtr;
 
@@ -1625,15 +2057,9 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
 
 // Checks whether the prefab JSON already contains a component of this type
 bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
-    // Determine which components array to use (Flat vs Hierarchical)
-    nlohmann::json* componentsPtr = nullptr;
-    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Components"];
-    } 
-    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Entity"]["Components"];
-    }
-
+	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure; 
+    // if it doesn't exist, there are no components
+    const nlohmann::json* componentsPtr = _getSelectedPrefabComponents();
     if (!componentsPtr) return false;
 
     // Search each component entry
@@ -1775,6 +2201,14 @@ void InspectorPanel::_applyPrefabToInstances() {
     // Make sure the prefab file on disk is up to date
     _savePrefabData();
 
+	// Get the root node of the prefab JSON which contains the actual component definitions we need to apply
+    const nlohmann::json* prefabRootNode = GetPrefabRootNode(m_prefabData);
+    if (!prefabRootNode) {
+        m_statusMessage = "Failed: Prefab has no valid root data";
+        m_statusTimer = 2.0f;
+        return;
+    }
+
     // Compute hashes for robust matching
     std::vector<uint32_t> targetHashes;
     
@@ -1801,7 +2235,8 @@ void InspectorPanel::_applyPrefabToInstances() {
     m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
         // Check if the entity's hash matches any of our target hashes
         if (std::find(targetHashes.begin(), targetHashes.end(), meta.PrefabHash) != targetHashes.end()) {
-            _applyPrefabDataToEntity(entity);
+			// This entity is an instance of our prefab, so we apply the prefab data to it
+            _applyPrefabHierarchyToEntity(entity, *prefabRootNode, true);
             count++;
         }
     });
@@ -1838,17 +2273,10 @@ void InspectorPanel::_applyPrefabToInstances() {
     m_statusTimer = 2.0f;
 }
 
-// Applies all component data from the prefab JSON to one entity instance
-// This overwrites any local edits so the instance stays in sync with the prefab
-void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
-    // Determine which components array to use (Flat vs Hierarchical)
-    nlohmann::json* componentsPtr = nullptr;
-    if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Components"];
-    } 
-    else if (m_prefabData.contains("Entity") && m_prefabData["Entity"].contains("Components") && m_prefabData["Entity"]["Components"].is_array()) {
-        componentsPtr = &m_prefabData["Entity"]["Components"];
-    }
+// Applies all component data from one prefab node to one entity instance
+void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+	// Get the Components array for this prefab node; if it doesn't exist, there is nothing to apply
+    const nlohmann::json* componentsPtr = GetPrefabNodeComponents(prefabNode);
 
     // Prefab must have a valid Components array
     if (!componentsPtr) return;
@@ -1864,12 +2292,8 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
 
         // Use metadata to load the JSON into the live ECS component
         if (meta) {
-            // For LocalTransform on the root entity, we only want to apply Scale from the prefab
-            // Position and Rotation should remain specific to the instance
-            // We ensure this is the prefab root by checking for PrefabInstanceMetadata
-            bool isPrefabRoot = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
-
-            if (isPrefabRoot && (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform")) {
+            // For LocalTransform on the root entity, only apply Scale from prefab
+            if (preserveRootTransform && (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform")) {
                 // 1. Capture current instance values
                 ECS::Components::LocalTransform backupPosRot;
                 bool hasTransform = false;
@@ -1901,6 +2325,49 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
         }
+    }
+}
+
+// Recursively applies prefab data down the entity hierarchy
+void InspectorPanel::_applyPrefabHierarchyToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+	// Validate entity before applying data
+    if (!m_world || entity.IsNull() || !m_world->IsAlive(entity)) {
+        return;
+    }
+
+	// First apply data to the current entity, then we will recurse down to children
+    _applyPrefabDataToEntity(entity, prefabNode, preserveRootTransform);
+    if (!prefabNode.contains("Children") || !prefabNode["Children"].is_array()) {
+        return;
+    }
+
+	// Gather children of this entity into a vector so we can index them in the same order as the prefab JSON array
+    std::vector<ECS::Entity> entityChildren;
+    m_world->ForChildren(entity, [&](ECS::Entity child) {
+        if (!child.IsNull() && m_world->IsAlive(child)) {
+            entityChildren.push_back(child);
+        }
+    });
+
+	// If the prefab has more children than the entity, we can only apply to the overlapping ones
+    const auto& prefabChildren = prefabNode["Children"];
+    const size_t applyCount = std::min(prefabChildren.size(), entityChildren.size());
+
+	// Warn if there is a mismatch in child count, but still apply to the overlapping children
+    if (prefabChildren.size() != entityChildren.size()) {
+        LOG_WARNING("Prefab/entity child count mismatch at entity " << entity.Index
+            << " (prefab = " << prefabChildren.size() << ", entity = " << entityChildren.size()
+            << "); applying overlapping children only");
+    }
+
+	// Recursively apply prefab data to each child entity using the corresponding child prefab node
+    for (size_t i = 0; i < applyCount; i++) {
+		// Validate prefab child node before recursing
+        const auto& childPrefabNode = prefabChildren[i];
+        if (!childPrefabNode.is_object()) continue;
+
+		// Recurse down to child entity with corresponding prefab child node
+        _applyPrefabHierarchyToEntity(entityChildren[i], childPrefabNode, false);
     }
 }
 

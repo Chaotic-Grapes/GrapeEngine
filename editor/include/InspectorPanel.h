@@ -140,6 +140,30 @@ private:
     // Renders prefab specific action buttons including Save and Apply
     void _renderPrefabActions();
 
+    // Returns true if prefab data is stored in hierarchical {"Entity": {...}} format
+    bool _isHierarchicalPrefab() const;
+
+    // Returns selected prefab node from path (or root fallback)
+    nlohmann::json* _getSelectedPrefabNode();
+    const nlohmann::json* _getSelectedPrefabNode() const;
+
+    // Returns the selected node Components array
+    nlohmann::json* _getSelectedPrefabComponents(bool createIfMissing);
+    const nlohmann::json* _getSelectedPrefabComponents() const;
+
+    // Resolves a readable name for prefab node selector display
+    std::string _getPrefabNodeDisplayName(const nlohmann::json& node) const;
+
+	// Data structure for prefab node selection items in the popup menu
+    struct PrefabNodeSelectionItem {
+        std::vector<size_t> Path;
+        std::string Label;
+		int Depth = 0;  // Depth in the hierarchy for indentation display
+    };
+
+    // Builds root + full descendant list for popup node selection
+    std::vector<PrefabNodeSelectionItem> _buildPrefabNodeSelectionItems() const;
+
     // -------------------------------------------------------------------------
     // Component Section Rendering (Template Implementation)
     // -------------------------------------------------------------------------
@@ -169,8 +193,11 @@ private:
     // Applies prefab changes to all existing instances in the current world
     void _applyPrefabToInstances();
 
-    // Applies prefab data to a specific entity instance
-    void _applyPrefabDataToEntity(ECS::Entity entity);
+    // Applies one prefab node's component data to an entity
+    void _applyPrefabDataToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform);
+
+    // Recursively applies prefab node + descendants to entity hierarchy
+    void _applyPrefabHierarchyToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform);
 
     // -------------------------------------------------------------------------
     // Entity Component Management
@@ -229,6 +256,7 @@ private:
     std::string m_prefabPath;                      // Path to prefab asset file
     nlohmann::json m_prefabData;                   // Loaded JSON data for editing  
     size_t m_lastSavedPrefabHash = 0;              // Hash of last saved state
+    std::vector<size_t> m_selectedPrefabNodePath;  // Selected prefab node path from root (empty = root)
 
     // UI state
     std::vector<std::string> m_componentsToDelete; // Components scheduled for removal
