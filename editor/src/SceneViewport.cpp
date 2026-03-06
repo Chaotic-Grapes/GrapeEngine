@@ -172,6 +172,28 @@ void SceneViewport::_renderViewport() {
 
     // Begin scene viewport window
     ImGui::Begin("Scene", nullptr, windowFlags);
+    {
+		// Handle gizmo operation hotkeys when the scene viewport is focused or hovered
+        // and no text input or item interaction is active
+        ImGuiIO& io = ImGui::GetIO();
+        const bool sceneFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        const bool sceneHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+        const bool sceneInputContext = sceneFocused || sceneHovered;
+
+		// Only process gizmo hotkeys if we're in the scene viewport and not typing or interacting with UI items
+        if (sceneInputContext && !io.WantTextInput && !ImGui::IsAnyItemActive()) {
+			// Translate (T), Rotate (E), Scale (R) hotkeys
+            if (ImGui::IsKeyPressed(ImGuiKey_T)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Translate);
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_E)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Rotate);
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Scale);
+            }
+        }
+    }
     if (!m_maximizeViewport) {
         // Cache docking state for restoring the viewport later.
         m_restoreDockId = ImGui::GetWindowDockID();
@@ -286,7 +308,7 @@ void SceneViewport::_renderViewport() {
     auto curOp = m_interactionMgr.GetGizmoOperation();
     auto curMode = m_interactionMgr.GetGizmoMode();
     ImGui::PushID("GizmoOps");
-    if (iconButtonTinted("Move", ICON_MOVE, "Move (W)", curOp == Editor::GizmoRenderer::Operation::Translate, gizmoTint, true)) {
+    if (iconButtonTinted("Move", ICON_MOVE, "Move (T)", curOp == Editor::GizmoRenderer::Operation::Translate, gizmoTint, true)) {
         m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Translate);
     }
     ImGui::SameLine();
