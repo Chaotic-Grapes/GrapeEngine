@@ -115,8 +115,11 @@ tilemaps or tilesets can be resolved externally.
 */
 void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
 {
+    // Dropping a tilemap/tileset should not immediately arm viewport painting
+    m_paintMode = false;
+
     if (m_assetDropCallback) {
-        // Forward asset path to the editor-level handler.
+        // Forward asset path to the editor-level handler
         m_assetDropCallback(assetPath);
     }
 }
