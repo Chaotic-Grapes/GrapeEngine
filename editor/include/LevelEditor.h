@@ -181,6 +181,9 @@ private:
 	// Focus request flags for panels that can't immediately focus when requested (e.g. due to tab closing)
     bool m_focusTilePaletteNextFrame = false;
 
+    // Ignore viewport selection callbacks when hierarchy drives selection
+    bool m_suppressViewportSelectionSync = false;
+
     // Undo System
     Editor::UndoSystem m_undoSystem;
 

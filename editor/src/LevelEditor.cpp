@@ -780,11 +780,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
+        m_suppressViewportSelectionSync = true;
+
         if (!m_world) {
             m_inspector.ClearSelection();
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when no world.
+            m_suppressViewportSelectionSync = false;
             return;
         } // Clear when no world
 
@@ -793,6 +796,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when selection is empty.
+            m_suppressViewportSelectionSync = false;
             return;
         } // Clear when no entity
 
@@ -816,6 +820,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette for invalid entity.
         }
+        m_suppressViewportSelectionSync = false;
         });
 }
 
@@ -1017,6 +1022,10 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
 // Process selection changes coming from viewports.
 void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
+    if (m_suppressViewportSelectionSync) {
+        return; // Ignore feedback loop when hierarchy drives selection.
+    }
+
     if (!m_world) {
         m_inspector.ClearSelection();
         m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
