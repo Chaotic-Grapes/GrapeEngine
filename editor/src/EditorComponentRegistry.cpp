@@ -742,7 +742,7 @@ static void _initializeDefaultRegistry() {
         // Active
         {
             "Active", "Active", "ECS::Components::Active",
-            GetComponentIdFromHashOrWarn(kHashActive, "Active"), kHashActive, true, true,
+            GetComponentIdFromHashOrWarn(kHashActive, "Active"), kHashActive, false, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); }),
             // Serialize component JSON.
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Enabled", true}}; }),

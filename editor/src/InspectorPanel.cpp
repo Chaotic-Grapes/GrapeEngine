@@ -673,11 +673,19 @@ void InspectorPanel::InspectEntity(EntityId id) {
         return;
     }
 
-    // Ensure all entities have Transform component (mandatory)
+    // Ensure all entities have mandatory editor components
     // We use the registry to check and auto add defaults when missing
     const auto* transformMeta = ComponentRegistryUI::Find("LocalTransform");
     if (transformMeta && !transformMeta->HasComponent(m_world, e)) {
         transformMeta->AddComponent(m_world, e, transformMeta->GetDefaults());
+    }
+    const auto* activeMeta = ComponentRegistryUI::Find("Active");
+    if (activeMeta && !activeMeta->HasComponent(m_world, e)) {
+        activeMeta->AddComponent(m_world, e, activeMeta->GetDefaults());
+    }
+    const auto* layerMeta = ComponentRegistryUI::Find("Layer");
+    if (layerMeta && !layerMeta->HasComponent(m_world, e)) {
+        layerMeta->AddComponent(m_world, e, layerMeta->GetDefaults());
     }
 
     m_mode = InspectionMode::Entity;
@@ -713,15 +721,23 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
         file.close();
 
         // Handle empty files
-        // If the file is blank we create a prefab that at least has a Transform
+		// If the file is blank we create a prefab that contains the mandatory components
         if (content.empty() || content.find_first_not_of(" \t\n\r") == std::string::npos) {
             const auto* transformMeta = ComponentRegistryUI::Find("LocalTransform");
-            nlohmann::json defaultTransform = transformMeta ? transformMeta->GetDefaults() : nlohmann::json::object();
+            const auto* activeMeta = ComponentRegistryUI::Find("Active");
+            const auto* layerMeta = ComponentRegistryUI::Find("Layer");
 
-            // Build a minimal prefab JSON structure with a single Transform component
+			// Get default values for mandatory components from the registry; if any are missing we use hardcoded defaults
+            nlohmann::json defaultTransform = transformMeta ? transformMeta->GetDefaults() : nlohmann::json::object();
+            nlohmann::json defaultActive = activeMeta ? activeMeta->GetDefaults() : nlohmann::json{ {"Enabled", true} };
+            nlohmann::json defaultLayer = layerMeta ? layerMeta->GetDefaults() : nlohmann::json{ {"Id", 0} };
+
+            // Build a minimal prefab JSON structure with mandatory components
             m_prefabData = nlohmann::json{
                 {"Components", nlohmann::json::array({
-                    {{"TypeName", "ECS::Components::LocalTransform"}, {"Data", defaultTransform}}
+                    {{"TypeName", "ECS::Components::LocalTransform"}, {"Data", defaultTransform}},
+                    {{"TypeName", "ECS::Components::Active"}, {"Data", defaultActive}},
+                    {{"TypeName", "ECS::Components::Layer"}, {"Data", defaultLayer}}
                 })}
             };
 
@@ -735,7 +751,7 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
             // Immediately write this new prefab back to disk
             _savePrefabData();
 
-            m_statusMessage = "Opened empty prefab, added Transform";
+            m_statusMessage = "Opened empty prefab, added mandatory components";
             m_statusTimer = 2.0f;
             return;
         }
@@ -1941,14 +1957,14 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
     return false;
 }
 
-// Remove a component from the entity unless it is the Transform which must always exist
+// Remove a component from the entity unless it is mandatory
 void InspectorPanel::_removeComponentFromEntity(const std::string& componentType, bool recordUndo) {
     if (!m_world) return;
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return;
 
-    // Transform and Layer cannot be removed
-    if (componentType == "LocalTransform" || componentType == "Layer") return;
+    // Mandatory components cannot be removed
+    if (componentType == "LocalTransform" || componentType == "Layer" || componentType == "Active") return;
 
     std::vector<ECS::SerializedComponent> beforeSnapshot;
     if (recordUndo && m_undoSystem) {
