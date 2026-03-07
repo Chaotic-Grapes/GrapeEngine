@@ -530,6 +530,20 @@ void EditorFileMenu::_exportProject() {
                     }
                 }
 
+                // Handle rooted-relative inputs like "/Scenes/Main.scene" and normalize "."/"..".
+                if (!startupScenePath.is_absolute() && startupScenePath.has_root_directory()) {
+                    startupScenePath = startupScenePath.relative_path();
+                }
+                startupScenePath = startupScenePath.lexically_normal();
+                if (startupScenePath.empty() || startupScenePath == "." ||
+                    (startupScenePath.begin() != startupScenePath.end() && *startupScenePath.begin() == "..")) {
+                    pushResult({ "Copy project settings", false, "StartupScene must resolve inside the project folder.", "" });
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+                settingsJson["StartupScene"] = startupScenePath.generic_string();
+
                 // Now we will validate that the StartupScene path (whether originally relative or converted to relative) actually exists in the exported project
                 std::filesystem::path startupSceneResolved = startupScenePath;
                 if (!startupSceneResolved.is_absolute()) {
@@ -539,10 +553,22 @@ void EditorFileMenu::_exportProject() {
                 // If the resolved StartupScene path does not exist in the exported project, we will fail the export since the exported game would not be able to 
                 // find its startup scene and would be effectively broken, but if it does exist then we can proceed with the export as normal
                 if (!std::filesystem::exists(startupSceneResolved)) {
-                    pushResult({ "Copy project settings", false, "StartupScene path does not exist in exported project.", "" });
-                    m_exportDone = true;
-                    m_exportInProgress = false;
-                    return;
+                    // Support legacy settings that include "<ProjectName>/" prefix.
+                    std::filesystem::path trimmedPath = startupScenePath;
+                    if (trimmedPath.begin() != trimmedPath.end() && trimmedPath.begin()->string() == projectName) {
+                        trimmedPath = trimmedPath.lexically_relative(projectName);
+                        startupSceneResolved = exportProjectDir / trimmedPath;
+                    }
+
+                    if (!std::filesystem::exists(startupSceneResolved)) {
+                        pushResult({ "Copy project settings", false, "StartupScene path does not exist in exported project.", "" });
+                        m_exportDone = true;
+                        m_exportInProgress = false;
+                        return;
+                    }
+
+                    startupScenePath = trimmedPath;
+                    settingsJson["StartupScene"] = startupScenePath.generic_string();
                 }
 
                 std::ofstream settingsOut(exportSettingsPath, std::ios::trunc);
