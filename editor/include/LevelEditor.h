@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "SpriteImportPanel.h"
 #include "SystemsPanel.h"
 #include "TilePalettePanel.h"
+#include "GameConfigPanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 20.0f;
@@ -132,6 +133,7 @@ private:
     SpriteImportPanel m_spriteImportPanel;
     SystemsPanel m_systemsPanel;
     TilePalettePanel m_tilePalette;
+    GameConfigPanel m_gameConfigPanel;
 
     struct TileMapCacheEntry {
         std::shared_ptr<TileMap> Map;

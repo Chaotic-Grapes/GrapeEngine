@@ -191,6 +191,12 @@ private:
     // Helper to render project settings modal
     void _renderProjectSettingsModal();
 
+    // Optional callback to open the Game Configuration panel.
+    std::function<void()> m_openGameConfigPanel;
+
+public:
+    void SetOpenGameConfigPanelCallback(std::function<void()> callback) { m_openGameConfigPanel = std::move(callback); }
+
     // Export state
     bool m_exportRequested = false;
     bool m_openExportSummary = false;

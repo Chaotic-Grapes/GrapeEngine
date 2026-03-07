@@ -33,12 +33,23 @@ struct ProjectSettings {
      */
     struct Physics {
         float Gravity = -9.81f;    // Gravity acceleration
-        float TimeStep = 0.016f;    // Physics time step
+        float TimeStep = 0.016f;   // Physics time step
     } Physics;
 
+    // Root-level game metadata
     std::string Title = "GrapeEngine Game Project"; // Game/project name
     std::string Version = "1.0.0";                  // Version string
     std::string StartupScene = "";                  // Path to startup scene
+
+    // Audio configuration
+    float MasterVolume = 1.0f;       // Global volume multiplier [0,1]
+    float MusicVolume  = 1.0f;       // Music volume multiplier [0,1]
+    float SFXVolume    = 1.0f;       // Sound effects volume multiplier [0,1]
+    bool  MuteWhenUnfocused = false; // Mute audio when window loses focus
+
+    // Performance configuration
+    int TargetFPS = 60;  // Preferred target frame rate
+    int MaxFPS    = 120; // Hard cap when VSync is disabled
 };
 
 namespace Serialization {
@@ -92,6 +103,34 @@ namespace Serialization {
                 }
             }
 
+            // Parse Audio
+            if (settingsJson.contains("Audio") && settingsJson["Audio"].is_object()) {
+                const auto& audio = settingsJson["Audio"];
+                if (audio.contains("MasterVolume")) {
+                    settings.MasterVolume = audio["MasterVolume"].get<float>();
+                }
+                if (audio.contains("MusicVolume")) {
+                    settings.MusicVolume = audio["MusicVolume"].get<float>();
+                }
+                if (audio.contains("SFXVolume")) {
+                    settings.SFXVolume = audio["SFXVolume"].get<float>();
+                }
+                if (audio.contains("MuteWhenUnfocused")) {
+                    settings.MuteWhenUnfocused = audio["MuteWhenUnfocused"].get<bool>();
+                }
+            }
+
+            // Parse Performance
+            if (settingsJson.contains("Performance") && settingsJson["Performance"].is_object()) {
+                const auto& perf = settingsJson["Performance"];
+                if (perf.contains("TargetFPS")) {
+                    settings.TargetFPS = perf["TargetFPS"].get<int>();
+                }
+                if (perf.contains("MaxFPS")) {
+                    settings.MaxFPS = perf["MaxFPS"].get<int>();
+                }
+            }
+
             LOG_DEBUG("Project settings loaded successfully from: " << settingsPath << '\n');
             return true;
         }
@@ -118,6 +157,16 @@ namespace Serialization {
             
             settingsJson["Physics"]["Gravity"] = settings.Physics.Gravity;
             settingsJson["Physics"]["TimeStep"] = settings.Physics.TimeStep;
+
+            // Audio block
+            settingsJson["Audio"]["MasterVolume"] = settings.MasterVolume;
+            settingsJson["Audio"]["MusicVolume"]  = settings.MusicVolume;
+            settingsJson["Audio"]["SFXVolume"]    = settings.SFXVolume;
+            settingsJson["Audio"]["MuteWhenUnfocused"] = settings.MuteWhenUnfocused;
+
+            // Performance block
+            settingsJson["Performance"]["TargetFPS"] = settings.TargetFPS;
+            settingsJson["Performance"]["MaxFPS"]    = settings.MaxFPS;
 
             return Serializer::SaveJson(settingsPath, "json", settingsJson);
         }

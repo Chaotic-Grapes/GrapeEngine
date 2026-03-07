@@ -501,7 +501,7 @@ void EditorFileMenu::_exportProject() {
     });
 }
 
-// Draws the "Edit" menu with Undo/Redo and Project Settings
+// Draws the "Edit" menu with Undo/Redo and Project/Game settings
 void EditorFileMenu::RenderEditMenu() {
     if (ImGui::BeginMenu("Edit")) {
         const bool canUndo = m_undoSystem && m_undoSystem->CanUndo();
@@ -518,6 +518,11 @@ void EditorFileMenu::RenderEditMenu() {
         if (ImGui::MenuItem("Project Settings...")) {
             m_showProjectSettings = true;
             m_projectSettingsDirty = false;
+        }
+        if (ImGui::MenuItem("Game Configuration...")) {
+            if (m_openGameConfigPanel) {
+                m_openGameConfigPanel();
+            }
         }
         ImGui::EndMenu();
     }
