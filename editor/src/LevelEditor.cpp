@@ -679,6 +679,9 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             return;
         } // Clear when no world
 
+        const auto& selectedEntities = m_hierarchyWindow.GetSelectedEntities();
+        m_inspector.SetSelectedEntities(selectedEntities);
+
         if (id == ECS::Entity::NPOS32) {
             m_inspector.ClearSelection();
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
@@ -910,6 +913,9 @@ void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
         _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when no selection.
         return;
     }
+
+    // Sync multi-selection set to inspector
+    m_inspector.SetSelectedEntities(m_hierarchyWindow.GetSelectedEntities());
 
     // Validate entity before inspecting
     const ECS::Entity e = m_world->Resolve(id);

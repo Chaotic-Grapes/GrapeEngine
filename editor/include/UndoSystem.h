@@ -64,6 +64,24 @@ namespace Editor {
     };
 
     // ========================================================================
+    // Macro Command (group multiple commands into one)
+    // ========================================================================
+
+    class MacroCommand : public ICommand {
+    public:
+        MacroCommand() = default;
+        void AddCommand(std::unique_ptr<ICommand> command) { m_commands.push_back(std::move(command)); }
+        
+        void Execute() override { for (auto& cmd : m_commands) cmd->Execute(); }
+        void Undo() override { for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it) (*it)->Undo(); }
+        void Redo() override { for (auto& cmd : m_commands) cmd->Redo(); }
+        bool IsEmpty() const { return m_commands.empty(); }
+
+    private:
+        std::vector<std::unique_ptr<ICommand>> m_commands;
+    };
+
+    // ========================================================================
     // Transform Change Command
     // ========================================================================
 
@@ -367,6 +385,12 @@ namespace Editor {
         void BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& oldValue);
         void EndPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
             ComponentPropertyCommand::ApplyFn applyFn);
+
+        // Batch property edit API (for multi-select)
+        void BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath);
+        void EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
+            ComponentPropertyCommand::ApplyFn applyFn);
+
         void RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
             const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn);
 

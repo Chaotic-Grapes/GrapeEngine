@@ -388,6 +388,11 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
     EditorUI::SetSymbolsFont(symbolsFont);
 }
 
+void ComponentUI::SetSelectedEntities(const std::unordered_set<EntityId>* entities) {
+    m_selectedEntities = entities;
+    EditorUI::SetSelectedEntities(entities);
+}
+
 // Render any queued drag/drop validation popups
 void ComponentUI::RenderAssetDropFeedbackPopup() {
     RenderAssetDropErrorPopup();

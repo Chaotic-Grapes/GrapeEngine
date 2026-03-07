@@ -326,6 +326,7 @@ void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     // Forward fonts into the smaller ComponentUI helper so it can draw fields
     m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
     m_componentUI.SetUndoSystem(m_undoSystem);
+    m_componentUI.SetSelectedEntities(&m_selectedEntities);
     
     // NOTE: Do NOT call RebuildFromNativeRegistry() here!
     // The native registry won't have C# components yet (they're loaded on a background thread)
@@ -390,6 +391,10 @@ void InspectorPanel::InspectEntity(EntityId id) {
     }
 
     m_mode = InspectionMode::Entity;
+}
+
+void InspectorPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids) {
+    m_selectedEntities = ids;
 }
 
 // Load a prefab file from disk and switch into prefab editing mode
@@ -478,6 +483,7 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
 void InspectorPanel::ClearSelection() {
     m_mode = InspectionMode::None;
     m_entityId = 0;
+    m_selectedEntities.clear();
     m_editState.isEditing = false;
     m_editState.entityId = 0;
     m_editState.startComponents.clear();
@@ -877,12 +883,32 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (m_undoSystem && m_editState.hasSnapshot) {
                 const bool hadPropertyEdits = m_undoSystem->ConsumePropertyEditEmission();
                 if (!hadPropertyEdits) {
-                    auto endSnapshot = m_world->CaptureEntityComponents(entity);
-                    if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
-                        auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
-                            m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)
-                        );
-                        m_undoSystem->ExecuteCommand(std::move(command));
+                    bool isMultiSelect = m_selectedEntities.size() > 1 && m_selectedEntities.count(m_entityId);
+                    
+                    if (isMultiSelect) {
+                        auto macro = std::make_unique<Editor::MacroCommand>();
+                        
+                        // We don't have start snapshots for all entities, only the primary one.
+                        // This is a limitation of the current snapshot system for generic edits.
+                        // However, most property edits now use BatchComponentPropertyCommand.
+                        
+                        auto endSnapshot = m_world->CaptureEntityComponents(entity);
+                        if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
+                            macro->AddCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                                m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)));
+                        }
+                        
+                        if (!macro->IsEmpty()) {
+                            m_undoSystem->ExecuteCommand(std::move(macro));
+                        }
+                    } else {
+                        auto endSnapshot = m_world->CaptureEntityComponents(entity);
+                        if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
+                            auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                                m_world, entity, std::move(m_editState.startComponents), std::move(endSnapshot)
+                            );
+                            m_undoSystem->ExecuteCommand(std::move(command));
+                        }
                     }
                 }
             }
@@ -1321,7 +1347,8 @@ void InspectorPanel::_renderComponentMenuItem(const char* displayName, const cha
         bool added = false;
         // If we are editing a live entity
         if (m_mode == InspectionMode::Entity) {
-            added = _addComponentToEntity(componentType);
+            // _addComponentToEntity now handles multi-selection and undo internally
+            added = _addComponentToEntity(componentType, true);
         }
         // If we are editing a prefab template
         else if (m_mode == InspectionMode::Prefab) {
@@ -1341,68 +1368,79 @@ void InspectorPanel::_renderComponentMenuItem(const char* displayName, const cha
 
 // Attach a new component to the currently selected entity
 // We use metadata to create default JSON for the component and then apply it to the ECS
-bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
+bool InspectorPanel::_addComponentToEntity(const std::string& componentType, bool recordUndo) {
     if (!m_world) return false;
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return false;
 
-    std::vector<ECS::SerializedComponent> beforeSnapshot;
-    if (m_undoSystem) {
-        // Capture full entity state so add/remove can be undone as a single step.
-        beforeSnapshot = m_world->CaptureEntityComponents(entity);
+    // Multi-select support: collect all entities that will get the component
+    std::vector<ECS::Entity> targetEntities;
+    if (m_selectedEntities.count(m_entityId)) {
+        for (EntityId id : m_selectedEntities) {
+            ECS::Entity e = m_world->Resolve(id);
+            if (m_world->IsAlive(e)) targetEntities.push_back(e);
+        }
+    } else {
+        targetEntities.push_back(entity);
     }
 
-    // Shape components are mutually exclusive
-    if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
-        _removeComponentFromEntity("ShapeCircle2D", false);
-        _removeComponentFromEntity("ShapeBox2D", false);
-        _removeComponentFromEntity("ShapeLine2D", false);
+    auto macro = std::make_unique<Editor::MacroCommand>();
+
+    bool anyAdded = false;
+    for (ECS::Entity target : targetEntities) {
+        std::vector<ECS::SerializedComponent> beforeSnapshot;
+        if (recordUndo && m_undoSystem) {
+            beforeSnapshot = m_world->CaptureEntityComponents(target);
+        }
+
+        // Shape components are mutually exclusive
+        if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
+            // Internal call to remove mutually exclusive components - we don't want separate undo for these
+            // as they should be part of the same snapshot command.
+            // However, _removeComponentFromEntity handles its own snapshots if recordUndo=true.
+            // We'll pass false here to avoid double-snapshotting.
+            
+            // Temporary mode change to avoid recursive multi-select issues if we were to call _removeComponentFromEntity
+            // Instead we just use metadata to remove.
+            const char* shapes[] = { "ShapeCircle2D", "ShapeBox2D", "ShapeLine2D" };
+            for (const char* s : shapes) {
+                const auto* smeta = ComponentRegistryUI::Find(s);
+                if (smeta) smeta->RemoveComponent(m_world, target);
+            }
+        }
+
+        // Look up this component's metadata so we know how to create it
+        const auto* meta = ComponentRegistryUI::Find(componentType);
+        if (meta) {
+            // No duplicates
+            if (meta->HasComponent(m_world, target)) continue;
+
+            // Add to ECS with default JSON values
+            meta->AddComponent(m_world, target, meta->GetDefaults());
+            anyAdded = true;
+
+            if (recordUndo && m_undoSystem) {
+                auto afterSnapshot = m_world->CaptureEntityComponents(target);
+                if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
+                    macro->AddCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                        m_world, target, std::move(beforeSnapshot), std::move(afterSnapshot)
+                    ));
+                }
+            }
+        }
     }
 
-    // Look up this component's metadata so we know how to create it
-    const auto* meta = ComponentRegistryUI::Find(componentType);
-    if (meta) {
-        // Add to ECS with default JSON values
-        meta->AddComponent(m_world, entity, meta->GetDefaults());
+    if (anyAdded) {
         m_statusMessage = std::string("Added ") + componentType;
         m_statusTimer = 3.0f;
-
-        // DEBUG: dump all known native components and whether this entity has them
-        {
-            auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
-            for (auto aid : allIds) {
-                const auto& ameta = ECS::ComponentRegistry::Meta(aid);
-                std::string aname = ECS::ComponentRegistry::GetComponentNameFromHash(ameta.TypeHash);
-                if (aname.empty()) {
-                    char buffer[64];
-                    snprintf(buffer, sizeof(buffer), "Component_0x%08x", ameta.TypeHash);
-                    aname = buffer;
-                }
-                bool has = m_world->HasById(entity, aid);
-                LOG_INFO("[DebugComponents] Entity " << entity.Index << " HasById id=" << aid << " name=" << aname << " -> " << (has ? "YES" : "NO"));
-                if (has) {
-                    void* ptr = m_world->GetRawComponentPtr(entity, aid);
-                    LOG_INFO("[DebugComponents]    ptr=" << ptr);
-                }
-            }
-        }
-
-        // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);
 
-        if (m_undoSystem) {
-            // Record a snapshot diff for undo/redo of the add operation.
-            auto afterSnapshot = m_world->CaptureEntityComponents(entity);
-            if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
-                auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
-                    m_world, entity, std::move(beforeSnapshot), std::move(afterSnapshot)
-                );
-                m_undoSystem->ExecuteCommand(std::move(command));
-            }
+        if (recordUndo && m_undoSystem && !macro->IsEmpty()) {
+            m_undoSystem->ExecuteCommand(std::move(macro));
         }
-
         return true;
     }
+
     return false;
 }
 
@@ -1415,32 +1453,53 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
     // Transform and Layer cannot be removed
     if (componentType == "LocalTransform" || componentType == "Layer") return;
 
-    std::vector<ECS::SerializedComponent> beforeSnapshot;
-    if (recordUndo && m_undoSystem) {
-        // Capture full entity state so removal can be undone cleanly.
-        beforeSnapshot = m_world->CaptureEntityComponents(entity);
+    // Multi-select support: collect all entities that will lose the component
+    std::vector<ECS::Entity> targetEntities;
+    if (m_selectedEntities.count(m_entityId)) {
+        for (EntityId id : m_selectedEntities) {
+            ECS::Entity e = m_world->Resolve(id);
+            if (m_world->IsAlive(e)) targetEntities.push_back(e);
+        }
+    } else {
+        targetEntities.push_back(entity);
     }
 
-    // // Look up this component's metadata
-    const auto* meta = ComponentRegistryUI::Find(componentType);
-    if (meta) {
-        // Remove from ECS
-        meta->RemoveComponent(m_world, entity);
+    auto macro = std::make_unique<Editor::MacroCommand>();
+
+    bool anyRemoved = false;
+    for (ECS::Entity target : targetEntities) {
+        std::vector<ECS::SerializedComponent> beforeSnapshot;
+        if (recordUndo && m_undoSystem) {
+            beforeSnapshot = m_world->CaptureEntityComponents(target);
+        }
+
+        // Look up this component's metadata
+        const auto* meta = ComponentRegistryUI::Find(componentType);
+        if (meta) {
+            if (!meta->HasComponent(m_world, target)) continue;
+
+            // Remove from ECS
+            meta->RemoveComponent(m_world, target);
+            anyRemoved = true;
+
+            if (recordUndo && m_undoSystem) {
+                auto afterSnapshot = m_world->CaptureEntityComponents(target);
+                if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
+                    macro->AddCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                        m_world, target, std::move(beforeSnapshot), std::move(afterSnapshot)
+                    ));
+                }
+            }
+        }
+    }
+
+    if (anyRemoved) {
         m_statusMessage = std::string("Removed ") + componentType;
         m_statusTimer = 3.0f;
-
-        // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);
 
-        if (recordUndo && m_undoSystem) {
-            // Record a snapshot diff for undo/redo of the removal.
-            auto afterSnapshot = m_world->CaptureEntityComponents(entity);
-            if (!SnapshotsEqual(beforeSnapshot, afterSnapshot)) {
-                auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
-                    m_world, entity, std::move(beforeSnapshot), std::move(afterSnapshot)
-                );
-                m_undoSystem->ExecuteCommand(std::move(command));
-            }
+        if (recordUndo && m_undoSystem && !macro->IsEmpty()) {
+            m_undoSystem->ExecuteCommand(std::move(macro));
         }
     }
 }
@@ -1534,6 +1593,60 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
             return;
         }
     }
+}
+
+void InspectorPanel::_resetComponentOnSelectedEntities(const std::string& componentType, nlohmann::json& data, const nlohmann::json& defaults) {
+    if (!m_world) return;
+
+    // Snapshot primary entity BEFORE
+    ECS::Entity primary = m_world->Resolve(m_entityId);
+    auto primaryBefore = m_world->CaptureEntityComponents(primary);
+
+    // Apply reset to the JSON buffer (for the primary entity)
+    data = defaults;
+
+    // Create a macro command to group all resets into a single undo step
+    auto macro = std::make_unique<Editor::MacroCommand>();
+
+    // Apply to primary entity immediately so we can capture AFTER
+    const auto* primaryMeta = ComponentRegistryUI::Find(componentType);
+    if (primaryMeta) {
+        primaryMeta->ApplyToEntity(m_world, primary, defaults);
+    }
+    auto primaryAfter = m_world->CaptureEntityComponents(primary);
+    
+    if (m_undoSystem) {
+        macro->AddCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+            m_world, primary, std::move(primaryBefore), std::move(primaryAfter)));
+    }
+
+    // Multi-select support: reset same component on all other selected entities
+    if (m_mode == InspectionMode::Entity && m_selectedEntities.size() > 1 && m_selectedEntities.count(m_entityId)) {
+        for (EntityId id : m_selectedEntities) {
+            if (id == m_entityId) continue;
+            ECS::Entity other = m_world->Resolve(id);
+            if (m_world->IsAlive(other)) {
+                const auto* meta = Editor::ComponentRegistryUI::Find(componentType);
+                if (meta && meta->HasComponent(m_world, other)) {
+                    auto before = m_world->CaptureEntityComponents(other);
+                    meta->ApplyToEntity(m_world, other, defaults);
+                    auto after = m_world->CaptureEntityComponents(other);
+                    
+                    if (m_undoSystem) {
+                        macro->AddCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                            m_world, other, std::move(before), std::move(after)));
+                    }
+                }
+            }
+        }
+    }
+
+    if (m_undoSystem && !macro->IsEmpty()) {
+        m_undoSystem->ExecuteCommand(std::move(macro));
+    }
+
+    // Mark scene as dirty
+    MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
 // Checks whether the prefab JSON already contains a component of this type

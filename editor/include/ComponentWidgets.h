@@ -49,6 +49,9 @@ namespace EditorUI {
     // Clears the active default-data mapping after a component finishes rendering
     void ClearDefaultDataScope();
 
+    // Sets the list of selected entities for multi-select editing
+    void SetSelectedEntities(const std::unordered_set<EntityId>* entities);
+
     // -------------------------------------------------------------------------
     // Section Management
     // -------------------------------------------------------------------------

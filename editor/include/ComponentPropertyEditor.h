@@ -36,6 +36,7 @@ public:
     // all inspectors
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
     void SetUndoSystem(Editor::UndoSystem* undo) { m_undo = undo; }
+    void SetSelectedEntities(const std::unordered_set<EntityId>* entities) { m_selectedEntities = entities; }
 
     // -------------------------------------------------------------------------
     // Component Rendering
@@ -141,6 +142,7 @@ private:
     ImFont* m_boldFont;
     ImFont* m_symbolsFont;
     Editor::UndoSystem* m_undo = nullptr;
+    const std::unordered_set<EntityId>* m_selectedEntities = nullptr;
 };
 
 #endif
