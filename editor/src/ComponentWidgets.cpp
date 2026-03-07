@@ -19,9 +19,12 @@ so both entities and prefab files use the same UI drawing path.
 #include <imgui.h>
 #include <algorithm>
 #include <unordered_map>
+#include <memory>
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "ecs/ComponentRegistry.h"
+#include "serialization/EntitySerializer.h"
 
 namespace EditorUI {
 
@@ -38,6 +41,10 @@ namespace EditorUI {
     static const std::unordered_set<EntityId>* s_selectedEntities = nullptr; // For multi-select support
 
     static const char* kResetIcon = EditorIcons::Reset;
+
+    // Forward declarations for helpers used before their definitions.
+    static const nlohmann::json* _findDefaultsFor(const nlohmann::json& data);
+    static bool _renderResetButton(const std::string& id);
 
     // Strips "##" suffixes so visible labels don't show internal IDs
     static std::string _displayLabel(const std::string& label) {
@@ -1294,8 +1301,9 @@ namespace EditorUI {
                         reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
                             entityId, componentTypeId, propertyPath,
                             oldMask, mask,
-                            [applyFn](void* wp, uint32_t eid, uint32_t cid, const std::string& p, const nlohmann::json& v) {
-                                applyFn(wp, eid, cid, p, v);
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
                             }
                         );
                     }
@@ -1309,8 +1317,9 @@ namespace EditorUI {
                         reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
                             entityId, componentTypeId, propertyPath,
                             oldMask, mask,
-                            [applyFn](void* wp, uint32_t eid, uint32_t cid, const std::string& p, const nlohmann::json& v) {
-                                applyFn(wp, eid, cid, p, v);
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
                             }
                         );
                     }
@@ -1329,8 +1338,9 @@ namespace EditorUI {
                             reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
                                 entityId, componentTypeId, propertyPath,
                                 oldMask, mask,
-                                [applyFn](void* wp, uint32_t eid, uint32_t cid, const std::string& p, const nlohmann::json& v) {
-                                    applyFn(wp, eid, cid, p, v);
+                                [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                          const std::string& p, const nlohmann::json& v) {
+                                    applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
                                 }
                             );
                         }
@@ -1395,26 +1405,55 @@ namespace EditorUI {
                 bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
 
                 if (isMultiSelect) {
-                    std::vector<BatchComponentPropertyCommand::Entry> entries;
+                    std::vector<Editor::BatchComponentPropertyCommand::Entry> entries;
+
+                    // Resolve component short name from registry so we can locate JSON in the serialized entity.
+                    const auto& metaInfo = ECS::ComponentRegistry::Meta(componentTypeId);
+                    const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+
                     for (EntityId id : *s_selectedEntities) {
-                        const auto* meta = ECS::ComponentRegistry::Find(componentTypeId);
-                        if (meta) {
-                            nlohmann::json oldComp = meta->SerializeToJSON(world, world->Resolve(id));
-                            nlohmann::json oldValEnt = oldComp.contains(key) ? oldComp[key] : nlohmann::json(false);
-                            entries.push_back({ id, oldValEnt, nlohmann::json(value) });
+                        ECS::Entity other = world->Resolve(id);
+                        if (!world->IsAlive(other)) continue;
+
+                        nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, other);
+                        nlohmann::json* dataPtr = nullptr;
+
+                        if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                            for (auto& comp : entityJson["Components"]) {
+                                if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                                std::string typeName = comp["TypeName"];
+                                if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                                    if (comp.contains("Data") && comp["Data"].is_object()) {
+                                        dataPtr = &comp["Data"];
+                                    }
+                                    break;
+                                }
+                            }
                         }
+
+                        nlohmann::json oldValEnt = false;
+                        if (dataPtr && dataPtr->is_object()) {
+                            oldValEnt = dataPtr->contains(key) ? (*dataPtr)[key] : nlohmann::json(false);
+                        }
+
+                        entries.push_back({ id, oldValEnt, nlohmann::json(value) });
                     }
-                    auto cmd = std::make_unique<BatchComponentPropertyCommand>(
-                        world, componentTypeId, propertyPath, std::move(entries),
-                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& v) {
-                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
-                        });
-                    undo->ExecuteCommand(std::move(cmd));
+
+                    if (!entries.empty()) {
+                        auto cmd = std::make_unique<Editor::BatchComponentPropertyCommand>(
+                            world, componentTypeId, propertyPath, std::move(entries),
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                            });
+                        undo->ExecuteCommand(std::move(cmd));
+                    }
                 } else {
                     undo->RecordPropertyChange(entityId, componentTypeId, propertyPath,
                         oldVal, value,
-                        [applyFn](void* wp, uint32_t eid, uint32_t cid, const std::string& p, const nlohmann::json& v) {
-                            applyFn(wp, eid, cid, p, v);
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
                         }
                     );
                 }

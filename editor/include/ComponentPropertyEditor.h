@@ -21,6 +21,7 @@ to C++ components.
 
 #include <nlohmann/json.hpp>
 #include <imgui.h>
+#include <unordered_set>
 #include "ecs/Entity.h"
 #include "ecs/World.h"
 namespace Editor { class UndoSystem; }
@@ -36,7 +37,7 @@ public:
     // all inspectors
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
     void SetUndoSystem(Editor::UndoSystem* undo) { m_undo = undo; }
-    void SetSelectedEntities(const std::unordered_set<EntityId>* entities) { m_selectedEntities = entities; }
+    void SetSelectedEntities(const std::unordered_set<EntityId>* entities);
 
     // -------------------------------------------------------------------------
     // Component Rendering

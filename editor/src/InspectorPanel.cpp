@@ -1626,7 +1626,7 @@ void InspectorPanel::_resetComponentOnSelectedEntities(const std::string& compon
             if (id == m_entityId) continue;
             ECS::Entity other = m_world->Resolve(id);
             if (m_world->IsAlive(other)) {
-                const auto* meta = Editor::ComponentRegistryUI::Find(componentType);
+                const auto* meta = ComponentRegistryUI::Find(componentType);
                 if (meta && meta->HasComponent(m_world, other)) {
                     auto before = m_world->CaptureEntityComponents(other);
                     meta->ApplyToEntity(m_world, other, defaults);

@@ -22,6 +22,8 @@ Used by component inspectors for both entity and prefab editing workflows.
 #include <vector>
 #include <functional>
 #include <cstdint>
+#include <unordered_set>
+#include "ecs/Entity.h"
 
 struct ImFont;
 

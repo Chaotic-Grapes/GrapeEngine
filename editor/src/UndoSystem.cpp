@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 #include "core/Logger.h"
 #include "EditorECSUtils.h"
+#include "serialization/EntitySerializer.h"
 #include "../include/core/World/TileMap.hpp"
 #include <algorithm>
 #include <cstring>
@@ -888,39 +889,62 @@ namespace Editor {
     void UndoSystem::BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath) {
         if (!m_world) return;
 
-        const auto* meta = ECS::ComponentRegistry::Find(componentId);
-        if (!meta) return;
+        // Resolve component short name from registry so we can locate JSON data in the serialized entity.
+        const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+        const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+        if (compShortName.empty()) {
+            return;
+        }
 
         // Fetch current value for each entity to store as the "before" state
         for (EntityId id : entities) {
             ECS::Entity entity = m_world->Resolve(id);
             if (!m_world->IsAlive(entity)) continue;
 
-            nlohmann::json currentVal = meta->SerializeToJSON(m_world, entity);
-            
-            // Extract the specific property from the component JSON
-            // propertyPath is like "Position.X"
-            nlohmann::json propertyVal = currentVal;
-            size_t start = 0;
-            size_t end = propertyPath.find('.');
-            while (end != std::string::npos) {
-                std::string part = propertyPath.substr(start, end - start);
-                if (propertyVal.is_object() && propertyVal.contains(part)) {
-                    propertyVal = propertyVal[part];
-                } else {
-                    propertyVal = nlohmann::json();
-                    break;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+            nlohmann::json* componentData = nullptr;
+
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string typeName = comp["TypeName"];
+                    if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            componentData = &comp["Data"];
+                        }
+                        break;
+                    }
                 }
-                start = end + 1;
-                end = propertyPath.find('.', start);
             }
-            if (!propertyVal.is_null()) {
-                std::string lastPart = propertyPath.substr(start);
-                if (propertyVal.is_object() && propertyVal.contains(lastPart)) {
-                    propertyVal = propertyVal[lastPart];
-                } else {
-                    propertyVal = nlohmann::json();
+
+            nlohmann::json propertyVal;
+            if (componentData) {
+                // Extract the specific property from the component JSON
+                // propertyPath is like "Position.X"
+                propertyVal = *componentData;
+                size_t start = 0;
+                size_t end = propertyPath.find('.');
+                while (end != std::string::npos) {
+                    std::string part = propertyPath.substr(start, end - start);
+                    if (propertyVal.is_object() && propertyVal.contains(part)) {
+                        propertyVal = propertyVal[part];
+                    } else {
+                        propertyVal = nlohmann::json();
+                        break;
+                    }
+                    start = end + 1;
+                    end = propertyPath.find('.', start);
                 }
+                if (!propertyVal.is_null()) {
+                    std::string lastPart = propertyPath.substr(start);
+                    if (propertyVal.is_object() && propertyVal.contains(lastPart)) {
+                        propertyVal = propertyVal[lastPart];
+                    } else {
+                        propertyVal = nlohmann::json();
+                    }
+                }
+            } else {
+                propertyVal = nlohmann::json();
             }
 
             BeginPropertyEdit(id, componentId, propertyPath, propertyVal);
