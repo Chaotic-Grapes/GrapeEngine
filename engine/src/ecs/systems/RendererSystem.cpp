@@ -753,12 +753,19 @@ namespace ECS {
                             for (const auto& ts : entry.Tilesets) {
                                 rawTilesets.push_back(ts.get());
                             }
+                            const ECS::Components::Material2D* mat = nullptr;
+                            if (!entry.SourceEntity.IsNull()
+                                && world.IsAlive(entry.SourceEntity)
+                                && world.Has<ECS::Components::Material2D>(entry.SourceEntity)) {
+                                mat = &world.Get<ECS::Components::Material2D>(entry.SourceEntity);
+                            }
 							// Submit tilemap for rendering
                             tileRenderer.Submit(
                                 entry.Map.get(),
                                 rawTilesets,
                                 *m_renderer,
-                                entry.Offset
+                                entry.Offset,
+                                mat
                             );
                         }
                     }
@@ -893,112 +900,22 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-                }
 
-                // --- Boid Instanced Rendering ---
-                if (m_boidSystem && m_boidShader) {
-                    const auto& flockData = m_boidSystem->GetFlockRenderData();
-                    if (!flockData.empty()) {
+                    // --- Boids on this layer ---
+                    if (m_boidSystem && m_boidShader) {
                         m_boidShader->use();
                         m_boidShader->setMat4("uViewProj", viewProj);
-
-                        for (const auto& [entityId, flock] : flockData) {
-                            if (flock.count <= 0 || flock.vao == 0) continue;
-
-                            m_boidShader->setUniform("uBoidSize", flock.boidSize);
-
-                            if (flock.textureId != 0) {
-                                m_boidShader->setUniform("uHasTexture", 1);
-                                m_boidShader->setUniform("uTexture", 0);
-                                glActiveTexture(GL_TEXTURE0);
-                                glBindTexture(GL_TEXTURE_2D, flock.textureId);
-                            }
-                            else {
-                                m_boidShader->setUniform("uHasTexture", 0);
-                            }
-
-                            m_boidShader->setUniform("uColor", glm::vec4(1.0f));
-
-                            glBindVertexArray(flock.vao);
-                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
-                            glBindVertexArray(0);
-                        }
+                        m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
                     }
-                }
 
-                // --- Particle Instanced Rendering ---
-                if (m_particleSystem && m_particleShader) {
-                    const auto& emitterData = m_particleSystem->GetRenderData();
-                    if (!emitterData.empty()) {
+                    // --- Particles on this layer ---
+                    if (m_particleSystem && m_particleShader) {
                         m_particleShader->use();
                         m_particleShader->setMat4("uViewProj", viewProj);
-                        m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
-
+                        m_lightManager.Bind(*m_particleShader);
                         glEnable(GL_BLEND);
                         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-                        for (const auto& [entityId, emitter] : emitterData) {
-                            if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
-
-                            m_particleShader->setUniform("uParticleSize", emitter.particleSize);
-
-                            // --- Material2D gate: same opt-in as sprites ---
-                            ECS::Entity e{ entityId };
-                            bool hasMaterial = world.Has<Components::Material2D>(e);
-
-                            if (hasMaterial) {
-                                const auto& mat = world.Get<Components::Material2D>(e);
-                                m_particleShader->setUniform("uLightingEnabled", 1);
-                                m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
-                                m_particleShader->setUniform("uMetallic", mat.Metallic);
-                                m_particleShader->setUniform("uSmoothness", mat.Smoothness);
-                                m_particleShader->setUniform("uAOStrength", mat.AOStrength);
-                                m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
-
-                                // Normal map (texture unit 1)
-                                if (mat.NormalTextureId != 0) {
-                                    m_particleShader->setUniform("uHasNormalMap", 1);
-                                    m_particleShader->setUniform("uNormalMap", 1);
-                                    glActiveTexture(GL_TEXTURE1);
-                                    glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
-                                }
-                                else {
-                                    m_particleShader->setUniform("uHasNormalMap", 0);
-                                }
-
-                                // MRA map (texture unit 2)
-                                if (mat.MRA_TextureId != 0) {
-                                    m_particleShader->setUniform("uHasMRAMap", 1);
-                                    m_particleShader->setUniform("uMRAMap", 2);
-                                    glActiveTexture(GL_TEXTURE2);
-                                    glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
-                                }
-                                else {
-                                    m_particleShader->setUniform("uHasMRAMap", 0);
-                                }
-                            }
-                            else {
-                                m_particleShader->setUniform("uLightingEnabled", 0);
-                                m_particleShader->setUniform("uMaterialFlags", 0);
-                                m_particleShader->setUniform("uHasNormalMap", 0);
-                                m_particleShader->setUniform("uHasMRAMap", 0);
-                            }
-
-                            // Albedo/particle texture (texture unit 0)
-                            if (emitter.textureId != 0) {
-                                m_particleShader->setUniform("uHasTexture", 1);
-                                m_particleShader->setUniform("uTexture", 0);
-                                glActiveTexture(GL_TEXTURE0);
-                                glBindTexture(GL_TEXTURE_2D, emitter.textureId);
-                            }
-                            else {
-                                m_particleShader->setUniform("uHasTexture", 0);
-                            }
-
-                            glBindVertexArray(emitter.vao);
-                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
-                            glBindVertexArray(0);
-                        }
+                        m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
                     }
                 }
 
@@ -2057,6 +1974,13 @@ namespace ECS {
             entry.Origin = origin;
             entry.Visible = comp.Visible && world.IsActiveInHierarchy(entity);
             entry.RenderLayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
+
+            // Resolve Material2D for lighting
+            entry.HasMaterial = false;
+            if (world.Has<ECS::Components::Material2D>(entity)) {
+                entry.Material = world.Get<ECS::Components::Material2D>(entity);
+                entry.HasMaterial = true;
+            }
         });
 
 		// Remove any runtime entries for entities that no longer have a TileMapComponent (i.e. they were destroyed or had the component removed)
@@ -2113,7 +2037,10 @@ namespace ECS {
             }
 
 			// Submit the tilemap for rendering
-            m_tileMapRenderer.Submit(*entry.Map, rawTilesets, *m_renderer, entry.Origin);
+            m_tileMapRenderer.Submit(
+                *entry.Map, rawTilesets, *m_renderer, entry.Origin,
+                entry.HasMaterial ? &entry.Material : nullptr
+            );
         }
     }
 
@@ -2323,7 +2250,13 @@ namespace ECS {
                     for (const auto& ts : entry.Tilesets) {
                         rawTilesets.push_back(ts.get());
                     }
-                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset);
+                    const ECS::Components::Material2D* mat = nullptr;
+                    if (!entry.SourceEntity.IsNull()
+                        && world.IsAlive(entry.SourceEntity)
+                        && world.Has<ECS::Components::Material2D>(entry.SourceEntity)) {
+                        mat = &world.Get<ECS::Components::Material2D>(entry.SourceEntity);
+                    }
+                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset, mat);
                 }
             }
 
@@ -2411,115 +2344,24 @@ namespace ECS {
                 }
             }
               m_renderer->endFrame();
+
+              // --- Boids on this layer ---
+              if (m_boidSystem && m_boidShader) {
+                  m_boidShader->use();
+                  m_boidShader->setMat4("uViewProj", viewProj);
+                  m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
+              }
+
+              // --- Particles on this layer ---
+              if (m_particleSystem && m_particleShader) {
+                  m_particleShader->use();
+                  m_particleShader->setMat4("uViewProj", viewProj);
+                  m_lightManager.Bind(*m_particleShader);
+                  glEnable(GL_BLEND);
+                  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                  m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
+              }
           }
-
-        // --- Boid Instanced Rendering ---
-        if (m_boidSystem && m_boidShader) {
-            const auto& flockData = m_boidSystem->GetFlockRenderData();
-            if (!flockData.empty()) {
-                m_boidShader->use();
-                m_boidShader->setMat4("uViewProj", viewProj);
-
-                for (const auto& [entityId, flock] : flockData) {
-                    if (flock.count <= 0 || flock.vao == 0) continue;
-
-                    m_boidShader->setUniform("uBoidSize", flock.boidSize);
-
-                    if (flock.textureId != 0) {
-                        m_boidShader->setUniform("uHasTexture", 1);
-                        m_boidShader->setUniform("uTexture", 0);
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, flock.textureId);
-                    }
-                    else {
-                        m_boidShader->setUniform("uHasTexture", 0);
-                    }
-
-                    m_boidShader->setUniform("uColor", glm::vec4(1.0f));
-
-                    glBindVertexArray(flock.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
-                    glBindVertexArray(0);
-                }
-            }
-        }
-
-        // --- Particle Instanced Rendering ---
-        if (m_particleSystem && m_particleShader) {
-            const auto& emitterData = m_particleSystem->GetRenderData();
-            if (!emitterData.empty()) {
-                m_particleShader->use();
-                m_particleShader->setMat4("uViewProj", viewProj);
-                m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
-
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-                for (const auto& [entityId, emitter] : emitterData) {
-                    if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
-
-                    m_particleShader->setUniform("uParticleSize", emitter.particleSize);
-
-                    // --- Material2D gate: same opt-in as sprites ---
-                    ECS::Entity e{ entityId };
-                    bool hasMaterial = world.Has<Components::Material2D>(e);
-
-                    if (hasMaterial) {
-                        const auto& mat = world.Get<Components::Material2D>(e);
-                        m_particleShader->setUniform("uLightingEnabled", 1);
-                        m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
-                        m_particleShader->setUniform("uMetallic", mat.Metallic);
-                        m_particleShader->setUniform("uSmoothness", mat.Smoothness);
-                        m_particleShader->setUniform("uAOStrength", mat.AOStrength);
-                        m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
-
-                        // Normal map (texture unit 1)
-                        if (mat.NormalTextureId != 0) {
-                            m_particleShader->setUniform("uHasNormalMap", 1);
-                            m_particleShader->setUniform("uNormalMap", 1);
-                            glActiveTexture(GL_TEXTURE1);
-                            glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
-                        }
-                        else {
-                            m_particleShader->setUniform("uHasNormalMap", 0);
-                        }
-
-                        // MRA map (texture unit 2)
-                        if (mat.MRA_TextureId != 0) {
-                            m_particleShader->setUniform("uHasMRAMap", 1);
-                            m_particleShader->setUniform("uMRAMap", 2);
-                            glActiveTexture(GL_TEXTURE2);
-                            glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
-                        }
-                        else {
-                            m_particleShader->setUniform("uHasMRAMap", 0);
-                        }
-                    }
-                    else {
-                        m_particleShader->setUniform("uLightingEnabled", 0);
-                        m_particleShader->setUniform("uMaterialFlags", 0);
-                        m_particleShader->setUniform("uHasNormalMap", 0);
-                        m_particleShader->setUniform("uHasMRAMap", 0);
-                    }
-
-                    // Albedo/particle texture (texture unit 0)
-                    if (emitter.textureId != 0) {
-                        m_particleShader->setUniform("uHasTexture", 1);
-                        m_particleShader->setUniform("uTexture", 0);
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, emitter.textureId);
-                    }
-                    else {
-                        m_particleShader->setUniform("uHasTexture", 0);
-                    }
-
-                    glBindVertexArray(emitter.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
-                    glBindVertexArray(0);
-                }
-            }
-        }
-
         RenderWorldGUI(viewProj);
 
         // Unbind the current render target.

@@ -381,6 +381,9 @@ namespace ECS {
             uint16_t RenderLayerId = 0;
             bool Visible = true;
             glm::vec2 Origin{ 0.0f, 0.0f };
+
+            ECS::Components::Material2D Material{};
+            bool HasMaterial = false;
         };
 
         std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;

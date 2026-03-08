@@ -28,8 +28,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #pragma once
 
-#include "../include/core/World/TileMap.hpp"
-#include "../include/core/World/TileSet.hpp"
+#include "core/World/TileMap.hpp"
+#include "core/World/TileSet.hpp"
+#include "ecs/Components.h"
 #include <glm/vec2.hpp>
 #include <vector>
 
@@ -43,6 +44,7 @@ public:
         const TileMap& tileMap,
         const std::vector<const Tileset*>& tilesets,
         Renderer& renderer,
-        const glm::vec2& worldOffset
+        const glm::vec2& worldOffset,
+        const ECS::Components::Material2D* material = nullptr
     ) const;
 };
