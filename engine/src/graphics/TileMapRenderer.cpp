@@ -25,13 +25,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "graphics/renderer.hpp"
 #include "graphics/TileMapRenderer.hpp"
-#include "../include/core/World/TileLayer.hpp"
+#include "core/World/TileLayer.hpp"
 
 void TileMapRenderer::Submit(
     const TileMap& tileMap,
     const std::vector<const Tileset*>& tilesets,
     Renderer& renderer,
-    const glm::vec2& worldOffset
+    const glm::vec2& worldOffset,
+    const ECS::Components::Material2D* material
 ) const
 {
     const uint32_t layerIndex = 0; // render base layer for now
@@ -42,6 +43,14 @@ void TileMapRenderer::Submit(
     const float tileSize = tileMap.TileSize();
 
     const glm::vec4 color(1.0f); // white = no tint
+
+    GLuint   normalTexId = material ? material->NormalTextureId : 0;
+    GLuint   mraTexId = material ? material->MRA_TextureId : 0;
+    float    metallic = material ? material->Metallic : 0.0f;
+    float    smoothness = material ? material->Smoothness : 0.5f;
+    float    aoStrength = material ? material->AOStrength : 1.0f;
+    float    normalStrength = material ? material->NormalStrength : 1.0f;
+    uint32_t matFlags = material ? material->Flags : 0;
 
     for (uint32_t y = 0; y < height; ++y)
     {
@@ -93,9 +102,18 @@ void TileMapRenderer::Submit(
                 textureId,
                 uvRect,
                 color,
-                rotation,   // rotation
-                1.0f,   // scale
-                0       // render layer
+                rotation,
+                1.0f,           // uniformScale
+                0,              // layer
+                0,              // emissiveTextureId
+                0.0f,           // emissiveStrength
+                normalTexId,
+                mraTexId,
+                metallic,
+                smoothness,
+                aoStrength,
+                normalStrength,
+                matFlags
             );
         }
     }

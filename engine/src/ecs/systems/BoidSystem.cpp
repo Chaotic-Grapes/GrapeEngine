@@ -93,12 +93,17 @@ namespace ECS {
                     it = m_flocks.find(id);
                 }
 
+                uint16_t layerId = 0;
+                if (world.Has<Components::Layer>(entity))
+                    layerId = world.Get<Components::Layer>(entity).Id;
+
                 // Update render data each frame (texture/size may change in editor)
                 m_renderData[id] = FlockRenderData{
                     it->second.vao,
                     flock.count,
                     flock.textureId,
-                    flock.boidSize
+                    flock.boidSize,
+                    layerId
                 };
 
 #ifdef GRAPE_HAS_CUDA
@@ -361,5 +366,31 @@ namespace ECS {
         m_collisionGrid.originY = tileMap.OriginY();
         m_collisionGrid.tileSize = tileMap.TileSize();
 #endif
+    }
+
+    void BoidSystem::DrawFlocksByLayer(uint16_t layerId, Shader& shader,
+        const glm::mat4& viewProj) {
+        for (const auto& [entityId, flock] : m_renderData) {
+            if (flock.layerId != layerId) continue;
+            if (flock.count <= 0 || flock.vao == 0) continue;
+
+            shader.setUniform("uBoidSize", flock.boidSize);
+
+            if (flock.textureId != 0) {
+                shader.setUniform("uHasTexture", 1);
+                shader.setUniform("uTexture", 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, flock.textureId);
+            }
+            else {
+                shader.setUniform("uHasTexture", 0);
+            }
+
+            shader.setUniform("uColor", glm::vec4(1.0f));
+
+            glBindVertexArray(flock.vao);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+            glBindVertexArray(0);
+        }
     }
 } // namespace ECS

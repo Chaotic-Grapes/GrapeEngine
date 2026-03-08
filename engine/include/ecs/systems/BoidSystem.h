@@ -2,6 +2,7 @@
 
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include "graphics/shader.hpp"
 #include "Export.h"
 
 #include <glad/glad.h>
@@ -31,6 +32,9 @@ namespace ECS {
         SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
+        void DrawFlocksByLayer(uint16_t layerId, Shader& shader,
+            const glm::mat4& viewProj);
+
         // ----------------------------------------------------------------
         // Render data — read by RendererSystem each frame
         // ----------------------------------------------------------------
@@ -39,6 +43,7 @@ namespace ECS {
             int      count = 0;      // number of active boids
             uint32_t textureId = 0;      // sprite texture for this flock
             float    boidSize = 0.3f;   // world-space size per boid
+            uint16_t layerId = 0;
         };
 
         const std::unordered_map<uint32_t, FlockRenderData>& GetFlockRenderData() const {

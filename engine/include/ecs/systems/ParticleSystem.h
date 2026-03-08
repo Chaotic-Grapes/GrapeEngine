@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/SystemManager.h"
 #include "graphics/ParticlePreset.hpp"
+#include "graphics/LightManager.hpp"
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
@@ -35,6 +36,10 @@ struct cudaGraphicsResource;
 #endif
 
 class TileMap;
+
+namespace Graphics {
+    class LightManager;
+}
 
 namespace ECS {
 
@@ -83,6 +88,7 @@ namespace ECS {
         int    aliveCount = 0;
         uint32_t textureId = 0;
         float  particleSize = 8.0f;
+        uint16_t layerId = 0;
     };
 
     class ParticleSystem : public ISystem {
@@ -92,6 +98,10 @@ namespace ECS {
         void OnCreate(World& world) override;
         void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
+
+        void DrawEmittersByLayer(uint16_t layerId, Shader& shader,
+            const glm::mat4& viewProj,
+            Graphics::LightManager& lights, World& world);
 
         // --- Preset registry ---
         uint32_t RegisterPreset(const ParticlePreset& preset) {
