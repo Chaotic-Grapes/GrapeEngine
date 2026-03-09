@@ -198,8 +198,8 @@ public:
     /*!
     \brief Checks if viewport hover can be processed.
     */
-    // Gate viewport hover handling to valid tile-editing state.
-    bool CanHandleViewportHover() const { return m_active && m_tileMap && m_tileset; }
+    // Gate viewport hover handling to active painting tools only.
+    bool CanHandleViewportHover() const { return m_active && (m_paintMode || m_collisionEditActive) && m_tileMap && m_tileset; }
 
     /*------------------------------------------------------------------*/
     /*!
