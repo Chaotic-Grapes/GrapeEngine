@@ -4762,7 +4762,7 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
             ImGui::SetNextItemWidth(200.0f);
             {
                 int oldId = static_cast<int>(data.value("Id", 0));
-                const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Layer2D"), "Layer2D");
+                const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Layer"), "Layer");
                 auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
                     ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
                     if (!world) return;
