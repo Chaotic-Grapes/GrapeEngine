@@ -88,6 +88,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 namespace {
 	// Resolve a project-relative path to an absolute path for loading assets (for existing maps)
@@ -185,6 +187,24 @@ namespace ECS {
         m_guiViewport.Origin = { 0.0f, 0.0f };
         m_guiViewport.Size = m_renderTargetSize;
         m_guiViewport.DisplayScale = { 1.0f, 1.0f };
+        if (Engine::CORE) {
+            auto* context = Engine::CORE->GetPlatformContext();
+            auto* window = context ? context->GetMainWindow() : nullptr;
+            if (window) {
+                auto* native = static_cast<GLFWwindow*>(window->GetNativeHandle());
+                if (native) {
+                    int windowW = 0;
+                    int windowH = 0;
+                    glfwGetWindowSize(native, &windowW, &windowH);
+                    if (windowW > 0 && windowH > 0) {
+                        m_guiViewport.DisplayScale = {
+                            m_renderTargetSize.X / static_cast<float>(windowW),
+                            m_renderTargetSize.Y / static_cast<float>(windowH)
+                        };
+                    }
+                }
+            }
+        }
         m_guiViewport.Active = true;
     }
 
