@@ -33,8 +33,6 @@ add_executable(GrapeEditor
     ${EDITOR_HEADERS}
     # Force global new/delete override to be compiled into the Editor EXE
     ../engine/src/services/GlobalMemoryOverride.cpp
-    # Explicitly include new editor panels that may not be picked up yet by glob verification.
-    ${CMAKE_CURRENT_LIST_DIR}/src/GameConfigPanel.cpp
 )
 
 # Set output name
