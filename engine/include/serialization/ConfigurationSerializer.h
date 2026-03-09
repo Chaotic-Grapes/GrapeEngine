@@ -48,7 +48,6 @@ struct ProjectSettings {
     bool  MuteWhenUnfocused = false; // Mute audio when window loses focus
 
     // Performance configuration
-    int TargetFPS = 60;  // Preferred target frame rate
     int MaxFPS    = 120; // Hard cap when VSync is disabled
 };
 
@@ -123,9 +122,6 @@ namespace Serialization {
             // Parse Performance
             if (settingsJson.contains("Performance") && settingsJson["Performance"].is_object()) {
                 const auto& perf = settingsJson["Performance"];
-                if (perf.contains("TargetFPS")) {
-                    settings.TargetFPS = perf["TargetFPS"].get<int>();
-                }
                 if (perf.contains("MaxFPS")) {
                     settings.MaxFPS = perf["MaxFPS"].get<int>();
                 }
@@ -165,7 +161,6 @@ namespace Serialization {
             settingsJson["Audio"]["MuteWhenUnfocused"] = settings.MuteWhenUnfocused;
 
             // Performance block
-            settingsJson["Performance"]["TargetFPS"] = settings.TargetFPS;
             settingsJson["Performance"]["MaxFPS"]    = settings.MaxFPS;
 
             return Serializer::SaveJson(settingsPath, "json", settingsJson);

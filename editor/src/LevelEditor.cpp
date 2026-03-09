@@ -751,20 +751,6 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this](ECS::World* w) { m_systemsPanel.SetWorld(w); }
     );
 
-    // Register Game Configuration panel (project-wide config editor)
-    _registerPanel("Game Configuration",
-        [this]() {
-            m_gameConfigPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
-        },
-        [this]() {
-            if (Engine::CORE && Engine::CORE->HasProjectSettings()) {
-                auto& settings = Engine::CORE->GetProjectSettings();
-                m_gameConfigPanel.Render(settings);
-            }
-        },
-        nullptr
-    );
-
     // Initialize all registered panels
     _initializePanels();
 
@@ -796,11 +782,6 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_activeTileset = entry.Tilesets[index];
             m_activeTilesetPath = (index < entry.TilesetPaths.size()) ? entry.TilesetPaths[index] : std::string();
         }
-    });
-
-    // Allow the file menu to open the Game Configuration panel from the Edit menu.
-    m_fileMenu.SetOpenGameConfigPanelCallback([this]() {
-        m_gameConfigPanel.Open();
     });
 
     // Set up hierarchy selection callback to sync with inspector and viewports
