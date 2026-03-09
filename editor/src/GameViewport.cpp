@@ -145,6 +145,25 @@ void GameViewport::PrepareFrame() {
     const bool synced = (activeCamera != nullptr) &&
         _syncGameCamera(activeCameraEntity, *activeCamera, targetRatio);
     Graphics::ViewportManager::SetCamera(kGameViewportName, synced ? &m_gameCamera : nullptr);
+
+    // Keep GUI layout/input in the same coordinate space as the visible Game viewport image.
+    // This aligns editor Game view behavior with standalone runtime.
+    ImVec2 guiOrigin = m_sceneDrawPos;
+    ImVec2 guiSize = m_sceneDrawSize;
+    if (m_immersiveMode || guiSize.x <= 1.0f || guiSize.y <= 1.0f) {
+        guiOrigin = ImVec2(0.0f, 0.0f);
+        guiSize = ImVec2(static_cast<float>(vp->Size.x), static_cast<float>(vp->Size.y));
+    }
+
+    const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+    rendererSystem->SetGUIViewport(
+        Vector2D{ guiOrigin.x, guiOrigin.y },
+        Vector2D{ guiSize.x, guiSize.y },
+        Vector2D{
+            std::max(0.0001f, fbScale.x),
+            std::max(0.0001f, fbScale.y)
+        }
+    );
 }
 
 bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect) {

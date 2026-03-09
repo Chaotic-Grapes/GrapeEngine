@@ -2555,14 +2555,20 @@ namespace ECS {
         // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
         GUIViewport layoutViewport = m_guiViewport;
         if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
+            layoutViewport.Origin = { 0.0f, 0.0f };
             layoutViewport.Size = m_renderTargetSize;
         }
         const float layoutW = std::max(1.0f, layoutViewport.Size.X);
         const float layoutH = std::max(1.0f, layoutViewport.Size.Y);
         const float guiScaleX = w / layoutW;
         const float guiScaleY = h / layoutH;
+        const float layoutOriginX = layoutViewport.Origin.X;
+        const float layoutOriginY = layoutViewport.Origin.Y;
         auto scalePos = [&](const Vector2D& p) {
-            return Vector2D{ p.X * guiScaleX, p.Y * guiScaleY };
+            return Vector2D{
+                (p.X - layoutOriginX) * guiScaleX,
+                (p.Y - layoutOriginY) * guiScaleY
+            };
         };
         auto scaleSize = [&](const Vector2D& s) {
             return Vector2D{ s.X * guiScaleX, s.Y * guiScaleY };
