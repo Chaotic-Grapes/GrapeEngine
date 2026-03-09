@@ -177,7 +177,14 @@ void EditorService::SetProjectStartupCallbacks(const Editor::ProjectStartupCallb
 // Proxy function to set the editor settings in the ProjectStartupUI, allowing the 
 // UI to access configuration settings such as recent projects and UI scale for rendering the startup screens.
 void EditorService::SetEditorSettings(EditorSettings* settings) {
+    m_editorSettings = settings;
     m_projectStartupUI.SetEditorSettings(settings);
+
+	// Also propagate the editor settings to the level editor if it exists, so that any changes 
+    // to settings (e.g. UI scale) can be reflected in the editor views immediately
+    if (m_levelEditor) {
+        m_levelEditor->SetEditorSettings(settings);
+    }
 }
 
 // Proxy function to request the project browser UI to be shown, which can be called 
@@ -365,6 +372,7 @@ void EditorService::Update() {
         // When rebuilding the level editor, we need to determine the appropriate target scene to use for the new instance.
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : m_sceneManager.GetActive();
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
+        m_levelEditor->SetEditorSettings(m_editorSettings);
 
         // Reinitialize the level editor with the main window's native handle to ensure it has the correct context for rendering and input handling.
         if (Engine::CORE) {
@@ -405,6 +413,7 @@ void EditorService::Update() {
         LevelEditorConfig config;
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : activeScene;
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
+        m_levelEditor->SetEditorSettings(m_editorSettings);
 
         // Initialize the level editor with the main window's native handle to ensure it has the correct context for rendering and input handling.
         if (Engine::CORE) {
