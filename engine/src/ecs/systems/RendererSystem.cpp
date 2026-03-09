@@ -445,18 +445,29 @@ namespace ECS {
                 outView = glm::lookAt(eye, eye + forward, up);
 
                 // --- Projection
+                // In standalone runtime (no editor-managed viewports), render against
+                // the current render-target aspect so serialized camera aspect values
+                // don't distort the final image when window settings differ.
+                float effectiveAspect = camera.AspectRatio;
+                if (!m_activeCamera && m_viewports.empty() && m_renderTargetSize.Y > 0.0f) {
+                    effectiveAspect = m_renderTargetSize.X / m_renderTargetSize.Y;
+                }
+                if (effectiveAspect <= 0.0f) {
+                    effectiveAspect = 1.0f;
+                }
+
                 if (camera.UsePerspective) {
                     // camera.FOV stored in degrees
                     outProjection = glm::perspective(
                         glm::radians(camera.FOV),
-                        camera.AspectRatio,
+                        effectiveAspect,
                         camera.NearPlane,
                         camera.FarPlane
                     );
                 }
                 else {
                     const float halfH = camera.OrthoSize;
-                    const float halfW = halfH * camera.AspectRatio;
+                    const float halfW = halfH * effectiveAspect;
                     outProjection = glm::ortho(
                         -halfW, +halfW,
                         -halfH, +halfH,

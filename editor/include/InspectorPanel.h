@@ -71,6 +71,9 @@ public:
     // Sets the inspector to inspect a specific entity by ID
     void InspectEntity(EntityId id);
 
+    // Sets the list of all currently selected entities (for multi-select edits)
+    void SetSelectedEntities(const std::unordered_set<EntityId>& ids);
+
     // Sets the inspector to inspect a specific prefab file by path
     void InspectPrefab(const std::string& path);
 
@@ -204,7 +207,7 @@ private:
     // -------------------------------------------------------------------------
 
     // Adds a component of specified type to an entity using registry metadata
-    bool _addComponentToEntity(const std::string& componentType);
+    bool _addComponentToEntity(const std::string& componentType, bool recordUndo = true);
 
     // Removes a component of specified type from an entity
     void _removeComponentFromEntity(const std::string& componentType, bool recordUndo = true);
@@ -221,6 +224,9 @@ private:
 
     // Removes a component definition from the prefab JSON data
     void _removeComponentFromPrefab(const std::string& componentType);
+
+    // Resets a component on all selected entities to defaults
+    void _resetComponentOnSelectedEntities(const std::string& componentType, nlohmann::json& data, const nlohmann::json& defaults);
 
     // Checks if the prefab contains a specific component type definition
     bool _prefabHasComponent(const std::string& componentType);
@@ -250,7 +256,8 @@ private:
 
     // Selection state
     InspectionMode m_mode = InspectionMode::None;  // Current inspection context
-    EntityId m_entityId = 0;                       // Currently inspected entity ID
+    EntityId m_entityId = 0;                       // Currently inspected entity ID (the "primary" selection)
+    std::unordered_set<EntityId> m_selectedEntities; // All currently selected entities for multi-edit support
 
     // File path and data
     std::string m_prefabPath;                      // Path to prefab asset file
@@ -356,7 +363,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PopID();
 
         if (resetClicked) {
-            data = *defaults;
+            _resetComponentOnSelectedEntities(componentType, data, *defaults);
         }
     }
 

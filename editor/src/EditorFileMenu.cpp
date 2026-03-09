@@ -1,8 +1,12 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.cpp
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin    (60%)
+        Muhammad Nur Fadzly Bin Zulkifli (20%)
+        Samantha Leong Sher Yen (20%)
 \par    ruiqin.foo@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+        s.leong@digipen.edu
 \date   16th November 2025
 
 \brief
@@ -634,7 +638,7 @@ void EditorFileMenu::_exportProject() {
     });
 }
 
-// Draws the "Edit" menu with Undo/Redo and Project Settings
+// Draws the "Edit" menu with Undo/Redo and Project settings
 void EditorFileMenu::RenderEditMenu() {
     if (ImGui::BeginMenu("Edit")) {
         const bool canUndo = m_undoSystem && m_undoSystem->CanUndo();
@@ -695,6 +699,8 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     static nlohmann::json baselineProject;
     static nlohmann::json baselineWindow;
     static nlohmann::json baselinePhysics;
+    static nlohmann::json baselineAudio;
+    static nlohmann::json baselinePerformance;
 
     static const nlohmann::json projectDefaults = {
         {"Title", "GrapeEngine Game Project"},
@@ -710,6 +716,15 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     static const nlohmann::json physicsDefaults = {
         {"Gravity", -9.81f},
         {"TimeStep", 0.016f}
+    };
+    static const nlohmann::json audioDefaults = {
+        {"MasterVolume", 1.0f},
+        {"MusicVolume", 1.0f},
+        {"SFXVolume", 1.0f},
+        {"MuteWhenUnfocused", false}
+    };
+    static const nlohmann::json performanceDefaults = {
+        {"MaxFPS", 120}
     };
 
     if (!baselineValid) {
@@ -727,6 +742,15 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         baselinePhysics = {
             {"Gravity", settings.Physics.Gravity},
             {"TimeStep", settings.Physics.TimeStep}
+        };
+        baselineAudio = {
+            {"MasterVolume", settings.MasterVolume},
+            {"MusicVolume", settings.MusicVolume},
+            {"SFXVolume", settings.SFXVolume},
+            {"MuteWhenUnfocused", settings.MuteWhenUnfocused}
+        };
+        baselinePerformance = {
+            {"MaxFPS", settings.MaxFPS}
         };
         baselineValid = true;
     }
@@ -778,6 +802,19 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     auto resetPhysicsDefaults = [&]() {
         settings.Physics.Gravity = physicsDefaults.value("Gravity", settings.Physics.Gravity);
         settings.Physics.TimeStep = physicsDefaults.value("TimeStep", settings.Physics.TimeStep);
+        m_projectSettingsDirty = true;
+    };
+
+    auto resetAudioDefaults = [&]() {
+        settings.MasterVolume = audioDefaults.value("MasterVolume", settings.MasterVolume);
+        settings.MusicVolume = audioDefaults.value("MusicVolume", settings.MusicVolume);
+        settings.SFXVolume = audioDefaults.value("SFXVolume", settings.SFXVolume);
+        settings.MuteWhenUnfocused = audioDefaults.value("MuteWhenUnfocused", settings.MuteWhenUnfocused);
+        m_projectSettingsDirty = true;
+    };
+
+    auto resetPerformanceDefaults = [&]() {
+        settings.MaxFPS = performanceDefaults.value("MaxFPS", settings.MaxFPS);
         m_projectSettingsDirty = true;
     };
 
@@ -1305,6 +1342,107 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         }
         if (settings.Physics.TimeStep != physicsData.value("TimeStep", settings.Physics.TimeStep)) {
             settings.Physics.TimeStep = physicsData["TimeStep"].get<float>();
+            m_projectSettingsDirty = true;
+        }
+
+        nlohmann::json audioData = {
+            {"MasterVolume", settings.MasterVolume},
+            {"MusicVolume", settings.MusicVolume},
+            {"SFXVolume", settings.SFXVolume},
+            {"MuteWhenUnfocused", settings.MuteWhenUnfocused}
+        };
+        const bool audioModified = (audioData != baselineAudio);
+        const std::string audioHeaderLabel = std::string("Audio Settings") +
+            (audioModified ? " *" : "");
+
+        renderSection("Audio Settings", audioHeaderLabel.c_str(), [&]() {
+            EditorUI::RegisterDefaultDataScope(audioData, audioDefaults);
+
+            float masterVolume = audioData.value("MasterVolume", settings.MasterVolume);
+            if (ImGui::SliderFloat("Master Volume", &masterVolume, 0.0f, 1.0f, "%.2f")) {
+                audioData["MasterVolume"] = masterVolume;
+            }
+            const float defaultMaster = audioDefaults.value("MasterVolume", 1.0f);
+            if (audioData.value("MasterVolume", defaultMaster) != defaultMaster) {
+                if (renderRowResetButton("MasterVolume", "Reset to default")) {
+                    audioData["MasterVolume"] = defaultMaster;
+                }
+            }
+
+            float musicVolume = audioData.value("MusicVolume", settings.MusicVolume);
+            if (ImGui::SliderFloat("Music Volume", &musicVolume, 0.0f, 1.0f, "%.2f")) {
+                audioData["MusicVolume"] = musicVolume;
+            }
+            const float defaultMusic = audioDefaults.value("MusicVolume", 1.0f);
+            if (audioData.value("MusicVolume", defaultMusic) != defaultMusic) {
+                if (renderRowResetButton("MusicVolume", "Reset to default")) {
+                    audioData["MusicVolume"] = defaultMusic;
+                }
+            }
+
+            float sfxVolume = audioData.value("SFXVolume", settings.SFXVolume);
+            if (ImGui::SliderFloat("SFX Volume", &sfxVolume, 0.0f, 1.0f, "%.2f")) {
+                audioData["SFXVolume"] = sfxVolume;
+            }
+            const float defaultSfx = audioDefaults.value("SFXVolume", 1.0f);
+            if (audioData.value("SFXVolume", defaultSfx) != defaultSfx) {
+                if (renderRowResetButton("SFXVolume", "Reset to default")) {
+                    audioData["SFXVolume"] = defaultSfx;
+                }
+            }
+
+            EditorUI::RenderCheckboxProperty("Mute when unfocused", audioData, "MuteWhenUnfocused");
+            EditorUI::ClearDefaultDataScope();
+        }, resetAudioDefaults);
+
+        if (settings.MasterVolume != audioData.value("MasterVolume", settings.MasterVolume)) {
+            settings.MasterVolume = audioData["MasterVolume"].get<float>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.MusicVolume != audioData.value("MusicVolume", settings.MusicVolume)) {
+            settings.MusicVolume = audioData["MusicVolume"].get<float>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.SFXVolume != audioData.value("SFXVolume", settings.SFXVolume)) {
+            settings.SFXVolume = audioData["SFXVolume"].get<float>();
+            m_projectSettingsDirty = true;
+        }
+        if (settings.MuteWhenUnfocused != audioData.value("MuteWhenUnfocused", settings.MuteWhenUnfocused)) {
+            settings.MuteWhenUnfocused = audioData["MuteWhenUnfocused"].get<bool>();
+            m_projectSettingsDirty = true;
+        }
+
+        nlohmann::json performanceData = {
+            {"MaxFPS", settings.MaxFPS}
+        };
+        const bool performanceModified = (performanceData != baselinePerformance);
+        const std::string performanceHeaderLabel = std::string("Performance Settings") +
+            (performanceModified ? " *" : "");
+
+        renderSection("Performance Settings", performanceHeaderLabel.c_str(), [&]() {
+            EditorUI::RegisterDefaultDataScope(performanceData, performanceDefaults);
+
+            if (!settings.WindowSettings.VSync) {
+                EditorUI::RenderIntProperty("Max FPS", performanceData, "MaxFPS");
+                const int defaultMaxFps = performanceDefaults.value("MaxFPS", 120);
+                if (performanceData.value("MaxFPS", defaultMaxFps) != defaultMaxFps) {
+                    if (renderRowResetButton("MaxFPS", "Reset to default")) {
+                        performanceData["MaxFPS"] = defaultMaxFps;
+                    }
+                }
+            } else {
+                int maxFpsValue = performanceData.value("MaxFPS", settings.MaxFPS);
+                ImGui::BeginDisabled();
+                ImGui::InputInt("Max FPS", &maxFpsValue);
+                ImGui::EndDisabled();
+            }
+
+            EditorUI::ClearDefaultDataScope();
+        }, resetPerformanceDefaults);
+
+        const int maxFpsValue = std::max(1, performanceData.value("MaxFPS", settings.MaxFPS));
+        if (settings.MaxFPS != maxFpsValue) {
+            settings.MaxFPS = maxFpsValue;
             m_projectSettingsDirty = true;
         }
         

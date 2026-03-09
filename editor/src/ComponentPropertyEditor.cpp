@@ -37,6 +37,9 @@ prefab assets use the same UI path.
 #include <cstdio>
 #include "AudioAssetLibrary.h"
 #include "core/Application.h"
+#include "UndoSystem.h"
+#include "EditorComponentRegistry.h"
+#include "serialization/EntitySerializer.h"
 
 namespace {
     constexpr int kMaxAnimSegments = 8;
@@ -493,6 +496,11 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
     EditorUI::SetSymbolsFont(symbolsFont);
 }
 
+void ComponentUI::SetSelectedEntities(const std::unordered_set<EntityId>* entities) {
+    m_selectedEntities = entities;
+    EditorUI::SetSelectedEntities(entities);
+}
+
 // Render any queued drag/drop validation popups
 void ComponentUI::RenderAssetDropFeedbackPopup() {
     RenderAssetDropErrorPopup();
@@ -517,13 +525,48 @@ void ComponentUI::RenderName(nlohmann::json& data, ECS::Entity entity, ECS::Worl
     buffer[sizeof(buffer) - 1] = '\0';
 
     // Render text input for name
-    ImGui::Text("Name");
-    ImGui::SameLine();
-    // Set cursor pos x.
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::InputText("##Name", buffer, sizeof(buffer))) {
-        data["Value"] = std::string(buffer);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Name"), "Name");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderTextProperty("Name", data, "Value",
+            m_undo, world, entity.Index, compId, "Value", applyFn);
     }
 
     // End property section.
@@ -537,7 +580,49 @@ void ComponentUI::RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::Wo
     ImGuiIdScope id("Active");
     // Begin property section.
     EditorUI::BeginPropertySection({ "Active" });
-    EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled");
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Active"), "Active");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled",
+            m_undo, world, entity.Index, compId, "Enabled", applyFn);
+    }
     // End property section.
     EditorUI::EndPropertySection();
 }
@@ -551,8 +636,49 @@ void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::W
     EditorUI::BeginPropertySection({ "Tag Mask" });
 
     static const std::vector<std::string> kTagNames = BuildTagMaskNames();
-    // Render bitmask dropdown.
-    EditorUI::RenderBitmaskDropdown("Mask", data, "Mask", kTagNames, 0u);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("TagMask"), "TagMask");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderBitmaskDropdown("Mask", data, "Mask", kTagNames, 0u,
+            m_undo, world, entity.Index, compId, "Mask", applyFn);
+    }
 
     // End property section.
     EditorUI::EndPropertySection();
@@ -680,15 +806,102 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity,
         }
     }
 
-    // Draw position as a 3D vector with X Y Z fields
-    EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f);
+    // Draw position as a 3D vector with X Y Z fields (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("LocalTransform"), "LocalTransform");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f,
+            m_undo, world, entity.Index, compId, "Position", applyFn);
+    }
 
     // Draw rotation as a quaternion with X Y Z W components
     // EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
 
-    // Draw scale as a 3D vector with X Y Z fields
-    // Smaller dragSpeed so scaling changes are more precise
-    EditorUI::RenderVector3DRow("Local Scale", data["Scale"], "X", "Y", "Z", 0.01f);
+    // Draw scale as a 3D vector with X Y Z fields (with undo). Smaller dragSpeed for precision.
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("LocalTransform"), "LocalTransform");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector3DRow("Local Scale", data["Scale"], "X", "Y", "Z", 0.01f,
+            m_undo, world, entity.Index, compId, "Scale", applyFn);
+    }
 
     // Close the grouped section and restore layout state
     EditorUI::EndPropertySection();
@@ -832,17 +1045,55 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::BeginCombo("##SpriteTextureFilter", filterLabels[filter])) {
+    {
+        int oldFilter = data.value("TextureFilter", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["TextureFilter"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##SpriteTextureFilter", filterLabels[filter])) {
         for (int i = 0; i < 2; ++i) {
             bool selected = (filter == i);
             if (ImGui::Selectable(filterLabels[i], selected)) {
                 filter = i;
                 data["TextureFilter"] = filter;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "TextureFilter", oldFilter, filter,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // Normal map row
@@ -897,16 +1148,191 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         ImGui::TextColored(EditorStyle::SuccessText, "Emissive map updated");
     }
 
-    // Render float row.
-    EditorUI::RenderFloatRow("Emissive Strength", "", data, "EmissiveStrength", 0.1f, 0.0f, 100.0f);
-    // Color tint applied on top of the sprite
-    EditorUI::RenderColorProperty("Color##Sprite", data["Color"]);
-    // UV tiling controls how many times the texture repeats over the shape
-    EditorUI::RenderVector2DRow("Tiling##Sprite", data["Tiling"], "X", "Y", 0.1f);
-    // UV offset shifts the texture sampling across the sprite
-    EditorUI::RenderVector2DRow("Offset##Sprite", data["Offset"], "X", "Y", 0.1f);
+    // Emissive strength multiplier
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Emissive Strength", "", data, "EmissiveStrength", 0.1f, 0.0f, 100.0f,
+            m_undo, world, entity.Index, compId, "EmissiveStrength", applyFn);
+    }
 
-    // End property section.
+    // Color tint applied on top of the sprite
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderColorProperty("Color##Sprite", data["Color"],
+            m_undo, world, entity.Index, compId, "Color", applyFn);
+    }
+
+    // UV tiling controls how many times the texture repeats over the shape
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Tiling##Sprite", data["Tiling"], "X", "Y", 0.1f,
+            m_undo, world, entity.Index, compId, "Tiling", applyFn);
+    }
+
+    // UV offset shifts the texture sampling across the sprite
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Offset##Sprite", data["Offset"], "X", "Y", 0.1f,
+            m_undo, world, entity.Index, compId, "Offset", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 // Renders the Rigidbody2D physics component properties
@@ -918,8 +1344,52 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping",
         "Gravity Scale", "Flags" });
 
-    // Mass in kilograms
-    EditorUI::RenderFloatRow("Mass", "kg", data, "Mass", 0.1f);
+    // Mass in kilograms (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Rigidbody2D"), "Rigidbody2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Mass", "kg", data, "Mass", 0.1f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Mass", applyFn);
+    }
 
     // Inverse mass is derived from mass; keep it in sync and render read-only
     const float mass = data.value("Mass", 1.0f);
@@ -931,21 +1401,195 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderStaticValueRow("Inverse Mass", invBuf);
 
     // Linear damping slows translational motion over time
-    EditorUI::RenderFloatRow("Linear Damping", "", data, "LinearDamping", 0.01f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Rigidbody2D"), "Rigidbody2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Linear Damping", "", data, "LinearDamping", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "LinearDamping", applyFn);
+    }
 
     // Angular damping slows rotational motion over time
-    EditorUI::RenderFloatRow("Angular Damping", "", data, "AngularDamping", 0.01f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Rigidbody2D"), "Rigidbody2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Angular Damping", "", data, "AngularDamping", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "AngularDamping", applyFn);
+    }
 
     // Gravity scale lets this body feel heavier or lighter than global gravity
-    EditorUI::RenderFloatRow("Gravity Scale", "", data, "GravityScale", 0.1f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Rigidbody2D"), "Rigidbody2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Gravity Scale", "", data, "GravityScale", 0.1f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "GravityScale", applyFn);
+    }
 
     static const std::vector<std::string> kRigidbodyFlagNames = {
         "Kinematic",
         "Use Gravity",
         "Fixed Rotation"
     };
-    // Render bitmask dropdown.
-    EditorUI::RenderBitmaskDropdown("Flags", data, "Flags", kRigidbodyFlagNames, 0u);
+    // Render bitmask dropdown (undo-wired).
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Rigidbody2D"), "Rigidbody2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderBitmaskDropdown("Flags", data, "Flags", kRigidbodyFlagNames, 0u,
+            m_undo, world, entity.Index, compId, "Flags", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -970,8 +1614,52 @@ void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity enti
     // Single row section for angular velocity
     EditorUI::BeginPropertySection({ "Angular Velocity" });
 
-    // Value represents speed in radians per second
-    EditorUI::RenderFloatRow("Angular Velocity##Angular", "rad/s", data, "Value", 0.5f);
+    // Value represents speed in radians per second (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AngularVelocity2D"), "AngularVelocity2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Angular Velocity##Angular", "rad/s", data, "Value", 0.5f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Value", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -986,22 +1674,141 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entit
     // Flags field stores collider settings as bits packed in an integer
     int flags = data.value("Flags", 0);
 
-    // Bit 0 controls whether this collider is a trigger (no physical collision)
-    bool isTrigger = (flags & 0x1) != 0;
-
-    // Render a checkbox which both displays and edits the trigger flag
-    // Function returns true only when the user changes the checkbox state
-    if (EditorUI::RenderCheckboxPropertyReturn("Is Trigger##Circle", isTrigger)) {
-        // If enabled, set bit 0 to 1 by ORing with 0x1
-        // If disabled, clear bit 0 by ANDing with the inverse of 0x1
-        data["Flags"] = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+    // Bit 0 controls whether this collider is a trigger (no physical collision) (undo-wired)
+    {
+        bool isTrigger = (flags & 0x1) != 0;
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("CircleCollider2D"), "CircleCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            // Read current data, update Flags bit 0 based on boolean v
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            bool enabled = v.is_boolean() ? v.get<bool>() : false;
+            int f = (*dataPtr).value("Flags", 0);
+            if (enabled) f |= 0x1; else f &= ~0x1;
+            (*dataPtr)["Flags"] = f;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        // Use a transient key to render checkbox; do not alter Flags here directly.
+        nlohmann::json& transient = data;
+        transient["IsTrigger"] = isTrigger;
+        EditorUI::RenderCheckboxProperty("Is Trigger##Circle", transient, "IsTrigger",
+            m_undo, world, entity.Index, compId, "Flags", applyFn);
+        // Keep the JSON clean by not relying on transient "IsTrigger" downstream.
     }
 
-    // Offset moves the collider shape relative to the entity origin
-    EditorUI::RenderVector2DRow("Offset##Circle", data["Offset"], "X", "Y", 1.0f);
+    // Offset moves the collider shape relative to the entity origin (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("CircleCollider2D"), "CircleCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Offset##Circle", data["Offset"], "X", "Y", 1.0f,
+            m_undo, world, entity.Index, compId, "Offset", applyFn);
+    }
 
-    // Radius defines how large the circle collider is
-    EditorUI::RenderFloatRow("Radius##Circle", "px", data, "Radius", 1.0f);
+    // Radius defines how large the circle collider is (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("CircleCollider2D"), "CircleCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Radius##Circle", "px", data, "Radius", 1.0f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Radius", applyFn);
+    }
 
     // Layer mask decides which other layers this collider can interact with
     const std::vector<std::string> layerNames = BuildLayerMaskNames();
@@ -1021,19 +1828,182 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
     int flags = data.value("Flags", 0);
     bool isTrigger = (flags & 0x1) != 0;
 
-    // Toggle bit 0 whenever the checkbox is changed
-    if (EditorUI::RenderCheckboxPropertyReturn("Is Trigger##Box", isTrigger)) {
-        data["Flags"] = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+    // Toggle bit 0 whenever the checkbox is changed (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            bool enabled = v.is_boolean() ? v.get<bool>() : false;
+            int f = (*dataPtr).value("Flags", 0);
+            if (enabled) f |= 0x1; else f &= ~0x1;
+            (*dataPtr)["Flags"] = f;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        nlohmann::json& transient = data;
+        transient["IsTrigger"] = isTrigger;
+        EditorUI::RenderCheckboxProperty("Is Trigger##Box", transient, "IsTrigger",
+            m_undo, world, entity.Index, compId, "Flags", applyFn);
     }
 
-    // Offset moves the box shape relative to the entity origin
-    EditorUI::RenderVector2DRow("Offset##Box", data["Offset"], "X", "Y", 1.0f);
+    // Offset moves the box shape relative to the entity origin (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Offset##Box", data["Offset"], "X", "Y", 1.0f,
+            m_undo, world, entity.Index, compId, "Offset", applyFn);
+    }
 
-    // Half extents describe half the width and half the height of the box
-    EditorUI::RenderVector2DRow("Half Extents##Box", data["HalfExtents"], "X", "Y", 1.0f);
+    // Half extents describe half the width and half the height of the box (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Half Extents##Box", data["HalfExtents"], "X", "Y", 1.0f,
+            m_undo, world, entity.Index, compId, "HalfExtents", applyFn);
+    }
 
-    // Rotation in degrees rotates the collider around its center
-    EditorUI::RenderFloatRow("Rotation##Box", "degrees", data, "Rotation", 1.0f);
+    // Rotation in degrees rotates the collider around its center (with undo)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) {
+                uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+            }
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Rotation##Box", "degrees", data, "Rotation", 1.0f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Rotation", applyFn);
+    }
 
     // Layer mask selects which collision layers the box interacts with
     const std::vector<std::string> layerNames = BuildLayerMaskNames();
@@ -1191,14 +2161,140 @@ void ComponentUI::RenderCamera3D(nlohmann::json& data, ECS::Entity entity, ECS::
         EditorUI::RenderFloatRow("Ortho Size", "units", data, "OrthoSize", 0.5f);
     }
 
-    // Near plane is the closest distance that gets rendered
-    EditorUI::RenderFloatRow("Near Plane", "", data, "NearPlane", 0.01f);
+    // Near plane is the closest distance that gets rendered (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Camera3D"), "Camera3D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Near Plane", "", data, "NearPlane", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "NearPlane", applyFn);
+    }
 
-    // Far plane is the furthest distance that gets rendered
-    EditorUI::RenderFloatRow("Far Plane", "", data, "FarPlane", 0.1f);
+    // Far plane is the furthest distance that gets rendered (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Camera3D"), "Camera3D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Far Plane", "", data, "FarPlane", 0.1f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "FarPlane", applyFn);
+    }
 
-    // Aspect ratio is the ratio of width to height used for projection
-    EditorUI::RenderFloatRow("Aspect Ratio", "w/h", data, "AspectRatio", 0.01f);
+    // Aspect ratio is the ratio of width to height used for projection (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Camera3D"), "Camera3D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Aspect Ratio", "w/h", data, "AspectRatio", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "AspectRatio", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -1225,14 +2321,140 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity enti
     // Begin property section.
     EditorUI::BeginPropertySection({ "Friction", "Restitution", "Position Correct" });
 
-    // Friction coefficient (0 = frictionless, 1 = very sticky)
-    EditorUI::RenderFloatRow("Friction", "", data, "Friction", 0.01f);
+    // Friction coefficient (0 = frictionless, 1 = very sticky) (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("PhysicsMaterial2D"), "PhysicsMaterial2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Friction", "", data, "Friction", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Friction", applyFn);
+    }
 
-    // Restitution (bounciness) - 0 = no bounce, 1 = perfect bounce
-    EditorUI::RenderFloatRow("Restitution", "", data, "Restitution", 0.01f);
+    // Restitution (bounciness) - 0 = no bounce, 1 = perfect bounce (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("PhysicsMaterial2D"), "PhysicsMaterial2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Restitution", "", data, "Restitution", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Restitution", applyFn);
+    }
 
-    // How much of penetration to correct each frame (stability vs accuracy)
-    EditorUI::RenderFloatRow("Position Correct", "%", data, "PositionCorrectPercent", 0.01f);
+    // How much of penetration to correct each frame (stability vs accuracy) (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("PhysicsMaterial2D"), "PhysicsMaterial2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Position Correct", "%", data, "PositionCorrectPercent", 0.01f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "PositionCorrectPercent", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -1338,17 +2560,55 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::BeginCombo("##SpriteSheetTextureFilter", filterLabels[filter])) {
+    {
+        int oldFilter = data.value("TextureFilter", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteSheetAnimation2D"), "SpriteSheetAnimation2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["TextureFilter"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##SpriteSheetTextureFilter", filterLabels[filter])) {
         for (int i = 0; i < 2; ++i) {
             bool selected = (filter == i);
             if (ImGui::Selectable(filterLabels[i], selected)) {
                 filter = i;
                 data["TextureFilter"] = filter;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "TextureFilter", oldFilter, filter,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
     (void)dropped; // suppress for now, could be used for feedback
 
@@ -1466,19 +2726,105 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         // How many frames in the animation sequence
         EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
     } else {
-        // Render int property.
-        EditorUI::RenderIntProperty("Row", data, "Row");
-        EditorUI::RenderIntProperty("Frame Offset", data, "FrameOffset");
-        // Render int property.
-        EditorUI::RenderIntProperty("Frame Length", data, "FrameLength");
+        // Row index and per-row frame controls (undo-wired)
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteSheetAnimation2D"), "SpriteSheetAnimation2D");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0;
+                size_t pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderIntProperty("Row", data, "Row",
+                m_undo, world, entity.Index, compId, "Row", applyFn);
+            EditorUI::RenderIntProperty("Frame Offset", data, "FrameOffset",
+                m_undo, world, entity.Index, compId, "FrameOffset", applyFn);
+            EditorUI::RenderIntProperty("Frame Length", data, "FrameLength",
+                m_undo, world, entity.Index, compId, "FrameLength", applyFn);
+        }
     }
 
     // Animation speed in frames per second
     EditorUI::RenderFloatRow("FPS", "", data, "FramesPerSecond", 0.5f);
 
-    // Playback controls
-    EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
-    EditorUI::RenderCheckboxProperty("Playing", data, "Playing");
+    // Playback controls (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteSheetAnimation2D"), "SpriteSheetAnimation2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderCheckboxProperty("Loop", data, "Loop",
+            m_undo, world, entity.Index, compId, "Loop", applyFn);
+        EditorUI::RenderCheckboxProperty("Playing", data, "Playing",
+            m_undo, world, entity.Index, compId, "Playing", applyFn);
+    }
 
     // End property section.
     EditorUI::EndPropertySection();
@@ -1504,8 +2850,50 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::
     // Begin property section.
     EditorUI::BeginPropertySection({ "Z-Order" });
 
-    // Integer Z-order value (can be negative)
-    EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
+    // Integer Z-order value (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("ZIndex2D"), "ZIndex2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderIntProperty("Z-Order", data, "ZOrder",
+            m_undo, world, entity.Index, compId, "ZOrder", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -1527,33 +2915,281 @@ void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::W
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::Combo("##LightType", &lightType, lightTypes, 2)) {
-        data["LightType"] = lightType;
+    {
+        int oldType = data.value("LightType", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["LightType"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::Combo("##LightType", &lightType, lightTypes, 2)) {
+            data["LightType"] = lightType;
+            if (m_undo) {
+                m_undo->RecordPropertyChange(entity.Index, compId, "LightType", oldType, lightType,
+                    [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                        applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                    });
+            }
+        }
     }
 
     const bool isPointLight = (lightType == 1);
     if (isPointLight) {
-        // Position and range are used for Point lights
-        EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
-        EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
+        // Position and range are used for Point lights (undo-wired)
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0;
+                size_t pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f,
+                m_undo, world, entity.Index, compId, "Position", applyFn);
+            EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f, 0.0f, 0.0f,
+                m_undo, world, entity.Index, compId, "Range", applyFn);
+        }
     }
     else {
-        // Direction is used for Directional lights
-        EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
+        // Direction is used for Directional lights (undo-wired)
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0;
+                size_t pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f,
+                m_undo, world, entity.Index, compId, "Direction", applyFn);
+        }
     }
 
-    // Color
+    // Color (undo-wired)
     if (!data.contains("Color")) {
         data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     }
-    // Render color property.
-    EditorUI::RenderColorProperty("Color##Light2D", data["Color"]);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderColorProperty("Color##Light2D", data["Color"],
+            m_undo, world, entity.Index, compId, "Color", applyFn);
+    }
 
-    // Intensity
-    EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f);
+    // Intensity (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Intensity", applyFn);
+    }
 
-    // Casts Shadows
-    EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows");
+    // Casts Shadows (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Light2D"), "Light2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows",
+            m_undo, world, entity.Index, compId, "CastsShadows", applyFn);
+    }
 
     // End property section.
     EditorUI::EndPropertySection();
@@ -1573,14 +3209,49 @@ void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::Worl
     strncpy_s(contentBuffer, content.c_str(), sizeof(contentBuffer) - 1);
     contentBuffer[sizeof(contentBuffer) - 1] = '\0';
 
-    // Render label text.
-    ImGui::Text("Content");
-    ImGui::SameLine();
-    // Set cursor pos x.
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(300.0f);
-    if (ImGui::InputText("##Content", contentBuffer, sizeof(contentBuffer))) {
-        data["Content"] = std::string(contentBuffer);
+    // Content (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Text"), "Text");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderTextProperty("Content", data, "Content",
+            m_undo, world, entity.Index, compId, "Content", applyFn);
     }
 
     // Font path
@@ -1589,25 +3260,144 @@ void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::Worl
     strncpy_s(fontBuffer, fontPath.c_str(), sizeof(fontBuffer) - 1);
     fontBuffer[sizeof(fontBuffer) - 1] = '\0';
 
-    // Render label text.
-    ImGui::Text("Font Path");
-    ImGui::SameLine();
-    // Set cursor pos x.
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(300.0f);
-    if (ImGui::InputText("##FontPath", fontBuffer, sizeof(fontBuffer))) {
-        data["FontPath"] = std::string(fontBuffer);
+    // Font path (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Text"), "Text");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderTextProperty("Font Path", data, "FontPath",
+            m_undo, world, entity.Index, compId, "FontPath", applyFn);
     }
 
-    // Pixel size
-    EditorUI::RenderFloatRow("Pixel Size##Text", "px", data, "PixelSize", 1.0f);
+    // Pixel size (undo-wired)
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Text"), "Text");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Pixel Size##Text", "px", data, "PixelSize", 1.0f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "PixelSize", applyFn);
+    }
 
     // Color
     if (!data.contains("Color")) {
         data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     }
-    // Render color property.
-    EditorUI::RenderColorProperty("Color##Text", data["Color"]);
+    // Render color property (undo-wired).
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Text"), "Text");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderColorProperty("Color##Text", data["Color"],
+            m_undo, world, entity.Index, compId, "Color", applyFn);
+    }
 
     // Anchor (enum: Absolute, TopLeft, TopRight, BottomLeft, BottomRight, Center)
     int anchor = data.value("Anchor", 0);
@@ -1619,8 +3409,46 @@ void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::Worl
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::Combo("##Anchor", &anchor, anchors, 6)) {
-        data["Anchor"] = anchor;
+    {
+        int oldAnchor = data.value("Anchor", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Text"), "Text");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["Anchor"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::Combo("##Anchor", &anchor, anchors, 6)) {
+            data["Anchor"] = anchor;
+            if (m_undo) {
+                m_undo->RecordPropertyChange(entity.Index, compId, "Anchor", oldAnchor, anchor,
+                    [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                        applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                    });
+            }
+        }
     }
 
     // End property section.
@@ -1660,9 +3488,51 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
 
     // Begin property section.
     EditorUI::BeginPropertySection({ "Reference Size", "Offset", "Scale Mode" });
-    EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f);
-    // Render vector 2 drow.
-    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUICanvas"), "GUICanvas");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f,
+            m_undo, world, entity.Index, compId, "ReferenceSize", applyFn);
+        EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f,
+            m_undo, world, entity.Index, compId, "Offset", applyFn);
+    }
 
     const char* scaleModes[] = { "Fit", "Fill", "Match Width", "Match Height" };
     int scaleMode = data.value("ScaleMode", 0);
@@ -1672,17 +3542,55 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUIScaleMode", scaleModes[scaleMode])) {
+    {
+        int oldScale = data.value("ScaleMode", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUICanvas"), "GUICanvas");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["ScaleMode"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUIScaleMode", scaleModes[scaleMode])) {
         for (int i = 0; i < 4; ++i) {
             bool selected = (scaleMode == i);
             if (ImGui::Selectable(scaleModes[i], selected)) {
                 scaleMode = i;
                 data["ScaleMode"] = scaleMode;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "ScaleMode", oldScale, scaleMode,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // End property section.
@@ -1708,17 +3616,55 @@ void ComponentUI::RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, 
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUIRenderModeSpace", spaceOptions[space])) {
+    {
+        int oldSpace = data.value("Space", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIRenderMode"), "GUIRenderMode");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["Space"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUIRenderModeSpace", spaceOptions[space])) {
         for (int i = 0; i < 2; ++i) {
             bool selected = (space == i);
             if (ImGui::Selectable(spaceOptions[i], selected)) {
                 space = i;
                 data["Space"] = space;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "Space", oldSpace, space,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // End property section.
@@ -1757,17 +3703,55 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUIAlignment", alignmentOptions[alignment])) {
+    {
+        int oldAlign = data.value("Alignment", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIElement"), "GUIElement");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["Alignment"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUIAlignment", alignmentOptions[alignment])) {
         for (int i = 0; i < 9; ++i) {
             bool selected = (alignment == i);
             if (ImGui::Selectable(alignmentOptions[i], selected)) {
                 alignment = i;
                 data["Alignment"] = alignment;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "Alignment", oldAlign, alignment,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
     // Render int property.
     EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
@@ -1788,9 +3772,50 @@ void ComponentUI::RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::
 
     // Begin property section.
     EditorUI::BeginPropertySection({ "Color", "Corner Radius" });
-    EditorUI::RenderColorRow("Color", data["Color"]);
-    // Render float row.
-    EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIPanel"), "GUIPanel");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0, pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderColorProperty("Color", data["Color"],
+            m_undo, world, entity.Index, compId, "Color", applyFn);
+        EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "CornerRadius", applyFn);
+    }
     EditorUI::EndPropertySection();
 }
 
@@ -1850,17 +3875,55 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUITextHAlign", hAlignOptions[hAlign])) {
+    {
+        int oldH = data.value("HAlign", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIText"), "GUIText");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["HAlign"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUITextHAlign", hAlignOptions[hAlign])) {
         for (int i = 0; i < 3; ++i) {
             bool selected = (hAlign == i);
             if (ImGui::Selectable(hAlignOptions[i], selected)) {
                 hAlign = i;
                 data["HAlign"] = hAlign;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "HAlign", oldH, hAlign,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     const char* vAlignOptions[] = { "Top", "Middle", "Bottom" };
@@ -1871,17 +3934,55 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUITextVAlign", vAlignOptions[vAlign])) {
+    {
+        int oldV = data.value("VAlign", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIText"), "GUIText");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["VAlign"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUITextVAlign", vAlignOptions[vAlign])) {
         for (int i = 0; i < 3; ++i) {
             bool selected = (vAlign == i);
             if (ImGui::Selectable(vAlignOptions[i], selected)) {
                 vAlign = i;
                 data["VAlign"] = vAlign;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "VAlign", oldV, vAlign,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
     // End property section.
     EditorUI::EndPropertySection();
@@ -1930,17 +4031,55 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::BeginCombo("##GUIImageTextureFilter", filterLabels[filter])) {
+    {
+        int oldFilter = data.value("TextureFilter", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIImage"), "GUIImage");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["TextureFilter"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUIImageTextureFilter", filterLabels[filter])) {
         for (int i = 0; i < 2; ++i) {
             bool selected = (filter == i);
             if (ImGui::Selectable(filterLabels[i], selected)) {
                 filter = i;
                 data["TextureFilter"] = filter;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "TextureFilter", oldFilter, filter,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // Render color row.
@@ -1955,17 +4094,55 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
     ImGui::SameLine();
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    if (ImGui::BeginCombo("##GUIImageScaleMode", scaleModes[scaleMode])) {
+    {
+        int oldScale = data.value("ScaleMode", 0);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("GUIImage"), "GUIImage");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["ScaleMode"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##GUIImageScaleMode", scaleModes[scaleMode])) {
         for (int i = 0; i < 3; ++i) {
             bool selected = (scaleMode == i);
             if (ImGui::Selectable(scaleModes[i], selected)) {
                 scaleMode = i;
                 data["ScaleMode"] = scaleMode;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "ScaleMode", oldScale, scaleMode,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // Render checkbox property.
@@ -2281,8 +4458,50 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
         });
 
     // Volume + Pitch sliders using EditorUI helpers
-    EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
-    EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AudioSource"), "AudioSource");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0, pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Volume", applyFn);
+        EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f, 0.0f, 0.0f,
+            m_undo, world, entity.Index, compId, "Pitch", applyFn);
+    }
 
     // Checkboxes
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
@@ -2300,24 +4519,103 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     // Set cursor pos x.
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::BeginCombo("##AudioBusCombo", busOptions[bus])) {
+    {
+        int oldBus = data.value("Bus", 2);
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AudioSource"), "AudioSource");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            (*dataPtr)["Bus"] = v.get<int>();
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        if (ImGui::BeginCombo("##AudioBusCombo", busOptions[bus])) {
         for (int i = 0; i < 5; ++i) {
             bool selected = (bus == i);
             if (ImGui::Selectable(busOptions[i], selected)) {
                 bus = i;
                 data["Bus"] = bus;
+                if (m_undo) {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "Bus", oldBus, bus,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                        });
+                }
             }
             if (selected) ImGui::SetItemDefaultFocus();
         }
         // End combo.
         ImGui::EndCombo();
+        }
     }
 
     // Stereo pan (2D only)
     bool spatial3D = data.value("Spatial3D", true);
     if (!spatial3D) {
         // Render float row.
-        EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f);
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AudioSource"), "AudioSource");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0, pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f,
+                m_undo, world, entity.Index, compId, "Pan", applyFn);
+        }
     }
 
     // Fade settings
@@ -2327,7 +4625,48 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     bool fadeInEnabled = data.value("EnableFadeIn", false);
     if (fadeInEnabled) {
         // Render float row.
-        EditorUI::RenderFloatRow("Fade In Duration", "s", data, "FadeInDuration", 0.1f);
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AudioSource"), "AudioSource");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0, pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderFloatRow("Fade In Duration", "s", data, "FadeInDuration", 0.1f, 0.0f, 0.0f,
+                m_undo, world, entity.Index, compId, "FadeInDuration", applyFn);
+        }
     }
 
     // Render checkbox property.
@@ -2337,7 +4676,48 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     bool fadeOutEnabled = data.value("EnableFadeOut", false);
     if (fadeOutEnabled) {
         // Render float row.
-        EditorUI::RenderFloatRow("Fade Out Duration", "s", data, "FadeOutDuration", 0.1f);
+        {
+            const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("AudioSource"), "AudioSource");
+            auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+                ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                if (!world) return;
+                ECS::Entity e = world->Resolve(entityId);
+                if (!world->IsAlive(e)) return;
+                const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                if (!uiMeta) return;
+                nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                nlohmann::json* dataPtr = nullptr;
+                if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                    for (auto& comp : entityJson["Components"]) {
+                        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                        std::string tn = comp["TypeName"];
+                        if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                            if (comp.contains("Data") && comp["Data"].is_object()) {
+                                dataPtr = &comp["Data"];
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!dataPtr) return;
+                nlohmann::json* cur = dataPtr;
+                size_t start = 0, pos = 0;
+                while ((pos = path.find('.', start)) != std::string::npos) {
+                    std::string token = path.substr(start, pos - start);
+                    if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                    cur = &(*cur)[token];
+                    start = pos + 1;
+                }
+                std::string last = path.substr(start);
+                (*cur)[last] = value;
+                uiMeta->ApplyToEntity(world, e, *dataPtr);
+            };
+            EditorUI::RenderFloatRow("Fade Out Duration", "s", data, "FadeOutDuration", 0.1f, 0.0f, 0.0f,
+                m_undo, world, entity.Index, compId, "FadeOutDuration", applyFn);
+        }
     }
 
     // SINGLE EndPropertySection call
@@ -2380,8 +4760,47 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
             // Set cursor pos x.
             ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::Combo("##LayerId", &displayIndex, cstrs.data(), static_cast<int>(cstrs.size()))) {
-                data["Id"] = ids[displayIndex];
+            {
+                int oldId = static_cast<int>(data.value("Id", 0));
+                const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Layer2D"), "Layer2D");
+                auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& v) {
+                    ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+                    if (!world) return;
+                    ECS::Entity e = world->Resolve(entityId);
+                    if (!world->IsAlive(e)) return;
+                    const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+                    std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+                    const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+                    if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+                    if (!uiMeta) return;
+                    nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+                    nlohmann::json* dataPtr = nullptr;
+                    if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                        for (auto& comp : entityJson["Components"]) {
+                            if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                            std::string tn = comp["TypeName"];
+                            if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                                if (comp.contains("Data") && comp["Data"].is_object()) {
+                                    dataPtr = &comp["Data"];
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!dataPtr) return;
+                    (*dataPtr)["Id"] = v.get<int>();
+                    uiMeta->ApplyToEntity(world, e, *dataPtr);
+                };
+                if (ImGui::Combo("##LayerId", &displayIndex, cstrs.data(), static_cast<int>(cstrs.size()))) {
+                    data["Id"] = ids[displayIndex];
+                    if (m_undo) {
+                        int newId = static_cast<int>(ids[displayIndex]);
+                        m_undo->RecordPropertyChange(entity.Index, compId, "Id", oldId, newId,
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& p, const nlohmann::json& val) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, val);
+                            });
+                    }
+                }
             }
 
             // End property section.
@@ -2481,13 +4900,138 @@ void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS
     RenderTextureSlot("MRA Map", "MRA_TexturePath", "MRA_TextureId");
 
     // Scalar material properties
-    EditorUI::RenderFloatRow("Metallic", "", data, "Metallic", 0.01f, 0.0f, 1.0f);
-    EditorUI::RenderFloatRow("Smoothness", "", data, "Smoothness", 0.01f, 0.0f, 1.0f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Material2D"), "Material2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0, pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Metallic", "", data, "Metallic", 0.01f, 0.0f, 1.0f,
+            m_undo, world, entity.Index, compId, "Metallic", applyFn);
+        EditorUI::RenderFloatRow("Smoothness", "", data, "Smoothness", 0.01f, 0.0f, 1.0f,
+            m_undo, world, entity.Index, compId, "Smoothness", applyFn);
+    }
     // Render float row.
-    EditorUI::RenderFloatRow("AO Strength", "", data, "AOStrength", 0.01f, 0.0f, 5.0f);
-    EditorUI::RenderFloatRow("Normal Strength", "", data, "NormalStrength", 0.01f, 0.0f, 5.0f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Material2D"), "Material2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0, pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("AO Strength", "", data, "AOStrength", 0.01f, 0.0f, 5.0f,
+            m_undo, world, entity.Index, compId, "AOStrength", applyFn);
+        EditorUI::RenderFloatRow("Normal Strength", "", data, "NormalStrength", 0.01f, 0.0f, 5.0f,
+            m_undo, world, entity.Index, compId, "NormalStrength", applyFn);
+    }
     // Render float row.
-    EditorUI::RenderFloatRow("Alpha Cutoff", "", data, "AlphaCutoff", 0.01f, 0.0f, 1.0f);
+    {
+        const ECS::ComponentTypeId compId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("Material2D"), "Material2D");
+        auto applyFn = [](void* worldPtr, uint32_t entityId, uint32_t componentId, const std::string& path, const nlohmann::json& value) {
+            ECS::World* world = reinterpret_cast<ECS::World*>(worldPtr);
+            if (!world) return;
+            ECS::Entity e = world->Resolve(entityId);
+            if (!world->IsAlive(e)) return;
+            const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+            std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+            const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
+            if (!uiMeta) uiMeta = ComponentRegistryUI::Find("ECS::Components::" + compShortName);
+            if (!uiMeta) return;
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, e);
+            nlohmann::json* dataPtr = nullptr;
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string tn = comp["TypeName"];
+                    if (tn == compShortName || tn == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            dataPtr = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!dataPtr) return;
+            nlohmann::json* cur = dataPtr;
+            size_t start = 0, pos = 0;
+            while ((pos = path.find('.', start)) != std::string::npos) {
+                std::string token = path.substr(start, pos - start);
+                if (!cur->contains(token)) (*cur)[token] = nlohmann::json::object();
+                cur = &(*cur)[token];
+                start = pos + 1;
+            }
+            std::string last = path.substr(start);
+            (*cur)[last] = value;
+            uiMeta->ApplyToEntity(world, e, *dataPtr);
+        };
+        EditorUI::RenderFloatRow("Alpha Cutoff", "", data, "AlphaCutoff", 0.01f, 0.0f, 1.0f,
+            m_undo, world, entity.Index, compId, "AlphaCutoff", applyFn);
+    }
 
     // Bitmask/flag-based material options
     static const std::vector<std::string> kMaterialFlagNames = BuildGenericFlagNames("Flag");
@@ -2639,7 +5183,7 @@ void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity
     // --- Emitter ---
     ImGui::SeparatorText("Emitter");
 
-    // Preset dropdown — applies preset values as template
+    // Preset dropdown ï¿½ applies preset values as template
     static const char* presetNames[] = { "Bubbles", "Geyser", "Smoke", "Explosion", "Sediment" };
     int presetId = data.value("presetId", 0);
     ImGui::Text("Preset");
@@ -2648,7 +5192,7 @@ void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity
     ImGui::SetNextItemWidth(150.0f);
     if (ImGui::Combo("##Preset", &presetId, presetNames, IM_ARRAYSIZE(presetNames))) {
         data["presetId"] = presetId;
-        // Apply preset as template — overwrites simulation fields
+        // Apply preset as template ï¿½ overwrites simulation fields
         _ApplyPresetToJson(data, presetId);
     }
 

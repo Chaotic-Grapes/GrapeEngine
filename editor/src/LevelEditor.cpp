@@ -385,6 +385,7 @@ void LevelEditor::_buildDockLayout() {
     // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Systems", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Game Configuration", assetBrowserNode);
 
     // Finalize the dock builder layout.
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
@@ -769,6 +770,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
     m_sceneViewport.SetTilePalette(&m_tilePalette);
+    m_tilePalette.SetPaintModeChangedCallback([this](bool enabled) {
+        if (!enabled) {
+            m_sceneViewport.SetGridVisible(false);
+        }
+    });
     m_tilePalette.SetActiveTileMapCallback([this](const EntityId id) { _setActiveTileMap(id); });
     // Set active tileset callback.
     m_tilePalette.SetActiveTilesetCallback([this](const uint8_t index) {
@@ -798,6 +804,9 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             m_suppressViewportSelectionSync = false;
             return;
         } // Clear when no world
+
+        const auto& selectedEntities = m_hierarchyWindow.GetSelectedEntities();
+        m_inspector.SetSelectedEntities(selectedEntities);
 
         if (id == ECS::Entity::NPOS32) {
             m_inspector.ClearSelection();
@@ -1047,6 +1056,9 @@ void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
         _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when no selection.
         return;
     }
+
+    // Sync multi-selection set to inspector
+    m_inspector.SetSelectedEntities(m_hierarchyWindow.GetSelectedEntities());
 
     // Validate entity before inspecting
     const ECS::Entity e = m_world->Resolve(id);

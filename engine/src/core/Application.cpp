@@ -65,6 +65,18 @@ namespace Engine {
             }
             return Platform::WindowMode::Windowed;
         }
+
+        // Applies software frame cap from project settings to TimeSystem.
+        // When VSync is enabled, disable software FPS capping.
+        void ApplyFrameCapFromProjectSettings(const ProjectSettings& settings, bool vsyncEnabled) {
+            if (vsyncEnabled) {
+                TimeSystem::Instance().SetMaximumFPS(0.0);
+                return;
+            }
+
+            const int maxFps = settings.MaxFPS > 0 ? settings.MaxFPS : 0;
+            TimeSystem::Instance().SetMaximumFPS(static_cast<double>(maxFps));
+        }
     }
 
     void Application::Initialize(EngineMode mode, bool enableConsole) {
@@ -141,6 +153,20 @@ namespace Engine {
         const double frameStart = std::chrono::duration_cast<Duration>(Clock::now().time_since_epoch()).count();
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
+
+        // Apply runtime frame cap from project performance settings.
+        // Editor mode stays uncapped by default.
+        if (m_mode == EngineMode::Game && m_hasProjectSettings) {
+            bool vsyncEnabled = m_projectSettings.WindowSettings.VSync;
+            if (m_platformContext) {
+                if (auto* window = m_platformContext->GetMainWindow()) {
+                    vsyncEnabled = window->IsVSync();
+                }
+            }
+            ApplyFrameCapFromProjectSettings(m_projectSettings, vsyncEnabled);
+        } else {
+            TimeSystem::Instance().SetMaximumFPS(0.0);
+        }
 
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
