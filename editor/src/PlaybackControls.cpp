@@ -70,9 +70,17 @@ void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont, float toolbarHe
 // Process keyboard input for play/stop, pause/resume, and step.
 // Maps Ctrl+P, Ctrl+Shift+P, and Alt+P into state changes/flags.
 void Playback::ProcessInput() {
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput) {
+        return;
+    }
+
+    const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+    const bool shiftDown = Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
+    const bool altDown = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
+
     // Play/Stop: Ctrl + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
-        !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT))
+    if (Input::IsKeyPressed(KEY_P) && ctrlDown && !shiftDown && !altDown)
     {
         if (m_editorState == EditorState::Edit) {
             if (_startPlayFromEdit()) {
@@ -88,8 +96,7 @@ void Playback::ProcessInput() {
     }
 
     // Pause/Resume: Ctrl + Shift + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
-        Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT))
+    if (Input::IsKeyPressed(KEY_P) && ctrlDown && shiftDown)
     {
         if (m_editorState == EditorState::Play) {
             _changeState(EditorState::Paused);
@@ -102,7 +109,7 @@ void Playback::ProcessInput() {
     }
 
     // Step: Alt + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) {
+    if (Input::IsKeyPressed(KEY_P) && altDown) {
         if (m_editorState == EditorState::Paused) {
             _changeState(EditorState::Step);
             m_stepRequested = true;
@@ -400,36 +407,91 @@ void Playback::Render() {
         }
     }
 
-    // Deferred popup open to keep ImGui ordering stable.
-    if (m_showUnsavedPlayPopup) {
-        ImGui::OpenPopup("Unsaved Changes##PlayWarning");
-        m_showUnsavedPlayPopup = false;
+	// If the user tries to Play without a saved scene path, we need to prompt them to save first
+    if (m_showSaveScenePrompt) {
+        ImGui::OpenPopup("Save Scene?##PlaySavePrompt");
+        m_showSaveScenePrompt = false;
     }
 
-    // Unsaved-changes guard before entering play mode.
-    if (ImGui::BeginPopupModal("Unsaved Changes##PlayWarning", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Scene has unsaved changes. Save before entering Play?");
+	// Center the modal over the main viewport to ensure it appears prominently
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    if (viewport) {
+        ImGui::SetNextWindowViewport(viewport->ID);
+		// Calculate the center of the viewport for modal positioning
+        const ImVec2 center(
+            viewport->Pos.x + viewport->Size.x * 0.5f,
+            viewport->Pos.y + viewport->Size.y * 0.5f
+        );
+		// Set the next window position
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    }
+
+	// Modal popup to prompt user to save the scene before playing, if there is no existing save path
+    if (ImGui::BeginPopupModal("Save Scene?##PlaySavePrompt", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		// Wrap the message text at 20% of the viewport width
+        const float viewportWidth = viewport ? viewport->WorkSize.x : 0.0f;
+        const float wrapWidth = (viewportWidth > 0.0f) ? (viewportWidth * 0.2f) : 0.0f;
+
+		// Show a warning message about the missing save path, with text wrapping for readability
+        if (wrapWidth > 0.0f) {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrapWidth);
+        }
+        ImGui::TextDisabled("This scene has no save location yet. Play needs a saved scene so tile collisions (if any) can load.");
+        ImGui::Dummy(ImVec2(0.0f, 0.2f));
+        ImGui::TextDisabled("You can still play without saving.");
+        
+        if (wrapWidth > 0.0f) {
+            ImGui::PopTextWrapPos();
+        }
         ImGui::Separator();
 
-        // Popup buttons
-        if (ImGui::Button("Save & Play", ImVec2(120, 0))) {
-            if (m_saveSceneCallback) m_saveSceneCallback();
+		// Styled "Yes" option for saving and playing, with a success color to indicate the recommended action
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SuccessButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SuccessButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        // Save and play
+        if (ImGui::Button("Yes", ImVec2(90, 0))) {
+            if (m_saveSceneCallback) {
+                m_saveSceneCallback();
+            }
+            // If there's no scene path, we have to do a blocking save dialog before we can start play mode
+            if (_hasScenePath()) {
+                // Which can cause a huge delta time on the first frame
+                // To mitigate this, we set a flag to zero out the time scale on the next frame after starting play mode, 
+                // and restore it immediately after.
+                m_zeroTimeOnNextPlay = true;
+                _saveWorldState();
+                _changeState(EditorState::Play);
+                ImGui::CloseCurrentPopup();
+            }
+        }
+
+		// Styled "No" option for playing without saving, with a warning color to indicate potential data loss
+        ImGui::PopStyleColor(4);
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
+
+        // Play without saving
+        if (ImGui::Button("No", ImVec2(90, 0))) {
             _saveWorldState();
             _changeState(EditorState::Play);
             ImGui::CloseCurrentPopup();
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Play Anyway", ImVec2(120, 0))) {
-            _saveWorldState();
-            _changeState(EditorState::Play);
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(90, 0))) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::Checkbox("Warn next time", &m_warnOnUnsavedPlay);
+        ImGui::PopStyleColor(4);
         ImGui::EndPopup();
+    }
+
+    // If we suppressed the first Play frame time scale, restore it on the next frame
+    if (m_restoreTimeScaleFrame >= 0 &&
+        m_editorState == EditorState::Play &&
+        TimeSystem::Instance().GetFrameCount() >= m_restoreTimeScaleFrame) {
+        TimeSystem::Instance().SetTimeScale(m_userTimeScale);
+        m_restoreTimeScaleFrame = -1;
     }
 
     ImGui::PopStyleVar();
@@ -637,15 +699,29 @@ void Playback::_changeState(EditorState newState) {
     // Handle time scale changes based on state
     switch (newState) {
     case EditorState::Edit:
+		m_zeroTimeOnNextPlay = false;  // Reset flag when returning to Edit
+		m_restoreTimeScaleFrame = -1;  // Ensure time scale is normal in Edit mode
         TimeSystem::Instance().SetTimeScale(1.0);
         break;
     case EditorState::Paused:
+		m_restoreTimeScaleFrame = -1;  // Clear any pending time scale restore since we're now paused
         TimeSystem::Instance().SetTimeScale(0.0);
         break;
     case EditorState::Play:
-        TimeSystem::Instance().SetTimeScale(m_userTimeScale);
+		// If we flagged to zero time on the first frame of Play (due to starting play without a saved scene), 
+        // do that now and set up to restore on the next frame
+        if (m_zeroTimeOnNextPlay) {
+            TimeSystem::Instance().SetTimeScale(0.0);
+            m_restoreTimeScaleFrame = TimeSystem::Instance().GetFrameCount() + 1;
+            m_zeroTimeOnNextPlay = false;
+        }
+		// Otherwise, apply the user's desired time scale immediately when entering Play mode
+        else {
+            TimeSystem::Instance().SetTimeScale(m_userTimeScale);
+        }
         break;
     case EditorState::Step:
+		m_restoreTimeScaleFrame = -1;  // Clear any pending time scale restore since we're now stepping
         TimeSystem::Instance().SetTimeScale(0.0);  // Don't advance time, single frame only
         break;
     }
@@ -661,11 +737,27 @@ bool Playback::_hasUnsavedChanges() const {
     return m_hasUnsavedChangesProvider ? m_hasUnsavedChangesProvider() : false;
 }
 
-// Entry point that defers to the unsaved-changes guard if enabled.
+// Local guard for scene path existence checks
+bool Playback::_hasScenePath() const {
+    return m_hasScenePathProvider ? m_hasScenePathProvider() : true;
+}
+
+// Entry point that defers to the unsaved-changes guard if enabled
 bool Playback::_startPlayFromEdit() {
-    if (m_warnOnUnsavedPlay && _hasUnsavedChanges()) {
-        m_showUnsavedPlayPopup = true;
+    // If the scene has never been saved, prompt Save As... before playing
+    if (!_hasScenePath()) {
+        m_showSaveScenePrompt = true;
         return false;
+    }
+	// If the scene has unsaved changes, auto-save before playing
+    else if (_hasUnsavedChanges()) {
+        if (m_saveSceneCallback) {
+            m_saveSceneCallback();
+        }
+        // If save fails or is canceled, abort play
+        if (_hasUnsavedChanges()) {
+            return false;
+        }
     }
 
     _saveWorldState();
@@ -686,6 +778,11 @@ void Playback::SetUnsavedChangesProvider(std::function<bool()> provider) {
 // Injected save callback so playback can offer save-and-play.
 void Playback::SetSaveSceneCallback(std::function<void()> callback) {
     m_saveSceneCallback = std::move(callback);
+}
+
+// Injected from the editor to check if the current scene has a valid save path
+void Playback::SetHasScenePathProvider(std::function<bool()> provider) {
+    m_hasScenePathProvider = std::move(provider);
 }
 
 // Query: Is the game currently in the Playing state?

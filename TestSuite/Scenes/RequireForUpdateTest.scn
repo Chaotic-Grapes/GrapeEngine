@@ -1,0 +1,148 @@
+{
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "New Entity"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "FontPath": "",
+                        "FontSize": 24.0,
+                        "HAlign": 0,
+                        "Text": "Text",
+                        "VAlign": 0,
+                        "Wrap": false
+                    },
+                    "TypeName": "GUIText"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        }
+    ],
+    "EntityCount": 1,
+    "Hierarchy": [],
+    "Layers": [
+        {
+            "id": 0,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Background",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 1,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "World",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 2,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Gameplay",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 3,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Foreground",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 98,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "UI",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 99,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Debug",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        }
+    ],
+    "SceneName": "RequireForUpdateTest",
+    "Version": "1.0"
+}

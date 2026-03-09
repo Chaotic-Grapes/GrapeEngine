@@ -93,7 +93,11 @@ template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& n
     // typeid(T).name() returns the type name as a string (e.g. "Texture", "AudioData")
     auto it = cache.find(name);
     if (it != cache.end()) {
-        LOG_DEBUG("[CACHE HIT] " << typeid(T).name() << ": " << name);
+		// Only log the first time we hit this asset in cache to avoid spamming logs for frequently used assets
+        static std::unordered_set<std::string> loggedHits;
+        if (loggedHits.insert(name).second) {
+            LOG_DEBUG("[CACHE HIT] " << typeid(T).name() << ": " << name);
+        }
         TrackOwner<T>(name);
         return it->second;  // Cache hit
     }

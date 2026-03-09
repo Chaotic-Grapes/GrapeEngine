@@ -8,9 +8,9 @@
 # - Wrapped by Interop for C# scripting
 # ===============================================================================
 
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.24)
 
-project(GrapeEngineLib VERSION 1.0.0 LANGUAGES CXX)
+project(GrapeEngineLib VERSION 1.0.0 LANGUAGES CXX CUDA)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 23)
@@ -21,6 +21,16 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/*.c
 )
+
+# Collect CUDA source files
+if(GRAPE_HAS_CUDA)
+    file(GLOB_RECURSE CUDA_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_LIST_DIR}/src/*.cu
+    )
+    file(GLOB_RECURSE CUDA_HEADERS CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_LIST_DIR}/include/*.cuh
+    )
+endif()
 
 # GlobalMemoryOverride.cpp is already picked up by GLOB_RECURSE above
 
@@ -56,6 +66,8 @@ if(BUILD_ENGINE_SHARED)
         ${ENGINE_HEADERS}
         ${EXTERNAL_SOURCES}
         ${EXTERNAL_HEADERS}
+        ${CUDA_SOURCES}
+        ${CUDA_HEADERS}
     )
     message(STATUS "Engine: Building as SHARED library (DLL)")
     
@@ -73,6 +85,8 @@ else()
         ${ENGINE_HEADERS}
         ${EXTERNAL_SOURCES}
         ${EXTERNAL_HEADERS}
+        ${CUDA_SOURCES}
+        ${CUDA_HEADERS}
     )
     message(STATUS "Engine: Building as STATIC library")
 endif()
@@ -95,18 +109,25 @@ endif()
 
 # ======================= Link Dependencies =========================
 # CoreCLR / .NET Hosting
-set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../lib/CoreCLR")
-find_library(NETHOST_LIB 
-    NAMES nethost
-    PATHS ${CORECLR_LIB_DIR}
-    NO_DEFAULT_PATH
-    REQUIRED
-)
+if(NOT NETHOST_LIB)
+    set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/../externals/lib/CoreCLR")
+    set(CORECLR_FALLBACK_DIR "${CMAKE_CURRENT_LIST_DIR}/../lib/CoreCLR")
+    set(NETHOST_ENV_DIR $ENV{NETHOST_DIR})
+
+    find_library(NETHOST_LIB
+        NAMES nethost
+        PATHS
+            ${CORECLR_LIB_DIR}
+            ${CORECLR_FALLBACK_DIR}
+            ${NETHOST_ENV_DIR}
+        REQUIRED
+    )
+endif()
 
 if(NETHOST_LIB)
     message(STATUS "Engine: Found nethost library: ${NETHOST_LIB}")
 else()
-    message(FATAL_ERROR "Engine: nethost.lib not found in ${CORECLR_LIB_DIR}")
+    message(FATAL_ERROR "Engine: nethost.lib not found. Searched: ${CORECLR_LIB_DIR}; ${CORECLR_FALLBACK_DIR}; ${NETHOST_ENV_DIR}")
 endif()
 
 # Link core dependencies (NO ImGui - that's editor-only)
@@ -126,6 +147,17 @@ if(TARGET fmod)
     )
 else()
     message(WARNING "Engine: FMOD target not available; audio features disabled unless FMOD is provided in externals/lib/Fmod or lib/fmod")
+endif()
+
+# ======================= CUDA Configuration =========================
+if(GRAPE_HAS_CUDA)
+    target_link_libraries(GrapeEngineLib
+        PRIVATE
+            CUDA::cudart
+            CUDA::cuda_driver    # needed for OpenGL-CUDA interop
+    )
+    target_compile_definitions(GrapeEngineLib PUBLIC GRAPE_HAS_CUDA=1)
+    message(STATUS "Engine: CUDA enabled")
 endif()
 
 # ======================= Compiler Definitions =========================
@@ -180,6 +212,31 @@ foreach(header IN LISTS EXTERNAL_HEADERS)
     endif()
     source_group("${group_path}" FILES "${header}")
 endforeach()
+
+# Organize CUDA files in Visual Studio
+if(GRAPE_HAS_CUDA AND CUDA_SOURCES)
+    foreach(source IN LISTS CUDA_SOURCES)
+        get_filename_component(source_path "${source}" PATH)
+        file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/src" "${source_path}")
+        if(NOT source_path_rel STREQUAL "")
+            string(REPLACE "/" "\\" group_path "Engine Source\\${source_path_rel}")
+        else()
+            set(group_path "Engine Source")
+        endif()
+        source_group("${group_path}" FILES "${source}")
+    endforeach()
+
+    foreach(header IN LISTS CUDA_HEADERS)
+        get_filename_component(header_path "${header}" PATH)
+        file(RELATIVE_PATH header_path_rel "${CMAKE_CURRENT_LIST_DIR}/include" "${header_path}")
+        if(NOT header_path_rel STREQUAL "")
+            string(REPLACE "/" "\\" group_path "Engine Include\\${header_path_rel}")
+        else()
+            set(group_path "Engine Include")
+        endif()
+        source_group("${group_path}" FILES "${header}")
+    endforeach()
+endif()
 
 # ======================= Installation (Optional) =========================
 # This allows engine to be installed as a reusable library

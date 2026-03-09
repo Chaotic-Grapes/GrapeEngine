@@ -48,12 +48,14 @@ if "%choice%"=="1" (
 if "%choice%"=="2" goto EDITOR_MENU
 if "%choice%"=="3" goto GAME_MENU
 if "%choice%"=="4" (
-    call script_build_all.bat Debug
+    call script_build_editor.bat Debug
+    call script_build_game.bat Debug
     pause
     goto MENU
 )
 if "%choice%"=="5" (
-    call script_build_all.bat Release
+    call script_build_editor.bat Release
+    call script_build_game.bat Release
     pause
     goto MENU
 )

@@ -41,6 +41,7 @@ bool Input::s_mousePrevious[MAX_MOUSE] = { false };
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
 std::string Input::m_charInput{ "" };
+std::vector<std::string> Input::m_droppedFiles{};
 
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
@@ -103,6 +104,14 @@ void Input::SetupEventCallbacks() {
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
     glfwSetDropCallback(m_window, _fileDropCallback);
     glfwSetCharCallback(m_window, _charCallback);
+}
+
+// Retrieves and clears any file paths dropped from the OS since the last consume
+std::vector<std::string> Input::ConsumeDroppedFiles() {
+    std::vector<std::string> dropped;
+	// Swap the dropped files with an empty vector to efficiently clear the internal state
+    dropped.swap(m_droppedFiles);
+    return dropped;
 }
 
 // Called when GLFW encounters an error
@@ -204,8 +213,11 @@ void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {
 
     if (count > 0) {
         // Broadcast event for each dropped file
-        for (int i = 0; i < count; ++i) {
-            Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ std::string(paths[i]) });
+        for (int i = 0; i < count; i++) {
+			// Convert the dropped file path to a std::string and store it in the internal queue
+            std::string droppedPath(paths[i]);
+            m_droppedFiles.push_back(droppedPath);
+            Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ droppedPath });
         }
     }
 }

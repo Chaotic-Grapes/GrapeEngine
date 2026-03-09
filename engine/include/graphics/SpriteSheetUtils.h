@@ -57,10 +57,12 @@ namespace SpriteSheetUtils {
     Window ComputeWindow(int startFrame, int frameCount, int totalCols, int totalRows);
 
     /**
-     * @brief Compute a window for a specific row in the sprite sheet
+     * @brief Compute a window from a row/column anchor in the sprite sheet
      * @param rowIndex Index of the row (0-based)
      * @param rowStartCol Starting column index for the row (0-based)
-     * @param rowFrameCount Number of frames in the row
+     * @param rowFrameCount Number of frames to include.
+     *        - <= 0: use the rest of the selected row
+     *        - > 0 : may continue into following rows
      * @param totalCols Total columns in the sprite sheet
      * @param totalRows Total rows in the sprite sheet
      * @return Window struct with start and count

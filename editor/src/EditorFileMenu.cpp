@@ -45,8 +45,10 @@ centralized and consistent with the currently active scene.
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
+#include <chrono>
 #include <thread>
 #include <cstdio>
+#include <fstream>
 #include <unordered_map>
 #include "serialization/ConfigurationSerializer.h"
 #include <filesystem>
@@ -260,8 +262,8 @@ void EditorFileMenu::_exportProject() {
 
     std::filesystem::path destinationRoot = std::filesystem::path(destFolder);
     std::error_code ec;
-    const std::filesystem::path projectRootAbs = std::filesystem::weakly_canonical(projectRoot, ec);
-    const std::filesystem::path destAbs = std::filesystem::weakly_canonical(destinationRoot, ec);
+    const std::filesystem::path projectRootAbs = std::filesystem::absolute(projectRoot, ec);
+    const std::filesystem::path destAbs = std::filesystem::absolute(destinationRoot, ec);
 
     if (!projectRootAbs.empty() && !destAbs.empty()) {
         const auto projStr = projectRootAbs.string();
@@ -290,18 +292,20 @@ void EditorFileMenu::_exportProject() {
         return {};
     };
 
-    const std::filesystem::path repoRoot = findRepoRoot(projectRoot);
+    std::filesystem::path repoRoot;
+    {
+        std::error_code cwdEc;
+        const std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
+        if (!cwdEc) {
+            repoRoot = findRepoRoot(cwd);
+        }
+    }
+    if (repoRoot.empty()) {
+        repoRoot = findRepoRoot(projectRoot);
+    }
     if (repoRoot.empty()) {
         std::lock_guard<std::mutex> lock(m_exportMutex);
-        m_exportResults.push_back({ "Locate repo root", false, "Could not find CMakeLists.txt above project root.", "" });
-        m_openExportSummary = true;
-        return;
-    }
-    const std::filesystem::path expectedProjectDir = repoRoot / projectName;
-    const std::filesystem::path expectedProjectAbs = std::filesystem::weakly_canonical(expectedProjectDir, ec);
-    if (!projectRootAbs.empty() && !expectedProjectAbs.empty() && projectRootAbs != expectedProjectAbs) {
-        std::lock_guard<std::mutex> lock(m_exportMutex);
-        m_exportResults.push_back({ "Validate project location", false, "Project must live under the repo root for export.", "" });
+        m_exportResults.push_back({ "Locate repo root", false, "Could not locate engine repo root.", "" });
         m_openExportSummary = true;
         return;
     }
@@ -318,6 +322,7 @@ void EditorFileMenu::_exportProject() {
             "Build & export game",
             "Validate export output",
             "Compile scripts",
+            "Copy project settings",
             "Prepare destination",
             "Copy export output"
         };
@@ -326,10 +331,6 @@ void EditorFileMenu::_exportProject() {
     m_exportInProgress = true;
     m_exportDone = false;
     m_openExportSummary = true;
-
-    if (m_exportThread.joinable()) {
-        m_exportThread.join();
-    }
 
     m_exportThread = std::thread([this, projectRoot, repoRoot, projectName, buildRoot, exportRoot, destinationRoot]() {
         auto pushResult = [&](const ExportStepResult& result) {
@@ -340,6 +341,7 @@ void EditorFileMenu::_exportProject() {
         try {
             auto runCommand = [&](const std::string& command, const std::string& stepName) {
                 std::string output;
+                const auto start = std::chrono::steady_clock::now();
                 {
                     std::lock_guard<std::mutex> lock(m_exportMutex);
                     const auto it = std::find(m_exportStepNames.begin(), m_exportStepNames.end(), stepName);
@@ -349,22 +351,27 @@ void EditorFileMenu::_exportProject() {
                 }
                 const std::string fullCmd = "cmd /C " + command + " 2>&1";
                 FILE* pipe = _popen(fullCmd.c_str(), "r");
-                if (!pipe) {
+                const bool started = (pipe != nullptr);
+                int result = 1;
+                if (started) {
+                    char buffer[512] = {};
+                    while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe)) {
+                        output.append(buffer);
+                    }
+                    result = _pclose(pipe);
+                }
+                const auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - start).count();
+
+                if (!started) {
                     pushResult({ stepName, false, "Failed to start command.", "" });
                     return false;
                 }
-
-                char buffer[512] = {};
-                while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe)) {
-                    output.append(buffer);
-                }
-
-                const int result = _pclose(pipe);
                 if (result != 0) {
-                    pushResult({ stepName, false, "Command failed.", output });
+                    pushResult({ stepName, false, "Command failed after " + std::to_string(elapsedSeconds) + "s.", output });
                     return false;
                 }
-                pushResult({ stepName, true, "OK", "" });
+                pushResult({ stepName, true, "OK (" + std::to_string(elapsedSeconds) + "s)", "" });
                 return true;
             };
 
@@ -382,6 +389,7 @@ void EditorFileMenu::_exportProject() {
                 "cmake -S \"" + repoRoot.string() + "\" -B \"" + buildRoot.string() + "\" "
                 "-G \"Visual Studio 17 2022\" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON "
                 "-DEXPORT_PROJECT_NAME=\"" + projectName + "\" "
+                "-DEXPORT_PROJECT_DIR=\"" + projectRoot.string() + "\" "
                 "-DGAME_OUTPUT_NAME=\"" + projectName + "\"";
 
             if (!runCommand(configureCmd, "Configure game build")) {
@@ -451,9 +459,133 @@ void EditorFileMenu::_exportProject() {
                 }
             }
 
+            m_exportCurrentStep = 5;
+            const std::filesystem::path exportProjectDir = exportRoot / projectName;
+            const std::filesystem::path localSettingsPath = projectRoot / "ProjectSettings.json";
+            const std::filesystem::path docsSettingsPath = Engine::ProjectPaths::GetSettingsPath();
+            std::filesystem::path settingsSourcePath;
+
+            if (std::filesystem::exists(localSettingsPath)) {
+                settingsSourcePath = localSettingsPath;
+            } else if (std::filesystem::exists(docsSettingsPath)) {
+                settingsSourcePath = docsSettingsPath;
+            } else {
+                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in project root or Documents.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            std::error_code createProjectDirEc;
+            std::filesystem::create_directories(exportProjectDir, createProjectDirEc);
+            if (createProjectDirEc) {
+                pushResult({ "Copy project settings", false, "Failed to prepare export project folder.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            // Copy the ProjectSettings.json to the export output
+            const std::filesystem::path exportSettingsPath = exportProjectDir / "ProjectSettings.json";
+            std::error_code settingsCopyEc;
+            std::filesystem::copy_file(settingsSourcePath, exportSettingsPath,
+                std::filesystem::copy_options::overwrite_existing, settingsCopyEc);
+            if (settingsCopyEc) {
+                pushResult({ "Copy project settings", false, "Failed to copy ProjectSettings.json.", "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            // After copying the ProjectSettings.json, we need to ensure that the StartupScene path is valid for the exported project
+            try {
+                std::ifstream settingsIn(exportSettingsPath);
+                nlohmann::json settingsJson;
+                settingsIn >> settingsJson;
+
+                // If there is no StartupScene setting or it's empty, we can't validate it, so we will just warn the user but continue with the export since they may not be using a startup scene at all
+                // But if there is a StartupScene setting, we will attempt to validate and fix it for the exported project, but if it's missing or empty then we can skip this step entirely
+                std::string startupSceneSetting = settingsJson.value("StartupScene", std::string{});
+                if (startupSceneSetting.empty()) {
+                    pushResult({ "Copy project settings", false, "StartupScene is empty in ProjectSettings.json.", "" });
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+
+                // If the StartupScene path is absolute, we will check if it can be made relative to the project root
+                // If it can, we will convert it to a relative path and update the settings for the exported project
+                std::filesystem::path startupScenePath(startupSceneSetting);
+                if (startupScenePath.is_absolute()) {
+                    std::error_code relEc;
+                    const std::filesystem::path rel = std::filesystem::relative(startupScenePath, projectRoot, relEc);
+                    if (!relEc && !rel.empty() && rel.begin() != rel.end() && *rel.begin() != "..") {
+                        startupScenePath = rel;
+                        settingsJson["StartupScene"] = startupScenePath.generic_string();
+                    } else {
+                        pushResult({ "Copy project settings", false, "StartupScene must be inside the project folder for export.", "" });
+                        m_exportDone = true;
+                        m_exportInProgress = false;
+                        return;
+                    }
+                }
+
+                // Handle rooted-relative inputs like "/Scenes/Main.scene" and normalize "."/"..".
+                if (!startupScenePath.is_absolute() && startupScenePath.has_root_directory()) {
+                    startupScenePath = startupScenePath.relative_path();
+                }
+                startupScenePath = startupScenePath.lexically_normal();
+                if (startupScenePath.empty() || startupScenePath == "." ||
+                    (startupScenePath.begin() != startupScenePath.end() && *startupScenePath.begin() == "..")) {
+                    pushResult({ "Copy project settings", false, "StartupScene must resolve inside the project folder.", "" });
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+                settingsJson["StartupScene"] = startupScenePath.generic_string();
+
+                // Now we will validate that the StartupScene path (whether originally relative or converted to relative) actually exists in the exported project
+                std::filesystem::path startupSceneResolved = startupScenePath;
+                if (!startupSceneResolved.is_absolute()) {
+                    startupSceneResolved = exportProjectDir / startupSceneResolved;
+                }
+
+                // If the resolved StartupScene path does not exist in the exported project, we will fail the export since the exported game would not be able to 
+                // find its startup scene and would be effectively broken, but if it does exist then we can proceed with the export as normal
+                if (!std::filesystem::exists(startupSceneResolved)) {
+                    // Support legacy settings that include "<ProjectName>/" prefix.
+                    std::filesystem::path trimmedPath = startupScenePath;
+                    if (trimmedPath.begin() != trimmedPath.end() && trimmedPath.begin()->string() == projectName) {
+                        trimmedPath = trimmedPath.lexically_relative(projectName);
+                        startupSceneResolved = exportProjectDir / trimmedPath;
+                    }
+
+                    if (!std::filesystem::exists(startupSceneResolved)) {
+                        pushResult({ "Copy project settings", false, "StartupScene path does not exist in exported project.", "" });
+                        m_exportDone = true;
+                        m_exportInProgress = false;
+                        return;
+                    }
+
+                    startupScenePath = trimmedPath;
+                    settingsJson["StartupScene"] = startupScenePath.generic_string();
+                }
+
+                std::ofstream settingsOut(exportSettingsPath, std::ios::trunc);
+                settingsOut << settingsJson.dump(4);
+            } catch (const std::exception& ex) {
+                pushResult({ "Copy project settings", false, std::string("Invalid ProjectSettings.json: ") + ex.what(), "" });
+                m_exportDone = true;
+                m_exportInProgress = false;
+                return;
+            }
+
+            pushResult({ "Copy project settings", true, "OK", "" });
+
+            // Error code to remove existing destination if it exists, create destination directory, and copy export output to destination
             std::error_code removeDestEc;
             if (std::filesystem::exists(destinationRoot)) {
-                m_exportCurrentStep = 5;
+                m_exportCurrentStep = 6;
                 std::filesystem::remove_all(destinationRoot, removeDestEc);
                 if (removeDestEc) {
                     pushResult({ "Prepare destination", false, "Failed to clear destination.", "" });
@@ -463,6 +595,7 @@ void EditorFileMenu::_exportProject() {
                 }
             }
 
+            // Create the destination directory if it doesn't exist (it should be removed by the previous step if it already exists, but we will create it here just in case it didn't exist before or there was an error removing it)
             std::error_code createEc;
             std::filesystem::create_directories(destinationRoot, createEc);
             if (createEc) {
@@ -474,7 +607,7 @@ void EditorFileMenu::_exportProject() {
             pushResult({ "Prepare destination", true, "OK", "" });
 
             std::error_code copyEc;
-            m_exportCurrentStep = 6;
+            m_exportCurrentStep = 7;
             std::filesystem::copy(exportRoot, destinationRoot,
                 std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, copyEc);
             if (copyEc) {
@@ -1527,6 +1660,13 @@ void EditorFileMenu::OpenSceneDialog() {
 #endif
 }
 
+void EditorFileMenu::OpenSceneFromPath(const std::string& path) {
+    if (path.empty()) {
+        return;
+    }
+    _openScene(path);
+}
+
 // Opens a Windows file save dialog for the user to choose a filename and location for saving
 // Then saves the active scene to that path
 void EditorFileMenu::SaveSceneAsDialog() {
@@ -1608,6 +1748,13 @@ void EditorFileMenu::SaveScene() {
 // Processes keyboard shortcuts for common editor operations (save, open, zoom, etc.)
 // Called every frame to check if user pressed Ctrl+S, Ctrl+O, Ctrl+N, etc.
 void EditorFileMenu::HandleShortcuts(float& uiScale) {
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput) {
+        uiScale = std::clamp(uiScale, 0.75f, 2.0f);
+        EditorStyle::FontScale = uiScale;
+        return;
+    }
+
     // Check if Control key (either left or right) is currently held down
     bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
     // Check if Shift key (either left or right) is currently held down

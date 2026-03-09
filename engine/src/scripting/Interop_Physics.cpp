@@ -33,7 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
  * @param worldPtr Pointer to the ECS World
  * @param x Gravity X component
  */
-INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, float y) {
+INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float /*x*/, float /*y*/) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -65,7 +65,7 @@ INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* outX, fl
  * @param worldPtr Pointer to the ECS World
  * @param enabled True to enable, false to disable
  */
-INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enabled) {
+INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool /*enabled*/) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;

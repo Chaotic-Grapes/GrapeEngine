@@ -19,6 +19,54 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/SpriteSheetUtils.h"
 #include <algorithm>
 
+namespace {
+    constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
+
+    int BuildSegmentSpans(const ECS::Components::SpriteSheetAnimation2D& anim,
+        int totalCols, int totalRows,
+        int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+        if (totalCols <= 0 || totalRows <= 0)
+            return 0;
+
+        const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+        int totalCount = 0;
+        for (int i = 0; i < segCount; ++i) {
+            const int row = std::clamp(anim.SegmentRows[i], 0, totalRows - 1);
+            const int startCol = std::clamp(anim.SegmentOffsets[i], 0, totalCols - 1);
+            const int available = totalCols - startCol;
+
+            int count = anim.SegmentLengths[i];
+            if (count <= 0 || count > available) {
+                count = available;
+            }
+            if (count <= 0) {
+                starts[i] = 0;
+                counts[i] = 0;
+                continue;
+            }
+
+            starts[i] = row * totalCols + startCol;
+            counts[i] = count;
+            totalCount += count;
+        }
+        return totalCount;
+    }
+
+    int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
+        int segmentCount, int localFrame) {
+        int cursor = 0;
+        for (int i = 0; i < segmentCount; ++i) {
+            const int count = counts[i];
+            if (count <= 0) continue;
+            if (localFrame < cursor + count) {
+                return starts[i] + (localFrame - cursor);
+            }
+            cursor += count;
+        }
+        return -1;
+    }
+}
+
 namespace ECS {
     SystemMetadata AnimationPreviewSystem::GetMetadata() const {
         ComponentAccessBuilder builder("AnimationPreview");
@@ -57,21 +105,34 @@ namespace ECS {
                 if (layout.TotalCols <= 0 || layout.TotalRows <= 0)
                     return;
 
-                // Compute frame window based on mode
+                const bool useSegments = anim.UseSegments && anim.SegmentCount > 0;
+                int clipCount = 0;
+                int absoluteFrame = 0;
+
+                // Compute frame selection based on mode.
                 SpriteSheetUtils::Window window{};
-                if (anim.UseRow) { // Row-based window
+                int segmentStarts[kMaxAnimSegments] = { 0 };
+                int segmentCounts[kMaxAnimSegments] = { 0 };
+                if (useSegments) {
+                    clipCount = BuildSegmentSpans(anim, layout.TotalCols, layout.TotalRows, segmentStarts, segmentCounts);
+                    if (clipCount <= 0)
+                        return;
+                }
+                else if (anim.UseRow) { // Row-based window
                     window = SpriteSheetUtils::ComputeRowWindow(
                         anim.Row, anim.FrameOffset, anim.FrameLength,
                         layout.TotalCols, layout.TotalRows);
+                    if (window.Count <= 0)
+                        return;
+                    clipCount = window.Count;
                 } else { // Standard window (columns)
                     window = SpriteSheetUtils::ComputeWindow(
                         anim.StartFrame, anim.FrameCount,
                         layout.TotalCols, layout.TotalRows);
+                    if (window.Count <= 0)
+                        return;
+                    clipCount = window.Count;
                 }
-
-                // No valid frames to display
-                if (window.Count <= 0)
-                    return;
 
                 // Determine current frame to display
                 int localFrame = 0;
@@ -79,10 +140,18 @@ namespace ECS {
                     localFrame = world.Get<Components::AnimationState2D>(entity).CurrentFrame;
                 }
                 // Clamp local frame within window
-                localFrame = std::clamp(localFrame, 0, window.Count - 1);
+                localFrame = std::clamp(localFrame, 0, clipCount - 1);
 
                 // Compute absolute frame index and UVs
-                const int absoluteFrame = window.Start + localFrame;
+                if (useSegments) {
+                    const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+                    absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segCount, localFrame);
+                    if (absoluteFrame < 0)
+                        return;
+                }
+                else {
+                    absoluteFrame = window.Start + localFrame;
+                }
                 const glm::vec4 uv = SpriteSheetUtils::ComputeUV(
                     absoluteFrame, anim.FrameWidth, anim.FrameHeight, anim.SheetWidth, anim.SheetHeight);
 

@@ -38,6 +38,20 @@ namespace Platform {
 
     bool GLFWWindow::Initialize(const std::string& title, int width, int height,
                                 bool vsync, WindowMode mode, bool resizable, bool decorated) {
+        constexpr int kDefaultWindowWidth = 1600;
+        constexpr int kDefaultWindowHeight = 900;
+        constexpr int kMinWindowWidth = 640;
+        constexpr int kMinWindowHeight = 360;
+
+        const int inputWidth = width;
+        const int inputHeight = height;
+        width = (width <= 0) ? kDefaultWindowWidth : std::max(width, kMinWindowWidth);
+        height = (height <= 0) ? kDefaultWindowHeight : std::max(height, kMinWindowHeight);
+        if (inputWidth != width || inputHeight != height) {
+            LOG_WARNING("[GLFWWindow] Invalid window size " << inputWidth << "x" << inputHeight
+                        << ", using " << width << "x" << height);
+        }
+
         // Configure GLFW hints
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);

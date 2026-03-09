@@ -46,7 +46,7 @@ namespace Engine::Gameplay {
 
 		// On enter/exit/update functionalities
         virtual void OnEnter() {}
-        virtual void OnUpdate(float deltaTime) {}
+        virtual void OnUpdate(float /*deltaTime*/) {}
         virtual void OnExit() {}
     };
 

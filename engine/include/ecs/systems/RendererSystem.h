@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include "ecs/systems/ParticleSystem.h"
 #include "ecs/World.h"
 #include "Color.h"
 #include "Math/Vector2D.h"
@@ -41,14 +42,20 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <queue>
 #include <string>
 
 #include "graphics/TileMapRenderer.hpp"
 
+// Forward declarations
 class TileMap;
 class Tileset;
 class TileMapRenderer;
+
+namespace ECS {
+    class BoidSystem;
+}
 
 namespace ECS {
     /**
@@ -283,6 +290,7 @@ namespace ECS {
             std::vector<std::shared_ptr<const Tileset>> Tilesets;
             
             glm::vec2 Offset;
+            Entity SourceEntity = NULL_ENTITY; // Editor entity that owns this debug tilemap
         };
 
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);
@@ -355,6 +363,30 @@ namespace ECS {
         std::vector<DebugTileMapEntry> m_debugTileMaps; // Multiple tilemaps to render in the editor.
 
         TileMapRenderer m_tileMapRenderer; // value member, no pointer
+
+        // Compute systems
+        BoidSystem* m_boidSystem = nullptr;
+
+		// This cache holds runtime tilemap data for entities with TileMapComponent, keyed by EntityId
+        struct RuntimeTileMapEntry {
+			uint32_t Generation = 0;       // Used to track changes and invalidate cache when tilemap is modified
+			std::shared_ptr<TileMap> Map;  // Pointer to tilemap data 
+			std::vector<std::shared_ptr<Tileset>> Tilesets;  // Pointers to tilesets used by the tilemap
+			std::vector<std::string> TilesetPaths;           // Original tileset paths
+			std::string MapPath;                             // Original map path
+			float TileWorldSize = 1.0f;    
+			uint32_t TilePixelSize = 32;   
+			uint32_t DefaultWidth = 64;    
+			uint32_t DefaultHeight = 64;  
+            uint16_t RenderLayerId = 0;
+            bool Visible = true;
+            glm::vec2 Origin{ 0.0f, 0.0f };
+
+            ECS::Components::Material2D Material{};
+            bool HasMaterial = false;
+        };
+
+        std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;
 
         // ====================================================================
         // Member Variables - Wireframe Submissions
@@ -448,6 +480,7 @@ namespace ECS {
         // TEXTURE/SHADER/FONT CAN BE REUSED WITHOUT DUPLICATING MEMORY
 
         std::shared_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::shared_ptr<Shader> m_guiShader;       ///< GUI-only shader with gamma correction
         std::shared_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::shared_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
         std::shared_ptr<Shader> m_blitShader;
@@ -456,6 +489,13 @@ namespace ECS {
         std::shared_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
         std::shared_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
         std::shared_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+
+        // Compute shaders
+        std::shared_ptr<Shader> m_boidShader;
+
+        // Particle
+        std::shared_ptr<Shader> m_particleShader;
+        ECS::ParticleSystem* m_particleSystem = nullptr;
 
         // ====================================================================
         // Member Variables - Object Picking
@@ -518,6 +558,10 @@ namespace ECS {
             const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
         void RenderBloom(Viewport& vp, float bloomRadius);
         void ToneMap(Viewport& vp);
+
+		void RefreshRuntimeTileMaps(World& world);  // Sync runtime tilemap cache with current world state
+		void SubmitRuntimeTileMaps(int layer);      // Submit tilemaps from runtime cache for rendering in the current layer
+
         void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
         void RenderGUI(Viewport& vp);

@@ -1,17 +1,43 @@
 # ======================= Project Configuration =========================
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.24)
 
 # Set the CMake policy version (ensures consistent behavior)
-cmake_policy(VERSION 3.13)
+cmake_policy(VERSION 3.24)
 
 project(GrapeEngine)
+
+# ======================= CUDA Configuration =========================
+option(ENABLE_CUDA "Enable CUDA GPU acceleration" ON)
+
+if(ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_ARCHITECTURES native)
+        find_package(CUDAToolkit REQUIRED)
+        set(GRAPE_HAS_CUDA TRUE)
+        message(STATUS "CUDA enabled: ${CMAKE_CUDA_COMPILER}")
+        message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+    else()
+        set(GRAPE_HAS_CUDA FALSE)
+        message(WARNING "CUDA compiler not found - CUDA features disabled")
+    endif()
+else()
+    set(GRAPE_HAS_CUDA FALSE)
+    message(STATUS "CUDA disabled by option")
+endif()
 
 # Set C++ standard globally
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-    add_compile_options(/EHsc /bigobj)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/EHsc>
+                        $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
+                        $<$<COMPILE_LANGUAGE:C>:/EHsc>
+                        $<$<COMPILE_LANGUAGE:C>:/bigobj>)
 endif()
 
 # Set the directory where custom CMake modules are stored
@@ -118,7 +144,12 @@ if(TARGET GrapeEngineLib)
         target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
     elseif (MSVC)
         # /FS ensures shared PDB access for parallel cl.exe usage.
-        target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
+	target_compile_options(GrapeEngineLib PRIVATE 
+    		$<$<COMPILE_LANGUAGE:CXX>:/W4>
+    		$<$<COMPILE_LANGUAGE:CXX>:/FS>
+    		$<$<COMPILE_LANGUAGE:C>:/W4>
+    		$<$<COMPILE_LANGUAGE:C>:/FS>
+	)
     endif()
 endif()
 # Build editor if requested
@@ -341,13 +372,16 @@ if(DOTNET_EXECUTABLE)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     
-    # Find all .NET SDK versions and select the highest one
+    # Find all .NET SDK versions and select the highest one.
+    # Guard empty lists so configure doesn't fail on runtime-only dotnet installs.
     string(REGEX MATCHALL "([0-9]+\\.[0-9]+\\.[0-9]+)" DOTNET_SDK_VERSIONS "${DOTNET_SDK_LIST}")
-    
-    # Sort versions and pick the highest (last in sorted list)
-    list(SORT DOTNET_SDK_VERSIONS COMPARE NATURAL ORDER DESCENDING)
-    list(GET DOTNET_SDK_VERSIONS 0 DOTNET_SDK_VERSION)
-    
+    if(DOTNET_SDK_VERSIONS)
+        list(SORT DOTNET_SDK_VERSIONS COMPARE NATURAL ORDER DESCENDING)
+        list(GET DOTNET_SDK_VERSIONS 0 DOTNET_SDK_VERSION)
+    else()
+        set(DOTNET_SDK_VERSION "")
+    endif()
+
     if(DOTNET_SDK_VERSION)
         message(STATUS "  Detected .NET SDK version: ${DOTNET_SDK_VERSION}")
         
@@ -540,11 +574,23 @@ endif()
 # Stages a standalone game build + project content to a distributable folder.
 if(BUILD_GAME AND TARGET GrapeRuntime)
     set(EXPORT_PROJECT_NAME "" CACHE STRING "Project folder name to export for game packaging")
+    set(EXPORT_PROJECT_DIR "" CACHE PATH "Project directory to export for game packaging")
 
     file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json")
     list(LENGTH PROJECT_SETTINGS_FILES PROJECT_SETTINGS_COUNT)
 
-    if(EXPORT_PROJECT_NAME STREQUAL "")
+    if(EXPORT_PROJECT_DIR)
+        get_filename_component(EXPORT_PROJECT_DIR "${EXPORT_PROJECT_DIR}" ABSOLUTE)
+        if(EXPORT_PROJECT_NAME STREQUAL "")
+            get_filename_component(EXPORT_PROJECT_NAME "${EXPORT_PROJECT_DIR}" NAME)
+        else()
+            get_filename_component(EXPORT_PROJECT_DIR_NAME "${EXPORT_PROJECT_DIR}" NAME)
+            if(NOT EXPORT_PROJECT_NAME STREQUAL EXPORT_PROJECT_DIR_NAME)
+                message(WARNING "Export: EXPORT_PROJECT_NAME does not match EXPORT_PROJECT_DIR name; using directory name '${EXPORT_PROJECT_DIR_NAME}'.")
+                set(EXPORT_PROJECT_NAME "${EXPORT_PROJECT_DIR_NAME}")
+            endif()
+        endif()
+    elseif(EXPORT_PROJECT_NAME STREQUAL "")
         if(PROJECT_SETTINGS_COUNT EQUAL 1)
             list(GET PROJECT_SETTINGS_FILES 0 EXPORT_PROJECT_SETTINGS)
             get_filename_component(EXPORT_PROJECT_DIR "${EXPORT_PROJECT_SETTINGS}" DIRECTORY)
@@ -558,7 +604,9 @@ if(BUILD_GAME AND TARGET GrapeRuntime)
     endif()
 
       if(EXPORT_PROJECT_NAME)
-          set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
+          if(NOT EXPORT_PROJECT_DIR)
+              set(EXPORT_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}/${EXPORT_PROJECT_NAME}")
+          endif()
           set(EXPORT_OUTPUT_DIR "${CMAKE_BINARY_DIR}/export/${EXPORT_PROJECT_NAME}")
           set(EXPORT_ENGINE_DLL_COMMAND "")
           set(EXPORT_ENGINE_DLL_DEPENDENCY "")

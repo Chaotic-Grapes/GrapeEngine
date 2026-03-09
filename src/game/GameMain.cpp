@@ -36,6 +36,18 @@ extern "C" {
 }
 
 namespace {
+    int ExitWithStartupError(const std::string& message, Engine::Application* engine = nullptr) {
+        std::cerr << message << '\n';
+        LOG_ERROR(message);
+#ifdef _WIN32
+        MessageBoxA(nullptr, message.c_str(), "GrapeEngine Runtime Error", MB_OK | MB_ICONERROR);
+#endif
+        if (engine) {
+            engine->Shutdown();
+        }
+        return 1;
+    }
+
     std::filesystem::path GetExecutableDir() {
 #ifdef _WIN32
         wchar_t buffer[MAX_PATH]{};
@@ -103,11 +115,12 @@ int main(int argc, char** argv) {
         projectRoot = FindProjectRootInCwd();
     }
     if (projectRoot.empty()) {
-        std::cerr << "No project found. Place a project folder next to the executable or pass --project <path>.\n";
-        return 1;
+        return ExitWithStartupError(
+            "No project found. Place exactly one project folder next to the executable or pass --project <path>.");
     }
     if (projectRoot == "__ambiguous__") {
-        return 1;
+        return ExitWithStartupError(
+            "Multiple projects found next to the executable. Launch with --project <path>.");
     }
 
     // Initialize project paths
@@ -125,9 +138,10 @@ int main(int argc, char** argv) {
 
     // Load project settings
     if (!engine.LoadProjectSettings(projectRoot)) {
-        LOG_ERROR("Failed to load ProjectSettings.json for: " << projectRoot);
-        LOG_ERROR("Cannot start game without project configuration");
-        return 1;
+        return ExitWithStartupError(
+            "Failed to load ProjectSettings.json for: " + projectRoot +
+            ". Ensure the exported project contains a valid ProjectSettings.json.",
+            &engine);
     }
 
     const auto& projectSettings = engine.GetProjectSettings();
@@ -162,9 +176,7 @@ int main(int argc, char** argv) {
     LOG_INFO("Creating game window: " << projectSettings.Title);
     auto* platformContext = engine.GetPlatformContext();
     if (!platformContext) {
-        LOG_ERROR("Platform context not available");
-        engine.Shutdown();
-        return 1;
+        return ExitWithStartupError("Platform context not available.", &engine);
     }
 
     Platform::WindowCreateInfo windowInfo;
@@ -176,9 +188,7 @@ int main(int argc, char** argv) {
 
     auto* window = platformContext->CreatePlatformWindow(windowInfo);
     if (!window) {
-        LOG_ERROR("Failed to create game window");
-        engine.Shutdown();
-        return 1;
+        return ExitWithStartupError("Failed to create game window.", &engine);
     }
 
     // Initialize systems after window is created
@@ -204,9 +214,8 @@ int main(int argc, char** argv) {
     // Load startup scene
     const std::string& startupScene = projectSettings.StartupScene;
     if (startupScene.empty()) {
-        LOG_ERROR("No startup scene specified in ProjectSettings.json");
-        engine.Shutdown();
-        return 1;
+        return ExitWithStartupError(
+            "No startup scene specified in ProjectSettings.json.", &engine);
     }
 
     std::filesystem::path startupScenePath = startupScene;
@@ -221,9 +230,10 @@ int main(int argc, char** argv) {
     size_t sceneIndex = sceneManager.AddScene(scene);
 
     if (!sceneManager.LoadScene(sceneIndex, startupScenePath.string())) {
-        LOG_ERROR("Failed to load startup scene: " << startupScenePath.string());
-        engine.Shutdown();
-        return 1;
+        return ExitWithStartupError(
+            "Failed to load startup scene: " + startupScenePath.string() +
+            ". Check that StartupScene points to an existing .scn/.scene file.",
+            &engine);
     }
 
     // Ensure the startup scene is active before the first frame update.
@@ -243,8 +253,6 @@ int main(int argc, char** argv) {
             LOG_INFO("Registered " << systemCount << " scripted systems from " << scriptsPath.string());
         }
     }
-
-    engine.GetSystemManager().OnSceneStart(scene->GetWorld());
 
     // Game main loop
     while (engine.IsRunning()) {

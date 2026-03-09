@@ -16,6 +16,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Core.Dependencies;
+using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems.Attributes;
 using System.Reflection;
@@ -132,6 +134,7 @@ public static class ScriptHost
     /// Maps native world pointer to managed World wrapper.
     /// </summary>
     private static readonly Dictionary<IntPtr, World> _worldCache = [];
+    private static readonly Dictionary<ulong, uint[]> _requireForUpdateCache = [];
 
     /// <summary>
     /// Track the currently active world for hot reload operations.
@@ -320,6 +323,7 @@ public static class ScriptHost
             // Clear all discovered systems (disposes IDisposable instances)
             // This breaks references from instances back to assembly types
             SystemDiscovery.ClearDiscoveredSystems();
+            ClearRequireForUpdateCache();
             
             // Force additional GC to clean up any dangling references before AssemblyManager unload
             GC.Collect();
@@ -410,6 +414,7 @@ public static class ScriptHost
 
             // Clear discovered systems before discovering new ones to avoid duplication
             SystemDiscovery.ClearDiscoveredSystems();
+            ClearRequireForUpdateCache();
 
             // Discover systems in newly loaded assembly
             Assembly? newAssembly = AssemblyManager.GetLoadedAssembly(logicalPath);
@@ -976,7 +981,7 @@ public static class ScriptHost
     /// Get metadata about a system (name, group, run mode).
     /// </summary>
     [UnmanagedCallersOnly]
-    public static void GetSystemMetadata(ulong handle, IntPtr outNameBuffer, IntPtr outGroupPtr, IntPtr outRunModePtr)
+    public static void GetSystemMetadata(ulong handle, IntPtr outNameBuffer, IntPtr outGroupPtr, IntPtr outRunModePtr, IntPtr outOrderPtr)
     {
         try
         {
@@ -995,7 +1000,13 @@ public static class ScriptHost
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
             if (outNameBuffer != IntPtr.Zero)
             {
-                Marshal.Copy(nameBytes, 0, outNameBuffer, System.Math.Min(nameBytes.Length, 256));
+                const int maxLen = 256;
+                int copyLen = System.Math.Min(nameBytes.Length, maxLen - 1);
+                if (copyLen > 0)
+                {
+                    Marshal.Copy(nameBytes, 0, outNameBuffer, copyLen);
+                }
+                Marshal.WriteByte(outNameBuffer, copyLen, 0);
             }
             
             // Get group from ISystemMetadata interface first, then [SystemGroup] attribute
@@ -1008,6 +1019,11 @@ public static class ScriptHost
             if (outRunModePtr != IntPtr.Zero)
             {
                 Marshal.WriteInt32(outRunModePtr, (int)SystemMetadataExtractor.GetSystemRunMode(systemType, instance));
+            }
+
+            if (outOrderPtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outOrderPtr, SystemMetadataExtractor.GetSystemOrder(systemType));
             }
         }
         catch (Exception ex)
@@ -1196,6 +1212,88 @@ public static class ScriptHost
         }
     }
 
+    // Clear the cached required component hashes for a system, called after assembly reload to ensure we re-extract updated metadata
+    private static void ClearRequireForUpdateCache()
+    {
+        _requireForUpdateCache.Clear();
+    }
+
+    // Get the required component hashes for update for a system, using a cache to avoid repeated reflection
+    private static uint[] GetRequireForUpdateHashes(ulong handle)
+    {
+        // Check cache first to avoid reflection on every ShouldRun call
+        if (_requireForUpdateCache.TryGetValue(handle, out var hashes))
+        {
+            return hashes;
+        }
+
+        // If not in cache, extract from system type and cache it
+        Type? systemType = SystemDiscovery.GetSystemType(handle);
+        if (systemType == null)
+        {
+            hashes = [];
+            _requireForUpdateCache[handle] = hashes;
+            return hashes;
+        }
+
+        hashes = ComponentAccessBridge.ExtractRequireForUpdateComponentHashes(systemType).ToArray();
+        _requireForUpdateCache[handle] = hashes;
+        return hashes;
+    }
+
+    private static unsafe bool MatchesRequireForUpdate(World world, uint[] requiredHashes)
+    {
+        if (requiredHashes.Length == 0)
+        {
+            return true;
+        }
+
+        // Perform a query to check if any entities match the required component hashes 
+        fixed (uint* reqPtr = requiredHashes)
+        {
+            QueryIterator iterator = default;
+            QueryInteropAPI.CreateQuery(world.NativePtr, reqPtr, requiredHashes.Length, null, 0, null, 0, &iterator);
+            ulong entityId = 0;
+            return QueryInteropAPI.QueryNext(&iterator, &entityId);
+        }
+    }
+
+    /// <summary>
+    /// Call ShouldRun on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int CallSystemShouldRun(ulong handle, IntPtr worldPtr)
+    {
+        try
+        {
+            // Get the system instance for this handle
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return 1;
+            }
+
+            // If the system implements ISystem, call ShouldRun and return the result
+            if (instance is ISystem system)
+            {
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
+                uint[] requiredHashes = GetRequireForUpdateHashes(handle);
+                if (!MatchesRequireForUpdate(managedWorld, requiredHashes))
+                {
+                    return 0;
+                }
+                return system.ShouldRun(managedWorld) ? 1 : 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in ShouldRun: {ex.Message}", LogLevel.Error);
+        }
+
+        return 1;
+    }
+
 
     /// <summary>
     /// Call OnDestroy on a scripted system.
@@ -1222,6 +1320,114 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnSceneStart on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnSceneStart(ulong handle)
+    {
+        try
+        {
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                system.OnSceneStart();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnSceneStart: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnSceneStop on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnSceneStop(ulong handle)
+    {
+        try
+        {
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                system.OnSceneStop();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnSceneStop: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnStartRunning on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnStartRunning(ulong handle, IntPtr worldPtr)
+    {
+        try
+        {
+            // Get the system instance for this handle and call OnStartRunning if it implements ISystem
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
+                system.OnStartRunning(managedWorld);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnStartRunning: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnStopRunning on a scripted system.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void CallSystemOnStopRunning(ulong handle, IntPtr worldPtr)
+    {
+        try
+        {
+            // Get the system instance for this handle and call OnStopRunning if it implements ISystem
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
+                return;
+            }
+
+            if (instance is ISystem system)
+            {
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
+                system.OnStopRunning(managedWorld);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in OnStopRunning: {ex.Message}", LogLevel.Error);
         }
     }
 

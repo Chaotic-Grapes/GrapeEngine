@@ -55,39 +55,6 @@ extern "C" void __cdecl Native_OnScriptsChanged(const char* scriptsDir) {
 
 namespace ECS {
 
-    // Helper: produce a single-line summary from possibly multi-line diagnostics
-    static std::string SummarizeDiagnostics(const std::string& diags) {
-        if (diags.empty())
-            return std::string();
-
-        // Trim leading newlines/spaces
-        size_t pos = 0;
-        while (pos < diags.size() && (diags[pos] == '\r' || diags[pos] == '\n'))
-            ++pos;
-
-        // Find end of first line
-        size_t end = diags.find_first_of('\r', pos);
-        size_t nl = diags.find_first_of('\n', pos);
-
-        // Take the earliest line ending
-        if (end == std::string::npos || (nl != std::string::npos && nl < end))
-            end = nl;
-        std::string firstLine = (end == std::string::npos)
-            ? diags.substr(pos)
-            : diags.substr(pos, end - pos);
-
-        // Trim trailing whitespace
-        while (!firstLine.empty() && (firstLine.back() == '\r' || firstLine.back() == '\n'))
-            firstLine.pop_back();
-
-        // If there are additional lines, indicate truncation
-        if (diags.find_first_of('\n', pos) != std::string::npos || diags.find_first_of('\r', pos) != std::string::npos) {
-            return firstLine + " ...";
-        }
-
-        return firstLine;
-    }
-
     // ============================================================================
     // ScriptManager Implementation
     // ============================================================================
@@ -364,6 +331,48 @@ namespace ECS {
         if (!m_initialized || !m_callSystemOnDestroy) return;
         try {
             m_callSystemOnDestroy(handle, worldPtr);
+        } catch (...) {}
+    }
+
+    void ScriptManager::CallSystemOnSceneStart(uint64_t handle)
+    {
+        if (!m_initialized || !m_callSystemOnSceneStart) return;
+        try {
+            m_callSystemOnSceneStart(handle);
+        } catch (...) {}
+    }
+
+    void ScriptManager::CallSystemOnSceneStop(uint64_t handle)
+    {
+        if (!m_initialized || !m_callSystemOnSceneStop) return;
+        try {
+            m_callSystemOnSceneStop(handle);
+        } catch (...) {}
+    }
+
+    bool ScriptManager::CallSystemShouldRun(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemShouldRun) return true;
+        try {
+            return m_callSystemShouldRun(handle, worldPtr) != 0;
+        } catch (...) {
+            return true;
+        }
+    }
+
+    void ScriptManager::CallSystemOnStartRunning(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnStartRunning) return;
+        try {
+            m_callSystemOnStartRunning(handle, worldPtr);
+        } catch (...) {}
+    }
+
+    void ScriptManager::CallSystemOnStopRunning(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnStopRunning) return;
+        try {
+            m_callSystemOnStopRunning(handle, worldPtr);
         } catch (...) {}
     }
 
@@ -801,6 +810,11 @@ namespace ECS {
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
+        success &= loadMethod("CallSystemOnSceneStart",           scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStart));
+        success &= loadMethod("CallSystemOnSceneStop",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnSceneStop));
+        success &= loadMethod("CallSystemShouldRun",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemShouldRun));
+        success &= loadMethod("CallSystemOnStartRunning",         scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnStartRunning));
+        success &= loadMethod("CallSystemOnStopRunning",          scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnStopRunning));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -966,6 +980,54 @@ namespace ECS {
         }
     }
 
+    void ScriptSystemWrapper::OnSceneStart() {
+        if (!m_scriptManager) return;
+
+        auto callOnSceneStart = m_scriptManager->GetCallSystemOnSceneStart();
+        if (callOnSceneStart) {
+            callOnSceneStart(m_managedHandle);
+        }
+    }
+
+    void ScriptSystemWrapper::OnSceneStop() {
+        if (!m_scriptManager) return;
+
+        auto callOnSceneStop = m_scriptManager->GetCallSystemOnSceneStop();
+        if (callOnSceneStop) {
+            callOnSceneStop(m_managedHandle);
+        }
+    }
+
+    bool ScriptSystemWrapper::ShouldRun(World& world) {
+        if (!m_scriptManager) {
+            return true;
+        }
+
+        auto callShouldRun = m_scriptManager->GetCallSystemShouldRun();
+        if (!callShouldRun) {
+            return true;
+        }
+        return callShouldRun(m_managedHandle, &world) != 0;
+    }
+
+    void ScriptSystemWrapper::OnStartRunning(World& world) {
+        if (!m_scriptManager) return;
+
+        auto callOnStartRunning = m_scriptManager->GetCallSystemOnStartRunning();
+        if (callOnStartRunning) {
+            callOnStartRunning(m_managedHandle, &world);
+        }
+    }
+
+    void ScriptSystemWrapper::OnStopRunning(World& world) {
+        if (!m_scriptManager) return;
+
+        auto callOnStopRunning = m_scriptManager->GetCallSystemOnStopRunning();
+        if (callOnStopRunning) {
+            callOnStopRunning(m_managedHandle, &world);
+        }
+    }
+
     /**
      * @brief Get the metadata of the managed system.
      * @return SystemMetadata structure
@@ -1007,6 +1069,7 @@ namespace ECS {
         std::string systemName = m_typeName;
         SystemGroup group = SystemGroup::Update;
         SystemRunMode runMode = SystemRunMode::PlayOnly;
+        int executionOrder = 0;
 
         if (m_scriptManager) {
             auto getMetadata = m_scriptManager->GetGetSystemMetadata();
@@ -1015,7 +1078,7 @@ namespace ECS {
                 int groupInt = 0;
                 int runModeInt = 0;
 
-                getMetadata(m_managedHandle, nameBuffer, &groupInt, &runModeInt);
+                getMetadata(m_managedHandle, nameBuffer, &groupInt, &runModeInt, &executionOrder);
 
                 // Extract metadata from C# system
                 if (nameBuffer[0] != '\0') {
@@ -1028,7 +1091,7 @@ namespace ECS {
 
         // Build immutable metadata using ComponentAccessBuilder
         ComponentAccessBuilder builder(systemName);
-        builder.SetExecutionOrder(0)  // TODO: Get from C#
+        builder.SetExecutionOrder(executionOrder)
             .SetGroup(group)
             .SetRunMode(runMode)
             .SetEnabled(true)

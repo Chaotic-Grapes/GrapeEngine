@@ -32,6 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <filesystem>
+#include "core/ProjectPaths.h"
 
 TileMap::TileMap(float tileSize)
     : m_tileSize(tileSize)
@@ -52,6 +54,13 @@ uint32_t TileMap::LayerCount() const
 uint32_t TileMap::AddLayer(uint32_t width, uint32_t height)
 {
     m_layers.emplace_back(width, height);
+
+	// Initialize collision grid if this is the first layer, using the same dimensions
+    if (m_layers.size() == 1) {
+        m_collisionWidth = width;
+        m_collisionHeight = height;
+        m_collisionMasks.assign(static_cast<size_t>(width) * static_cast<size_t>(height), 0);  // Initialize all masks to 0 (no collision)
+    }
     return static_cast<uint32_t>(m_layers.size() - 1);
 }
 
@@ -100,6 +109,9 @@ void TileMap::ResizeLayer(uint32_t layerIndex, uint32_t newWidth, uint32_t newHe
     }
 
     layer = std::move(resized);
+
+	// If resizing the first layer, we also need to resize the collision grid to match the new dimensions
+    if (layerIndex == 0) ResizeCollisionGrid(newWidth, newHeight, 0, 0);
 }
 
 int32_t TileMap::OriginX() const
@@ -194,6 +206,9 @@ void TileMap::ExpandLayerToFit(uint32_t layerIndex, int32_t tileX, int32_t tileY
     layer = std::move(resized);
     m_originX = newOriginX;
     m_originY = newOriginY;
+
+	// Same thing; resize to match the new layer dimensions and shift existing masks if the origin moved
+    if (layerIndex == 0) ResizeCollisionGrid(newWidth, newHeight, offsetX, offsetY);
 }
 
 // world -> tile (floor avoids off-by-one at boundaries)
@@ -266,6 +281,44 @@ void TileMap::SetTileSigned(uint32_t layerIndex, int32_t tileX, int32_t tileY, T
     layer.Set(static_cast<uint32_t>(ix), static_cast<uint32_t>(iy), id);
 }
 
+// Collision masks are stored in a separate grid aligned with the first layer, 
+// indexed by signed tile coordinates relative to the origin
+// Each mask is 4 bits representing collision in 2x2 subcells of the tile
+uint8_t TileMap::GetCollisionMaskSigned(int32_t tileX, int32_t tileY) const
+{
+	// If there are no collision masks, treat as empty (0)
+    if (m_collisionMasks.empty()) return 0;
+
+	// Calculate the index in the collision mask grid based on the signed tile coordinates and origin offset
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+
+	// If the coordinates are out of bounds of the collision mask grid, treat as empty
+    if (ix < 0 || iy < 0) return 0;
+    if (ix >= static_cast<int32_t>(m_collisionWidth) || iy >= static_cast<int32_t>(m_collisionHeight)) return 0;
+
+	// Calculate the linear index into the collision mask vector and return the mask value
+    const size_t index = static_cast<size_t>(iy) * m_collisionWidth + static_cast<size_t>(ix);
+    return m_collisionMasks[index];
+}
+
+// Sets the collision mask for the tile at the given signed coordinates, if within bounds
+void TileMap::SetCollisionMaskSigned(int32_t tileX, int32_t tileY, uint8_t mask)
+{
+    // Usual checks
+    if (m_collisionMasks.empty()) return;
+
+	// Same as above
+    const int32_t ix = tileX - m_originX;
+    const int32_t iy = tileY - m_originY;
+    if (ix < 0 || iy < 0) return;
+    if (ix >= static_cast<int32_t>(m_collisionWidth) || iy >= static_cast<int32_t>(m_collisionHeight)) return;
+
+	// Store only the lower 4 bits of the mask, since each tile has a 4-bit collision mask for its 2x2 subcells
+    const size_t index = static_cast<size_t>(iy) * m_collisionWidth + static_cast<size_t>(ix);
+    m_collisionMasks[index] = static_cast<uint8_t>(mask & 0x0F);
+}
+
 uint8_t TileMap::AddTilesetPath(const std::string& path)
 {
     if (path.empty()) {
@@ -312,6 +365,44 @@ bool TileMap::IsValidLayer(uint32_t layerIndex) const
     return layerIndex < m_layers.size();
 }
 
+// If the layer is resized to be smaller, we can just discard the out-of-bounds collision masks
+// If larger, we need to create new collision masks for the new area
+void TileMap::ResizeCollisionGrid(uint32_t newWidth, uint32_t newHeight, int32_t offsetX, int32_t offsetY)
+{
+	// If there are no collision masks yet, initialize to the new size with empty masks
+    if (newWidth == 0 || newHeight == 0) return;
+
+	// Create a new collision mask grid with the new dimensions, initialized to 0 (no collision)
+    std::vector<uint8_t> resized(static_cast<size_t>(newWidth) * static_cast<size_t>(newHeight), 0);
+    const uint32_t copyWidth = std::min(m_collisionWidth, newWidth);
+    const uint32_t copyHeight = std::min(m_collisionHeight, newHeight);
+
+	// Copy existing collision masks to the new grid with the appropriate offset, if they fall within the new bounds
+    for (uint32_t y = 0; y < copyHeight; y++) {
+        for (uint32_t x = 0; x < copyWidth; x++) {
+			// Calculate the new coordinates with the offset applied
+            const int32_t newX = static_cast<int32_t>(x) + offsetX;
+            const int32_t newY = static_cast<int32_t>(y) + offsetY;
+
+			// Skip if the new coordinates are out of bounds of the resized grid
+            if (newX < 0 || newY < 0) continue;
+            if (newX >= static_cast<int32_t>(newWidth) || newY >= static_cast<int32_t>(newHeight)) continue;
+
+			// Copy the collision mask from the old grid to the new grid at the new coordinates
+            const size_t oldIndex = static_cast<size_t>(y) * m_collisionWidth + static_cast<size_t>(x);
+            const size_t newIndex = static_cast<size_t>(newY) * newWidth + static_cast<size_t>(newX);
+
+			// If the old index is out of bounds of the existing collision masks, treat it as 0 
+            resized[newIndex] = m_collisionMasks.empty() ? 0 : m_collisionMasks[oldIndex];
+        }
+    }
+
+	// Replace the old collision masks with the resized version and update dimensions
+    m_collisionMasks = std::move(resized);
+    m_collisionWidth = newWidth;
+    m_collisionHeight = newHeight;
+}
+
 bool TileMap::SaveMap(const std::string& filepath) const
 {
     std::ofstream out(filepath, std::ios::binary);
@@ -319,7 +410,7 @@ bool TileMap::SaveMap(const std::string& filepath) const
 
     // Header: Magic, Version, Tile Size, Layer Count
     static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
-    static constexpr uint32_t kTileMapVersion = 2; // Version with tileset list + origin.
+    static constexpr uint32_t kTileMapVersion = 3; // Version with tileset list + origin + collision masks.
 
     out.write(reinterpret_cast<const char*>(&kTileMapMagic), sizeof(uint32_t));
     out.write(reinterpret_cast<const char*>(&kTileMapVersion), sizeof(uint32_t));
@@ -349,14 +440,56 @@ bool TileMap::SaveMap(const std::string& filepath) const
     out.write(reinterpret_cast<const char*>(&m_originY), sizeof(int32_t));
 
     // Append tileset list (count + length-prefixed strings).
-    const uint32_t tilesetCount = static_cast<uint32_t>(m_tilesetPaths.size());
-    out.write(reinterpret_cast<const char*>(&tilesetCount), sizeof(uint32_t));
+	// We normalize paths to be relative to the project root if possible, to improve portability of the 
+    // tilemap asset across different machines and project locations
+    auto normalizePathForStorage = [](const std::string& path) {
+		// If the path is empty or project paths aren't initialized, we can't normalize, so return as-is
+        if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+            return path;
+        }
+		// Only normalize absolute paths; relative paths are stored as-is
+        std::filesystem::path fsPath(path);
+        if (!fsPath.is_absolute()) {
+            return path;
+        }
+		// Convert to relative path; if the path is outside the project, this will return an empty string, 
+        // so we fall back to storing the original absolute path in that case
+        const std::string relative = Engine::ProjectPaths::ToRelativePath(path);
+        return relative.empty() ? path : relative;
+    };
+
+	// Normalize all paths before writing to ensure consistent storage format
+    std::vector<std::string> normalizedPaths;
+    normalizedPaths.reserve(m_tilesetPaths.size());
     for (const auto& path : m_tilesetPaths) {
+        normalizedPaths.push_back(normalizePathForStorage(path));
+    }
+
+	// Write the count of tileset paths, followed by each path as a length-prefixed string
+    const uint32_t tilesetCount = static_cast<uint32_t>(normalizedPaths.size());
+    out.write(reinterpret_cast<const char*>(&tilesetCount), sizeof(uint32_t));
+
+	// Each path is stored as a 4-byte length prefix followed by the UTF-8 string data (without null terminator)
+    for (const auto& path : normalizedPaths) {
         const uint32_t len = static_cast<uint32_t>(path.size());
         out.write(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
         if (len > 0) {
             out.write(path.data(), len);
         }
+    }
+
+    // Append collision masks (width, height, then 1 byte per tile).
+    const uint32_t collisionWidth = m_collisionWidth;
+    const uint32_t collisionHeight = m_collisionHeight;
+
+	// If there are no collision masks, we still write the dimensions as 0 and skip writing any mask data.
+    out.write(reinterpret_cast<const char*>(&collisionWidth), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char*>(&collisionHeight), sizeof(uint32_t));
+
+	// Only write mask data if we have a non-empty collision grid
+    // This allows older files to omit this section entirely
+    if (!m_collisionMasks.empty()) {
+        out.write(reinterpret_cast<const char*>(m_collisionMasks.data()), static_cast<std::streamsize>(m_collisionMasks.size()));
     }
     
     const bool ok = out.good();
@@ -376,6 +509,7 @@ bool TileMap::LoadMap(const std::string& filepath)
 
     static constexpr uint32_t kTileMapMagic = 0x50414D54; // 'TMAP'
     static constexpr uint32_t kTileMapVersionWithTilesets = 2;
+    static constexpr uint32_t kTileMapVersionWithCollision = 3;
 
     uint32_t header = 0;
     in.read(reinterpret_cast<char*>(&header), sizeof(uint32_t));
@@ -465,6 +599,52 @@ bool TileMap::LoadMap(const std::string& filepath)
                 }
             }
         }
+    }
+
+    // Read optional collision data if present.
+    m_collisionMasks.clear();
+    m_collisionWidth = 0;
+    m_collisionHeight = 0;
+
+    if (isNewFormat && version >= kTileMapVersionWithCollision && in.peek() != EOF) {
+		// We expect the collision data to be at the end of the file, 
+        // so we can read it after all the layers and tilesets
+        uint32_t collisionWidth = 0;
+        uint32_t collisionHeight = 0;
+
+		// Read the dimensions of the collision grid
+        // If they are valid, read the mask data
+        in.read(reinterpret_cast<char*>(&collisionWidth), sizeof(uint32_t));
+        in.read(reinterpret_cast<char*>(&collisionHeight), sizeof(uint32_t));
+
+		// Only attempt to read the mask data if the dimensions are valid and we are still in a good state
+        if (in.good() && collisionWidth > 0 && collisionHeight > 0) {
+			// 1 byte per tile for the collision mask, stored in row-major order
+            const size_t count = static_cast<size_t>(collisionWidth) * static_cast<size_t>(collisionHeight);
+
+			// We can read directly into m_collisionMasks after resizing it to the correct size
+            m_collisionMasks.resize(count, 0);
+            in.read(reinterpret_cast<char*>(m_collisionMasks.data()), static_cast<std::streamsize>(count));
+
+			// If we successfully read the mask data, store the dimensions
+            if (in.good()) {
+                m_collisionWidth = collisionWidth;
+                m_collisionHeight = collisionHeight;
+            } 
+            // Otherwise, clear the masks to indicate no collision data
+            else {
+                m_collisionMasks.clear();
+            }
+        }
+    }
+
+	// If the file didn't have collision data, we can initialize an empty collision grid that matches 
+    // the first layer's dimensions (if it exists)
+    if (m_collisionMasks.empty() && !m_layers.empty()) {
+        const TileLayer& layer = m_layers[0];
+        m_collisionWidth = layer.Width();
+        m_collisionHeight = layer.Height();
+        m_collisionMasks.assign(static_cast<size_t>(m_collisionWidth) * static_cast<size_t>(m_collisionHeight), 0);
     }
 
     const bool ok = in.good();

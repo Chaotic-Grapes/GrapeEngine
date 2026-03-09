@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "EditorECSUtils.h"
 #include "serialization/EntitySerializer.h"
 #include "../include/core/World/TileMap.hpp"
+#include <imgui.h>
 #include <algorithm>
 #include <cstring>
 #include <unordered_map>
@@ -649,6 +650,11 @@ namespace Editor {
     }
 
     void UndoSystem::Update() {
+        const ImGuiIO& io = ImGui::GetIO();
+        if (io.WantTextInput) {
+            return;
+        }
+
         // Check for CTRL+Z (Undo)
         if ((Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL)) &&
             Input::IsKeyPressed(KEY_Z)) {

@@ -64,6 +64,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
 
     // Mandatory LocalTransform
     Editor::ECSUtils::SetComponent(&world, e, "LocalTransform", ECS::Components::LocalTransform{});
+    // Mandatory Active
+    Editor::ECSUtils::SetComponent(&world, e, "Active", ECS::Components::Active{});
 
     // Ensure WorldTransform exists so hierarchy/system queries that require it see the entity
     // Initialize as dirty so systems will compute it on the next update

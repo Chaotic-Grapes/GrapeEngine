@@ -365,6 +365,8 @@ namespace ECS {
         // Sprite sheet animation configuration (POD)
         struct SpriteSheetAnimation2D {
         public:
+            static constexpr int MaxSegments = 8;
+
             uint32_t TextureId = 0;           // Texture containing the sprite sheet
             uint32_t NormalTextureId = 0;     // Optional normal map sprite sheet
             int FrameWidth = 0;               // Width of a single frame in pixels
@@ -380,6 +382,16 @@ namespace ECS {
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
             bool UseRow = false;              // Use row-based window instead of StartFrame
+            bool UseSegments = false;         // Use segment-list mode instead of Frame Window/Row
+            uint8_t SegmentCount = 0;         // Number of active segments in arrays below
+            uint8_t _paddingSegments[2] = { 0, 0 };
+
+            // Segment-list mode data (index 0..SegmentCount-1)
+            // Each segment is row-local and does not spill into the next row:
+            // Row + FrameOffset + FrameLength(<=0 = rest of row)
+            int SegmentRows[MaxSegments] = { 0 };
+            int SegmentOffsets[MaxSegments] = { 0 };
+            int SegmentLengths[MaxSegments] = { 0 };
 
             // Persistent texture path IDs (StringTable). 0 = invalid.
             uint32_t TexturePath = 0;
@@ -559,6 +571,69 @@ namespace ECS {
             uint32_t _padding = 0;            // Alignment / if needed
         };
         static_assert(std::is_trivially_copyable_v<Material2D>, "Material2D must be trivially copyable");
+
+        // CUDA-related stuff
+        struct ParticleEmitter {
+            uint32_t presetId = 0;        // index into ParticleSystem's preset registry
+            int      maxParticles = 1000;     // GPU buffer capacity
+            float    emissionRate = 50.0f;    // particles per second (0 = burst only)
+            int      burstCount = 0;        // one-shot burst, consumed after fire
+            float    particleSize = 8.0f;     // base render size
+            bool     active = true;
+
+            uint32_t textureId = 0;        // GPU texture handle
+            // Persistent texture path IDs (StringTable). 0 = invalid.
+            uint32_t TexturePath = 0;
+
+            // Full simulation data (initialized from preset, then freely editable)
+            float speedMin = 0.5f;
+            float speedMax = 1.5f;
+            float gravityX = 0.0f;
+            float gravityY = 0.3f;
+            float drag = 0.3f;
+            float turbulence = 0.0f;
+            float wobbleFrequency = 0.0f;
+            float wobbleAmplitude = 0.0f;
+            float sizeStart = 0.2f;
+            float sizeEnd = 0.5f;
+            float lifetimeMin = 1.0f;
+            float lifetimeMax = 3.0f;
+            float emissionAngle = 1.5708f;
+            float emissionSpread = 0.5f;
+            float emissionRadius = 0.5f;
+            uint8_t emissionShape = 0;
+            float colorStartR = 1.0f; float colorStartG = 1.0f;
+            float colorStartB = 1.0f; float colorStartA = 1.0f;
+            float colorEndR = 1.0f; float colorEndG = 1.0f;
+            float colorEndB = 1.0f; float colorEndA = 0.0f;
+            bool  dieOnCollision = false;
+            float bounciness = 0.0f;
+            bool  killOutOfBounds = false;
+            float rotationSpeedMin = 0.0f;
+            float rotationSpeedMax = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<ParticleEmitter>, "ParticleEmitter must be trivially copyable");
+
+        struct BoidFlock {
+            int count               = 5000;
+            float separationWeight  = 2.5f;
+            float alignmentWeight   = 3.0f;
+            float cohesionWeight    = 0.4f;
+
+			// Avoidance stuff (not used in basic Boids, but can be added as an extra behavior)
+            float collisionAvoidWeight = 2.5f;  // tune to taste
+            float collisionAvoidRadius = 3.0f;  // in tiles
+
+            float visualRange       = 4.0f;
+            float maxSpeed          = 4.0f;
+            float maxForce          = 1.2f;
+            float boidSize          = 1.0f;     // world-space size of each boid quad
+
+
+            uint32_t textureId      = 0;    // runtime only
+            uint32_t TexturePath    = 0;    // Persistent texture path IDs (StringTable). 0 = invalid.
+        };
+        static_assert(std::is_trivially_copyable_v<BoidFlock>, "BoidFlock must be trivially copyable");
 
         // ---------- GUI ----------
 

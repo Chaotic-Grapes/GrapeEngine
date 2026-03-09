@@ -51,14 +51,20 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "physics/LayerMask.h"
 #include "scene/LayerManager.h"
 #include "ecs/Components.h"
+#include "core/World/TileMap.hpp"
+#include "core/World/TileTypes.hpp"
+#include "core/ProjectPaths.h"
+#include "ecs/StringTable.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <cmath>
 #include <algorithm>
 #include <cfloat>
+#include <filesystem>
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
+#include "helpers/TransformUtils.h"
 #include <iostream>
 #include "core/Logger.h"
 #include "audio/FmodAudioDevice.h"
@@ -163,6 +169,49 @@ private:
     std::unordered_map<CellCoord, std::vector<ECS::Entity>, CellHash> m_grid;
 };
 
+namespace {
+    // Collision bitmask definitions for tile corners (2x2 subcells)
+	constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;  // Bit 0: Bottom-left corner
+	constexpr uint8_t kCollisionMaskBottomRight = 1 << 1; // Bit 1: Bottom-right corner
+	constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;     // Bit 2: Top-left corner
+	constexpr uint8_t kCollisionMaskTopRight = 1 << 3;    // Bit 3: Top-right corner
+
+    // Resolve a project-relative path to an absolute path for loading assets
+    std::string ResolveProjectPathForLoad(const std::string& path) {
+		// If path is empty or project paths not initialized, return as-is (likely to fail later)
+        if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
+            return path;
+        }
+
+		// If already absolute, return as-is
+        std::filesystem::path fsPath(path);
+        if (fsPath.is_absolute()) {
+            return path;
+        }
+
+        // Otherwise, resolve relative to project root
+        std::filesystem::path absolute = Engine::ProjectPaths::ToAbsolutePath(path);
+        return absolute.lexically_normal().string();
+    }
+
+    // Helper to get the effective transform for runtime tilemaps
+    static void GetTileMapTransform(ECS::World& world, const ECS::Entity entity, const ECS::Components::LocalTransform& lt, 
+        Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) 
+    {
+		// If the entity has a WorldTransform, decompose it to get the effective position/rotation/scale
+        if (world.Has<ECS::Components::WorldTransform>(entity)) {
+            const auto& wt = world.Get<ECS::Components::WorldTransform>(entity);
+            TransformUtils::DecomposeTRS(wt.Matrix, outPosition, outRotation, outScale);
+        }
+		// Otherwise, use the LocalTransform directly
+        else {
+            outPosition = lt.Position;
+            outRotation = lt.Rotation;
+            outScale = lt.Scale;
+        }
+    }
+}
+
 /**
  * @brief: main physics update function
  * called every frame to:
@@ -193,9 +242,99 @@ namespace ECS {
         return builder.Build();
     }
 
-    void PhysicsSystem::OnDestroy(World& world) {
+    void PhysicsSystem::OnDestroy(World& /*world*/) {
         m_previousCollisions.clear();
         m_previousTriggerOverlaps.clear();
+        m_runtimeTileMaps.clear();
+    }
+
+	// Refresh the runtime tilemap cache to synchronize with any changes to tilemap components in the world
+    void PhysicsSystem::RefreshRuntimeTileMaps(World& world) {
+		// Track which entities we see with tilemap components to detect removals
+        std::unordered_set<EntityId> seen;
+
+		// Iterate all entities with TileMapComponent to update or create runtime cache entries
+        world.Each<ECS::Components::TileMapComponent>([this, &seen, &world](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
+			// Mark this entity as seen for cache synchronization
+            seen.insert(entity.Index);
+
+			// Lookup or create the runtime tilemap entry for this entity
+            RuntimeTileMapEntry& entry = m_runtimeTileMaps[entity.Index];
+
+			// Check if the tilemap generation has changed, which indicates the tilemap component was modified or replaced
+            const bool generationChanged = (entry.Generation != entity.Generation);
+
+			// If so, reset the entry to force a reload
+            // Handles cases where the tilemap component is replaced with a new one (e.g. via prefab instantiation or component swapping)
+            if (generationChanged) {
+                entry = RuntimeTileMapEntry{};
+            }
+
+			// Update the generation to match the current component, so we can detect future changes
+            entry.Generation = entity.Generation;
+
+			// Resolve the tilemap path from the string table and project paths
+            std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath);
+            mapPath = ResolveProjectPathForLoad(mapPath);
+
+			// Check if we need to reload the tilemap asset due to changes in the component or path
+            const bool mapNeedsReload = generationChanged || entry.MapPath != mapPath || entry.TileWorldSize != comp.TileWorldSize ||
+                entry.DefaultWidth != comp.DefaultWidth || entry.DefaultHeight != comp.DefaultHeight;
+
+			// If so, reload the tilemap asset and update the cache entry
+            if (mapNeedsReload) {
+                entry.Map.reset();
+                entry.MapPath = mapPath;
+                entry.TileWorldSize = comp.TileWorldSize;
+                entry.DefaultWidth = comp.DefaultWidth;
+                entry.DefaultHeight = comp.DefaultHeight;
+
+				// Attempt to load the tilemap from the specified path if it exists
+                if (!mapPath.empty() && std::filesystem::exists(mapPath)) {
+                    entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+
+					// If loading fails (e.g. invalid file), reset the map pointer to ensure we have a valid empty tilemap later
+                    if (!entry.Map->LoadMap(mapPath)) {
+                        entry.Map.reset();
+                    }
+                }
+
+				// If loading failed (e.g. invalid path), ensure we have a valid empty tilemap to avoid null references in physics updates
+                if (!entry.Map) {
+                    entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
+                    entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
+                }
+            }
+
+			// Calculate the tilemap origin based on the entity's transform (world or local)
+            Vector2D origin{ 0.0f, 0.0f };
+
+			// If the entity has a LocalTransform, use it to calculate the origin
+            // This allows tilemaps to be positioned/scaled/rotated in the world
+            if (world.Has<ECS::Components::LocalTransform>(entity)) {
+                const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+                Vector3D position, scale;
+                Quaternion rotation;
+                GetTileMapTransform(world, entity, lt, position, rotation, scale);
+                origin = Vector2D(position.X, position.Y);
+            }
+
+			// Update the cache entry with the calculated origin and enabled state based on visibility and hierarchy
+            entry.Origin = origin;
+            entry.Enabled = comp.Visible && world.IsActiveInHierarchy(entity);
+            entry.LayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
+        });
+
+		// Remove any runtime tilemap entries for entities that no longer have a TileMapComponent (i.e. were destroyed or 
+        // had the component removed)
+        for (auto it = m_runtimeTileMaps.begin(); it != m_runtimeTileMaps.end(); ) {
+            if (!seen.contains(it->first)) {
+                it = m_runtimeTileMaps.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
     }
 
     // =====================================================================
@@ -484,6 +623,9 @@ namespace ECS {
 
         // Get LayerManager for layer-wide physics gating
         auto* layerManager = world.GetLayerManager();
+
+        // Sync runtime tilemap cache for grid-based collisions.
+        RefreshRuntimeTileMaps(world);
 
         // =====================
         // Entity Collection
@@ -962,7 +1104,276 @@ namespace ECS {
                 if (resolved == 0) break;
             }
 
-            // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
+            // =====================
+            // Tilemap Collisions (Grid Query)
+            // =====================
+            // For each dynamic entity, query the spatial partitioning for nearby tiles and test collisions against them
+            if (!m_runtimeTileMaps.empty()) {
+                // Small epsilon to prevent edge cases where an entity is exactly on the boundary between two tiles, 
+                // which could cause it to miss colliding with one of them due to floating-point precision issues
+                constexpr float kTileCoordEpsilon = 1e-4f;
+
+                // Iterate all dynamic entities and check for collisions against nearby tiles in enabled tilemaps
+                for (Entity e : dynamicEntities) {
+                    // Skip if entity got destroyed during earlier steps
+                    if (!world.IsAlive(e)) continue;
+                    if (!world.IsActiveInHierarchy(e)) continue;
+
+                    // Fetch required components; if missing, skip
+                    // We need transform for position, rigidbody and velocity for physics state
+                    auto* tA = world.TryGet<Components::LocalTransform>(e);
+                    auto* rbAp = world.TryGet<Components::Rigidbody2D>(e);
+                    auto* vAp = world.TryGet<Components::LinearVelocity2D>(e);
+                    if (!tA || !rbAp || !vAp) continue;
+                    if (rbAp->Mass <= 0.0f) continue; // Zero/negative mass = static or invalid; skip
+
+                    // Query colliders; if no collider, skip (nothing to collide with tiles)
+                    const auto* circA = world.TryGet<Components::CircleCollider2D>(e);
+                    const auto* boxA = world.TryGet<Components::BoxCollider2D>(e);
+                    if (!circA && !boxA) continue;
+
+                    // Check if this entity is a trigger; if so, skip tilemap collision (triggers don't resolve)
+                    // Trigger flag is stored in bit 0 of the collider's Flags field
+                    const bool isTriggerA = (circA && (circA->Flags & 0x1u)) || (boxA && (boxA->Flags & 0x1u));
+                    if (isTriggerA) continue;
+
+                    // Layer mask check: if entity is not in a layer that collides with tilemap layers, skip
+                    const auto* la = world.TryGet<Components::Layer>(e);
+                    if (!la) {
+                        if (!loggedMissingLayer) {
+                            loggedMissingLayer = true;
+                            LOG_WARNING("PhysicsSystem: Skipping collision event (missing Layer component on one or both entities).");
+                        }
+                        continue;
+                    }
+
+                    // Get entity's layer ID and its collision mask (bitmask of which layers it collides with)
+                    const uint16_t layerAId = la->Id;
+                    const uint32_t maskA = layerManager->GetLayerMask(layerAId);
+
+                    // Resolve entity's physics material, falling back to defaults if none assigned
+                    Components::PhysicsMaterial2D mA{ 0.2f, 0.5f, 0.5f };
+                    if (const auto* mpA = world.TryGet<Components::PhysicsMaterial2D>(e)) {
+                        mA = *mpA;
+                    }
+
+                    // Tilemap uses a fixed default material (no per-tile material support yet)
+                    Components::PhysicsMaterial2D mB{ 0.2f, 0.5f, 0.5f };
+
+                    // Combine entity and tilemap materials into a single interaction material:
+                    // * Friction: average of both (blends surface properties)
+                    // * Restitution: max of both (bouncier surface wins, physically plausible)
+                    // * PositionCorrectPercent: average of both (balanced position correction)
+                    const Components::PhysicsMaterial2D mCombined{
+                        (mA.Friction + mB.Friction) * 0.5f,
+                        std::max(mA.Restitution, mB.Restitution),
+                        (mA.PositionCorrectPercent + mB.PositionCorrectPercent) * 0.5f
+                    };
+
+                    // Check collisions against all enabled tilemaps that collide with this entity's layer
+                    for (const auto& entryPair : m_runtimeTileMaps) {
+                        const RuntimeTileMapEntry& entry = entryPair.second;
+
+                        // Skip disabled tilemaps or ones with no layers (nothing to collide against)
+                        if (!entry.Enabled || !entry.Map) continue;
+                        if (entry.Map->LayerCount() == 0) continue;
+
+                        // Skip tilemaps whose layer has physics disabled entirely
+                        const auto& layerData = layerManager->Get(entry.LayerId);
+                        if (!layerData.physicsEnabled) continue;
+
+                        // Check if this entity's layer and the tilemap's layer are configured to collide with each other
+                        const uint32_t maskB = layerManager->GetLayerMask(entry.LayerId);
+                        if (!Engine::CanCollide(maskA, layerAId, maskB, entry.LayerId)) {
+                            continue;
+                        }
+
+                        // Get tile size from the tilemap; a non-positive tile size is invalid so skip
+                        const float tileSize = entry.Map->TileSize();
+                        if (tileSize <= 0.0f) continue;
+
+                        // Compute the world-space AABB of the entity's collider to find which tiles it overlaps with
+                        // We query tiles in this range rather than every tile in the map for efficiency
+                        Engine::WorldAABB worldAABB{};
+                        if (circA) {
+                            // Circle AABB: centered on the circle's world position, half-extents equal to radius on both axes
+                            const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, *tA);
+                            worldAABB.Center = worldCircle.Center;
+                            worldAABB.HalfExtents = Vector2D(worldCircle.Radius, worldCircle.Radius);
+                        }
+                        else {
+                            // Box AABB: derived from the OBB in world space (accounts for rotation)
+                            worldAABB = Engine::Physics::GetWorldAABB(*boxA, *tA);
+                        }
+
+                        // Compute the world-space min/max corners of the entity's AABB
+                        const float minX = worldAABB.Center.X - worldAABB.HalfExtents.X;
+                        const float maxX = worldAABB.Center.X + worldAABB.HalfExtents.X;
+                        const float minY = worldAABB.Center.Y - worldAABB.HalfExtents.Y;
+                        const float maxY = worldAABB.Center.Y + worldAABB.HalfExtents.Y;
+
+                        // Transform world-space AABB corners into the tilemap's local space by subtracting the tilemap's world origin
+                        // Apply epsilon to the max edge to avoid sampling one tile too many on exact boundary cases
+                        const float localMinX = minX - entry.Origin.X;
+                        const float localMinY = minY - entry.Origin.Y;
+                        const float localMaxX = maxX - entry.Origin.X - kTileCoordEpsilon;
+                        const float localMaxY = maxY - entry.Origin.Y - kTileCoordEpsilon;
+
+                        // Convert local coordinates to integer tile indices.
+                        // WorldToTileSigned handles negative coordinates (tiles to the left/below origin)
+                        int32_t tileMinX = entry.Map->WorldToTileSigned(localMinX);
+                        int32_t tileMinY = entry.Map->WorldToTileSigned(localMinY);
+                        int32_t tileMaxX = entry.Map->WorldToTileSigned(localMaxX);
+                        int32_t tileMaxY = entry.Map->WorldToTileSigned(localMaxY);
+
+                        // Ensure min <= max in case the tilemap's coordinate space is flipped
+                        if (tileMaxX < tileMinX) std::swap(tileMaxX, tileMinX);
+                        if (tileMaxY < tileMinY) std::swap(tileMaxY, tileMinY);
+
+                        // Precompute tile geometry constants used across all tiles in this tilemap:
+                        // * tileHalf: half the tile size — center offset and full-tile half-extents
+                        // * subHalf: quarter of the tile size — used for sub-tile collision cells (half-tile quadrants)
+                        // * subHalfExtents: half-extents for a single quadrant collision cell
+                        const float tileHalf = tileSize * 0.5f;
+                        const float subHalf = tileSize * 0.25f;
+                        const Vector2D subHalfExtents(subHalf, subHalf);
+
+                        // Iterate over every tile in the AABB's tile range
+                        for (int32_t ty = tileMinY; ty <= tileMaxY; ++ty) {
+                            for (int32_t tx = tileMinX; tx <= tileMaxX; ++tx) {
+                                // Skip empty tiles; no geometry to collide against
+                                if (entry.Map->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
+                                    continue;
+                                }
+
+                                // Get the 4-bit collision mask for this tile
+                                // Each bit represents one quadrant: TopLeft, TopRight, BottomLeft, BottomRight
+                                // A mask of 0 means the tile exists visually but has no collision
+                                const uint8_t mask = static_cast<uint8_t>(entry.Map->GetCollisionMaskSigned(tx, ty) & 0x0F);
+                                if (mask == 0) {
+                                    continue;
+                                }
+
+                                // Compute the world-space origin (bottom-left corner) of this tile
+                                const float tileWorldX = entry.Origin.X + entry.Map->TileToWorldSigned(tx);
+                                const float tileWorldY = entry.Origin.Y + entry.Map->TileToWorldSigned(ty);
+
+                                // resolveCell: tests and resolves a collision between the entity and a rectangular sub-cell
+                                // within the current tile
+                                // The cell is defined by its center offset from the tile origin and its half-extents
+                                // This allows partial-tile collision shapes (quadrants, half-tiles, etc.)
+                                auto resolveCell = [&](float centerOffsetX, float centerOffsetY, const Vector2D& halfExtents) {
+                                    const Vector2D cellCenter(tileWorldX + centerOffsetX, tileWorldY + centerOffsetY);
+                                    Engine::Collision::ContactManifold manifold;
+
+                                    if (circA) {
+                                        // Circle vs. tile cell OBB test
+                                        // Build an axis-aligned OBB for the cell (rotation = 0, standard axes)
+                                        const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, *tA);
+                                        Engine::WorldOBB tileObb;
+                                        tileObb.Center = cellCenter;
+                                        tileObb.HalfExtents = halfExtents;
+                                        tileObb.Rotation = 0.0f;
+                                        tileObb.AxisX = Vector2D(1.0f, 0.0f);
+                                        tileObb.AxisY = Vector2D(0.0f, 1.0f);
+
+                                        Vector2D n;
+                                        float depth = 0.0f;
+                                        Vector2D contact;
+                                        if (!TestCircleBox(worldCircle, tileObb, n, depth, contact)) {
+                                            return; // No overlap, nothing to resolve
+                                        }
+
+                                        // Pack result into manifold for unified resolution below
+                                        manifold.normal = n;
+                                        manifold.penetration = depth;
+                                        manifold.points[0] = contact;
+                                        manifold.pointCount = 1;
+                                    }
+                                    else {
+                                        // Box vs. tile cell OBB test (entity box may be rotated; tile cell is always axis-aligned)
+                                        const Engine::WorldOBB worldObb = Engine::Physics::GetWorldOBB(*boxA, *tA);
+                                        Engine::WorldOBB tileObb;
+                                        tileObb.Center = cellCenter;
+                                        tileObb.HalfExtents = halfExtents;
+                                        tileObb.Rotation = 0.0f;
+                                        tileObb.AxisX = Vector2D(1.0f, 0.0f);
+                                        tileObb.AxisY = Vector2D(0.0f, 1.0f);
+
+                                        manifold = TestBoxBox(worldObb, tileObb);
+                                        if (manifold.pointCount <= 0) {
+                                            return; // No overlap, nothing to resolve
+                                        }
+                                    }
+
+                                    // Construct a synthetic static rigidbody for the tile cell
+                                    // Mass = 0 signals to the resolver that this body is immovable (infinite mass)
+                                    Components::Rigidbody2D rbB{};
+                                    rbB.Mass = 0.0f;
+                                    Components::LinearVelocity2D vB{ {0.0f, 0.0f} };
+                                    Components::LocalTransform tB{};
+                                    tB.Position = { cellCenter.X, cellCenter.Y, 0.0f };
+                                    tB.Scale = { 1.0f, 1.0f, 1.0f };
+                                    tB.Rotation = Quaternion::Identity();
+
+                                    // Apply impulse-based collision resolution and positional correction
+                                    Engine::Physics::ResolveCollisionManifold(
+                                        *rbAp, rbB, *vAp, vB, *tA, tB, manifold, mCombined);
+                                    };
+
+                                // Dispatch collision cells based on the tile's collision mask
+                                // Masks define which portions of the tile are solid
+                                // We map them to axis-aligned rectangular cells and resolve each independently
+
+                                // Full tile solid (all 4 quadrants); treat as one full-size box
+                                if (mask == 0x0F) {
+                                    resolveCell(tileHalf, tileHalf, Vector2D(tileHalf, tileHalf));
+                                    continue;
+                                }
+
+                                // Half-tile combinations: merge two quadrants into one wider/taller box
+                                // to avoid resolving two adjacent cells with a seam between them
+
+                                // Bottom half (BL + BR): full width, bottom half height
+                                if (mask == (kCollisionMaskBottomLeft | kCollisionMaskBottomRight)) {
+                                    resolveCell(tileHalf, subHalf, Vector2D(tileHalf, subHalf));
+                                    continue;
+                                }
+                                // Top half (TL + TR): full width, top half height
+                                if (mask == (kCollisionMaskTopLeft | kCollisionMaskTopRight)) {
+                                    resolveCell(tileHalf, tileSize - subHalf, Vector2D(tileHalf, subHalf));
+                                    continue;
+                                }
+                                // Left half (BL + TL): left half width, full height
+                                if (mask == (kCollisionMaskBottomLeft | kCollisionMaskTopLeft)) {
+                                    resolveCell(subHalf, tileHalf, Vector2D(subHalf, tileHalf));
+                                    continue;
+                                }
+                                // Right half (BR + TR): right half width, full height
+                                if (mask == (kCollisionMaskBottomRight | kCollisionMaskTopRight)) {
+                                    resolveCell(tileSize - subHalf, tileHalf, Vector2D(subHalf, tileHalf));
+                                    continue;
+                                }
+
+                                // Individual quadrant cells: resolve each set bit as its own quarter-tile box
+                                // These handle diagonal/corner-only collision shapes
+                                if (mask & kCollisionMaskBottomLeft) {
+                                    resolveCell(subHalf, subHalf, subHalfExtents);
+                                }
+                                if (mask & kCollisionMaskBottomRight) {
+                                    resolveCell(tileSize - subHalf, subHalf, subHalfExtents);
+                                }
+                                if (mask & kCollisionMaskTopLeft) {
+                                    resolveCell(subHalf, tileSize - subHalf, subHalfExtents);
+                                }
+                                if (mask & kCollisionMaskTopRight) {
+                                    resolveCell(tileSize - subHalf, tileSize - subHalf, subHalfExtents);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Emit collision exits once per frame (after all substeps).

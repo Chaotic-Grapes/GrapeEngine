@@ -79,6 +79,46 @@ public abstract class SystemBase : ISystem
         }
     }
 
+    void ISystem.OnSceneStart()
+    {
+        OnSceneStart();
+    }
+
+    void ISystem.OnSceneStop()
+    {
+        OnSceneStop();
+    }
+
+    bool ISystem.ShouldRun(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        return ShouldRun();
+    }
+
+    void ISystem.OnStartRunning(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        OnStartRunning();
+    }
+
+    void ISystem.OnStopRunning(World world)
+    {
+        if (World != world)
+        {
+            World = world;
+            _queryCache?.Clear();
+        }
+        OnStopRunning();
+    }
+
     /// <summary>
     /// Log a message at the specified level.
     /// </summary>
@@ -127,6 +167,31 @@ public abstract class SystemBase : ISystem
     /// Override for cleanup logic.
     /// </summary>
     protected virtual void OnDestroy() { }
+
+    /// <summary>
+    /// Called when a scene starts playing (editor: transitioning to Play mode).
+    /// </summary>
+    protected virtual void OnSceneStart() { }
+
+    /// <summary>
+    /// Called when a scene stops playing (editor: transitioning away from Play mode).
+    /// </summary>
+    protected virtual void OnSceneStop() { }
+
+    /// <summary>
+    /// Determines whether this system should run this frame.
+    /// </summary>
+    protected virtual bool ShouldRun() => true;
+
+    /// <summary>
+    /// Called when this system transitions to running state.
+    /// </summary>
+    protected virtual void OnStartRunning() { }
+
+    /// <summary>
+    /// Called when this system transitions out of running state.
+    /// </summary>
+    protected virtual void OnStopRunning() { }
 
     // ------------------------ Query helpers ------------------------
 

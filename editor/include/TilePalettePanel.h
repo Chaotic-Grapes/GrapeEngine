@@ -32,11 +32,11 @@ Dependencies:
 #pragma once
 
 #include <memory>
-#include <map>
 #include <vector>
 #include <string>
 #include <functional>
 #include <cstdint>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "core/World/TileMap.hpp"
@@ -78,9 +78,12 @@ public:
     \param tileMap Initial tilemap reference
     \param tileset Initial tileset reference
     \param world ECS world pointer for physics syncing
+    \param symbolsFont Symbols font for icon glyphs
+    \param boldFont Bold font for section headers
     */
     void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset,
-        ECS::World* world, ImFont* symbolsFont);
+        ECS::World* world, ImFont* symbolsFont, ImFont* boldFont);
+
      /*------------------------------------------------------------------*/
     /*!
     \brief Assigns ECS world for physics entity management.
@@ -124,6 +127,13 @@ public:
     void OnViewportHover(const glm::vec2& worldPos);
     /*------------------------------------------------------------------*/
     /*!
+    \brief Draws collision brush hover preview inside the viewport.
+
+    \param worldPos Cursor position in world space
+    */
+    void OnViewportCollisionHover(const glm::vec2& worldPos);
+    /*------------------------------------------------------------------*/
+    /*!
     \brief Applies tile paint or erase action.
 
     \param worldPos Cursor position
@@ -137,6 +147,33 @@ public:
     \brief Ends drag-paint tracking state.
     */
     void EndViewportPaint() { m_hasLastPaint = false; }
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Enables or disables collision edit mode.
+    */
+    void SetCollisionEditActive(bool active);
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Returns whether collision edit mode is active.
+    */
+    bool IsCollisionEditActive() const { return m_collisionEditActive; }
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Applies collision mask paint action.
+
+    \param worldPos Cursor position
+    \return True if collision mask changed
+    */
+    bool OnViewportCollisionClick(const glm::vec2& worldPos);
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Ends collision paint drag tracking state.
+    */
+    void EndViewportCollisionPaint() { m_collisionHasLastPaint = false; }
 
     /*------------------------------------------------------------------*/
     /*!
@@ -169,7 +206,13 @@ public:
     \brief Checks if viewport painting is allowed.
     */
     // Gate viewport paint handling to valid tile-editing state.
-    bool CanHandleViewportPaint() const { return m_active && m_paintMode && m_tileMap && m_tileset; }
+    bool CanHandleViewportPaint() const { return m_active && m_paintMode && m_tileMap && m_tileset && !m_collisionEditActive; }
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Checks if viewport collision painting is allowed.
+    */
+    bool CanHandleViewportCollisionPaint() const { return m_active && m_collisionEditActive && m_tileMap && m_tileset; }
 
     /*------------------------------------------------------------------*/
     /*!
@@ -197,6 +240,12 @@ public:
     \brief Handles forwarded asset drop.
     */
     void HandleAssetDrop(const std::string& assetPath);
+
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Clears cached per-tilemap preview sizes and resets to default.
+    */
+    void ClearTilePreviewSizeCache();
 
     /*------------------------------------------------------------------*/
     /*!
@@ -229,11 +278,30 @@ public:
     // Update the world-space origin without resetting selection state.
     void SetTileMapOrigin(const glm::vec2& origin) { m_worldOrigin = origin; }
 
+    /*------------------------------------------------------------------*/
+    /*!
+    \brief Updates the tilemap asset path without resetting palette state.
+    */
+    void SetTileMapPath(const std::string& path) { m_tileMapPath = path; }
+
 private:
-    bool m_active = true;           //!< Palette enabled state
-    bool m_paintMode = false;       //!< Viewport painting enabled
+	// For the active tileset, we allow caching a user-adjusted tile preview size that persists when switching tilemaps
+    // This is keyed by a combination of tileset ID and tilemap path to allow different sizes for the same tileset across 
+    // different maps
+    std::string GetActiveTilesetPreviewKey() const;
+    void RefreshTilePreviewSizeForActiveTileset();
+
+    bool m_active = true;                  // Palette enabled state
+    bool m_paintMode = true;               // Viewport painting enabled
+    bool m_collisionEditActive = false;    // Collision edit mode enabled
+    bool m_collisionPrevPaintMode = true;  // Cached paint mode when entering collision edit
+    uint8_t m_collisionBrushMask = 0x0F;   // 4-bit brush mask for 2x2 subcells
+    bool m_collisionEraser = false;        // Eraser for collision masks
+    bool m_collisionHasLastPaint = false;
+    uint8_t m_collisionLastPaintMask = 0;
+    int64_t m_collisionLastPaintKey = 0;
     
-        //! Active tilemap and tilesets
+    //! Active tilemap and tilesets
     std::shared_ptr<TileMap> m_tileMap;
     std::shared_ptr<Tileset> m_tileset;
     std::vector<std::shared_ptr<Tileset>> m_tilesets;
@@ -255,11 +323,16 @@ private:
     ECS::World* m_world = nullptr;
     Editor::UndoSystem* m_undoSystem = nullptr;
     ImFont* m_symbolsFont = nullptr;
+    ImFont* m_boldFont = nullptr;
 
     //! Tilemap UI state
     std::vector<TileMapListEntry> m_tileMapList;
-    EntityId m_activeTileMapId = ECS::Entity::NPOS32;
-    uint8_t m_activeTilesetIndex = 0;
+	EntityId m_activeTileMapId = ECS::Entity::NPOS32; // Active tilemap entity ID for dropdown selection
+	uint8_t m_activeTilesetIndex = 0;                 // Index of the active tileset in m_tilesets
+	float m_tilePreviewSize = 64.0f;                  // Default tile preview size in pixels
+	static constexpr float kTilePreviewMin = 24.0f;   // Minimum tile preview size
+	static constexpr float kTilePreviewMax = 96.0f;   // Maximum tile preview size
+	std::unordered_map<std::string, float> m_tilePreviewSizeByTileset;  // Cache of user-adjusted tile preview sizes keyed by tileset + tilemap context
 
     //! Painting state
     TileID m_selectedTileID = 0;   // Base ID selected in palette
@@ -268,20 +341,6 @@ private:
 	bool m_hasLastPaint = false;   // Track last painted tile to avoid redundant paints
 	bool m_lastPaintErase = false; // Whether the last paint was an erase
 	int64_t m_lastPaintKey = 0;    // Packed coordinate of last painted tile
-
-     /*!
-    Physics collider entity cache.
-    Key = packed tile coordinate.
-    */
-    // Physics Sync State
-    // Key: (x << 16) | y. Value: Entity handle.
-    std::map<int64_t, ECS::Entity> m_physicsEntities;
-
-    /*------------------------------------------------------------------*/
-    /*!
-    \brief Synchronizes physics collider state with tile edits.
-    */
-    void SyncPhysics(int32_t x, int32_t y, TileID id, bool isEraser);
 
     /*------------------------------------------------------------------*/
     /*!

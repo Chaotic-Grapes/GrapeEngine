@@ -18,7 +18,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/CrashDumping.h"
 #include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
+#include "ecs/systems/ParticleSystem.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/BoidSystem.h"
 #include "ecs/systems/GUILayoutSystem.h"
 #include "ecs/systems/GUIInputSystem.h"
 #include "ecs/systems/GUIRenderSystem.h"
@@ -39,6 +41,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/ProjectPaths.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 #include "platform/glfw/GLFWWindow.h"
+
+#ifdef GRAPE_HAS_CUDA
+#include "cuda/CudaTest.cuh"
+#endif
 
 // Undefine potential Windows macros that conflict with enum names
 #ifdef ERROR
@@ -62,6 +68,10 @@ namespace Engine {
     }
 
     void Application::Initialize(EngineMode mode, bool enableConsole) {
+        #ifdef GRAPE_HAS_CUDA
+                CudaTestRun();
+        #endif
+
         if (m_initialized) {
             LOG_WARNING("Application already initialized");
             return;
@@ -69,6 +79,7 @@ namespace Engine {
 
         m_mode = mode;
         m_shouldStop = false;
+        m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
 
         // Set global pointer to this application instance
         CORE = this;
@@ -170,6 +181,24 @@ namespace Engine {
         // --- Scene Update ---
         m_sceneManager.Update();
 
+        // In game mode, broadcast scene lifecycle callbacks when active scene changes.
+        // Editor mode handles scene lifecycle from the editor playback state machine.
+        const size_t currentActiveSceneIndex = m_sceneManager.GetActiveIndex();
+        if (m_mode == EngineMode::Game && currentActiveSceneIndex != m_notifiedActiveSceneIndex) {
+            if (m_notifiedActiveSceneIndex != static_cast<size_t>(-1)) {
+                const Scenes::Scene* previousScene = m_sceneManager.GetScene(m_notifiedActiveSceneIndex);
+                if (previousScene) {
+                    m_systemManager.OnSceneStop(const_cast<Scenes::Scene*>(previousScene)->GetWorld());
+                }
+            }
+
+            if (auto* nextScene = m_sceneManager.GetActive()) {
+                m_systemManager.OnSceneStart(nextScene->GetWorld());
+            }
+
+            m_notifiedActiveSceneIndex = currentActiveSceneIndex;
+        }
+
         // --- Update Services ---
         m_audio->Update();
         auto* currentScene = m_sceneManager.GetActive();
@@ -178,6 +207,7 @@ namespace Engine {
             auto& world = currentScene->GetWorld();
 
             uint32_t pickedEntityID = 0;  // TODO: Get from renderer
+			(void)pickedEntityID;
 
             double mouseX, mouseY;
             Input::GetMousePosition(mouseX, mouseY);
@@ -248,6 +278,7 @@ namespace Engine {
         }
 
         m_initialized = false;
+        m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
         CORE = nullptr;
 
         LOG_INFO("Engine shutdown complete");
@@ -335,6 +366,7 @@ namespace Engine {
     void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world) {
         // Public API for editor to directly control which modes execute
         // This allows editor to implement play/pause/step/edit state transitions
+        m_systemManager.SetActiveRunModeMask(modes);
 
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world);
@@ -395,13 +427,15 @@ namespace Engine {
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         m_sceneManager.SetAudioSystem(audioSystem);
-        
+        m_systemManager.RegisterSystem<ECS::BoidSystem>();
+
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
         m_systemManager.RegisterSystem<ECS::TransformSystem>();
         m_systemManager.RegisterSystem<ECS::PhysicsSystem>();
         
         // Render Phase Systems
+        m_systemManager.RegisterSystem<ECS::ParticleSystem>();
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
         m_systemManager.RegisterSystem<ECS::GUIInputSystem>();
@@ -431,7 +465,7 @@ namespace Engine {
 #endif
     }
 
-    void Application::_updatePhysics(ECS::World& world) {
+    void Application::_updatePhysics(ECS::World& /*world*/) {
         // Handle fixed timestep accumulation for physics
         // Only called in Game mode - always accumulates
         
@@ -448,7 +482,7 @@ namespace Engine {
 
     // ==================== Device Management ====================
 
-    bool Application::SetResolution(int width, int height, int refreshRate) {
+    bool Application::SetResolution(int width, int height, int /*refreshRate*/) {
         if (!m_platformContext) {
             LOG_ERROR("Platform context unavailable");
             return false;

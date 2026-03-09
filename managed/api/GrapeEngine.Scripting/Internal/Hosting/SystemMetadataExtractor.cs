@@ -123,7 +123,22 @@ public static class SystemMetadataExtractor
         }
 
         // Default
-        return SystemRunMode.EditOnly;
+        return SystemRunMode.PlayOnly;
+    }
+
+    /// <summary>
+    /// Get the execution order for a system.
+    /// Priority: [SystemOrder] attribute > default (0)
+    /// </summary>
+    public static int GetSystemOrder(Type systemType)
+    {
+        var attr = systemType.GetCustomAttribute<SystemOrderAttribute>(true);
+        if (attr != null)
+        {
+            return attr.Order;
+        }
+
+        return 0;
     }
 
     /// <summary>
@@ -161,6 +176,31 @@ public static class SystemMetadataExtractor
     }
 
     /// <summary>
+    /// Get all component types required for this system to run.
+    /// </summary>
+    public static IEnumerable<Type> GetRequireForUpdateComponents(Type systemType)
+    {
+        // Check for RequireForUpdateAttribute<T> on the system type
+        var attrs = systemType.GetCustomAttributes(true);
+        foreach (var attr in attrs)
+        {
+            if (attr is null)
+                continue;
+
+            // Check if the attribute is a generic type and matches RequireForUpdateAttribute<T>
+            var attrType = attr.GetType();
+            if (!attrType.IsGenericType)
+                continue;
+
+            // Check if the generic type definition name matches "RequireForUpdateAttribute`1"
+            if (attrType.GetGenericTypeDefinition().Name == "RequireForUpdateAttribute`1")
+            {
+                yield return attrType.GetGenericArguments()[0];
+            }
+        }
+    }
+
+    /// <summary>
     /// Get all component access declarations for a system with their modes.
     /// Returns tuples of (ComponentType, AccessMode).
     /// </summary>
@@ -191,11 +231,9 @@ public static class SystemMetadataExtractor
     /// </summary>
     public static ComponentAccessMode GetComponentAccessMode(Type systemType, Type componentType)
     {
-        var componentHash = componentType.GetHashCode();
-        
         foreach (var (compType, mode) in GetComponentAccesses(systemType))
         {
-            if (compType.GetHashCode() == componentHash)
+            if (compType == componentType)
             {
                 return mode;
             }

@@ -39,6 +39,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3native.h>
 #include "services/Input.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include <scene/SceneManager.h>
 #include "ecs/systems/RendererSystem.h"
@@ -46,11 +47,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "core/World/TileTypes.hpp"
 #include "TilePalettePanel.h"
 #include "graphics/Viewport.hpp"
 
 namespace {
     constexpr const char* kSceneViewportName = "Scene";
+
+	// Collision mask bits for 2x2 subcell editing in the tile palette collision brush
+	constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;   // Bit 0
+	constexpr uint8_t kCollisionMaskBottomRight = 1 << 1;  // Bit 1
+	constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;      // Bit 2
+	constexpr uint8_t kCollisionMaskTopRight = 1 << 3;     // Bit 3
 }
 
 // -------------------------------------------------------------------------
@@ -125,8 +133,27 @@ void SceneViewport::_renderViewport() {
     // Handle maximize/restore state before rendering the window.
     ImGuiWindowFlags windowFlags = 0;
     if (!m_maximizeViewport && m_requestRestore && m_restoreDockValid) {
-        if (m_restoreDockId != 0) {
-            ImGui::SetNextWindowDockID(m_restoreDockId, ImGuiCond_Always);
+        ImGuiID restoreDockId = 0;
+
+        // Prefer docking back into the same panel/tab stack as Game.
+        if (ImGuiWindow* gameWindow = ImGui::FindWindowByName("Game")) {
+            if (gameWindow->DockId != 0 && ImGui::DockBuilderGetNode(gameWindow->DockId) != nullptr) {
+                restoreDockId = gameWindow->DockId;
+            }
+        }
+
+        // Fall back to the previously cached dock node if Game isn't docked/available.
+        if (restoreDockId == 0) {
+            restoreDockId = m_restoreDockId;
+            if (restoreDockId != 0 && ImGui::DockBuilderGetNode(restoreDockId) == nullptr) {
+                restoreDockId = 0;
+            }
+        }
+
+        if (restoreDockId != 0) {
+            ImGui::SetNextWindowDockID(restoreDockId, ImGuiCond_Always);
+        } else if (m_defaultDockspaceId != 0) {
+            ImGui::SetNextWindowDockID(m_defaultDockspaceId, ImGuiCond_Always);
         } else {
             ImGui::SetNextWindowPos(m_restorePos, ImGuiCond_Always);
             ImGui::SetNextWindowSize(m_restoreSize, ImGuiCond_Always);
@@ -145,6 +172,28 @@ void SceneViewport::_renderViewport() {
 
     // Begin scene viewport window
     ImGui::Begin("Scene", nullptr, windowFlags);
+    {
+		// Handle gizmo operation hotkeys when the scene viewport is focused or hovered
+        // and no text input or item interaction is active
+        ImGuiIO& io = ImGui::GetIO();
+        const bool sceneFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        const bool sceneHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+        const bool sceneInputContext = sceneFocused || sceneHovered;
+
+		// Only process gizmo hotkeys if we're in the scene viewport and not typing or interacting with UI items
+        if (sceneInputContext && !io.WantTextInput && !ImGui::IsAnyItemActive()) {
+			// Translate (T), Rotate (E), Scale (R) hotkeys
+            if (ImGui::IsKeyPressed(ImGuiKey_T)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Translate);
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_E)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Rotate);
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+                m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Scale);
+            }
+        }
+    }
     if (!m_maximizeViewport) {
         // Cache docking state for restoring the viewport later.
         m_restoreDockId = ImGui::GetWindowDockID();
@@ -259,7 +308,7 @@ void SceneViewport::_renderViewport() {
     auto curOp = m_interactionMgr.GetGizmoOperation();
     auto curMode = m_interactionMgr.GetGizmoMode();
     ImGui::PushID("GizmoOps");
-    if (iconButtonTinted("Move", ICON_MOVE, "Move (W)", curOp == Editor::GizmoRenderer::Operation::Translate, gizmoTint, true)) {
+    if (iconButtonTinted("Move", ICON_MOVE, "Move (T)", curOp == Editor::GizmoRenderer::Operation::Translate, gizmoTint, true)) {
         m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Translate);
     }
     ImGui::SameLine();
@@ -540,8 +589,17 @@ void SceneViewport::_renderViewport() {
                         glm::vec4 world4 = invViewProj * ndc;
                         glm::vec2 worldPos = { world4.x, world4.y };
 
-                        // Let tile palette panel handle hover and clicks
-                        m_tilePalettePanel->OnViewportHover(worldPos);
+						// Check if tile palette is in collision edit mode to determine hover vs paint behavior
+                        const bool collisionEditActive = m_tilePalettePanel->IsCollisionEditActive();
+
+						// When collision edit mode is active, show the collision brush preview instead of tile preview
+                        if (collisionEditActive) {
+                            m_tilePalettePanel->OnViewportCollisionHover(worldPos);
+                        } 
+						// When not in collision edit mode, show regular tile preview on hover
+                        else {
+                            m_tilePalettePanel->OnViewportHover(worldPos);
+                        }
 
                         // Draw tilemap bounds/grid when tile palette is active.
                         if (rendererSystem) {
@@ -565,21 +623,26 @@ void SceneViewport::_renderViewport() {
                                 }
 
                                 const glm::vec2 camPos(camera->Position.x, camera->Position.y);
-                                const glm::vec2 camLocal = camPos - mapOrigin; // Align grid to the tilemap origin.
-                                const float startX = std::floor((camLocal.x - halfWidth) / tileSize) * tileSize + mapOrigin.x;
+
+                                // Align grid to the tilemap origin
+                                const glm::vec2 camLocal = camPos - mapOrigin; 
+
+								// When in collision edit mode, show a finer grid at half tile size to help visualize sub-tile collision editing
+                                const float gridStep = collisionEditActive ? (tileSize * 0.5f) : tileSize;
+                                const float startX = std::floor((camLocal.x - halfWidth) / gridStep) * gridStep + mapOrigin.x;
                                 const float endX = camPos.x + halfWidth;
-                                const float startY = std::floor((camLocal.y - halfHeight) / tileSize) * tileSize + mapOrigin.y;
+                                const float startY = std::floor((camLocal.y - halfHeight) / gridStep) * gridStep + mapOrigin.y;
                                 const float endY = camPos.y + halfHeight;
 
                                 // Draw infinite-ish grid within the camera view.
                                 const glm::vec4 gridColor(0.6f, 0.8f, 0.9f, 0.12f);
-                                const uint32_t maxLines = 256;
+                                const uint32_t maxLines = 512;
                                 uint32_t lineCount = 0;
-                                for (float x = startX; x <= endX && lineCount < maxLines; x += tileSize, ++lineCount) {
+                                for (float x = startX; x <= endX && lineCount < maxLines; x += gridStep, ++lineCount) {
                                     rendererSystem->SubmitWireframeLine(glm::vec2(x, startY), glm::vec2(x, endY), gridColor, 0.02f);
                                 }
                                 lineCount = 0;
-                                for (float y = startY; y <= endY && lineCount < maxLines; y += tileSize, ++lineCount) {
+                                for (float y = startY; y <= endY && lineCount < maxLines; y += gridStep, ++lineCount) {
                                     rendererSystem->SubmitWireframeLine(glm::vec2(startX, y), glm::vec2(endX, y), gridColor, 0.02f);
                                 }
 
@@ -590,19 +653,105 @@ void SceneViewport::_renderViewport() {
                                                     mapOrigin.y + map->TileToWorldSigned(map->OriginY() + static_cast<int32_t>(layer.Height()))); // Bounds max in world space.
                                 const glm::vec4 outlineColor(0.2f, 0.9f, 0.9f, 0.45f);
                                 rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
+
+								// When in collision edit mode, overlay collision masks on top of tiles using 
+                                // the tile palette's current collision brush settings for visualization
+                                if (collisionEditActive && tileSize > 0.0f) {
+									// Compute visible tile range based on camera view to limit collision mask rendering 
+                                    // to only tiles within the viewport for performance
+                                    const glm::vec2 viewMin = camPos - glm::vec2(halfWidth, halfHeight);
+                                    const glm::vec2 viewMax = camPos + glm::vec2(halfWidth, halfHeight);
+                                    const glm::vec2 localMin = viewMin - mapOrigin;
+                                    const glm::vec2 localMax = viewMax - mapOrigin;
+
+									// Calculate tile indices for the visible range, clamping to the tilemap bounds
+                                    int32_t startTileX = static_cast<int32_t>(std::floor(localMin.x / tileSize));
+                                    int32_t endTileX = static_cast<int32_t>(std::floor(localMax.x / tileSize));
+                                    int32_t startTileY = static_cast<int32_t>(std::floor(localMin.y / tileSize));
+                                    int32_t endTileY = static_cast<int32_t>(std::floor(localMax.y / tileSize));
+
+									// Tilemap may have an origin offset, so factor that in when clamping tile indices to the map bounds
+                                    const int32_t mapMinX = map->OriginX();
+                                    const int32_t mapMinY = map->OriginY();
+                                    const int32_t mapMaxX = mapMinX + static_cast<int32_t>(layer.Width()) - 1;
+                                    const int32_t mapMaxY = mapMinY + static_cast<int32_t>(layer.Height()) - 1;
+
+									// Clamp tile indices to map bounds to avoid out-of-range access when checking collision masks
+                                    startTileX = std::max(startTileX, mapMinX);
+                                    endTileX = std::min(endTileX, mapMaxX);
+                                    startTileY = std::max(startTileY, mapMinY);
+                                    endTileY = std::min(endTileY, mapMaxY);
+
+									// Use a semi-transparent red fill to indicate collision areas, subdivided into quadrants based 
+                                    // on the tile's collision mask for better visualization of sub-tile collision editing
+                                    const glm::vec4 collisionFill(0.9f, 0.2f, 0.2f, 0.35f);
+                                    const float subSize = tileSize * 0.5f;
+
+									// Iterate over visible tiles and draw collision mask overlays
+                                    for (int32_t ty = startTileY; ty <= endTileY; ty++) {
+                                        for (int32_t tx = startTileX; tx <= endTileX; tx++) {
+											// Skip empty tiles since they don't have collision masks and it reduces visual clutter
+                                            if (map->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
+                                                continue;
+                                            }
+											// Calculate the world position of the tile's bottom-left corner for rendering the collision mask overlay
+                                            const glm::vec2 tileWorld(mapOrigin.x + map->TileToWorldSigned(tx), mapOrigin.y + map->TileToWorldSigned(ty));
+											
+                                            // Get the collision mask for the tile and draw filled quads for each quadrant based on the mask bits and 
+                                            // the tile palette's collision brush settings
+                                            const uint8_t mask = map->GetCollisionMaskSigned(tx, ty);
+
+											// The collision mask uses 4 bits to represent collision in each quadrant of the tile:
+                                            if (mask & kCollisionMaskBottomLeft) {
+                                                rendererSystem->SubmitFilledQuad(tileWorld, tileWorld + glm::vec2(subSize, subSize), collisionFill);
+                                            }
+                                            if (mask & kCollisionMaskBottomRight) {
+                                                rendererSystem->SubmitFilledQuad(tileWorld + glm::vec2(subSize, 0.0f), tileWorld + glm::vec2(tileSize, subSize), collisionFill);
+                                            }
+                                            if (mask & kCollisionMaskTopLeft) {
+                                                rendererSystem->SubmitFilledQuad(tileWorld + glm::vec2(0.0f, subSize), tileWorld + glm::vec2(subSize, tileSize), collisionFill);
+                                            }
+                                            if (mask & kCollisionMaskTopRight) {
+                                                rendererSystem->SubmitFilledQuad(tileWorld + glm::vec2(subSize, subSize), tileWorld + glm::vec2(tileSize, tileSize), collisionFill);
+                                            }
+
+                                        }
+                                    }
+                                }
                             }
                         }
-                        const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
+                        
+						// When tile palette is active, prioritize it handling clicks for painting over regular picking/selection 
+                        // to avoid interference
                         bool left = Input::IsMouseDown(MOUSE_LEFT);
-                        if (left) {
-                            if (canPaint) {
-                                // Always treat clicks as handled when tile palette is active to avoid deselecting entities.
-                                m_tilePalettePanel->OnViewportClick(worldPos, false);
-                                tilePaletteHandledClick = true;
+                        if (collisionEditActive) {
+                            const bool canPaintCollision = m_tilePalettePanel->CanHandleViewportCollisionPaint();
+							// Begin collision paint mode on mouse down
+                            if (left) {
+                                if (canPaintCollision) {
+									// Always treat clicks as handled when tile palette is active to avoid deselecting entities
+                                    m_tilePalettePanel->OnViewportCollisionClick(worldPos);
+                                    tilePaletteHandledClick = true;
+                                }
+                            } 
+							// End collision paint mode on mouse release 
+                            else {
+                                m_tilePalettePanel->EndViewportCollisionPaint();
                             }
                         } 
+						// When not in collision edit mode, use clicks for regular tile painting if the palette can handle it
                         else {
-                            m_tilePalettePanel->EndViewportPaint();
+                            const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
+                            if (left) {
+                                if (canPaint) {
+                                    // Always treat clicks as handled when tile palette is active to avoid deselecting entities
+                                    m_tilePalettePanel->OnViewportClick(worldPos, false);
+                                    tilePaletteHandledClick = true;
+                                }
+                            } 
+                            else {
+                                m_tilePalettePanel->EndViewportPaint();
+                            }
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {

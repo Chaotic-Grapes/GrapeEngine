@@ -112,12 +112,21 @@ public:
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders tilemap component with collision edit entry point
+    void RenderTileMapComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
     // Generic renderer for unknown (C#) components. Uses JSON field types to
     // render simple editors for booleans, integers, floats and strings.
-    void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world, bool addSpacing = true);
 
     // Renders material component for assigning materials to renderers
 	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    void RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    void RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    void _ApplyPresetToJson(nlohmann::json& data, int presetId);
 
     void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     void RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, ECS::World* world);

@@ -1,0 +1,186 @@
+#version 450 core
+
+in vec2 vTexCoord;
+in vec4 vColor;
+in vec2 vWorldPos;
+
+// ============================================================================
+// Uniforms
+// ============================================================================
+uniform sampler2D uTexture;
+uniform int uHasTexture;
+uniform int uLightingEnabled;
+
+// Per-emitter material uniforms (set from Material2D component)
+uniform sampler2D uNormalMap;
+uniform sampler2D uMRAMap;
+uniform int   uHasNormalMap;
+uniform int   uHasMRAMap;
+uniform float uMetallic;
+uniform float uSmoothness;
+uniform float uAOStrength;
+uniform float uNormalStrength;
+uniform int   uMaterialFlags;  // same bit layout as batch.frag
+
+// ============================================================================
+// Light data (MUST match batch.frag / LightManager SSBO layout)
+// ============================================================================
+struct GPUPointLight {
+    vec4 PositionAndRange;   // xyz = position, w = range
+    vec4 ColorAndIntensity;  // rgb = color,  a = intensity
+};
+
+layout(std430, binding = 0) buffer PointLightBuffer {
+    GPUPointLight uPointLights[];
+};
+
+struct DirLight {
+    vec3  Direction;
+    vec3  Color;
+    float Intensity;
+};
+
+uniform int      uPointLightCount;
+uniform int      uHasDirectional;
+uniform DirLight uDirLight;
+
+// ============================================================================
+// PBR functions (identical to batch.frag)
+// ============================================================================
+const float PI = 3.14159265359;
+const vec3 DefaultNormal = vec3(0.0, 0.0, 1.0);
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    return a2 / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 CalculatePBRLighting(vec3 albedo, vec3 normal, float metallic, float roughness, float ao) {
+    vec3 V = vec3(0.0, 0.0, 1.0);
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 Lo = vec3(0.0);
+
+    // Directional light
+    if (uHasDirectional > 0) {
+        vec3 L = normalize(-uDirLight.Direction);
+        vec3 H = normalize(V + L);
+        vec3 radiance = uDirLight.Color * uDirLight.Intensity;
+
+        float NDF = DistributionGGX(normal, H, roughness);
+        float G   = GeometrySmith(normal, V, L, roughness);
+        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 specular = (NDF * G * F) / (4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0) + 0.0001);
+        vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+        float NdotL = max(dot(normal, L), 0.0);
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    // Point lights
+    vec3 fragPos3D = vec3(vWorldPos, 0.0);
+    for (int i = 0; i < uPointLightCount; ++i) {
+        vec3  lightPos = uPointLights[i].PositionAndRange.xyz;
+        float range    = uPointLights[i].PositionAndRange.w;
+        vec3  L        = lightPos - fragPos3D;
+        float dist     = length(L);
+        L = normalize(L);
+
+        float attenuation = 1.0 - smoothstep(0.0, range, dist);
+        if (attenuation <= 0.0) continue;
+
+        vec3 H = normalize(V + L);
+        vec3 radiance = uPointLights[i].ColorAndIntensity.rgb * uPointLights[i].ColorAndIntensity.a * attenuation;
+
+        float NDF = DistributionGGX(normal, H, roughness);
+        float G   = GeometrySmith(normal, V, L, roughness);
+        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 specular = (NDF * G * F) / (4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0) + 0.0001);
+        vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+        float NdotL = max(dot(normal, L), 0.0);
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    return vec3(0.03) * albedo * ao + Lo;
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+out vec4 FragColor;
+
+void main() {
+    vec4 texColor = (uHasTexture == 1) ? texture(uTexture, vTexCoord) : vec4(1.0);
+    vec4 baseColor = texColor * vColor;
+
+    if (baseColor.a < 0.01) discard;
+
+    if (uLightingEnabled == 1) {
+        // Decode flags (same bit layout as batch.frag)
+        int flags = uMaterialFlags;
+        bool useNormalMap   = (flags & 1) != 0;   // bit 0
+        bool useMetallicMap = (flags & 2) != 0;   // bit 1
+        bool useAOMap       = (flags & 4) != 0;   // bit 2
+        bool alphaTest      = (flags & 8) != 0;   // bit 3
+        bool unlit          = (flags & 16) != 0;   // bit 4
+        bool flatLit        = (flags & 32) != 0;   // bit 5
+
+        if (alphaTest && baseColor.a < 0.5) discard;
+
+        if (unlit) {
+            FragColor = baseColor;
+            return;
+        }
+
+        vec3  normal     = DefaultNormal;
+        float metallic   = uMetallic;
+        float smoothness = uSmoothness;
+        float ao         = 1.0;
+
+        // Flat-lit forces constant normal (no normal map)
+        if (flatLit) {
+            normal = DefaultNormal;
+        }
+        // Normal map
+        else if (useNormalMap && uHasNormalMap == 1) {
+            vec3 normalMap = texture(uNormalMap, vTexCoord).rgb;
+            normalMap = normalMap * 2.0 - 1.0;
+            normalMap.xy *= uNormalStrength;
+            normal = normalize(normalMap);
+        }
+
+        // MRA map
+        if (uHasMRAMap == 1) {
+            vec3 mra = texture(uMRAMap, vTexCoord).rgb;
+            if (useMetallicMap) metallic   = mra.r;
+            if (useMetallicMap) smoothness = mra.g;
+            if (useAOMap)       ao = mix(1.0, mra.b, uAOStrength);
+        }
+
+        float roughness = 1.0 - smoothness;
+        baseColor.rgb = CalculatePBRLighting(baseColor.rgb, normal, metallic, roughness, ao);
+    }
+
+    FragColor = baseColor;
+}
