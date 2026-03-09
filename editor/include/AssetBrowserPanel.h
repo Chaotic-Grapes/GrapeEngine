@@ -23,8 +23,10 @@ Provides:
 
 #include "ecs/World.h"
 #include "AssetLibrary.h"
+#include "EditorConfiguration.h"
 #include "ScriptTemplates.h"
 #include <imgui.h>
+#include <filesystem>
 #include <string>
 #include <unordered_set>
 #include <functional>
@@ -36,6 +38,12 @@ class InspectorPanel;
 // Asset browser panel for file navigation and asset management
 class AssetBrowserPanel {
 public:
+	// View modes for asset display (list vs grid)
+    enum class ViewMode : uint8_t {
+        List = 0,
+        Grid = 1
+    };
+
     // Callback for asset selection changes (used by other editor systems).
     using AssetSelectionCallback = std::function<void(const std::string&)>;
     // -------------------------------------------------------------------------
@@ -50,9 +58,14 @@ public:
 
     // Connect inspector so double-click can open prefabs
     void SetInspector(InspectorPanel* inspector);
-    // Register a callback for asset selection changes.
+
+	// Update editor settings reference for view mode and other config
+    void SetEditorSettings(EditorSettings* settings);
+
+    // Register a callback for asset selection changes
     void SetSelectionChangedCallback(AssetSelectionCallback callback) { m_selectionCallback = std::move(callback); }
-    // Register a callback for scene file double-click opens.
+
+    // Register a callback for scene file double-click opens
     void SetSceneOpenCallback(std::function<void(const std::string&)> callback) { m_sceneOpenCallback = std::move(callback); }
 
     // -------------------------------------------------------------------------
@@ -83,8 +96,36 @@ private:
     // Render the main two panel layout
     void _renderContentArea();
 
-    // Render the file list on the left
+    // Render the main file list panel, switching between list and grid view based on view mode
     void _renderFileListPanel(float windowWidth);
+
+    // Return directory entries for the current path sorted by type then name
+    std::vector<std::filesystem::directory_entry> _getSortedEntriesForCurrentPath() const;
+
+    // Render all entries in the current directory as list rows
+    void _renderFileListEntries(const std::vector<std::filesystem::directory_entry>& entries);
+
+    // Calculate the tile dimensions that fit the longest filename in the current entry set
+    ImVec2 _calculateGridTileSize(const std::vector<std::filesystem::directory_entry>& entries, ImFont* nameFont,
+        float nameFontSize, float iconFontSize, float textPaddingX, float tilePaddingY, float contentGap) const;
+    
+    // Render a single grid tile entry at the given index with icon and label
+    void _renderFileGridEntry(const std::vector<std::filesystem::directory_entry>& entries, size_t index, int columns,
+        float tileWidth, float tileHeight, float tileSpacing, float tileRounding, float iconFontSize, float nameFontSize,
+        float textPaddingX, float contentGap, ImFont* nameFont);
+
+    // Render all entries in the current directory as a grid of tiles
+    void _renderFileGridEntries(const std::vector<std::filesystem::directory_entry>& entries);
+    
+    // Render the truncated or wrapped name label below a grid tile's icon
+    void _renderGridEntryLabel(const std::filesystem::directory_entry& entry, const std::string& entryPath, 
+        bool isRenaming, float contentTop, const ImVec2& iconSize, float contentGap, float textPaddingX, float tileWidth, 
+        ImFont* nameFont, float nameFontSize, const ImVec2& nameSize, const std::string& displayName);
+
+    // Handle click, double-click, right-click and hover interactions for a grid tile
+    void _handleGridEntryInteractions(const std::vector<std::filesystem::directory_entry>& entries, 
+        const std::string& entryPath, bool isSelected, bool isDirectory, const std::string& extLower, bool tileLeftClick,
+        bool tileDoubleClick, bool tileRightClick, bool tileHovered);
 
     // Render detailed info for the selected asset
     void _renderFileInfoPanel();
@@ -110,6 +151,28 @@ private:
 
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
+
+    // Clear the current multi-selection and reset the anchor
+    void _clearSelection();
+
+    // Set selection anchor and notify listeners when a single entry is selected
+    void _setSingleSelection(const std::string& entryPath, bool updateAnchor);
+
+    // Notify the registered callback that the selection has changed
+    void _notifySelectionChanged() const;
+
+    // Handle double-click on an entry, opening folders or assets as appropriate
+    bool _handleEntryDoubleClick(const std::string& entryPath, const std::string& extLower, bool isDirectory);
+
+    // Apply selection logic for an entry, accounting for shift/ctrl modifiers and double-clicks
+    void _applyEntrySelection(const std::vector<std::filesystem::directory_entry>& entries, const std::string& entryPath,
+        bool isSelected, bool isDoubleClick, bool isDirectory, const std::string& extLower);
+
+    // Track hover time on a folder and auto-navigate into it when dragging an asset over it
+    void _handleFolderHoverAutoOpen(const std::string& folderPath, bool isHoveredWithPayload);
+
+    // Validate and apply the pending rename, updating the file on disk
+    bool _commitRename(const std::filesystem::directory_entry& entry, const std::string& entryPath);
 
     // -------------------------------------------------------------------------
     // Context Menu
@@ -205,15 +268,20 @@ private:
     bool m_openCreateDialog = false;
     char m_newAssetNameBuffer[128] = "";
     bool m_focusNameInput = false;
-    enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER };
-    AssetCreationType m_creationType = AssetCreationType::NONE;
-    Editor::Templates::ScriptTemplateType m_selectedScriptTemplate = Editor::Templates::ScriptTemplateType::BasicSystem;
+
+    // Asset creation dialog state
+    enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER }; // Tracks which asset type the user is currently creating
+    AssetCreationType m_creationType = AssetCreationType::NONE;             // Defaults to NONE
+    Editor::Templates::ScriptTemplateType m_selectedScriptTemplate = Editor::Templates::ScriptTemplateType::BasicSystem; // Persistence
 
     // Rename state
     std::string m_renamingAsset;
     char m_renameBuffer[256] = "";
     bool m_focusRenameInput = false;
 
+	// View mode state (list vs grid)
+    ViewMode m_viewMode = ViewMode::Grid;
+    EditorSettings* m_editorSettings = nullptr;
 };
 
 #endif

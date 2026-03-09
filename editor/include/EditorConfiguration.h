@@ -45,6 +45,7 @@ struct EditorSettings {
     } WindowSettings;
 
     float UiScale = 1.0f;
+    int AssetBrowserViewMode = 1; // 0 = List, 1 = Grid
     std::vector<std::string> RecentProjects;
     std::string LastProject;
 };
@@ -87,8 +88,12 @@ namespace Editor {
                     }
                 }
             }
+
             if (configJson.contains("UiScale") && configJson["UiScale"].is_number()) {
                 config.UiScale = configJson["UiScale"].get<float>();
+            }
+            if (configJson.contains("AssetBrowserViewMode") && configJson["AssetBrowserViewMode"].is_number_integer()) {
+                config.AssetBrowserViewMode = std::clamp(configJson["AssetBrowserViewMode"].get<int>(), 0, 1);
             }
             if (configJson.contains("LastProject") && configJson["LastProject"].is_string()) {
                 config.LastProject = configJson["LastProject"].get<std::string>();
@@ -113,6 +118,7 @@ namespace Editor {
             configJson["WindowSettings"]["VSync"] = config.WindowSettings.VSync;
             configJson["WindowSettings"]["Mode"] = _normalizeWindowMode(config.WindowSettings.Mode);
             configJson["UiScale"] = config.UiScale;
+            configJson["AssetBrowserViewMode"] = std::clamp(config.AssetBrowserViewMode, 0, 1);
             configJson["RecentProjects"] = config.RecentProjects;
             configJson["LastProject"] = config.LastProject;
 
