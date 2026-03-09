@@ -129,6 +129,80 @@ public record struct Light2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public record struct TileMapComponent
+{
+    public StringId TileMapPath;
+    public StringId TilesetTexturePath;
+    public float TileWorldSize;
+    public uint TilePixelSize;
+    public uint DefaultWidth;
+    public uint DefaultHeight;
+    public uint LayerIndex;
+    public bool Visible;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct ParticleEmitter
+{
+    public uint PresetId;
+    public int MaxParticles;
+    public float EmissionRate;
+    public int BurstCount;
+    public float ParticleSize;
+    public bool Active;
+
+    public uint TextureId;
+    public StringId TexturePath;
+
+    public float SpeedMin;
+    public float SpeedMax;
+    public float GravityX;
+    public float GravityY;
+    public float Drag;
+    public float Turbulence;
+    public float WobbleFrequency;
+    public float WobbleAmplitude;
+    public float SizeStart;
+    public float SizeEnd;
+    public float LifetimeMin;
+    public float LifetimeMax;
+    public float EmissionAngle;
+    public float EmissionSpread;
+    public float EmissionRadius;
+    public byte EmissionShape;
+    public float ColorStartR;
+    public float ColorStartG;
+    public float ColorStartB;
+    public float ColorStartA;
+    public float ColorEndR;
+    public float ColorEndG;
+    public float ColorEndB;
+    public float ColorEndA;
+    public bool DieOnCollision;
+    public float Bounciness;
+    public bool KillOutOfBounds;
+    public float RotationSpeedMin;
+    public float RotationSpeedMax;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public record struct BoidFlock
+{
+    public int Count;
+    public float SeparationWeight;
+    public float AlignmentWeight;
+    public float CohesionWeight;
+    public float CollisionAvoidWeight;
+    public float CollisionAvoidRadius;
+    public float VisualRange;
+    public float MaxSpeed;
+    public float MaxForce;
+    public float BoidSize;
+    public uint TextureId;
+    public StringId TexturePath;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public record struct GUICanvas
 {
     public Vector2 ReferenceSize;
