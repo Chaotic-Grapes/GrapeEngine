@@ -193,13 +193,15 @@ public:
     */
     // Toggle whether the palette captures viewport input for painting.
     void SetPaintMode(bool enabled) { m_paintMode = enabled; }
+    bool IsPaintModeEnabled() const { return m_paintMode; }
+    EntityId GetActiveTileMapId() const { return m_activeTileMapId; }
 
     /*------------------------------------------------------------------*/
     /*!
     \brief Checks if viewport hover can be processed.
     */
-    // Gate viewport hover handling to valid tile-editing state.
-    bool CanHandleViewportHover() const { return m_active && m_tileMap && m_tileset; }
+    // Gate viewport hover handling to active painting tools only.
+    bool CanHandleViewportHover() const { return m_active && (m_paintMode || m_collisionEditActive) && m_tileMap && m_tileset; }
 
     /*------------------------------------------------------------------*/
     /*!
