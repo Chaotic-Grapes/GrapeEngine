@@ -112,7 +112,7 @@ void SceneViewport::HandleInWorldInteraction() {
 
     // Update viewport interaction manager (gizmo, picking, selection, transforms)
     uint32_t newSelectedEntity = m_interactionMgr.Update(*m_world, m_selectedEntity.Index);
-    
+
     // If selection changed due to picking, update our selected entity
     if (newSelectedEntity != m_selectedEntity.Index) {
         SetSelectedEntity(newSelectedEntity);
@@ -766,10 +766,60 @@ void SceneViewport::_renderViewport() {
                             // We need access to renderer system to make the request
                             auto* rs = _getRendererSystem();
                             if (rs && m_world) {
-                                m_interactionMgr.RequestPick(
-                                    static_cast<float>(mx),
-                                    static_cast<float>(my),
-                                    rs);
+                                // Default to NPOS32 (no fallback) unless we find a valid tilemap tile under the cursor
+                                uint32_t fallbackTileMapEntity = ECS::Entity::NPOS32;
+
+                                // Only compute a tilemap fallback when the palette exists and neither paint
+                                // nor collision edit is active; those modes handle their own input and
+                                // should not redirect picks to the tilemap
+                                if (m_tilePalettePanel && !m_tilePalettePanel->IsPaintModeEnabled() && !m_tilePalettePanel->IsCollisionEditActive()) {
+                                    const auto& map = m_tilePalettePanel->GetTileMap();
+                                    const EntityId activeTileMapId = m_tilePalettePanel->GetActiveTileMapId();
+
+                                    // Guard against an unset tilemap or one with no layers before sampling
+                                    if (map && activeTileMapId != ECS::Entity::NPOS32 && map->LayerCount() > 0) {
+                                        glm::vec2 worldPos(0.0f, 0.0f);
+                                        {
+                                            // ImGui reports positions in logical pixels; scale up to physical
+                                            // framebuffer pixels so the viewport math matches the actual render target
+                                            const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                                            glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                                            glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
+
+                                            // Mouse position relative to the top-left of the viewport in framebuffer pixels
+                                            glm::vec2 localPos = glm::vec2(static_cast<float>(mx), static_cast<float>(my)) - vpMin;
+
+                                            // Convert to NDC: x in [-1, 1] left-to-right, y in [-1, 1] bottom-to-top
+                                            glm::vec4 ndc;
+                                            ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
+                                            ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y; // Flip Y: screen-down to NDC-up
+                                            ndc.z = 0.0f;
+                                            ndc.w = 1.0f;
+
+                                            // Unproject from clip space back to world space using the inverse view-projection
+                                            glm::mat4 invViewProj = glm::inverse(proj * view);
+                                            glm::vec4 world4 = invViewProj * ndc;
+                                            worldPos = glm::vec2(world4.x, world4.y);
+                                        }
+
+                                        // Express world position relative to the tilemap's own origin before converting
+                                        // to tile coords, since WorldToTileSigned expects local tilemap space
+                                        const glm::vec2 localPos = worldPos - m_tilePalettePanel->GetTileMapOrigin();
+                                        const int32_t tx = map->WorldToTileSigned(localPos.x);
+                                        const int32_t ty = map->WorldToTileSigned(localPos.y);
+
+                                        // Only register the tilemap as a fallback if there is actually a tile
+                                        // at this position on layer 0; empty tiles should not consume the pick
+                                        if (map->GetTileSigned(0, tx, ty) != EMPTY_TILE) {
+                                            fallbackTileMapEntity = activeTileMapId;
+                                        }
+                                    }
+                                }
+
+                                // Register the fallback before requesting the pick so the picking manager
+                                // can apply it immediately if the pick ray hits nothing
+                                m_interactionMgr.SetNextPickFallback(fallbackTileMapEntity);
+                                m_interactionMgr.RequestPick(static_cast<float>(mx), static_cast<float>(my), rs);
                             }
                         }
                     }
