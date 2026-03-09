@@ -221,6 +221,56 @@ namespace {
  * 4. resolve collisions
  */
 
+
+ // Build an effective world-space transform from current local + parent hierarchy
+ // This avoids relying on WorldTransform snapshots, which can be stale during physics substeps
+static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity, ECS::Components::LocalTransform& outTransform) {
+    const auto* localTransform = world.TryGet<ECS::Components::LocalTransform>(entity);
+    if (!localTransform) {
+        // No local transform means this entity isn't positioned relative to a parent,
+        // so fall back to whatever world transform it has directly
+        if (!world.Has<ECS::Components::WorldTransform>(entity)) {
+            // Entity has neither local nor world transform — nothing we can reconstruct from
+            return false;
+        }
+
+        // Decompose the world matrix directly since there's no local hierarchy to walk
+        const auto& worldTransform = world.Get<ECS::Components::WorldTransform>(entity);
+        TransformUtils::DecomposeTRS(worldTransform.Matrix, outTransform.Position, outTransform.Rotation, outTransform.Scale);
+        return true;
+    }
+
+    // Start with this entity's own local TRS as the base of the accumulated world matrix
+    Matrix4x4 worldMatrix = TransformUtils::MakeTRS(localTransform->Position, localTransform->Rotation, localTransform->Scale);
+    ECS::Entity parent = world.ParentOf(entity);
+
+    while (!parent.IsNull()) {
+        if (const auto* parentLocal = world.TryGet<ECS::Components::LocalTransform>(parent)) {
+            // Parent has a local transform, so keep walking up; pre-multiply to accumulate
+            // parent-space contribution correctly (parent TRS applied before child's)
+            const Matrix4x4 parentMatrix = TransformUtils::MakeTRS(parentLocal->Position, parentLocal->Rotation, parentLocal->Scale);
+            worldMatrix = parentMatrix * worldMatrix;
+        }
+        else if (world.Has<ECS::Components::WorldTransform>(parent)) {
+            // Parent already has a baked world matrix; treat it as a root anchor and stop;
+            // no point walking further since everything above is already in world space
+            const auto& parentWorld = world.Get<ECS::Components::WorldTransform>(parent);
+            worldMatrix = parentWorld.Matrix * worldMatrix;
+            break;
+        }
+        else {
+            // Parent has no transform data at all; hierarchy is broken here, stop walking
+            break;
+        }
+
+        parent = world.ParentOf(parent);
+    }
+
+    // Pull position, rotation, scale back out of the final accumulated matrix for the caller
+    TransformUtils::DecomposeTRS(worldMatrix, outTransform.Position, outTransform.Rotation, outTransform.Scale);
+    return true;
+}
+
 namespace ECS {
 
     SystemMetadata PhysicsSystem::GetMetadata() const {
@@ -789,16 +839,16 @@ namespace ECS {
             // Rebuild grid each substep because poses changed.
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
-                const auto* t = world.TryGet<Components::LocalTransform>(e);
-                if (!t) return;
+                Components::LocalTransform worldTransform{};
+                if (!GetPhysicsWorldTransform(world, e, worldTransform)) return;
                 if (const auto* c = world.TryGet<Components::CircleCollider2D>(e)) {
                     // Step 2: Use world-space circle (includes scale and offset)
-                    Engine::WorldCircle wc = Engine::Physics::GetWorldCircle(*c, *t);
+                    Engine::WorldCircle wc = Engine::Physics::GetWorldCircle(*c, worldTransform);
                     grid.Insert(e, Vector3D(wc.Center.X, wc.Center.Y, 0.0f), wc.Radius);
                 }
                 else if (const auto* b = world.TryGet<Components::BoxCollider2D>(e)) {
                     // Step 2: Use world-space AABB (includes scale and offset)
-                    Engine::WorldAABB wa = Engine::Physics::GetWorldAABB(*b, *t);
+                    Engine::WorldAABB wa = Engine::Physics::GetWorldAABB(*b, worldTransform);
                     grid.InsertBox(e, Vector3D(wa.Center.X, wa.Center.Y, 0.0f), wa.HalfExtents);
                 }
             };
@@ -849,6 +899,10 @@ namespace ECS {
                     auto* tB = world.TryGet<Components::LocalTransform>(B);
                     // cannot resolve without positions
                     if (!tA || !tB) continue;
+                    Components::LocalTransform tAWorld{};
+                    Components::LocalTransform tBWorld{};
+                    if (!GetPhysicsWorldTransform(world, A, tAWorld)) continue;
+                    if (!GetPhysicsWorldTransform(world, B, tBWorld)) continue;
                     // Honor Active flags (including parents): if disabled, skip.
                     if (!world.IsActiveInHierarchy(A)) continue;
                     if (!world.IsActiveInHierarchy(B)) continue;
@@ -901,8 +955,8 @@ namespace ECS {
                         // Circle-circle: single contact point (keep old method for now)
                         Vector2D n;
                         float depth;
-                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, *tA);
-                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, *tB);
+                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, tAWorld);
+                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, tBWorld);
                         if (TestCircleCircle(wcA, wcB, n, depth)) {
                             manifold.normal = n;
                             manifold.penetration = depth;
@@ -915,8 +969,8 @@ namespace ECS {
                     }
                     else if (boxA && boxB) {
                         // Box-box: use new manifold generation
-                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
-                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, tAWorld);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, tBWorld);
 
                         // Test box-box
                         manifold = TestBoxBox(obbA, obbB);
@@ -929,8 +983,8 @@ namespace ECS {
                         Vector2D contact;
 
                         // Use world-space shapes
-                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, *tA);
-                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, tAWorld);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, tBWorld);
 
                         // Test circle-box
                         if (TestCircleBox(wcA, obbB, n, depth, contact)) {
@@ -949,8 +1003,8 @@ namespace ECS {
                         Vector2D contact;
 
                         // Use world-space shapes
-                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, *tB);
-                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
+                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, tBWorld);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, tAWorld);
 
                         // Test circle-box (flip normal later)
                         if (TestCircleBox(wcB, obbA, n, depth, contact)) {
@@ -1195,15 +1249,19 @@ namespace ECS {
                         // Compute the world-space AABB of the entity's collider to find which tiles it overlaps with
                         // We query tiles in this range rather than every tile in the map for efficiency
                         Engine::WorldAABB worldAABB{};
+                        Components::LocalTransform tAWorld{};
+                        if (!GetPhysicsWorldTransform(world, e, tAWorld)) {
+                            continue;
+                        }
                         if (circA) {
                             // Circle AABB: centered on the circle's world position, half-extents equal to radius on both axes
-                            const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, *tA);
+                            const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, tAWorld);
                             worldAABB.Center = worldCircle.Center;
                             worldAABB.HalfExtents = Vector2D(worldCircle.Radius, worldCircle.Radius);
                         }
                         else {
                             // Box AABB: derived from the OBB in world space (accounts for rotation)
-                            worldAABB = Engine::Physics::GetWorldAABB(*boxA, *tA);
+                            worldAABB = Engine::Physics::GetWorldAABB(*boxA, tAWorld);
                         }
 
                         // Compute the world-space min/max corners of the entity's AABB
@@ -1266,10 +1324,15 @@ namespace ECS {
                                     const Vector2D cellCenter(tileWorldX + centerOffsetX, tileWorldY + centerOffsetY);
                                     Engine::Collision::ContactManifold manifold;
 
+                                    Components::LocalTransform cellWorldTransform{};
+                                    if (!GetPhysicsWorldTransform(world, e, cellWorldTransform)) {
+                                        return;
+                                    }
+
                                     if (circA) {
                                         // Circle vs. tile cell OBB test
                                         // Build an axis-aligned OBB for the cell (rotation = 0, standard axes)
-                                        const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, *tA);
+                                        const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, cellWorldTransform);
                                         Engine::WorldOBB tileObb;
                                         tileObb.Center = cellCenter;
                                         tileObb.HalfExtents = halfExtents;
@@ -1292,7 +1355,7 @@ namespace ECS {
                                     }
                                     else {
                                         // Box vs. tile cell OBB test (entity box may be rotated; tile cell is always axis-aligned)
-                                        const Engine::WorldOBB worldObb = Engine::Physics::GetWorldOBB(*boxA, *tA);
+                                        const Engine::WorldOBB worldObb = Engine::Physics::GetWorldOBB(*boxA, cellWorldTransform);
                                         Engine::WorldOBB tileObb;
                                         tileObb.Center = cellCenter;
                                         tileObb.HalfExtents = halfExtents;
@@ -1438,3 +1501,4 @@ namespace ECS {
 
     }
 }// namespace ECS
+

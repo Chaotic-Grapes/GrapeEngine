@@ -218,6 +218,13 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
     // Defer panel initialization to Initialize to use loaded fonts
 }
 
+// Set the editor settings reference and propagate to panels that need it 
+// (currently just the asset browser for view mode config)
+void LevelEditor::SetEditorSettings(EditorSettings* settings) {
+    m_editorSettings = settings;
+    m_assetBrowser.SetEditorSettings(settings);
+}
+
 // Destroy the editor instance without owning the world
 LevelEditor::~LevelEditor() {
     // Unsubscribe from engine messages
@@ -609,6 +616,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     _registerPanel("Asset Browser",
         [this]() {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+            m_assetBrowser.SetEditorSettings(m_editorSettings);
             m_assetBrowser.SetInspector(&m_inspector);
             // Asset Browser selection should be passive; tilesets are applied only via explicit drag-drop
             m_assetBrowser.SetSelectionChangedCallback(nullptr);
