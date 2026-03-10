@@ -218,6 +218,13 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
     // Defer panel initialization to Initialize to use loaded fonts
 }
 
+// Set the editor settings reference and propagate to panels that need it 
+// (currently just the asset browser for view mode config)
+void LevelEditor::SetEditorSettings(EditorSettings* settings) {
+    m_editorSettings = settings;
+    m_assetBrowser.SetEditorSettings(settings);
+}
+
 // Destroy the editor instance without owning the world
 LevelEditor::~LevelEditor() {
     // Unsubscribe from engine messages
@@ -378,6 +385,7 @@ void LevelEditor::_buildDockLayout() {
     // Dock a window into the layout region.
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Systems", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Game Configuration", assetBrowserNode);
 
     // Finalize the dock builder layout.
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
@@ -608,6 +616,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     _registerPanel("Asset Browser",
         [this]() {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+            m_assetBrowser.SetEditorSettings(m_editorSettings);
             m_assetBrowser.SetInspector(&m_inspector);
             // Asset Browser selection should be passive; tilesets are applied only via explicit drag-drop
             m_assetBrowser.SetSelectionChangedCallback(nullptr);
@@ -761,6 +770,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
     m_sceneViewport.SetTilePalette(&m_tilePalette);
+    m_tilePalette.SetPaintModeChangedCallback([this](bool enabled) {
+        if (!enabled) {
+            m_sceneViewport.SetGridVisible(false);
+        }
+    });
     m_tilePalette.SetActiveTileMapCallback([this](const EntityId id) { _setActiveTileMap(id); });
     // Set active tileset callback.
     m_tilePalette.SetActiveTilesetCallback([this](const uint8_t index) {
@@ -780,19 +794,26 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
+        m_suppressViewportSelectionSync = true;
+
         if (!m_world) {
             m_inspector.ClearSelection();
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when no world.
+            m_suppressViewportSelectionSync = false;
             return;
         } // Clear when no world
+
+        const auto& selectedEntities = m_hierarchyWindow.GetSelectedEntities();
+        m_inspector.SetSelectedEntities(selectedEntities);
 
         if (id == ECS::Entity::NPOS32) {
             m_inspector.ClearSelection();
             if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when selection is empty.
+            m_suppressViewportSelectionSync = false;
             return;
         } // Clear when no entity
 
@@ -816,6 +837,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette for invalid entity.
         }
+        m_suppressViewportSelectionSync = false;
         });
 }
 
@@ -1017,6 +1039,10 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
 // Process selection changes coming from viewports.
 void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
+    if (m_suppressViewportSelectionSync) {
+        return; // Ignore feedback loop when hierarchy drives selection.
+    }
+
     if (!m_world) {
         m_inspector.ClearSelection();
         m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
@@ -1030,6 +1056,9 @@ void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
         _syncTilePaletteToSelection(ECS::Entity::NPOS32); // Clear tile palette when no selection.
         return;
     }
+
+    // Sync multi-selection set to inspector
+    m_inspector.SetSelectedEntities(m_hierarchyWindow.GetSelectedEntities());
 
     // Validate entity before inspecting
     const ECS::Entity e = m_world->Resolve(id);
@@ -1392,7 +1421,7 @@ void LevelEditor::_refreshTileMapCache() {
         }
 
         entry.Origin = origin; // Update origin every frame to follow entity transforms.
-        entry.Visible = comp.Visible; // Cache visibility so debug rendering matches component state.
+        entry.Visible = comp.Visible && m_world->IsActiveInHierarchy(entity); // Match runtime visibility gating
         entry.DisplayName = displayName;
 
         if (addedLegacyTileset && !entry.MapPath.empty()) {
@@ -1477,7 +1506,7 @@ void LevelEditor::_refreshTileMapCache() {
         for (const auto& tileset : entry.Tilesets) {
             tilesets.push_back(tileset);
         }
-        debugMaps.push_back({ *entry.Map, tilesets, entry.Origin });
+        debugMaps.push_back({ *entry.Map, tilesets, entry.Origin, m_world->Resolve(id) });
     }
 
         renderer->SetDebugTileMaps(debugMaps);
@@ -1744,14 +1773,15 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTilesetPath.clear();
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
-    m_tileMapList.clear(); // Drop tilemap list for the new scene.
+    m_tileMapList.clear();  // Drop tilemap list for the new scene.
+    m_tilePalette.ClearTilePreviewSizeCache(); // Reset per-scene tile preview size cache.
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
     const std::vector<std::string> emptyPaths;
     m_tilePalette.SetEditingContext(nullptr, emptyTilesets, emptyPaths, 0, std::string(), glm::vec2(0.0f, 0.0f));
 
     if (auto* renderer = ECS::RendererSystem::GetInstance()) {
         renderer->ClearDebugTileMaps(); // Remove any previous debug tilemaps.
-        renderer->ClearDebugTileMap(); // Clear the legacy single debug map as well.
+        renderer->ClearDebugTileMap();  // Clear the legacy single debug map as well.
     }
 }
 

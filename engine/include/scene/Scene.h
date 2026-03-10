@@ -118,6 +118,9 @@ namespace Scenes {
             // Will this suppress copy elision?
             // Consideration: Let user attach after creation to avoid this?
             const ECS::Entity e = m_world.Create();
+
+			// Set Active by default so new entities are enabled
+            m_world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
             if (parent.has_value())
                 m_world.Attach(e, parent.value());
 
@@ -147,6 +150,11 @@ namespace Scenes {
         template<typename... TCs>
         ECS::Entity CreateOnLayer(const uint16_t layerId, TCs&&... cs) {
             const ECS::Entity e = m_world.Create(std::forward<TCs>(cs)...);
+
+			// Set Active by default so new entities are enabled
+            if (!m_world.Has<ECS::Components::Active>(e)) {
+                m_world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
+            }
             m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{layerId});
             m_layers.OnLayerSet(e, layerId);
 

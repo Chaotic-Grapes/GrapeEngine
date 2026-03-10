@@ -222,13 +222,25 @@ namespace Editor {
         }
     }
 
+    // Store the fallback entity to use if the next pick returns no result
+    void ViewportInteractionManager::SetNextPickFallback(uint32_t entityId) {
+        m_nextPickFallbackId = entityId;
+    }
+
     uint32_t ViewportInteractionManager::_handlePickResult(uint32_t pickedEntityId, bool shouldUpdateSelection) {
         if (!shouldUpdateSelection) {
+            m_nextPickFallbackId = ECS::Entity::NPOS32;
             return m_selectedEntityId;  // Keep current selection
         }
 
         uint32_t oldSelection = m_selectedEntityId;
         uint32_t newSelection = pickedEntityId;
+        // If the pick missed all entities, fall back to the pre-registered entity (e.g. tilemap under cursor)
+        if (newSelection == ECS::Entity::NPOS32 && m_nextPickFallbackId != ECS::Entity::NPOS32) {
+            newSelection = m_nextPickFallbackId;
+        }
+        // Consume the fallback regardless of whether it was used; it is only valid for one pick
+        m_nextPickFallbackId = ECS::Entity::NPOS32;
 
         if (oldSelection != newSelection) {
             if (OnSelectionChanged) {

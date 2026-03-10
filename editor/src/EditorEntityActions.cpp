@@ -64,6 +64,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
 
     // Mandatory LocalTransform
     Editor::ECSUtils::SetComponent(&world, e, "LocalTransform", ECS::Components::LocalTransform{});
+    // Mandatory Active
+    Editor::ECSUtils::SetComponent(&world, e, "Active", ECS::Components::Active{});
 
     // Ensure WorldTransform exists so hierarchy/system queries that require it see the entity
     // Initialize as dirty so systems will compute it on the next update
@@ -237,6 +239,12 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Clone the entity hierarchy
     ECS::Entity cloned = cloneRecursive(id, originalParentId);
+    if (!cloned.IsNull() && world.IsAlive(cloned)) {
+        if (m_undoSystem) {
+            // Record clone creation so undo removes the full cloned hierarchy
+            m_undoSystem->RecordEntityCreation(cloned.Index);
+        }
+    }
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);

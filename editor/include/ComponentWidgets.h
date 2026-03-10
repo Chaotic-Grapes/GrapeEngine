@@ -20,6 +20,10 @@ Used by component inspectors for both entity and prefab editing workflows.
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
+#include <functional>
+#include <cstdint>
+#include <unordered_set>
+#include "ecs/Entity.h"
 
 struct ImFont;
 
@@ -47,6 +51,9 @@ namespace EditorUI {
     // Clears the active default-data mapping after a component finishes rendering
     void ClearDefaultDataScope();
 
+    // Sets the list of selected entities for multi-select editing
+    void SetSelectedEntities(const std::unordered_set<EntityId>* entities);
+
     // -------------------------------------------------------------------------
     // Section Management
     // -------------------------------------------------------------------------
@@ -68,6 +75,16 @@ namespace EditorUI {
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel, 
         nlohmann::json& data, const std::string& key, float dragSpeed, float min = 0.0f, float max = 0.0f);
 
+    // Overload with undo context
+    void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min, float max,
+        void* undoSystemPtr,            // Editor::UndoSystem*
+        void* worldPtr,                 // ECS::World*
+        uint32_t entityId,              // ECS::Entity id
+        uint32_t componentTypeId,       // ECS::ComponentTypeId
+        const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+
     // -------------------------------------------------------------------------
     // Vector Editing
     // -------------------------------------------------------------------------
@@ -80,6 +97,27 @@ namespace EditorUI {
     void RenderVector3DRow(const std::string& label, nlohmann::json& data, 
         const std::string& xKey, const std::string& yKey, const std::string& zKey, 
         float dragSpeed);
+
+    // Overload with undo context (2D)
+    void RenderVector2DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, float dragSpeed,
+        void* undoSystemPtr,            // Editor::UndoSystem*
+        void* worldPtr,                 // ECS::World*
+        uint32_t entityId,              // ECS::Entity id
+        uint32_t componentTypeId,       // ECS::ComponentTypeId
+        const std::string& basePath,    // e.g. "Offset" -> paths "Offset.X", "Offset.Y"
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+
+    // Overload with undo context (3D)
+    void RenderVector3DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey,
+        float dragSpeed,
+        void* undoSystemPtr,            // Editor::UndoSystem*
+        void* worldPtr,                 // ECS::World*
+        uint32_t entityId,              // ECS::Entity id
+        uint32_t componentTypeId,       // ECS::ComponentTypeId
+        const std::string& basePath,    // e.g. "Position" -> "Position.X", etc.
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
 
     // Renders a 4D vector editor with X, Y, Z and W components as separate drag controls
     void RenderVector4DRow(const std::string& label, nlohmann::json& data,
@@ -106,18 +144,53 @@ namespace EditorUI {
     void RenderTextProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
 
+    // Overload with undo context for Text
+    void RenderTextProperty(const std::string& label, nlohmann::json& data,
+        const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+
     // Renders an integer input field with drag control for numeric values
     void RenderIntProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
+
+    // Overload with undo context for Int
+    void RenderIntProperty(const std::string& label, nlohmann::json& data,
+        const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
 
     // Renders a dropdown to edit a bitmask (up to 32 bits) with labeled entries
     void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
         const std::string& key, const std::vector<std::string>& bitNames,
         uint32_t defaultMask = 0xFFFFFFFFu);
 
+    // Overload with undo context for Bitmask
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
+        const std::string& key, const std::vector<std::string>& bitNames,
+        uint32_t defaultMask,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+
     // Renders a checkbox that toggles boolean values in JSON data
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
+
+    // Overload with undo context for Checkbox (instant)
+    void RenderCheckboxProperty(const std::string& label, nlohmann::json& data,
+        const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+
+    // Overload with undo context for Color (begin/end)
+    void RenderColorProperty(const std::string& label, nlohmann::json& colorData,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& basePath, // expects keys "R","G","B","A"
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
 
     // Renders a checkbox and returns whether value changed, letting caller handle JSON update
     bool RenderCheckboxPropertyReturn(const std::string& label, bool& value);

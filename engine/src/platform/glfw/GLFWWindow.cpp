@@ -125,8 +125,13 @@ namespace Platform {
         Input::Initialize(m_windowHandle);
         Input::SetupEventCallbacks();
 
-        // Set viewport
-        glViewport(0, 0, width, height);
+        // Use framebuffer pixel size (not logical window size) for initial viewport.
+        int framebufferWidth = width;
+        int framebufferHeight = height;
+        glfwGetFramebufferSize(m_windowHandle, &framebufferWidth, &framebufferHeight);
+        m_width = framebufferWidth;
+        m_height = framebufferHeight;
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
 
         // Setup callbacks
         _setupCallbacks();
@@ -137,7 +142,9 @@ namespace Platform {
             m_mode = WindowMode::Borderless;
         }
 
-        LOG_INFO("[GLFWWindow] Created successfully: " << width << "x" << height);
+        LOG_INFO("[GLFWWindow] Created successfully: "
+                 << framebufferWidth << "x" << framebufferHeight
+                 << " framebuffer pixels");
         return true;
     }
 

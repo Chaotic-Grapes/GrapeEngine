@@ -1257,6 +1257,11 @@ namespace Serialization {
 			if (!world.Has<ECS::Components::Layer>(e)) {
 				world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
 			}
+
+			// Ensure every entity has Active so enable/disable state is explicit and editable
+			if (!world.Has<ECS::Components::Active>(e)) {
+				world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
+			}
 			return e;
 		}
 

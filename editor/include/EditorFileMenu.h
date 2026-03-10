@@ -1,8 +1,12 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.h
-\author Foo Rui Qin    (100%)
+\author Foo Rui Qin    (60%)
+        Muhammad Nur Fadzly Bin Zulkifli (20%)
+        Samantha Leong Sher Yen (20%)
 \par    ruiqin.foo@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+        s.leong@digipen.edu
 \date   16th November 2025
 
 \brief
@@ -202,6 +206,8 @@ private:
     bool m_projectSettingsDirty = false;
     // Helper to render project settings modal
     void _renderProjectSettingsModal();
+
+public:
 
     // Export state
     bool m_exportRequested = false;

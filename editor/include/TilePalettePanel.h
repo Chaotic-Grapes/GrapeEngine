@@ -36,6 +36,7 @@ Dependencies:
 #include <string>
 #include <functional>
 #include <cstdint>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "core/World/TileMap.hpp"
@@ -192,13 +193,15 @@ public:
     */
     // Toggle whether the palette captures viewport input for painting.
     void SetPaintMode(bool enabled) { m_paintMode = enabled; }
+    bool IsPaintModeEnabled() const { return m_paintMode; }
+    EntityId GetActiveTileMapId() const { return m_activeTileMapId; }
 
     /*------------------------------------------------------------------*/
     /*!
     \brief Checks if viewport hover can be processed.
     */
-    // Gate viewport hover handling to valid tile-editing state.
-    bool CanHandleViewportHover() const { return m_active && m_tileMap && m_tileset; }
+    // Gate viewport hover handling to active painting tools only.
+    bool CanHandleViewportHover() const { return m_active && (m_paintMode || m_collisionEditActive) && m_tileMap && m_tileset; }
 
     /*------------------------------------------------------------------*/
     /*!
@@ -242,6 +245,12 @@ public:
 
     /*------------------------------------------------------------------*/
     /*!
+    \brief Clears cached per-tilemap preview sizes and resets to default.
+    */
+    void ClearTilePreviewSizeCache();
+
+    /*------------------------------------------------------------------*/
+    /*!
     \brief Updates tilemap dropdown list.
     */
     // Update the list of tilemaps for the active tilemap dropdown.
@@ -261,6 +270,9 @@ public:
     // Notify LevelEditor when the active tileset changes.
     void SetActiveTilesetCallback(std::function<void(uint8_t)> callback) { m_activeTilesetCallback = std::move(callback); }
 
+    // Register paint mode toggle callback.
+    void SetPaintModeChangedCallback(std::function<void(bool)> callback) { m_onPaintModeChanged = std::move(callback); }
+
     /*------------------------------------------------------------------*/
     /*!
     \brief Updates world origin without resetting palette state.
@@ -275,6 +287,12 @@ public:
     void SetTileMapPath(const std::string& path) { m_tileMapPath = path; }
 
 private:
+	// For the active tileset, we allow caching a user-adjusted tile preview size that persists when switching tilemaps
+    // This is keyed by a combination of tileset ID and tilemap path to allow different sizes for the same tileset across 
+    // different maps
+    std::string GetActiveTilesetPreviewKey() const;
+    void RefreshTilePreviewSizeForActiveTileset();
+
     bool m_active = true;                  // Palette enabled state
     bool m_paintMode = true;               // Viewport painting enabled
     bool m_collisionEditActive = false;    // Collision edit mode enabled
@@ -285,7 +303,7 @@ private:
     uint8_t m_collisionLastPaintMask = 0;
     int64_t m_collisionLastPaintKey = 0;
     
-        //! Active tilemap and tilesets
+    //! Active tilemap and tilesets
     std::shared_ptr<TileMap> m_tileMap;
     std::shared_ptr<Tileset> m_tileset;
     std::vector<std::shared_ptr<Tileset>> m_tilesets;
@@ -301,6 +319,7 @@ private:
     std::function<void(const std::string&)> m_assetDropCallback;
     std::function<void(EntityId)> m_activeTileMapCallback;
     std::function<void(uint8_t)> m_activeTilesetCallback;
+    std::function<void(bool)> m_onPaintModeChanged;
 
     //! External systems
     ECS::World* m_world = nullptr;
@@ -310,8 +329,12 @@ private:
 
     //! Tilemap UI state
     std::vector<TileMapListEntry> m_tileMapList;
-    EntityId m_activeTileMapId = ECS::Entity::NPOS32;
-    uint8_t m_activeTilesetIndex = 0;
+	EntityId m_activeTileMapId = ECS::Entity::NPOS32; // Active tilemap entity ID for dropdown selection
+	uint8_t m_activeTilesetIndex = 0;                 // Index of the active tileset in m_tilesets
+	float m_tilePreviewSize = 64.0f;                  // Default tile preview size in pixels
+	static constexpr float kTilePreviewMin = 24.0f;   // Minimum tile preview size
+	static constexpr float kTilePreviewMax = 96.0f;   // Maximum tile preview size
+	std::unordered_map<std::string, float> m_tilePreviewSizeByTileset;  // Cache of user-adjusted tile preview sizes keyed by tileset + tilemap context
 
     //! Painting state
     TileID m_selectedTileID = 0;   // Base ID selected in palette

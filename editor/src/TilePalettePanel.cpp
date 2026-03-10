@@ -115,10 +115,71 @@ tilemaps or tilesets can be resolved externally.
 */
 void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
 {
+    // Dropping a tilemap/tileset should not immediately arm viewport painting
+    m_paintMode = false;
+
     if (m_assetDropCallback) {
-        // Forward asset path to the editor-level handler.
+        // Forward asset path to the editor-level handler
         m_assetDropCallback(assetPath);
     }
+}
+
+/*------------------------------------------------------------------*/
+/*!
+\brief Retrieves the key for the currently active tileset to manage tile preview 
+sizes.
+
+The key is a combination of the active tileset path and the tilemap path to allow 
+different preview sizes for the same tileset across different maps.
+
+\return A string key representing the active tileset and tilemap context, or an 
+empty string if no active tileset.
+*/
+std::string TilePalettePanel::GetActiveTilesetPreviewKey() const
+{
+	// Use the active tileset path combined with the tilemap path as a unique 
+    // key for caching preview sizes
+    if (m_activeTilesetIndex < m_tilesetPaths.size()) {
+        return m_tilesetPaths[m_activeTilesetIndex];
+    }
+	// If there's no valid active tileset, return an empty key which will default 
+    // to the base preview size
+    return std::string();
+}
+
+// ------------------------------------------------------------------*/
+/*!
+\brief Refreshes the tile preview size based on the active tileset.
+
+This looks up the cached preview size for the active tileset using the key
+from GetActiveTilesetPreviewKey().If a cached size exists, it applies it; 
+otherwise, it defaults to 64.0f.
+*/
+void TilePalettePanel::RefreshTilePreviewSizeForActiveTileset()
+{
+	// Look up the preview size for the active tileset using the unique key
+    const std::string key = GetActiveTilesetPreviewKey();
+
+	// If the key is empty, it means there's no active tileset, so we default 
+    // to the base size
+    if (key.empty()) {
+        m_tilePreviewSize = 64.0f;
+        return;
+    }
+
+	// Check if we have a cached preview size for this tileset + tilemap context
+    const auto it = m_tilePreviewSizeByTileset.find(key);
+    m_tilePreviewSize = (it != m_tilePreviewSizeByTileset.end()) ? it->second : 64.0f;
+}
+
+/*------------------------------------------------------------------*/
+/*!
+\brief Clears cached tile preview sizes when scene/world context changes.
+*/
+void TilePalettePanel::ClearTilePreviewSizeCache()
+{
+    m_tilePreviewSizeByTileset.clear();
+    m_tilePreviewSize = 64.0f;
 }
 
 /*------------------------------------------------------------------*/
@@ -130,8 +191,9 @@ void TilePalettePanel::HandleAssetDrop(const std::string& assetPath)
 */
 void TilePalettePanel::SetTileMapList(const std::vector<TileMapListEntry>& entries, EntityId activeId)
 {
-    m_tileMapList = entries; // Replace the list of tilemaps for the dropdown.
-    m_activeTileMapId = activeId; // Track which tilemap is currently active.
+    m_tileMapList = entries;                   // Replace the list of tilemaps for the dropdown
+    m_activeTileMapId = activeId;              // Track which tilemap is currently active
+	RefreshTilePreviewSizeForActiveTileset();  // Refresh preview size in case the active tilemap changed and has a different cached size
 }
 
 /*------------------------------------------------------------------*/
@@ -171,6 +233,7 @@ void TilePalettePanel::SetEditingContext(const std::shared_ptr<TileMap>& tileMap
     m_collisionHasLastPaint = false; // Reset collision drag tracking.
     m_collisionLastPaintKey = 0;
     m_collisionLastPaintMask = 0;
+	RefreshTilePreviewSizeForActiveTileset();  // Refresh the tile preview size based on the new active tileset
 }
 
 /*------------------------------------------------------------------*/
@@ -290,7 +353,8 @@ void TilePalettePanel::Render()
                     if (ImGui::Selectable(displayName.c_str(), isSelected)) {
                         m_activeTilesetIndex = static_cast<uint8_t>(i);
                         m_tileset = (i < m_tilesets.size()) ? m_tilesets[i] : nullptr;
-                        m_selectedTileID = 0; // Reset tile selection on tileset switch.
+						RefreshTilePreviewSizeForActiveTileset();  // Update preview size for the new active tileset
+                        m_selectedTileID = 0;                      // Reset tile selection on tileset switch
                         if (m_activeTilesetCallback) {
                             m_activeTilesetCallback(m_activeTilesetIndex);
                         }
@@ -339,6 +403,23 @@ void TilePalettePanel::Render()
                 m_currentRotation = (m_currentRotation + 1) % 4;
             }
 
+			// Tile Preview Size Slider
+            ImGui::SliderFloat("Tile Preview Size", &m_tilePreviewSize, kTilePreviewMin, kTilePreviewMax, "%.0f px");
+
+			// Clamp the preview size and cache it for the active tileset
+            m_tilePreviewSize = std::clamp(m_tilePreviewSize, kTilePreviewMin, kTilePreviewMax);
+
+			// When the user adjusts the slider, we want to save the preview size for the active tileset so that 
+            // it persists when switching between tilesets or tilemaps
+            // We use the unique key from GetActiveTilesetPreviewKey() to store this in a map
+            const std::string previewKey = GetActiveTilesetPreviewKey();
+
+			// Only cache the preview size if we have a valid active tileset, otherwise we just use the default size 
+            // without caching
+            if (!previewKey.empty()) {
+                m_tilePreviewSizeByTileset[previewKey] = m_tilePreviewSize;
+            }
+
             ImGui::Separator();
 
             // Palette Grid
@@ -346,7 +427,7 @@ void TilePalettePanel::Render()
             const auto& tiles = m_tileset->GetTiles();
             
             ImGuiStyle& style = ImGui::GetStyle();
-            float buttonSize = 64.0f;
+            const float buttonSize = m_tilePreviewSize;
             
             int i = 0;
             for (const auto& [id, def] : tiles)

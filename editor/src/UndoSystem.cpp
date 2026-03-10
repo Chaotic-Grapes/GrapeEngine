@@ -20,12 +20,38 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 #include "core/Logger.h"
 #include "EditorECSUtils.h"
+#include "serialization/EntitySerializer.h"
 #include "../include/core/World/TileMap.hpp"
 #include <imgui.h>
 #include <algorithm>
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
+#include <cmath>
+
+using Json = nlohmann::json;
+
+static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, float epsilon = 1e-5f) {
+    if (a.type() != b.type()) return false;
+    if (a.is_number_float()) {
+        return std::abs(a.get<float>() - b.get<float>()) < epsilon;
+    }
+    if (a.is_array()) {
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); i++) {
+            if (!JsonApproxEqual(a[i], b[i], epsilon)) return false;
+        }
+        return true;
+    }
+    if (a.is_object()) {
+        if (a.size() != b.size()) return false;
+        for (auto& [key, val] : a.items()) {
+            if (!b.contains(key) || !JsonApproxEqual(val, b[key], epsilon)) return false;
+        }
+        return true;
+    }
+    return a == b;
+}
 
 namespace Editor {
     namespace {
@@ -467,6 +493,107 @@ namespace Editor {
     }
 
     // ========================================================================
+    // ComponentPropertyCommand Implementation
+    // ========================================================================
+
+    ComponentPropertyCommand::ComponentPropertyCommand(
+        ECS::World* world,
+        EntityId entityId,
+        ECS::ComponentTypeId componentId,
+        std::string propertyPath,
+        nlohmann::json oldValue,
+        nlohmann::json newValue,
+        ApplyFn applyFn
+    )
+        : m_world(world)
+        , m_entityId(entityId)
+        , m_componentId(componentId)
+        , m_propertyPath(std::move(propertyPath))
+        , m_oldValue(std::move(oldValue))
+        , m_newValue(std::move(newValue))
+        , m_applyFn(std::move(applyFn))
+    {
+    }
+
+    void ComponentPropertyCommand::Execute() {
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
+        ECS::Entity e = m_world->Resolve(m_entityId);
+        if (!m_world->IsAlive(e)) return;
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_newValue);
+    }
+
+    void ComponentPropertyCommand::Undo() {
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
+        ECS::Entity e = m_world->Resolve(m_entityId);
+        if (!m_world->IsAlive(e)) return;
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_oldValue);
+    }
+
+    bool ComponentPropertyCommand::Coalesce(ICommand* other) {
+        auto* o = dynamic_cast<ComponentPropertyCommand*>(other);
+        if (!o) return false;
+        if (m_world != o->m_world) return false;
+        if (m_entityId != o->m_entityId) return false;
+        if (m_componentId != o->m_componentId) return false;
+        if (m_propertyPath != o->m_propertyPath) return false;
+        m_newValue = o->m_newValue;
+        return true;
+    }
+
+    // ========================================================================
+    // BatchComponentPropertyCommand Implementation
+    // ========================================================================
+
+    BatchComponentPropertyCommand::BatchComponentPropertyCommand(
+        ECS::World* world,
+        ECS::ComponentTypeId componentId,
+        std::string propertyPath,
+        std::vector<Entry> entries,
+        ApplyFn applyFn
+    )
+        : m_world(world)
+        , m_componentId(componentId)
+        , m_propertyPath(std::move(propertyPath))
+        , m_entries(std::move(entries))
+        , m_applyFn(std::move(applyFn))
+    {
+    }
+
+    void BatchComponentPropertyCommand::Execute() {
+        if (!m_world || !m_applyFn) return;
+        for (const auto& it : m_entries) {
+            ECS::Entity e = m_world->Resolve(it.Entity);
+            if (!m_world->IsAlive(e)) continue;
+            m_applyFn(m_world, e, m_componentId, m_propertyPath, it.NewValue);
+        }
+    }
+
+    void BatchComponentPropertyCommand::Undo() {
+        if (!m_world || !m_applyFn) return;
+        for (const auto& it : m_entries) {
+            ECS::Entity e = m_world->Resolve(it.Entity);
+            if (!m_world->IsAlive(e)) continue;
+            m_applyFn(m_world, e, m_componentId, m_propertyPath, it.OldValue);
+        }
+    }
+
+    bool BatchComponentPropertyCommand::Coalesce(ICommand* other) {
+        auto* o = dynamic_cast<BatchComponentPropertyCommand*>(other);
+        if (!o) return false;
+        if (m_world != o->m_world) return false;
+        if (m_componentId != o->m_componentId) return false;
+        if (m_propertyPath != o->m_propertyPath) return false;
+        if (m_entries.size() != o->m_entries.size()) return false;
+        for (size_t i = 0; i < m_entries.size(); ++i) {
+            if (m_entries[i].Entity != o->m_entries[i].Entity) return false;
+        }
+        for (size_t i = 0; i < m_entries.size(); ++i) {
+            m_entries[i].NewValue = o->m_entries[i].NewValue;
+        }
+        return true;
+    }
+
+    // ========================================================================
     // TilePaintCommand Implementation
     // ========================================================================
 
@@ -561,16 +688,25 @@ namespace Editor {
             return;
         }
 
-        // Execute the command
         command->Execute();
 
-        // Add to undo stack
+        if (dynamic_cast<ComponentPropertyCommand*>(command.get()) != nullptr ||
+            dynamic_cast<BatchComponentPropertyCommand*>(command.get()) != nullptr) {
+            m_propertyEditEmitted = true;
+        }
+
+        if (!m_undoStack.empty()) {
+            auto* tail = m_undoStack.back().get();
+            if (tail && tail->Coalesce(command.get())) {
+                m_redoStack.clear();
+                TrimUndoStack();
+                return;
+            }
+        }
         m_undoStack.push_back(std::move(command));
 
-        // Clear redo stack
         m_redoStack.clear();
 
-        // Trim undo stack if it exceeds maximum size
         TrimUndoStack();
 
         LOG_DEBUG("[UndoSystem] Command executed. Undo stack size: " << m_undoStack.size());
@@ -724,6 +860,145 @@ namespace Editor {
 
         m_redoStack.clear();
         return true;
+    }
+
+    void UndoSystem::BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& oldValue) {
+        PropertyKey key{ entityId, componentId, propertyPath };
+        if (m_activePropertyEdits.find(key) == m_activePropertyEdits.end()) {
+            m_activePropertyEdits.emplace(std::move(key), oldValue);
+        }
+    }
+
+    void UndoSystem::EndPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
+        ComponentPropertyCommand::ApplyFn applyFn) {
+        PropertyKey key{ entityId, componentId, propertyPath };
+        auto it = m_activePropertyEdits.find(key);
+        if (it == m_activePropertyEdits.end()) {
+            return;
+        }
+        const nlohmann::json& oldVal = it->second;
+        if (JsonApproxEqual(oldVal, newValue)) {
+            m_activePropertyEdits.erase(it);
+            return;
+        }
+        if (!m_world) {
+            m_activePropertyEdits.erase(it);
+            return;
+        }
+        auto cmd = std::make_unique<ComponentPropertyCommand>(
+            m_world, entityId, componentId, propertyPath, oldVal, newValue, std::move(applyFn)
+        );
+        ExecuteCommand(std::move(cmd));
+        m_activePropertyEdits.erase(it);
+    }
+
+    void UndoSystem::BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath) {
+        if (!m_world) return;
+
+        // Resolve component short name from registry so we can locate JSON data in the serialized entity.
+        const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
+        const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+        if (compShortName.empty()) {
+            return;
+        }
+
+        // Fetch current value for each entity to store as the "before" state
+        for (EntityId id : entities) {
+            ECS::Entity entity = m_world->Resolve(id);
+            if (!m_world->IsAlive(entity)) continue;
+
+            nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+            nlohmann::json* componentData = nullptr;
+
+            if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                for (auto& comp : entityJson["Components"]) {
+                    if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                    std::string typeName = comp["TypeName"];
+                    if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                        if (comp.contains("Data") && comp["Data"].is_object()) {
+                            componentData = &comp["Data"];
+                        }
+                        break;
+                    }
+                }
+            }
+
+            nlohmann::json propertyVal;
+            if (componentData) {
+                // Extract the specific property from the component JSON
+                // propertyPath is like "Position.X"
+                propertyVal = *componentData;
+                size_t start = 0;
+                size_t end = propertyPath.find('.');
+                while (end != std::string::npos) {
+                    std::string part = propertyPath.substr(start, end - start);
+                    if (propertyVal.is_object() && propertyVal.contains(part)) {
+                        propertyVal = propertyVal[part];
+                    } else {
+                        propertyVal = nlohmann::json();
+                        break;
+                    }
+                    start = end + 1;
+                    end = propertyPath.find('.', start);
+                }
+                if (!propertyVal.is_null()) {
+                    std::string lastPart = propertyPath.substr(start);
+                    if (propertyVal.is_object() && propertyVal.contains(lastPart)) {
+                        propertyVal = propertyVal[lastPart];
+                    } else {
+                        propertyVal = nlohmann::json();
+                    }
+                }
+            } else {
+                propertyVal = nlohmann::json();
+            }
+
+            BeginPropertyEdit(id, componentId, propertyPath, propertyVal);
+        }
+    }
+
+    void UndoSystem::EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
+        ComponentPropertyCommand::ApplyFn applyFn) {
+        if (!m_world || !applyFn) return;
+
+        std::vector<BatchComponentPropertyCommand::Entry> entries;
+        for (EntityId id : entities) {
+            PropertyKey key{ id, componentId, propertyPath };
+            auto it = m_activePropertyEdits.find(key);
+            if (it == m_activePropertyEdits.end()) continue;
+
+            const nlohmann::json& oldVal = it->second;
+            if (JsonApproxEqual(oldVal, newValue)) {
+                m_activePropertyEdits.erase(it);
+                continue;
+            }
+
+            entries.push_back({ id, oldVal, newValue });
+            m_activePropertyEdits.erase(it);
+        }
+
+        if (!entries.empty()) {
+            auto cmd = std::make_unique<BatchComponentPropertyCommand>(
+                m_world, componentId, propertyPath, std::move(entries), std::move(applyFn)
+            );
+            ExecuteCommand(std::move(cmd));
+        }
+    }
+
+    void UndoSystem::RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
+        const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn) {
+        if (!m_world) return;
+        if (JsonApproxEqual(oldValue, newValue)) return;
+        auto cmd = std::make_unique<ComponentPropertyCommand>(
+            m_world, entityId, componentId, propertyPath, oldValue, newValue, std::move(applyFn)
+        );
+        ExecuteCommand(std::move(cmd));
+    }
+
+    bool UndoSystem::ConsumePropertyEditEmission() {
+        bool was = m_propertyEditEmitted;
+        m_propertyEditEmitted = false;
+        return was;
     }
 
 } // namespace Editor

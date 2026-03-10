@@ -88,6 +88,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 namespace {
 	// Resolve a project-relative path to an absolute path for loading assets (for existing maps)
@@ -185,6 +187,24 @@ namespace ECS {
         m_guiViewport.Origin = { 0.0f, 0.0f };
         m_guiViewport.Size = m_renderTargetSize;
         m_guiViewport.DisplayScale = { 1.0f, 1.0f };
+        if (Engine::CORE) {
+            auto* context = Engine::CORE->GetPlatformContext();
+            auto* window = context ? context->GetMainWindow() : nullptr;
+            if (window) {
+                auto* native = static_cast<GLFWwindow*>(window->GetNativeHandle());
+                if (native) {
+                    int windowW = 0;
+                    int windowH = 0;
+                    glfwGetWindowSize(native, &windowW, &windowH);
+                    if (windowW > 0 && windowH > 0) {
+                        m_guiViewport.DisplayScale = {
+                            m_renderTargetSize.X / static_cast<float>(windowW),
+                            m_renderTargetSize.Y / static_cast<float>(windowH)
+                        };
+                    }
+                }
+            }
+        }
         m_guiViewport.Active = true;
     }
 
@@ -445,18 +465,29 @@ namespace ECS {
                 outView = glm::lookAt(eye, eye + forward, up);
 
                 // --- Projection
+                // In standalone runtime (no editor-managed viewports), render against
+                // the current render-target aspect so serialized camera aspect values
+                // don't distort the final image when window settings differ.
+                float effectiveAspect = camera.AspectRatio;
+                if (!m_activeCamera && m_viewports.empty() && m_renderTargetSize.Y > 0.0f) {
+                    effectiveAspect = m_renderTargetSize.X / m_renderTargetSize.Y;
+                }
+                if (effectiveAspect <= 0.0f) {
+                    effectiveAspect = 1.0f;
+                }
+
                 if (camera.UsePerspective) {
                     // camera.FOV stored in degrees
                     outProjection = glm::perspective(
                         glm::radians(camera.FOV),
-                        camera.AspectRatio,
+                        effectiveAspect,
                         camera.NearPlane,
                         camera.FarPlane
                     );
                 }
                 else {
                     const float halfH = camera.OrthoSize;
-                    const float halfW = halfH * camera.AspectRatio;
+                    const float halfW = halfH * effectiveAspect;
                     outProjection = glm::ortho(
                         -halfW, +halfW,
                         -halfH, +halfH,
@@ -700,11 +731,6 @@ namespace ECS {
 
                     m_renderer->beginFrame();
 
-                    // ===============================
-                    // TILEMAP DRAW (WORLD BACKGROUND)
-                    // ===============================
-                    SubmitRuntimeTileMaps(layer);
-
                     if (m_debugTileMap && m_debugTileset)
                     {
                         // Backward-compatible single debug tilemap path.
@@ -720,26 +746,34 @@ namespace ECS {
 
                     if (!m_debugTileMaps.empty())
                     {
-                        // Render all tilemaps requested by the editor.
+                        // Render only legacy debug tilemaps that are not owned by an entity
+                        // Entity-owned debug tilemaps are submitted in Z-sorted order below
                         TileMapRenderer tileRenderer;
+
+                        // For each debug tilemap entry...
                         for (const auto& entry : m_debugTileMaps) {
-							// Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
+                            // Skip if source entity is specified but not active/alive (e.g. deleted map)
+                            if (!entry.SourceEntity.IsNull()) {
+                                continue;
+                            }
+                            if (entry.Tilesets.empty()) {
+                                continue;
+                            }
+
+                            // Convert shared_ptr<Tileset> to raw pointer for TileMapRenderer
                             std::vector<const Tileset*> rawTilesets;
 
-							// Preallocate for efficiency
+                            // Preallocate for efficiency
                             rawTilesets.reserve(entry.Tilesets.size());
 
-							// Populate raw pointer list
+                            // Populate raw pointer list
                             for (const auto& ts : entry.Tilesets) {
                                 rawTilesets.push_back(ts.get());
                             }
-							// Submit tilemap for rendering
-                            tileRenderer.Submit(
-                                entry.Map.get(),
-                                rawTilesets,
-                                *m_renderer,
-                                entry.Offset
-                            );
+
+                            // Submit tilemap for rendering
+                            tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset,
+                                nullptr);
                         }
                     }
 
@@ -749,6 +783,10 @@ namespace ECS {
 
                         // Skip circles here (already drawn by SDF pass)
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                        // Keep tilemap draw order aligned with Z-sorted entity order
+                        SubmitRuntimeTileMapEntity(entity);
+                        SubmitDebugTileMapEntity(world, entity);
 
                         // Fetch transform
                         auto& lt = world.Get<Components::LocalTransform>(entity);
@@ -873,112 +911,22 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-                }
 
-                // --- Boid Instanced Rendering ---
-                if (m_boidSystem && m_boidShader) {
-                    const auto& flockData = m_boidSystem->GetFlockRenderData();
-                    if (!flockData.empty()) {
+                    // --- Boids on this layer ---
+                    if (m_boidSystem && m_boidShader) {
                         m_boidShader->use();
                         m_boidShader->setMat4("uViewProj", viewProj);
-
-                        for (const auto& [entityId, flock] : flockData) {
-                            if (flock.count <= 0 || flock.vao == 0) continue;
-
-                            m_boidShader->setUniform("uBoidSize", flock.boidSize);
-
-                            if (flock.textureId != 0) {
-                                m_boidShader->setUniform("uHasTexture", 1);
-                                m_boidShader->setUniform("uTexture", 0);
-                                glActiveTexture(GL_TEXTURE0);
-                                glBindTexture(GL_TEXTURE_2D, flock.textureId);
-                            }
-                            else {
-                                m_boidShader->setUniform("uHasTexture", 0);
-                            }
-
-                            m_boidShader->setUniform("uColor", glm::vec4(1.0f));
-
-                            glBindVertexArray(flock.vao);
-                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
-                            glBindVertexArray(0);
-                        }
+                        m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
                     }
-                }
 
-                // --- Particle Instanced Rendering ---
-                if (m_particleSystem && m_particleShader) {
-                    const auto& emitterData = m_particleSystem->GetRenderData();
-                    if (!emitterData.empty()) {
+                    // --- Particles on this layer ---
+                    if (m_particleSystem && m_particleShader) {
                         m_particleShader->use();
                         m_particleShader->setMat4("uViewProj", viewProj);
-                        m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
-
+                        m_lightManager.Bind(*m_particleShader);
                         glEnable(GL_BLEND);
                         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-                        for (const auto& [entityId, emitter] : emitterData) {
-                            if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
-
-                            m_particleShader->setUniform("uParticleSize", emitter.particleSize);
-
-                            // --- Material2D gate: same opt-in as sprites ---
-                            ECS::Entity e{ entityId };
-                            bool hasMaterial = world.Has<Components::Material2D>(e);
-
-                            if (hasMaterial) {
-                                const auto& mat = world.Get<Components::Material2D>(e);
-                                m_particleShader->setUniform("uLightingEnabled", 1);
-                                m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
-                                m_particleShader->setUniform("uMetallic", mat.Metallic);
-                                m_particleShader->setUniform("uSmoothness", mat.Smoothness);
-                                m_particleShader->setUniform("uAOStrength", mat.AOStrength);
-                                m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
-
-                                // Normal map (texture unit 1)
-                                if (mat.NormalTextureId != 0) {
-                                    m_particleShader->setUniform("uHasNormalMap", 1);
-                                    m_particleShader->setUniform("uNormalMap", 1);
-                                    glActiveTexture(GL_TEXTURE1);
-                                    glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
-                                }
-                                else {
-                                    m_particleShader->setUniform("uHasNormalMap", 0);
-                                }
-
-                                // MRA map (texture unit 2)
-                                if (mat.MRA_TextureId != 0) {
-                                    m_particleShader->setUniform("uHasMRAMap", 1);
-                                    m_particleShader->setUniform("uMRAMap", 2);
-                                    glActiveTexture(GL_TEXTURE2);
-                                    glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
-                                }
-                                else {
-                                    m_particleShader->setUniform("uHasMRAMap", 0);
-                                }
-                            }
-                            else {
-                                m_particleShader->setUniform("uLightingEnabled", 0);
-                                m_particleShader->setUniform("uMaterialFlags", 0);
-                                m_particleShader->setUniform("uHasNormalMap", 0);
-                                m_particleShader->setUniform("uHasMRAMap", 0);
-                            }
-
-                            // Albedo/particle texture (texture unit 0)
-                            if (emitter.textureId != 0) {
-                                m_particleShader->setUniform("uHasTexture", 1);
-                                m_particleShader->setUniform("uTexture", 0);
-                                glActiveTexture(GL_TEXTURE0);
-                                glBindTexture(GL_TEXTURE_2D, emitter.textureId);
-                            }
-                            else {
-                                m_particleShader->setUniform("uHasTexture", 0);
-                            }
-
-                            glBindVertexArray(emitter.vao);
-                            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
-                            glBindVertexArray(0);
-                        }
+                        m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
                     }
                 }
 
@@ -2037,6 +1985,13 @@ namespace ECS {
             entry.Origin = origin;
             entry.Visible = comp.Visible && world.IsActiveInHierarchy(entity);
             entry.RenderLayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
+
+            // Resolve Material2D for lighting
+            entry.HasMaterial = false;
+            if (world.Has<ECS::Components::Material2D>(entity)) {
+                entry.Material = world.Get<ECS::Components::Material2D>(entity);
+                entry.HasMaterial = true;
+            }
         });
 
 		// Remove any runtime entries for entities that no longer have a TileMapComponent (i.e. they were destroyed or had the component removed)
@@ -2050,50 +2005,121 @@ namespace ECS {
         }
     }
 
-	// Submit tilemaps for rendering for a specific layer
-	// Called after RefreshRuntimeTileMaps()
-    void RendererSystem::SubmitRuntimeTileMaps(int layer) {
-		// Tilemaps are only relevant in Game mode since in Editor mode the editor manages tilemap loading and rendering separately from the runtime logic
-        if (Engine::CORE->GetMode() != Engine::EngineMode::Game) {
+    // Submits a runtime tile map entity for rendering during Game mode
+    void RendererSystem::SubmitRuntimeTileMapEntity(Entity entity) {
+        // Runtime tile maps only exist during Game mode; skip if we're in the editor
+    // or if the renderer hasn't been initialized yet
+        if (Engine::CORE->GetMode() != Engine::EngineMode::Game || !m_renderer) {
             return;
         }
 
-        // Usual checks
-        if (!m_renderer) {
+        // Look up the cached runtime entry by entity index; the map is keyed on
+        // index alone, so we still need to validate generation below
+        const auto it = m_runtimeTileMaps.find(entity.Index);
+        if (it == m_runtimeTileMaps.end()) {
             return;
         }
 
-		// Log the number of tilemaps being submitted, but only once to avoid spamming the log every frame
-        static bool logged = false;
-        if (!logged) {
-            LOG_INFO("[TileMap] (Runtime) Submitting tilemaps: " << m_runtimeTileMaps.size());
-            logged = true;
+        const RuntimeTileMapEntry& entry = it->second;
+
+        // A stale index slot from a destroyed entity can linger in the map until
+        // the slot is reused, so generation mismatch means this handle is dead
+        if (entry.Generation != entity.Generation) {
+            return;
         }
 
-		// Iterate through all runtime tilemap entries and submit those that are visible, have a valid map and tileset and match the current render layer
-        for (const auto& entryPair : m_runtimeTileMaps) {
-            const RuntimeTileMapEntry& entry = entryPair.second;
-            if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
+        // Nothing to draw if the tile map is hidden, unloaded or has no tilesets
+        // providing the actual tile image data
+        if (!entry.Visible || !entry.Map || entry.Tilesets.empty()) {
+            return;
+        }
+
+        // A map with no layers has no geometry to emit, skip to avoid a no-op submit
+        if (entry.Map->LayerCount() == 0) {
+            return;
+        }
+
+        // TileMapRenderer::Submit expects raw pointers, but the entry owns the
+        // tilesets as unique_ptrs — build a temporary view without transferring ownership
+        std::vector<const Tileset*> rawTilesets;
+        rawTilesets.reserve(entry.Tilesets.size());
+        for (const auto& tileset : entry.Tilesets) {
+            rawTilesets.push_back(tileset.get());
+        }
+
+        // Pass nullptr for material when the entity has no material override so the
+        // renderer falls back to the tileset's default shader/texture bindings
+        m_tileMapRenderer.Submit(
+            *entry.Map, rawTilesets, *m_renderer, entry.Origin,
+            entry.HasMaterial ? &entry.Material : nullptr
+        );
+    }
+
+    // Submits a debug tile map entity for rendering in editor modes only
+    void RendererSystem::SubmitDebugTileMapEntity(World& world, Entity entity) {
+        // Debug tile maps are editor-only overlays; suppress them entirely in Game
+        // mode so they never leak into shipped builds
+        if (Engine::CORE->GetMode() == Engine::EngineMode::Game || !m_renderer) {
+            return;
+        }
+
+        // Early out before touching the world if there's nothing registered at all
+        if (m_debugTileMaps.empty()) {
+            return;
+        }
+
+        // Dead or inactive entities have no transform in the hierarchy, so rendering
+        // them would produce garbage world-space positions
+        if (!world.IsAlive(entity) || !world.IsActiveInHierarchy(entity)) {
+            return;
+        }
+
+        // Respect the per-component visibility flag when the entity carries a
+        // TileMapComponent: the debug entries still exist but the user hid them
+        if (world.Has<Components::TileMapComponent>(entity)) {
+            const auto& comp = world.Get<Components::TileMapComponent>(entity);
+            if (!comp.Visible) {
+                return;
+            }
+        }
+
+        // Each entity may have contributed multiple debug entries (e.g. one per
+        // physics layer), so we iterate all of them rather than assuming a 1:1 mapping
+        TileMapRenderer tileRenderer;
+        for (const auto& entry : m_debugTileMaps) {
+            // Null source means the entry was registered but never fully initialized
+            if (entry.SourceEntity.IsNull()) {
                 continue;
             }
 
-            if (static_cast<int>(entry.RenderLayerId) != layer) {
+            // Index + generation together uniquely identify the entity; index alone
+            // would incorrectly match a recycled slot from a different entity
+            if (entry.SourceEntity.Index != entity.Index || entry.SourceEntity.Generation != entity.Generation) {
                 continue;
             }
 
-            if (entry.Map->LayerCount() == 0) {
+            // Can't render a tile map with no tilesets; tile IDs would have no
+            // image data to resolve against
+            if (entry.Tilesets.empty()) {
                 continue;
             }
 
-			// The tilemap renderer expects raw pointers for the tilesets, so we need to extract those from the shared_ptrs in our runtime entry
+            // Same raw-pointer view pattern as the runtime path: borrow without
+            // transferring ownership out of the unique_ptrs
             std::vector<const Tileset*> rawTilesets;
             rawTilesets.reserve(entry.Tilesets.size());
-            for (const auto& tileset : entry.Tilesets) {
-                rawTilesets.push_back(tileset.get());
+            for (const auto& ts : entry.Tilesets) {
+                rawTilesets.push_back(ts.get());
             }
 
-			// Submit the tilemap for rendering
-            m_tileMapRenderer.Submit(*entry.Map, rawTilesets, *m_renderer, entry.Origin);
+            // Pull the material directly from the ECS component rather than a cached
+            // entry field, since debug renders reflect live component state in the editor
+            const ECS::Components::Material2D* mat = nullptr;
+            if (world.Has<ECS::Components::Material2D>(entity)) {
+                mat = &world.Get<ECS::Components::Material2D>(entity);
+            }
+
+            tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset, mat);
         }
     }
 
@@ -2281,23 +2307,34 @@ namespace ECS {
                 tileRenderer.Submit(*m_debugTileMap, tilesets, *m_renderer, m_debugTileMapOffset);
             }
 
-			// Render all other tilemaps stored in m_debugTileMaps
+			// Render only legacy debug tilemaps that are not owned by an entity
+            // Entity-owned debug tilemaps are submitted in Z-sorted order below
             if (!m_debugTileMaps.empty()) {
                 TileMapRenderer tileRenderer;
-				// Same thing here, but for multiple tilemaps
                 for (const auto& entry : m_debugTileMaps) {
+                    if (!entry.SourceEntity.IsNull()) {
+                        continue;
+                    }
+                    if (entry.Tilesets.empty()) {
+                        continue;
+                    }
+
                     std::vector<const Tileset*> rawTilesets;
                     rawTilesets.reserve(entry.Tilesets.size());
                     for (const auto& ts : entry.Tilesets) {
                         rawTilesets.push_back(ts.get());
                     }
-                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset);
+                    tileRenderer.Submit(entry.Map.get(), rawTilesets, *m_renderer, entry.Offset, nullptr);
                 }
             }
 
             for (Entity entity : list) {
                 if (!world.IsActiveInHierarchy(entity)) continue;
                 if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                // Keep tilemap draw order aligned with Z-sorted entity order
+                SubmitRuntimeTileMapEntity(entity);
+                SubmitDebugTileMapEntity(world, entity);
 
                 auto& lt = world.Get<Components::LocalTransform>(entity);
                 Vector3D position, scale; Quaternion rotation;
@@ -2379,115 +2416,24 @@ namespace ECS {
                 }
             }
               m_renderer->endFrame();
+
+              // --- Boids on this layer ---
+              if (m_boidSystem && m_boidShader) {
+                  m_boidShader->use();
+                  m_boidShader->setMat4("uViewProj", viewProj);
+                  m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
+              }
+
+              // --- Particles on this layer ---
+              if (m_particleSystem && m_particleShader) {
+                  m_particleShader->use();
+                  m_particleShader->setMat4("uViewProj", viewProj);
+                  m_lightManager.Bind(*m_particleShader);
+                  glEnable(GL_BLEND);
+                  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                  m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
+              }
           }
-
-        // --- Boid Instanced Rendering ---
-        if (m_boidSystem && m_boidShader) {
-            const auto& flockData = m_boidSystem->GetFlockRenderData();
-            if (!flockData.empty()) {
-                m_boidShader->use();
-                m_boidShader->setMat4("uViewProj", viewProj);
-
-                for (const auto& [entityId, flock] : flockData) {
-                    if (flock.count <= 0 || flock.vao == 0) continue;
-
-                    m_boidShader->setUniform("uBoidSize", flock.boidSize);
-
-                    if (flock.textureId != 0) {
-                        m_boidShader->setUniform("uHasTexture", 1);
-                        m_boidShader->setUniform("uTexture", 0);
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, flock.textureId);
-                    }
-                    else {
-                        m_boidShader->setUniform("uHasTexture", 0);
-                    }
-
-                    m_boidShader->setUniform("uColor", glm::vec4(1.0f));
-
-                    glBindVertexArray(flock.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
-                    glBindVertexArray(0);
-                }
-            }
-        }
-
-        // --- Particle Instanced Rendering ---
-        if (m_particleSystem && m_particleShader) {
-            const auto& emitterData = m_particleSystem->GetRenderData();
-            if (!emitterData.empty()) {
-                m_particleShader->use();
-                m_particleShader->setMat4("uViewProj", viewProj);
-                m_lightManager.Bind(*m_particleShader);  // bind SSBO + dir light uniforms once
-
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-                for (const auto& [entityId, emitter] : emitterData) {
-                    if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
-
-                    m_particleShader->setUniform("uParticleSize", emitter.particleSize);
-
-                    // --- Material2D gate: same opt-in as sprites ---
-                    ECS::Entity e{ entityId };
-                    bool hasMaterial = world.Has<Components::Material2D>(e);
-
-                    if (hasMaterial) {
-                        const auto& mat = world.Get<Components::Material2D>(e);
-                        m_particleShader->setUniform("uLightingEnabled", 1);
-                        m_particleShader->setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
-                        m_particleShader->setUniform("uMetallic", mat.Metallic);
-                        m_particleShader->setUniform("uSmoothness", mat.Smoothness);
-                        m_particleShader->setUniform("uAOStrength", mat.AOStrength);
-                        m_particleShader->setUniform("uNormalStrength", mat.NormalStrength);
-
-                        // Normal map (texture unit 1)
-                        if (mat.NormalTextureId != 0) {
-                            m_particleShader->setUniform("uHasNormalMap", 1);
-                            m_particleShader->setUniform("uNormalMap", 1);
-                            glActiveTexture(GL_TEXTURE1);
-                            glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
-                        }
-                        else {
-                            m_particleShader->setUniform("uHasNormalMap", 0);
-                        }
-
-                        // MRA map (texture unit 2)
-                        if (mat.MRA_TextureId != 0) {
-                            m_particleShader->setUniform("uHasMRAMap", 1);
-                            m_particleShader->setUniform("uMRAMap", 2);
-                            glActiveTexture(GL_TEXTURE2);
-                            glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
-                        }
-                        else {
-                            m_particleShader->setUniform("uHasMRAMap", 0);
-                        }
-                    }
-                    else {
-                        m_particleShader->setUniform("uLightingEnabled", 0);
-                        m_particleShader->setUniform("uMaterialFlags", 0);
-                        m_particleShader->setUniform("uHasNormalMap", 0);
-                        m_particleShader->setUniform("uHasMRAMap", 0);
-                    }
-
-                    // Albedo/particle texture (texture unit 0)
-                    if (emitter.textureId != 0) {
-                        m_particleShader->setUniform("uHasTexture", 1);
-                        m_particleShader->setUniform("uTexture", 0);
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, emitter.textureId);
-                    }
-                    else {
-                        m_particleShader->setUniform("uHasTexture", 0);
-                    }
-
-                    glBindVertexArray(emitter.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
-                    glBindVertexArray(0);
-                }
-            }
-        }
-
         RenderWorldGUI(viewProj);
 
         // Unbind the current render target.
@@ -2609,14 +2555,20 @@ namespace ECS {
         // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
         GUIViewport layoutViewport = m_guiViewport;
         if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
+            layoutViewport.Origin = { 0.0f, 0.0f };
             layoutViewport.Size = m_renderTargetSize;
         }
         const float layoutW = std::max(1.0f, layoutViewport.Size.X);
         const float layoutH = std::max(1.0f, layoutViewport.Size.Y);
         const float guiScaleX = w / layoutW;
         const float guiScaleY = h / layoutH;
+        const float layoutOriginX = layoutViewport.Origin.X;
+        const float layoutOriginY = layoutViewport.Origin.Y;
         auto scalePos = [&](const Vector2D& p) {
-            return Vector2D{ p.X * guiScaleX, p.Y * guiScaleY };
+            return Vector2D{
+                (p.X - layoutOriginX) * guiScaleX,
+                (p.Y - layoutOriginY) * guiScaleY
+            };
         };
         auto scaleSize = [&](const Vector2D& s) {
             return Vector2D{ s.X * guiScaleX, s.Y * guiScaleY };

@@ -56,6 +56,8 @@ struct PanelRegistration {
     std::function<void(ECS::World*)> SetWorldCallback;
 };
 
+struct EditorSettings;
+
 class LevelEditor {
 public:
     LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene);
@@ -78,6 +80,7 @@ public:
     EditorState GetEditorState() const;
     bool HasValidWorld() const { return m_world != nullptr; }
     void SetProjectBrowserRequestCallback(std::function<void()> callback) { m_projectBrowserRequest = std::move(callback); }
+    void SetEditorSettings(EditorSettings* settings);
 
 private:
     // Panel registration system
@@ -166,6 +169,7 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     float m_uiScale = 1.0f;
+    EditorSettings* m_editorSettings = nullptr;
 
     // Docking state
     ImGuiID m_dockspaceId = 0;
@@ -180,6 +184,9 @@ private:
 
 	// Focus request flags for panels that can't immediately focus when requested (e.g. due to tab closing)
     bool m_focusTilePaletteNextFrame = false;
+
+    // Ignore viewport selection callbacks when hierarchy drives selection
+    bool m_suppressViewportSelectionSync = false;
 
     // Undo System
     Editor::UndoSystem m_undoSystem;

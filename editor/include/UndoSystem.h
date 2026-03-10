@@ -34,6 +34,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <string>
+#include <nlohmann/json.hpp>
 
 // Forward declaration (global namespace)
 class TileMap;
@@ -57,6 +60,25 @@ namespace Editor {
         virtual void Execute() = 0;
         virtual void Undo() = 0;
         virtual void Redo() { Execute(); }
+        virtual bool Coalesce(ICommand* other) { (void)other; return false; }
+    };
+
+    // ========================================================================
+    // Macro Command (group multiple commands into one)
+    // ========================================================================
+
+    class MacroCommand : public ICommand {
+    public:
+        MacroCommand() = default;
+        void AddCommand(std::unique_ptr<ICommand> command) { m_commands.push_back(std::move(command)); }
+        
+        void Execute() override { for (auto& cmd : m_commands) cmd->Execute(); }
+        void Undo() override { for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it) (*it)->Undo(); }
+        void Redo() override { for (auto& cmd : m_commands) cmd->Redo(); }
+        bool IsEmpty() const { return m_commands.empty(); }
+
+    private:
+        std::vector<std::unique_ptr<ICommand>> m_commands;
     };
 
     // ========================================================================
@@ -192,6 +214,72 @@ namespace Editor {
     };
 
     // ========================================================================
+    // Component Property Command
+    // ========================================================================
+
+    class ComponentPropertyCommand : public ICommand {
+    public:
+        using ApplyFn = std::function<void(ECS::World*, ECS::Entity, ECS::ComponentTypeId, const std::string&, const nlohmann::json&)>;
+
+        ComponentPropertyCommand(
+            ECS::World* world,
+            EntityId entityId,
+            ECS::ComponentTypeId componentId,
+            std::string propertyPath,
+            nlohmann::json oldValue,
+            nlohmann::json newValue,
+            ApplyFn applyFn
+        );
+
+        void Execute() override;
+        void Undo() override;
+        bool Coalesce(ICommand* other) override;
+
+    private:
+        ECS::World* m_world = nullptr;
+        EntityId m_entityId = ECS::Entity::NPOS32;
+        ECS::ComponentTypeId m_componentId = 0;
+        std::string m_propertyPath;
+        nlohmann::json m_oldValue;
+        nlohmann::json m_newValue;
+        ApplyFn m_applyFn;
+    };
+
+    // ========================================================================
+    // Batch Component Property Command
+    // ========================================================================
+
+    class BatchComponentPropertyCommand : public ICommand {
+    public:
+        using ApplyFn = ComponentPropertyCommand::ApplyFn;
+
+        struct Entry {
+            EntityId Entity = ECS::Entity::NPOS32;
+            nlohmann::json OldValue;
+            nlohmann::json NewValue;
+        };
+
+        BatchComponentPropertyCommand(
+            ECS::World* world,
+            ECS::ComponentTypeId componentId,
+            std::string propertyPath,
+            std::vector<Entry> entries,
+            ApplyFn applyFn
+        );
+
+        void Execute() override;
+        void Undo() override;
+        bool Coalesce(ICommand* other) override;
+
+    private:
+        ECS::World* m_world = nullptr;
+        ECS::ComponentTypeId m_componentId = 0;
+        std::string m_propertyPath;
+        std::vector<Entry> m_entries;
+        ApplyFn m_applyFn;
+    };
+
+    // ========================================================================
     // Tile Paint Command
     // ========================================================================
 
@@ -293,12 +381,50 @@ namespace Editor {
         void RecordEntityDeletion(EntityId entityId);
         bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command.
 
+        // Property edit API
+        void BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& oldValue);
+        void EndPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
+            ComponentPropertyCommand::ApplyFn applyFn);
+
+        // Batch property edit API (for multi-select)
+        void BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath);
+        void EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
+            ComponentPropertyCommand::ApplyFn applyFn);
+
+        void RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
+            const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn);
+
+        // Property-level tracking to avoid double-undo with snapshot system
+        bool ConsumePropertyEditEmission();
+
     private:
         ECS::World* m_world = nullptr;
         size_t m_maxStackSize = 50;
 
         std::deque<std::unique_ptr<ICommand>> m_undoStack;
         std::deque<std::unique_ptr<ICommand>> m_redoStack;
+
+        bool m_propertyEditEmitted = false;
+
+        struct PropertyKey {
+            EntityId Entity;
+            ECS::ComponentTypeId Component;
+            std::string Property;
+            bool operator==(const PropertyKey& other) const {
+                return Entity == other.Entity && Component == other.Component && Property == other.Property;
+            }
+        };
+
+        struct PropertyKeyHasher {
+            size_t operator()(const PropertyKey& k) const {
+                size_t h1 = std::hash<uint32_t>{}(k.Entity);
+                size_t h2 = std::hash<uint32_t>{}(k.Component);
+                size_t h3 = std::hash<std::string>{}(k.Property);
+                return ((h1 * 1315423911u) ^ (h2 << 5)) ^ h3;
+            }
+        };
+
+        std::unordered_map<PropertyKey, nlohmann::json, PropertyKeyHasher> m_activePropertyEdits;
 
         // Maintain redo stack when clearing old undo entries
         void TrimUndoStack();

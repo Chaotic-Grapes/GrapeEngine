@@ -18,6 +18,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Scenes {
     ECS::Entity Scene::CreateEntityOnLayer(const uint16_t layerId, const std::optional<ECS::Entity> parent) {
         const ECS::Entity e = m_world.Create();
+
+		// Set Active by default so new entities are enabled
+        // User can disable after creation if desired
+        m_world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
         if (parent.has_value() && m_world.IsAlive(parent.value())) {
             m_world.Attach(e, parent.value());
         }

@@ -193,6 +193,17 @@ namespace Editor {
          */
         void RequestPick(float screenX, float screenY, ECS::RendererSystem* rendererSystem);
 
+        /**
+         * @brief Set a fallback entity ID to use if the next pick returns no result
+         *
+         * If the subsequent RequestPick finds no entity at the given screen position,
+         * the provided entity ID will be used as the pick result instead of returning
+         * an empty/invalid pick.
+         *
+         * @param entityId Entity ID to fall back to on a failed pick
+         */
+        void SetNextPickFallback(uint32_t entityId);
+
         // ====================================================================
         // Event Callbacks
         // ====================================================================
@@ -234,6 +245,7 @@ namespace Editor {
         // Interaction state
         uint32_t m_selectedEntityId = 0;
         uint32_t m_pendingPickRequestId = 0;  // 0 = no pending request
+        uint32_t m_nextPickFallbackId = ECS::Entity::NPOS32;
 
         /**
          * @brief Handle a completed pick result

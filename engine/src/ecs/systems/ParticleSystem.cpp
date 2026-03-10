@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/ParticleSystem.h"
 #include "ecs/Components.h"
+#include "graphics/shader.hpp"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
 #include "Core/World/TileMap.hpp"
@@ -213,12 +214,17 @@ namespace ECS {
                     }
                 }
 
+                uint16_t layerId = 0;
+                if (world.Has<Components::Layer>(entity))
+                    layerId = world.Get<Components::Layer>(entity).Id;
+
                 // Update render data
                 m_renderData[id] = EmitterRenderData{
                     gpu.vao,
                     gpu.aliveCount,
                     emitter.textureId,
-                    emitter.particleSize
+                    emitter.particleSize,
+                    layerId
                 };
 #endif
             });
@@ -443,4 +449,71 @@ namespace ECS {
 #endif
     }
 
+    void ParticleSystem::DrawEmittersByLayer(uint16_t layerId, Shader& shader,
+        const glm::mat4& viewProj,
+        Graphics::LightManager& lights, World& world) {
+        (void)viewProj;  // set by caller before this call
+        (void)lights;    // bound by caller before this call
+
+        for (const auto& [entityId, emitter] : m_renderData) {
+            if (emitter.layerId != layerId) continue;
+            if (emitter.aliveCount <= 0 || emitter.vao == 0) continue;
+
+            shader.setUniform("uParticleSize", emitter.particleSize);
+
+            // Material2D gate — same opt-in as sprites
+            ECS::Entity e{ entityId };
+            bool hasMaterial = world.Has<Components::Material2D>(e);
+
+            if (hasMaterial) {
+                const auto& mat = world.Get<Components::Material2D>(e);
+                shader.setUniform("uLightingEnabled", 1);
+                shader.setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
+                shader.setUniform("uMetallic", mat.Metallic);
+                shader.setUniform("uSmoothness", mat.Smoothness);
+                shader.setUniform("uAOStrength", mat.AOStrength);
+                shader.setUniform("uNormalStrength", mat.NormalStrength);
+
+                if (mat.NormalTextureId != 0) {
+                    shader.setUniform("uHasNormalMap", 1);
+                    shader.setUniform("uNormalMap", 1);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
+                }
+                else {
+                    shader.setUniform("uHasNormalMap", 0);
+                }
+
+                if (mat.MRA_TextureId != 0) {
+                    shader.setUniform("uHasMRAMap", 1);
+                    shader.setUniform("uMRAMap", 2);
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
+                }
+                else {
+                    shader.setUniform("uHasMRAMap", 0);
+                }
+            }
+            else {
+                shader.setUniform("uLightingEnabled", 0);
+                shader.setUniform("uMaterialFlags", 0);
+                shader.setUniform("uHasNormalMap", 0);
+                shader.setUniform("uHasMRAMap", 0);
+            }
+
+            if (emitter.textureId != 0) {
+                shader.setUniform("uHasTexture", 1);
+                shader.setUniform("uTexture", 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, emitter.textureId);
+            }
+            else {
+                shader.setUniform("uHasTexture", 0);
+            }
+
+            glBindVertexArray(emitter.vao);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
+            glBindVertexArray(0);
+        }
+    }
 } // namespace ECS

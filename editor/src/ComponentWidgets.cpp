@@ -19,6 +19,12 @@ so both entities and prefab files use the same UI drawing path.
 #include <imgui.h>
 #include <algorithm>
 #include <unordered_map>
+#include <memory>
+#include "UndoSystem.h"
+#include "ecs/World.h"
+#include "ecs/Entity.h"
+#include "ecs/ComponentRegistry.h"
+#include "serialization/EntitySerializer.h"
 
 namespace EditorUI {
 
@@ -32,8 +38,13 @@ namespace EditorUI {
     static std::string s_propertyFilterLower;              // Lowercase filter for property row matching
     static std::unordered_map<const nlohmann::json*, const nlohmann::json*> s_defaultScopeMap; // Maps data to defaults
     static ImFont* s_symbolsFont = nullptr;                // Symbols font for icon-only buttons
+    static const std::unordered_set<EntityId>* s_selectedEntities = nullptr; // For multi-select support
 
     static const char* kResetIcon = EditorIcons::Reset;
+
+    // Forward declarations for helpers used before their definitions.
+    static const nlohmann::json* _findDefaultsFor(const nlohmann::json& data);
+    static bool _renderResetButton(const std::string& id);
 
     // Strips "##" suffixes so visible labels don't show internal IDs
     static std::string _displayLabel(const std::string& label) {
@@ -85,6 +96,299 @@ namespace EditorUI {
                 const nlohmann::json& childDefaults = defaults[i];
                 if (child.is_object() || child.is_array()) {
                     _registerDefaultsRecursive(child, childDefaults);
+                }
+            }
+        }
+    }
+
+    void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min, float max,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        float value = data.value(key, 0.0f);
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+
+        ImGui::SetNextItemWidth(90.0f);
+        
+        const std::string itemId = "##" + label;
+        if (ImGui::DragFloat(itemId.c_str(), &value, dragSpeed, min, max, "%.2f")) {
+            data[key] = value;
+        }
+
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !propertyPath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath);
+                } else {
+                    nlohmann::json oldVal = data.contains(key) ? data[key] : nlohmann::json(0.0f);
+                    undo->BeginPropertyEdit(entityId, componentTypeId, propertyPath, oldVal);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isMultiSelect) {
+                // Real-time update for all selected entities during drag
+                nlohmann::json newVal = value;
+                for (EntityId id : *s_selectedEntities) {
+                    if (id == entityId) continue; // Skip primary, already updated via data[key]
+                    ECS::Entity other = world->Resolve(id);
+                    if (world->IsAlive(other)) {
+                        applyFn(worldPtr, id, componentTypeId, propertyPath, newVal);
+                    }
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = data.contains(key) ? data[key] : nlohmann::json(value);
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
+        if (!fieldLabel.empty()) {
+            ImGui::SameLine();
+            ImGui::Text("%s", fieldLabel.c_str());
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(key) && (*defaults)[key].is_number()) {
+                const float defaultValue = (*defaults)[key].get<float>();
+                if (value != defaultValue && _renderResetButton(label)) {
+                    data[key] = defaultValue;
+                }
+            }
+        }
+    }
+
+    void RenderVector2DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, float dragSpeed,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& basePath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+
+        float x = data.value(xKey, 0.0f);
+        float y = data.value(yKey, 0.0f);
+
+        const float fieldWidth = 90.0f;
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset);
+        ImGui::Text("X");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + axisLabelWidth + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(fieldWidth);
+        if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed, 0, 0, "%.2f")) {
+            data[xKey] = x;
+        }
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !basePath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + ".X");
+                } else {
+                    nlohmann::json oldVal = data.contains(xKey) ? data[xKey] : nlohmann::json(0.0f);
+                    undo->BeginPropertyEdit(entityId, componentTypeId, basePath + ".X", oldVal);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isMultiSelect) {
+                nlohmann::json newVal = x;
+                for (EntityId id : *s_selectedEntities) {
+                    if (id == entityId) continue;
+                    ECS::Entity other = world->Resolve(id);
+                    if (world->IsAlive(other)) applyFn(worldPtr, id, componentTypeId, basePath + ".X", newVal);
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = data.contains(xKey) ? data[xKey] : nlohmann::json(x);
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + ".X", newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, basePath + ".X", newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
+        float yStartX = valueStartOffset + axisLabelWidth + FIELD_LABEL_GAP + fieldWidth + FIELD_GAP;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(yStartX);
+        ImGui::Text("Y");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(yStartX + axisLabelWidth + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(fieldWidth);
+        if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed, 0, 0, "%.2f")) {
+            data[yKey] = y;
+        }
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !basePath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + ".Y");
+                } else {
+                    nlohmann::json oldVal = data.contains(yKey) ? data[yKey] : nlohmann::json(0.0f);
+                    undo->BeginPropertyEdit(entityId, componentTypeId, basePath + ".Y", oldVal);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isMultiSelect) {
+                nlohmann::json newVal = y;
+                for (EntityId id : *s_selectedEntities) {
+                    if (id == entityId) continue;
+                    ECS::Entity other = world->Resolve(id);
+                    if (world->IsAlive(other)) applyFn(worldPtr, id, componentTypeId, basePath + ".Y", newVal);
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = data.contains(yKey) ? data[yKey] : nlohmann::json(y);
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + ".Y", newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, basePath + ".Y", newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(xKey) && defaults->contains(yKey)) {
+                const float defaultX = (*defaults)[xKey].get<float>();
+                const float defaultY = (*defaults)[yKey].get<float>();
+                if ((x != defaultX || y != defaultY) && _renderResetButton(label)) {
+                    data[xKey] = defaultX;
+                    data[yKey] = defaultY;
+                }
+            }
+        }
+    }
+
+    void RenderVector3DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey, float dragSpeed,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& basePath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+
+        float vals[3] = { data.value(xKey, 0.0f), data.value(yKey, 0.0f), data.value(zKey, 0.0f) };
+        const float fieldWidth = 90.0f;
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+        const char* labels[3] = { "X", "Y", "Z" };
+        const std::string keys[3] = { xKey, yKey, zKey };
+        const std::string axisSuffix[3] = { ".X", ".Y", ".Z" };
+
+        for (int i = 0; i < 3; i++) {
+            float startX = valueStartOffset + i * (axisLabelWidth + FIELD_LABEL_GAP + fieldWidth + FIELD_GAP);
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX);
+            ImGui::Text("%s", labels[i]);
+
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX + axisLabelWidth + FIELD_LABEL_GAP);
+            ImGui::SetNextItemWidth(fieldWidth);
+            if (ImGui::DragFloat(("##" + label + labels[i]).c_str(), &vals[i], dragSpeed, 0, 0, "%.2f"))
+                data[keys[i]] = vals[i];
+
+            if (undoSystemPtr && worldPtr && componentTypeId != 0 && !basePath.empty()) {
+                auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+                auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+                bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+                if (ImGui::IsItemActivated()) {
+                    if (isMultiSelect) {
+                        undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + axisSuffix[i]);
+                    } else {
+                        nlohmann::json oldVal = data.contains(keys[i]) ? data[keys[i]] : nlohmann::json(0.0f);
+                        undo->BeginPropertyEdit(entityId, componentTypeId, basePath + axisSuffix[i], oldVal);
+                    }
+                }
+
+                if (ImGui::IsItemActive() && isMultiSelect) {
+                    nlohmann::json newVal = vals[i];
+                    for (EntityId id : *s_selectedEntities) {
+                        if (id == entityId) continue;
+                        ECS::Entity other = world->Resolve(id);
+                        if (world->IsAlive(other)) applyFn(worldPtr, id, componentTypeId, basePath + axisSuffix[i], newVal);
+                    }
+                }
+
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    nlohmann::json newVal = data.contains(keys[i]) ? data[keys[i]] : nlohmann::json(vals[i]);
+                    if (isMultiSelect) {
+                        undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath + axisSuffix[i], newVal,
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                            });
+                    } else {
+                        undo->EndPropertyEdit(entityId, componentTypeId, basePath + axisSuffix[i], newVal,
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                            });
+                    }
+                }
+            }
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(xKey) && defaults->contains(yKey) && defaults->contains(zKey)) {
+                const float defaultX = (*defaults)[xKey].get<float>();
+                const float defaultY = (*defaults)[yKey].get<float>();
+                const float defaultZ = (*defaults)[zKey].get<float>();
+                if ((vals[0] != defaultX || vals[1] != defaultY || vals[2] != defaultZ) && _renderResetButton(label)) {
+                    data[xKey] = defaultX;
+                    data[yKey] = defaultY;
+                    data[zKey] = defaultZ;
                 }
             }
         }
@@ -172,6 +476,10 @@ namespace EditorUI {
     // Sets the symbols font used for icon-only buttons in property rows
     void SetSymbolsFont(ImFont* symbolsFont) {
         s_symbolsFont = symbolsFont;
+    }
+
+    void SetSelectedEntities(const std::unordered_set<EntityId>* entities) {
+        s_selectedEntities = entities;
     }
 
     // Registers default values for the active component UI render
@@ -561,6 +869,95 @@ namespace EditorUI {
         }
     }
 
+    void RenderColorProperty(const std::string& label, nlohmann::json& colorData,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& basePath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(colorData);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+
+        float col[4] = {
+            colorData.value("R", 1.0f),
+            colorData.value("G", 1.0f),
+            colorData.value("B", 1.0f),
+            colorData.value("A", 1.0f)
+        };
+
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + axisLabelWidth + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::ColorEdit4(("##" + label).c_str(), col,
+            ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
+            ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel |
+            ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float))
+        {
+            colorData["R"] = col[0];
+            colorData["G"] = col[1];
+            colorData["B"] = col[2];
+            colorData["A"] = col[3];
+        }
+
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !basePath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath);
+                } else {
+                    nlohmann::json oldVal = colorData;
+                    undo->BeginPropertyEdit(entityId, componentTypeId, basePath, oldVal);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isMultiSelect) {
+                nlohmann::json newVal = { {"R", col[0]}, {"G", col[1]}, {"B", col[2]}, {"A", col[3]} };
+                for (EntityId id : *s_selectedEntities) {
+                    if (id == entityId) continue;
+                    ECS::Entity other = world->Resolve(id);
+                    if (world->IsAlive(other)) applyFn(worldPtr, id, componentTypeId, basePath, newVal);
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = { {"R", col[0]}, {"G", col[1]}, {"B", col[2]}, {"A", col[3]} };
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, basePath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, basePath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(colorData)) {
+            if (defaults->contains("R") && defaults->contains("G") && defaults->contains("B") && defaults->contains("A")) {
+                const float defaultR = (*defaults)["R"].get<float>();
+                const float defaultG = (*defaults)["G"].get<float>();
+                const float defaultB = (*defaults)["B"].get<float>();
+                const float defaultA = (*defaults)["A"].get<float>();
+                if ((col[0] != defaultR || col[1] != defaultG || col[2] != defaultB || col[3] != defaultA) &&
+                    _renderResetButton(label)) {
+                    colorData["R"] = defaultR;
+                    colorData["G"] = defaultG;
+                    colorData["B"] = defaultB;
+                    colorData["A"] = defaultA;
+                }
+            }
+        }
+    }
+
     void RenderColorRow(const std::string& label, nlohmann::json& colorData) {
         RenderColorProperty(label, colorData);
     }
@@ -602,6 +999,67 @@ namespace EditorUI {
         }
     }
 
+    void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        std::string value = data.value(key, std::string());
+        char buf[128];
+        strncpy_s(buf, value.c_str(), sizeof(buf) - 1);
+
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(180.0f);
+        if (ImGui::InputText(("##" + key).c_str(), buf, sizeof(buf))) {
+            data[key] = std::string(buf);
+        }
+
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !propertyPath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath);
+                } else {
+                    nlohmann::json oldVal = data.contains(key) ? data[key] : nlohmann::json(std::string());
+                    undo->BeginPropertyEdit(entityId, componentTypeId, propertyPath, oldVal);
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = data.contains(key) ? data[key] : nlohmann::json(std::string(buf));
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(key) && (*defaults)[key].is_string()) {
+                const std::string defaultValue = (*defaults)[key].get<std::string>();
+                if (data.value(key, std::string()) != defaultValue && _renderResetButton(label)) {
+                    data[key] = defaultValue;
+                }
+            }
+        }
+    }
+
     // Renders an integer property using a drag control
     // Reads the integer from JSON, lets the user drag to adjust it and writes the new value back when changed
     void RenderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key) {
@@ -622,6 +1080,72 @@ namespace EditorUI {
             data[key] = value;
 
         // Add a reset button when defaults exist and the value changed
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(key) && (*defaults)[key].is_number_integer()) {
+                const int defaultValue = (*defaults)[key].get<int>();
+                if (value != defaultValue && _renderResetButton(label)) {
+                    data[key] = defaultValue;
+                }
+            }
+        }
+    }
+
+    void RenderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        int value = data.value(key, 0);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(90.0f);
+        if (ImGui::DragInt(("##" + label).c_str(), &value))
+            data[key] = value;
+
+        if (undoSystemPtr && worldPtr && componentTypeId != 0 && !propertyPath.empty()) {
+            auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+            bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+            if (ImGui::IsItemActivated()) {
+                if (isMultiSelect) {
+                    undo->BeginBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath);
+                } else {
+                    nlohmann::json oldVal = data.contains(key) ? data[key] : nlohmann::json(0);
+                    undo->BeginPropertyEdit(entityId, componentTypeId, propertyPath, oldVal);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isMultiSelect) {
+                nlohmann::json newVal = value;
+                for (EntityId id : *s_selectedEntities) {
+                    if (id == entityId) continue;
+                    ECS::Entity other = world->Resolve(id);
+                    if (world->IsAlive(other)) applyFn(worldPtr, id, componentTypeId, propertyPath, newVal);
+                }
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                nlohmann::json newVal = data.contains(key) ? data[key] : nlohmann::json(value);
+                if (isMultiSelect) {
+                    undo->EndBatchPropertyEdit(*s_selectedEntities, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                } else {
+                    undo->EndPropertyEdit(entityId, componentTypeId, propertyPath, newVal,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid, const std::string& path, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, path, v);
+                        });
+                }
+            }
+        }
+
         if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
             if (defaults->contains(key) && (*defaults)[key].is_number_integer()) {
                 const int defaultValue = (*defaults)[key].get<int>();
@@ -734,6 +1258,105 @@ namespace EditorUI {
         }
     }
 
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
+        const std::string& key, const std::vector<std::string>& bitNames,
+        uint32_t defaultMask,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        uint32_t mask = data.value(key, defaultMask);
+
+        const size_t rawCount = bitNames.size();
+        const int bitCount = static_cast<int>(std::min<size_t>(32, rawCount));
+        const uint32_t allMask = (bitCount <= 0) ? 0u
+            : (bitCount >= 32 ? 0xFFFFFFFFu : ((1u << bitCount) - 1u));
+
+        int selectedCount = 0;
+        for (int i = 0; i < bitCount; ++i) {
+            if (mask & (1u << i)) ++selectedCount;
+        }
+
+        std::string summary;
+        if (bitCount <= 0) summary = std::to_string(mask);
+        else if (selectedCount == 0) summary = "None";
+        else if (mask == allMask) summary = "All";
+        else summary = std::to_string(selectedCount) + " of " + std::to_string(bitCount);
+
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(220.0f);
+
+        bool changed = false;
+        if (ImGui::BeginCombo(("##" + label).c_str(), summary.c_str())) {
+            if (bitCount > 0) {
+                if (ImGui::SmallButton("All")) {
+                    uint32_t oldMask = mask;
+                    mask = allMask;
+                    changed = true;
+                    if (undoSystemPtr) {
+                        reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
+                            entityId, componentTypeId, propertyPath,
+                            oldMask, mask,
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                            }
+                        );
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("None")) {
+                    uint32_t oldMask = mask;
+                    mask = 0u;
+                    changed = true;
+                    if (undoSystemPtr) {
+                        reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
+                            entityId, componentTypeId, propertyPath,
+                            oldMask, mask,
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                            }
+                        );
+                    }
+                }
+                ImGui::Separator();
+
+                for (int i = 0; i < bitCount; ++i) {
+                    bool isSet = (mask & (1u << i)) != 0;
+                    std::string entryLabel = bitNames[i].empty() ? ("Bit " + std::to_string(i)) : bitNames[i];
+                    if (ImGui::Checkbox((entryLabel + "##" + label + std::to_string(i)).c_str(), &isSet)) {
+                        uint32_t oldMask = mask;
+                        if (isSet) mask |= (1u << i);
+                        else mask &= ~(1u << i);
+                        changed = true;
+                        if (undoSystemPtr) {
+                            reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr)->RecordPropertyChange(
+                                entityId, componentTypeId, propertyPath,
+                                oldMask, mask,
+                                [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                          const std::string& p, const nlohmann::json& v) {
+                                    applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        if (changed || !data.contains(key) || data[key] != mask) {
+            data[key] = mask;
+        }
+    }
+
     // Renders a single checkbox tied directly to a JSON boolean key
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, const std::string& key) {
         if (!_filterAllowsLabel(label)) {
@@ -751,6 +1374,94 @@ namespace EditorUI {
             data[key] = value;
 
         // Add a reset button when defaults exist and the value changed
+        if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
+            if (defaults->contains(key) && (*defaults)[key].is_boolean()) {
+                const bool defaultValue = (*defaults)[key].get<bool>();
+                if (value != defaultValue && _renderResetButton(label)) {
+                    data[key] = defaultValue;
+                }
+            }
+        }
+    }
+
+    void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
+        const std::string& propertyPath,
+        const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
+    {
+        if (!_filterAllowsLabel(label)) {
+            return;
+        }
+        _ensureObject(data);
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        bool value = data.value(key, false);
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+        if (ImGui::Checkbox(("##" + label).c_str(), &value)) {
+            bool oldVal = data.value(key, false);
+            data[key] = value;
+            if (undoSystemPtr && worldPtr && componentTypeId != 0 && !propertyPath.empty()) {
+                auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
+                auto* world = reinterpret_cast<ECS::World*>(worldPtr);
+                bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
+
+                if (isMultiSelect) {
+                    std::vector<Editor::BatchComponentPropertyCommand::Entry> entries;
+
+                    // Resolve component short name from registry so we can locate JSON in the serialized entity.
+                    const auto& metaInfo = ECS::ComponentRegistry::Meta(componentTypeId);
+                    const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
+
+                    for (EntityId id : *s_selectedEntities) {
+                        ECS::Entity other = world->Resolve(id);
+                        if (!world->IsAlive(other)) continue;
+
+                        nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*world, other);
+                        nlohmann::json* dataPtr = nullptr;
+
+                        if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+                            for (auto& comp : entityJson["Components"]) {
+                                if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+                                std::string typeName = comp["TypeName"];
+                                if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                                    if (comp.contains("Data") && comp["Data"].is_object()) {
+                                        dataPtr = &comp["Data"];
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+
+                        nlohmann::json oldValEnt = false;
+                        if (dataPtr && dataPtr->is_object()) {
+                            oldValEnt = dataPtr->contains(key) ? (*dataPtr)[key] : nlohmann::json(false);
+                        }
+
+                        entries.push_back({ id, oldValEnt, nlohmann::json(value) });
+                    }
+
+                    if (!entries.empty()) {
+                        auto cmd = std::make_unique<Editor::BatchComponentPropertyCommand>(
+                            world, componentTypeId, propertyPath, std::move(entries),
+                            [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                      const std::string& p, const nlohmann::json& v) {
+                                applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                            });
+                        undo->ExecuteCommand(std::move(cmd));
+                    }
+                } else {
+                    undo->RecordPropertyChange(entityId, componentTypeId, propertyPath,
+                        oldVal, value,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                        }
+                    );
+                }
+            }
+        }
+
         if (const nlohmann::json* defaults = _findDefaultsFor(data)) {
             if (defaults->contains(key) && (*defaults)[key].is_boolean()) {
                 const bool defaultValue = (*defaults)[key].get<bool>();

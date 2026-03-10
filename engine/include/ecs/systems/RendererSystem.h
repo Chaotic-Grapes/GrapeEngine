@@ -290,6 +290,7 @@ namespace ECS {
             std::vector<std::shared_ptr<const Tileset>> Tilesets;
             
             glm::vec2 Offset;
+            Entity SourceEntity = NULL_ENTITY; // Editor entity that owns this debug tilemap
         };
 
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);
@@ -380,6 +381,9 @@ namespace ECS {
             uint16_t RenderLayerId = 0;
             bool Visible = true;
             glm::vec2 Origin{ 0.0f, 0.0f };
+
+            ECS::Components::Material2D Material{};
+            bool HasMaterial = false;
         };
 
         std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;
@@ -555,8 +559,17 @@ namespace ECS {
         void RenderBloom(Viewport& vp, float bloomRadius);
         void ToneMap(Viewport& vp);
 
-		void RefreshRuntimeTileMaps(World& world);  // Sync runtime tilemap cache with current world state
-		void SubmitRuntimeTileMaps(int layer);      // Submit tilemaps from runtime cache for rendering in the current layer
+        // Sync runtime tilemap cache with current world state
+        // Prepare runtime data
+		void RefreshRuntimeTileMaps(World& world); 
+
+        // Submit one runtime tilemap when its owning entity is reached in Z-sorted draw order
+        // Draw runtime tilemap per entity
+        void SubmitRuntimeTileMapEntity(Entity entity); 
+
+        // Submit one editor debug tilemap when its owning entity is reached in Z-sorted draw order
+        // Draw editor/debug tilemap per entity
+        void SubmitDebugTileMapEntity(World& world, Entity entity); 
 
         void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
