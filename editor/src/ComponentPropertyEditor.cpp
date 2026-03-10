@@ -2010,8 +2010,16 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
     EditorUI::RenderBitmaskDropdown("Layer Mask##Box", data, "LayerMask", layerNames, 0xFFFFFFFFu);
 
     // Auto-generates or updates a BoxCollider2D (AABB) for the selected entity based on its sprite size.
-    if (ImGui::Button("Generate AABB")) { // Sam
+    if (ImGui::Button("Generate AABB")) { 
         using namespace ECS::Components;
+
+        // Snapshot all components now so we can undo the AABB generation later
+        std::vector<ECS::SerializedComponent> beforeSnapshot;
+        if (m_undo && world && world->IsAlive(entity)) {
+            beforeSnapshot = world->CaptureEntityComponents(entity);
+        }
+        // Tracks whether anything actually changed before recording undo
+        bool changed = false;
         
         // Validate world and entity first to avoid dereferencing invalid pointers
         if (!world) {
@@ -2046,17 +2054,32 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 }
 
                 auto* col = static_cast<BoxCollider2D*>(world->GetRawComponentPtr(entity, colliderId));
+                const Vector2D newHalfExtents{ pixelWidth * 0.5f, pixelHeight * 0.5f };
                 if (col) {
                     // Update the collider's half-extents based on the sprite size
-                    col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+                    if (col->HalfExtents.X != newHalfExtents.X || col->HalfExtents.Y != newHalfExtents.Y) {
+                        col->HalfExtents = newHalfExtents;
+                        changed = true;
+                    }
                 }
                 else {
                     // No collider yet; create and attach a new BoxCollider2D
                     BoxCollider2D newCol;
-                    newCol.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+                    newCol.HalfExtents = newHalfExtents;
                     world->AddComponentById(entity, colliderId, &newCol, sizeof(newCol));
+                    changed = true;
                 }
             }
+        }
+
+        // Only record an undo entry if something actually changed
+        if (changed && m_undo && world && world->IsAlive(entity)) {
+            // Capture post-change state for redo
+            auto afterSnapshot = world->CaptureEntityComponents(entity);
+            // Before/after pair lets undo restore original collider
+            m_undo->ExecuteCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+                world, entity, std::move(beforeSnapshot), std::move(afterSnapshot)
+            ));
         }
     }
 
