@@ -239,6 +239,12 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Clone the entity hierarchy
     ECS::Entity cloned = cloneRecursive(id, originalParentId);
+    if (!cloned.IsNull() && world.IsAlive(cloned)) {
+        if (m_undoSystem) {
+            // Record clone creation so undo removes the full cloned hierarchy
+            m_undoSystem->RecordEntityCreation(cloned.Index);
+        }
+    }
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
