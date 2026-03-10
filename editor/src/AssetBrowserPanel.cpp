@@ -37,6 +37,25 @@ Provides:
 #include "EditorStyle.h"
 #include "EditorIcons.h"
 
+// Only compile this block on Windows
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN  // Strip rarely-used APIs from windows.h to speed up compilation
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX             // Prevent windows.h from defining min/max macros that clash with std::min/max
+#define NOMINMAX
+#endif
+#include <Windows.h>         // Core Win32 API
+#include <shellapi.h>        // Shell functions (ShellExecute, drag-drop, etc.)
+#include <shlobj.h>          // Shell object interfaces (folder dialogs, known paths, etc.)
+#ifdef ERROR                 
+#undef ERROR                 // windows.h defines ERROR as 0, which collides with any enum/symbol named ERROR
+#endif
+#ifdef CreateDirectory
+#undef CreateDirectory       // windows.h macro-ifies CreateDirectory, stomping any class method with that name
+#endif
+#endif
+
 namespace {
     // Lowercase helper for case-insensitive compares
     std::string ToLowerCopy(std::string value) {
@@ -738,6 +757,17 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
         // Capture empty area for right-click create + drop target behavior
         ImGui::InvisibleButton("##EmptySpaceDropTarget", contentAvail);
 
+        // Left-click on remaining empty area clears selection
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            _clearSelection();
+            _notifySelectionChanged();
+
+            // Clear
+            if (m_inspector) {
+                m_inspector->ClearSelection();
+            }
+        }
+
         // Right-click on empty space to create new assets
         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
             ImGui::OpenPopup("AssetContextMenu");
@@ -1162,25 +1192,28 @@ void AssetBrowserPanel::_renderDeleteButton() {
             }
         }
 
+        // Restore style overrides and font state
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+
         if (isSingleSelection && !isFolderSelection) {
-            ImGui::PushFont(m_symbolsFont);
             ImGui::SameLine();
+            ImGui::PushFont(m_symbolsFont);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
             if (ImGui::SmallButton((std::string(EditorIcons::Browse) + "##RevealInExplorer").c_str())) {
                 // Reveal selected file in explorer
                 _openInExplorer(*m_selectedAssets.begin());
             }
+            ImGui::PopStyleColor(4);
             ImGui::PopFont();
-            ImGui::PopStyleColor();
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 ImGui::SetTooltip("Show in Explorer");
             }
         }
-
-        // Restore style overrides and font state
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor(4);
     }
 }
 
@@ -1594,13 +1627,12 @@ bool AssetBrowserPanel::_commitRename(const std::filesystem::directory_entry& en
 
 // Clear selection when clicking empty space
 void AssetBrowserPanel::_selectEmptySpace() {
-    // Click on empty space in parent Asset Browser window to clear everything
-    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
-        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) {
-
+    // Click on empty background in this window/child to clear selection
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
+        && !ImGui::IsAnyItemHovered()) 
+    {
         _clearSelection();
+        _notifySelectionChanged();
 
         // Clear prefab editor if it exists (no need to clear property inspector here)
         if (m_inspector) {
@@ -2257,7 +2289,7 @@ void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
 // Reveal selected asset in Windows Explorer
 void AssetBrowserPanel::_openInExplorer(const std::string& assetPath) {
 #ifdef _WIN32
-    std::filesystem::path targetPath(assetPath);
+    std::filesystem::path targetPath = std::filesystem::absolute(std::filesystem::path(assetPath));
     if (!std::filesystem::exists(targetPath)) {
         // Guard against deleted/moved assets
         m_statusMessage = "Asset not found";
@@ -2265,18 +2297,40 @@ void AssetBrowserPanel::_openInExplorer(const std::string& assetPath) {
         return;
     }
 
-    std::string command;
+    HINSTANCE result = nullptr;
     if (std::filesystem::is_directory(targetPath)) {
-        // Open directory directly
-        command = "explorer \"" + targetPath.string() + "\"";
+        // target is a folder, so open it directly in Explorer as a new window
+        result = ShellExecuteW(nullptr, L"open", targetPath.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     }
     else {
-        // Open parent and pre-select file
-        command = "explorer /select,\"" + targetPath.string() + "\"";
+        // target is a file; we want Explorer to open its parent folder with the file highlighted
+        // SHOpenFolderAndSelectItems does this reliably; the "explorer /select,<path>" approach
+        // breaks on paths with spaces or special characters, so we avoid it
+        PIDLIST_ABSOLUTE pidl = nullptr;
+        const std::wstring targetWide = targetPath.wstring();
+
+        // SHParseDisplayName converts the file path string into a PIDL (shell item identifier),
+        // which is the format SHOpenFolderAndSelectItems requires
+        HRESULT hr = SHParseDisplayName(targetWide.c_str(), nullptr, &pidl, 0, nullptr);
+        if (SUCCEEDED(hr) && pidl) {
+            // Passing 0 items to select means the shell selects the PIDL target itself
+            hr = SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
+            // PIDL was allocated by SHParseDisplayName, caller is responsible for freeing it
+            CoTaskMemFree(pidl);
+
+            if (SUCCEEDED(hr)) {
+                m_statusMessage = "Opened in Explorer";
+                m_statusTimer = 2.0f;
+                return;
+            }
+        }
+
+        // Fallback when shell selection fails
+        const std::wstring params = L"/select,\"" + targetWide + L"\"";
+        result = ShellExecuteW(nullptr, L"open", L"explorer.exe", params.c_str(), nullptr, SW_SHOWNORMAL);
     }
 
-    int result = system(command.c_str());
-    if (result == 0) {
+    if (reinterpret_cast<INT_PTR>(result) > 32) {
         m_statusMessage = "Opened in Explorer";
         m_statusTimer = 2.0f;
     }

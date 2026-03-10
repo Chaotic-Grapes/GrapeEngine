@@ -826,7 +826,7 @@ void InspectorPanel::Render() {
         ImGui::SetNextWindowFocus();
         m_focusOnNextRender = false;
     }
-    ImGui::Begin(windowTitle);
+    ImGui::Begin(windowTitle, nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     // Keyboard shortcuts for common inspector actions
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput) {
@@ -1014,8 +1014,8 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
 // Render all components on an entity using JSON as a temporary editable buffer
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
-    // Footer needs 2 lines: one for button row, one for status message
-    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
+    // Reserve extra footer space so bottom status text remains visible
+    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
 
     // Component/property filter input for the inspector list
     if (m_focusComponentFilter) {
@@ -1636,8 +1636,8 @@ void InspectorPanel::_renderPrefabComponents() {
         ImGui::Dummy(ImVec2(0, 4));
     }
 
-    // Footer needs 2 lines: one for buttons, one for status message
-    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
+    // Reserve extra footer space so bottom status text remains visible
+    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
 
     // Component/property filter input for prefab inspector list
     if (m_focusComponentFilter) {
@@ -2510,15 +2510,21 @@ void InspectorPanel::_applyPrefabHierarchyToEntity(ECS::Entity entity, const nlo
 // Renders the status message bar at the bottom of the inspector
 // Shows short success or error messages that fade out over time
 void InspectorPanel::_renderStatusBar() {
+    ImGui::Separator();
+    const float footerHeight = ImGui::GetFrameHeightWithSpacing() * 1.5f;
+    ImGui::BeginChild("InspectorStatusFooter", ImVec2(0, footerHeight), false,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
     if (m_statusTimer > 0.0f) {
         // Pick color based on whether the message contains "Failed"
-        ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
+        const ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
             ? EditorStyle::DangerText
             : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
-        ImGui::Separator();
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());
 
         // Countdown so the message disappears naturally
         m_statusTimer -= ImGui::GetIO().DeltaTime;
     }
+
+    ImGui::EndChild();
 }
