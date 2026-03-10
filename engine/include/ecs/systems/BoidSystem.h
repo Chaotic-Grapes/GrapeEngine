@@ -35,15 +35,33 @@ namespace ECS {
         void DrawFlocksByLayer(uint16_t layerId, Shader& shader,
             const glm::mat4& viewProj);
 
+        void DrawFlockForEntity(uint32_t entityIndex, Shader& shader);
+
         // ----------------------------------------------------------------
         // Render data — read by RendererSystem each frame
         // ----------------------------------------------------------------
         struct FlockRenderData {
-            GLuint   vao = 0;      // VAO with quad mesh + instanced attributes
-            int      count = 0;      // number of active boids
-            uint32_t textureId = 0;      // sprite texture for this flock
-            float    boidSize = 0.3f;   // world-space size per boid
+            GLuint   vao = 0;
+            int      count = 0;
+            float    boidSize = 1.0f;
             uint16_t layerId = 0;
+            int      zOrder = 0;
+
+            // From SpriteRenderer2D
+            uint32_t textureId = 0;
+            uint32_t emissiveTexId = 0;
+            float    emissiveStrength = 0.0f;
+            glm::vec4 color = glm::vec4(1.0f);
+
+            // From Material2D (optional — zero means no PBR)
+            uint32_t normalTexId = 0;
+            uint32_t mraTexId = 0;
+            float    metallic = 0.0f;
+            float    smoothness = 0.5f;
+            float    aoStrength = 1.0f;
+            float    normalStrength = 1.0f;
+            uint32_t materialFlags = 0;
+            bool     hasMaterial = false;
         };
 
         const std::unordered_map<uint32_t, FlockRenderData>& GetFlockRenderData() const {
@@ -56,13 +74,18 @@ namespace ECS {
     private:
         // Per-flock GPU state
         struct FlockGPUData {
-            GLuint   instanceVBO = 0;     // GL VBO: float4 per boid (pos.xy, vel.xy)
-            GLuint   quadVBO = 0;     // unit quad vertices
-            GLuint   vao = 0;     // VAO binding quad + instance data
+            GLuint   instanceVBO[2] = { 0, 0 };
+            GLuint   quadVBO = 0;
+            GLuint   vao[2] = { 0, 0 };
 #ifdef GRAPE_HAS_CUDA
-            cudaGraphicsResource_t cudaVBO = nullptr;  // CUDA handle for instanceVBO
-            float4* d_prevPosVel = nullptr;  // previous frame (CUDA-only buffer)
+            cudaGraphicsResource_t cudaVBO[2] = { nullptr, nullptr };
+            cudaStream_t           stream = nullptr;
+            uint32_t* d_cellIds = nullptr;  // cell id per boid
+            uint32_t* d_boidIds = nullptr;  // boid indices sorted by cell
+            uint32_t* d_cellStart = nullptr;  // start index per cell
+            int       hashTableSize = 0;
 #endif
+            uint8_t  bufferIndex = 0;
             int      count = 0;
             bool     initialized = false;
         };
@@ -83,7 +106,7 @@ namespace ECS {
 
         void InitFlock(uint32_t entityIndex, int count);
         void DestroyFlock(uint32_t entityIndex);
-        void CreateQuadVAO(FlockGPUData& gpu, int boidCount);
+        void CreateQuadVAO(FlockGPUData& gpu, int slot);
     };
 
 } // namespace ECS

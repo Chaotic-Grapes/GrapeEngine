@@ -5133,31 +5133,6 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
 
     EditorUI::RenderFloatRow("Boid Size", "", data, "boidSize", 0.01f, 0.0f, 100.0f);
 
-    // Texture drag-drop (like SpriteRenderer2D)
-    std::string texPath = data.value("TexturePath", "");
-    std::string label = texPath.empty()
-        ? "None (drag texture here)"
-        : std::filesystem::path(texPath).filename().string();
-
-    EditorUI::RenderStaticValueRow("Texture", label, texPath.empty());
-
-    HandleAssetDragDropTarget(kImageExtensions,
-        [&](const std::string& droppedPath)
-        {
-            auto tex = RM.Get<Texture>(droppedPath);
-            if (tex)
-            {
-                data["TexturePath"] = droppedPath;
-                data["textureId"] = static_cast<uint32_t>(tex->ID());
-                return true;
-            }
-            return false;
-        },
-        [&](const std::string& rejectedPath)
-        {
-            QueueAssetDropError(rejectedPath, kImageExtensions);
-        });
-
     EditorUI::EndPropertySection();
 }
 
@@ -5206,7 +5181,7 @@ void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity
     if (!data.contains("rotationSpeedMax"))  data["rotationSpeedMax"] = 0.0f;
 
     EditorUI::BeginPropertySection({
-        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active", "Texture",
+        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active",
         "Speed Min", "Speed Max", "Gravity X", "Gravity Y", "Drag", "Turbulence",
         "Wobble Frequency", "Wobble Amplitude", "Size Start", "Size End",
         "Lifetime Min", "Lifetime Max", "Emission Angle", "Emission Spread",

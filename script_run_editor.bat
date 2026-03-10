@@ -1,6 +1,6 @@
 @echo off
 set CONFIG=%1
-if "%CONFIG%"=="" set CONFIG=Debug
+if "%CONFIG%"=="" set CONFIG=DEBUG
 
 REM Check if build directory exists
 if not exist build (

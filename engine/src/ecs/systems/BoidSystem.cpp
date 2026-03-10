@@ -93,29 +93,74 @@ namespace ECS {
                     it = m_flocks.find(id);
                 }
 
+                // Update render data each frame (texture/size may change in editor)
+                // Read layer
                 uint16_t layerId = 0;
                 if (world.Has<Components::Layer>(entity))
                     layerId = world.Get<Components::Layer>(entity).Id;
 
-                // Update render data each frame (texture/size may change in editor)
-                m_renderData[id] = FlockRenderData{
-                    it->second.vao,
-                    flock.count,
-                    flock.textureId,
-                    flock.boidSize,
-                    layerId
-                };
+                // Read ZIndex
+                int zOrder = 0;
+                if (world.Has<Components::ZIndex2D>(entity))
+                    zOrder = world.Get<Components::ZIndex2D>(entity).ZOrder;
+
+                // Read SpriteRenderer2D for texture + color + emissive
+                FlockRenderData rd{};
+                rd.vao = it->second.vao[1 - it->second.bufferIndex];
+                rd.count = flock.count;
+                rd.boidSize = flock.boidSize;
+                rd.layerId = layerId;
+                rd.zOrder = zOrder;
+
+                if (world.Has<Components::SpriteRenderer2D>(entity)) {
+                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                    rd.textureId = sr.TextureId;
+                    rd.emissiveTexId = sr.EmissiveTextureId;
+                    rd.emissiveStrength = sr.EmissiveStrength;
+                    rd.color = glm::vec4(sr.Color.R, sr.Color.G, sr.Color.B, sr.Color.A);
+                }
+                else {
+                    rd.textureId = 0;
+                    rd.emissiveTexId = 0;
+                    rd.emissiveStrength = 0.0f;
+                    rd.color = glm::vec4(1.0f);
+                }
+
+                // Read Material2D for PBR lighting (optional)
+                if (world.Has<Components::Material2D>(entity)) {
+                    const auto& mat = world.Get<Components::Material2D>(entity);
+                    rd.hasMaterial = true;
+                    rd.normalTexId = mat.NormalTextureId != 0 ? mat.NormalTextureId : 0;
+                    rd.mraTexId = mat.MRA_TextureId;
+                    rd.metallic = mat.Metallic;
+                    rd.smoothness = mat.Smoothness;
+                    rd.aoStrength = mat.AOStrength;
+                    rd.normalStrength = mat.NormalStrength;
+                    rd.materialFlags = mat.Flags;
+                }
+
+                m_renderData[id] = rd;
 
 #ifdef GRAPE_HAS_CUDA
                 // --------------------------------------------------
                 // 2. Run CUDA simulation kernel
                 // --------------------------------------------------
                 FlockGPUData& gpu = it->second;
-                if (!gpu.initialized || !gpu.cudaVBO) return;
+                if (!gpu.initialized) return;
 
-                // Map the GL VBO for CUDA write access
-                float4* d_posVel = CudaGL::Map<float4>(gpu.cudaVBO);
-                if (!d_posVel) return;
+                const uint8_t readIdx = gpu.bufferIndex;        // prev frame's output
+                const uint8_t writeIdx = 1 - gpu.bufferIndex;    // this frame's target
+
+                if (!gpu.cudaVBO[readIdx] || !gpu.cudaVBO[writeIdx]) return;
+
+                const float4* d_prev = CudaGL::Map<float4>(gpu.cudaVBO[readIdx]);
+                float4* d_cur = CudaGL::Map<float4>(gpu.cudaVBO[writeIdx]);
+
+                if (!d_prev || !d_cur) {
+                    if (d_prev) CudaGL::Unmap(gpu.cudaVBO[readIdx]);
+                    if (d_cur)  CudaGL::Unmap(gpu.cudaVBO[writeIdx]);
+                    return;
+                }
 
                 // Build kernel params from component
                 BoidParams params{};
@@ -127,8 +172,6 @@ namespace ECS {
                 params.maxForce = flock.maxForce;
                 params.dt = dt;
                 params.count = flock.count;
-
-                // TileMap collision avoidance
                 params.collisionMasks = m_collisionGrid.d_masks;
                 params.collisionWidth = m_collisionGrid.width;
                 params.collisionHeight = m_collisionGrid.height;
@@ -138,33 +181,25 @@ namespace ECS {
                 params.collisionAvoidWeight = flock.collisionAvoidWeight;
                 params.collisionAvoidRadius = flock.collisionAvoidRadius;
                 params.frameCount = (unsigned int)TimeSystem::Instance().GetFrameCount();
-
-                // World bounds — use a generous default for now
-                // TODO: make configurable per flock or derive from camera
                 params.boundsMinX = -500.0f;
                 params.boundsMinY = -500.0f;
                 params.boundsMaxX = 500.0f;
                 params.boundsMaxY = 500.0f;
 
-                LOG_INFO("[BoidSystem] BoidParams collision:"
-                    << " masks=" << (params.collisionMasks ? "valid" : "NULL")
-                    << " w=" << params.collisionWidth
-                    << " h=" << params.collisionHeight
-                    << " originX=" << params.collisionOriginX
-                    << " originY=" << params.collisionOriginY
-                    << " tileSize=" << params.tileSize
-                    << " avoidWeight=" << params.collisionAvoidWeight);
+                // Spatial hashing stuff
+                params.cellSize = flock.visualRange;  // cell = visual range so 3x3 covers all neighbors
+                params.hashTableSize = gpu.hashTableSize;
+                params.d_cellIds = gpu.d_cellIds;
+                params.d_boidIds = gpu.d_boidIds;
+                params.d_cellStart = gpu.d_cellStart;
 
-                // Launch: reads from prev, writes to current
-                CudaBoids::Launch(d_posVel, gpu.d_prevPosVel, params);
+                CudaBoids::Launch(d_cur, d_prev, params, gpu.stream);
 
-                // Copy current -> prev for next frame
-                cudaMemcpy(gpu.d_prevPosVel, d_posVel,
-                    sizeof(float4) * flock.count,
-                    cudaMemcpyDeviceToDevice);
+                CudaGL::Unmap(gpu.cudaVBO[readIdx]);
+                CudaGL::Unmap(gpu.cudaVBO[writeIdx]);
 
-                // Unmap so OpenGL can use the VBO for rendering
-                CudaGL::Unmap(gpu.cudaVBO);
+                // Flip — no memcpy, just a bit toggle
+                gpu.bufferIndex = writeIdx;
 #endif
             });
 
@@ -186,16 +221,19 @@ namespace ECS {
         for (auto& [id, gpu] : m_flocks)
         {
 #ifdef GRAPE_HAS_CUDA
-            if (gpu.cudaVBO)
-                CudaGL::UnregisterBuffer(gpu.cudaVBO);
+            for (int i = 0; i < 2; ++i)
+                if (gpu.cudaVBO[i]) CudaGL::UnregisterBuffer(gpu.cudaVBO[i]);
+            if (gpu.stream)      cudaStreamDestroy(gpu.stream);
 
-            if (gpu.d_prevPosVel)
-                cudaFree(gpu.d_prevPosVel);
+            if (gpu.d_cellIds)   cudaFree(gpu.d_cellIds);
+            if (gpu.d_boidIds)   cudaFree(gpu.d_boidIds);
+            if (gpu.d_cellStart) cudaFree(gpu.d_cellStart);
 #endif
-
-            if (gpu.vao) glDeleteVertexArrays(1, &gpu.vao);
+            for (int i = 0; i < 2; ++i) {
+                if (gpu.vao[i])         glDeleteVertexArrays(1, &gpu.vao[i]);
+                if (gpu.instanceVBO[i]) glDeleteBuffers(1, &gpu.instanceVBO[i]);
+            }
             if (gpu.quadVBO) glDeleteBuffers(1, &gpu.quadVBO);
-            if (gpu.instanceVBO) glDeleteBuffers(1, &gpu.instanceVBO);
         }
 
 #ifdef GRAPE_HAS_CUDA
@@ -218,41 +256,73 @@ namespace ECS {
 
         FlockGPUData gpu{};
         gpu.count = count;
+        gpu.bufferIndex = 0;
 
-        // Create the OpenGL instance VBO (float4 per boid: pos.xy, vel.xy)
-        glGenBuffers(1, &gpu.instanceVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER,
-            sizeof(float) * 4 * count,
-            nullptr,
-            GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        for (int i = 0; i < 2; ++i) {
+            glGenBuffers(1, &gpu.instanceVBO[i]);
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO[i]);
+            glBufferData(GL_ARRAY_BUFFER,
+                sizeof(float4) * count,
+                nullptr,
+                GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 #ifdef GRAPE_HAS_CUDA
-        // Register VBO with CUDA
-        gpu.cudaVBO = CudaGL::RegisterBuffer(gpu.instanceVBO);
+            gpu.cudaVBO[i] = CudaGL::RegisterBuffer(gpu.instanceVBO[i]);
+#endif
+        }
 
-        // Allocate CUDA-only "previous frame" buffer
-        cudaMalloc(&gpu.d_prevPosVel, sizeof(float4) * count);
+#ifdef GRAPE_HAS_CUDA
+        cudaStreamCreate(&gpu.stream);
+        // Pick a prime just larger than count for good hash distribution
 
-        // Initialize boid positions randomly
-        float4* d_posVel = CudaGL::Map<float4>(gpu.cudaVBO);
+        gpu.hashTableSize = (count <= 1000) ? 2003 :
+            (count <= 10000) ? 20011 :
+            (count <= 50000) ? 50021 :
+            (count <= 100000) ? 100003 :
+            (count <= 200000) ? 200003 :
+            (count <= 500000) ? 500009 :
+            (count <= 1000000) ? 1000003 :
+            2000003;
+
+        cudaMalloc(&gpu.d_cellIds, sizeof(uint32_t) * count);
+        cudaMalloc(&gpu.d_boidIds, sizeof(uint32_t) * count);
+        cudaMalloc(&gpu.d_cellStart, sizeof(uint32_t) * gpu.hashTableSize);
+#endif
+
+#ifdef GRAPE_HAS_CUDA
+        // Initialize boid positions into buffer 0
+        float4* d_posVel = CudaGL::Map<float4>(gpu.cudaVBO[0]);
         if (d_posVel) {
             CudaBoids::InitRandom(d_posVel, count,
                 -200.0f, -200.0f,
                 200.0f, 200.0f,
                 100.0f,
-                entityIndex);
-            // Copy initial state to prev buffer
-            cudaMemcpy(gpu.d_prevPosVel, d_posVel,
-                sizeof(float4) * count,
-                cudaMemcpyDeviceToDevice);
-            CudaGL::Unmap(gpu.cudaVBO);
+                entityIndex,
+                m_collisionGrid.d_masks,
+                m_collisionGrid.width,
+                m_collisionGrid.height,
+                m_collisionGrid.originX,
+                m_collisionGrid.originY,
+                m_collisionGrid.tileSize);
+            CudaGL::Unmap(gpu.cudaVBO[0]);
+        }
+
+        // Copy buffer 0 -> buffer 1 so prev is also initialized
+        // (only needed at init, not every frame)
+        {
+            float4* src = CudaGL::Map<float4>(gpu.cudaVBO[0]);
+            float4* dst = CudaGL::Map<float4>(gpu.cudaVBO[1]);
+            if (src && dst)
+                cudaMemcpy(dst, src, sizeof(float4) * count, cudaMemcpyDeviceToDevice);
+            CudaGL::Unmap(gpu.cudaVBO[0]);
+            CudaGL::Unmap(gpu.cudaVBO[1]);
         }
 #endif
 
-        // Create the VAO that binds the unit quad + instance data
-        CreateQuadVAO(gpu, count);
+        // Create one VAO per buffer
+        CreateQuadVAO(gpu, 0);
+        CreateQuadVAO(gpu, 1);
 
         gpu.initialized = true;
         m_flocks[entityIndex] = gpu;
@@ -268,62 +338,65 @@ namespace ECS {
         FlockGPUData& gpu = it->second;
 
 #ifdef GRAPE_HAS_CUDA
-        if (gpu.cudaVBO) {
-            CudaGL::UnregisterBuffer(gpu.cudaVBO);
-            gpu.cudaVBO = nullptr;
+        for (int i = 0; i < 2; ++i) {
+            if (gpu.cudaVBO[i]) {
+                CudaGL::UnregisterBuffer(gpu.cudaVBO[i]);
+                gpu.cudaVBO[i] = nullptr;
+            }
         }
-        if (gpu.d_prevPosVel) {
-            cudaFree(gpu.d_prevPosVel);
-            gpu.d_prevPosVel = nullptr;
+        if (gpu.stream) {
+            cudaStreamDestroy(gpu.stream);
+            gpu.stream = nullptr;
         }
+
+        if (gpu.d_cellIds) { cudaFree(gpu.d_cellIds);   gpu.d_cellIds = nullptr; }
+        if (gpu.d_boidIds) { cudaFree(gpu.d_boidIds);   gpu.d_boidIds = nullptr; }
+        if (gpu.d_cellStart) { cudaFree(gpu.d_cellStart); gpu.d_cellStart = nullptr; }
 #endif
 
-        if (gpu.vao) { glDeleteVertexArrays(1, &gpu.vao);   gpu.vao = 0; }
-        if (gpu.quadVBO) { glDeleteBuffers(1, &gpu.quadVBO);    gpu.quadVBO = 0; }
-        if (gpu.instanceVBO) { glDeleteBuffers(1, &gpu.instanceVBO); gpu.instanceVBO = 0; }
+        for (int i = 0; i < 2; ++i) {
+            if (gpu.vao[i]) { glDeleteVertexArrays(1, &gpu.vao[i]);    gpu.vao[i] = 0; }
+            if (gpu.instanceVBO[i]) { glDeleteBuffers(1, &gpu.instanceVBO[i]); gpu.instanceVBO[i] = 0; }
+        }
+        if (gpu.quadVBO) { glDeleteBuffers(1, &gpu.quadVBO); gpu.quadVBO = 0; }
 
         m_flocks.erase(it);
 
         LOG_INFO("[BoidSystem] Destroyed flock for entity " << entityIndex);
     }
 
-    void BoidSystem::CreateQuadVAO(FlockGPUData& gpu, int /*boidCount*/) {
-        // Unit quad: 2 triangles, each vertex has pos(2) + uv(2)
-        // Centered at origin, size 1x1
+    void BoidSystem::CreateQuadVAO(FlockGPUData& gpu, int slot) {
         float quadVertices[] = {
-            // pos.x  pos.y  uv.x  uv.y
             -0.5f, -0.5f,  0.0f, 0.0f,
              0.5f, -0.5f,  1.0f, 0.0f,
              0.5f,  0.5f,  1.0f, 1.0f,
-
             -0.5f, -0.5f,  0.0f, 0.0f,
              0.5f,  0.5f,  1.0f, 1.0f,
             -0.5f,  0.5f,  0.0f, 1.0f,
         };
 
-        glGenVertexArrays(1, &gpu.vao);
-        glBindVertexArray(gpu.vao);
+        glGenVertexArrays(1, &gpu.vao[slot]);
+        glBindVertexArray(gpu.vao[slot]);
 
-        // Quad VBO (per-vertex data)
-        glGenBuffers(1, &gpu.quadVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, gpu.quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+        // Quad VBO is shared between both VAOs
+        if (slot == 0) {
+            glGenBuffers(1, &gpu.quadVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.quadVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+        }
+        else {
+            glBindBuffer(GL_ARRAY_BUFFER, gpu.quadVBO);
+        }
 
-        // layout(location = 0) in vec2 aPos
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-
-        // layout(location = 1) in vec2 aTexCoord
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-        // Instance VBO (per-instance data: float4 = pos.xy, vel.xy)
-        glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO);
-
-        // layout(location = 2) in vec4 aInstancePosVel
+        glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO[slot]);
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glVertexAttribDivisor(2, 1);  // advance once per instance
+        glVertexAttribDivisor(2, 1);
 
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -368,29 +441,132 @@ namespace ECS {
 #endif
     }
 
-    void BoidSystem::DrawFlocksByLayer(uint16_t layerId, Shader& shader,
-        const glm::mat4& viewProj) {
-        for (const auto& [entityId, flock] : m_renderData) {
-            if (flock.layerId != layerId) continue;
-            if (flock.count <= 0 || flock.vao == 0) continue;
+    void BoidSystem::DrawFlocksByLayer(uint16_t layerId, Shader& shader, const glm::mat4& viewProj) {
+        for (const auto& [id, rd] : m_renderData) {
+            if (rd.layerId != layerId) continue;
+            if (rd.count <= 0 || rd.vao == 0) continue;
 
-            shader.setUniform("uBoidSize", flock.boidSize);
+            shader.setUniform("uBoidSize", rd.boidSize);
+            shader.setUniform("uColor", rd.color);
 
-            if (flock.textureId != 0) {
+            // Albedo texture
+            if (rd.textureId != 0) {
                 shader.setUniform("uHasTexture", 1);
                 shader.setUniform("uTexture", 0);
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, flock.textureId);
+                glBindTexture(GL_TEXTURE_2D, rd.textureId);
             }
             else {
                 shader.setUniform("uHasTexture", 0);
             }
 
-            shader.setUniform("uColor", glm::vec4(1.0f));
+            // Emissive
+            shader.setUniform("uEmissiveStrength", rd.emissiveStrength);
+            if (rd.emissiveTexId != 0) {
+                shader.setUniform("uHasEmissive", 1);
+                shader.setUniform("uEmissiveTex", 4);
+                glActiveTexture(GL_TEXTURE4);
+                glBindTexture(GL_TEXTURE_2D, rd.emissiveTexId);
+            }
+            else {
+                shader.setUniform("uHasEmissive", 0);
+            }
 
-            glBindVertexArray(flock.vao);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, flock.count);
+            // Material2D — lighting
+            shader.setUniform("uLightingEnabled", rd.hasMaterial ? 1 : 0);
+            if (rd.hasMaterial) {
+                shader.setUniform("uMetallic", rd.metallic);
+                shader.setUniform("uSmoothness", rd.smoothness);
+                shader.setUniform("uAOStrength", rd.aoStrength);
+                shader.setUniform("uNormalStrength", rd.normalStrength);
+                shader.setUniform("uMaterialFlags", (int)rd.materialFlags);
+
+                if (rd.normalTexId != 0) {
+                    shader.setUniform("uHasNormalMap", 1);
+                    shader.setUniform("uNormalMap", 1);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, rd.normalTexId);
+                }
+                else {
+                    shader.setUniform("uHasNormalMap", 0);
+                }
+
+                if (rd.mraTexId != 0) {
+                    shader.setUniform("uHasMRAMap", 1);
+                    shader.setUniform("uMRAMap", 2);
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, rd.mraTexId);
+                }
+                else {
+                    shader.setUniform("uHasMRAMap", 0);
+                }
+            }
+
+            glBindVertexArray(rd.vao);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, rd.count);
             glBindVertexArray(0);
         }
+    }
+
+    void BoidSystem::DrawFlockForEntity(uint32_t entityIndex, Shader& shader) {
+        auto it = m_renderData.find(entityIndex);
+        if (it == m_renderData.end()) return;
+        const FlockRenderData& rd = it->second;
+        if (rd.count <= 0 || rd.vao == 0) return;
+
+        shader.setUniform("uBoidSize", rd.boidSize);
+        shader.setUniform("uColor", rd.color);
+
+        if (rd.textureId != 0) {
+            shader.setUniform("uHasTexture", 1);
+            shader.setUniform("uTexture", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, rd.textureId);
+        }
+        else {
+            shader.setUniform("uHasTexture", 0);
+        }
+
+        shader.setUniform("uEmissiveStrength", rd.emissiveStrength);
+        if (rd.emissiveTexId != 0) {
+            shader.setUniform("uHasEmissive", 1);
+            shader.setUniform("uEmissiveTex", 4);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, rd.emissiveTexId);
+        }
+        else {
+            shader.setUniform("uHasEmissive", 0);
+        }
+
+        shader.setUniform("uLightingEnabled", rd.hasMaterial ? 1 : 0);
+        if (rd.hasMaterial) {
+            shader.setUniform("uMetallic", rd.metallic);
+            shader.setUniform("uSmoothness", rd.smoothness);
+            shader.setUniform("uAOStrength", rd.aoStrength);
+            shader.setUniform("uNormalStrength", rd.normalStrength);
+            shader.setUniform("uMaterialFlags", (int)rd.materialFlags);
+            if (rd.normalTexId != 0) {
+                shader.setUniform("uHasNormalMap", 1);
+                shader.setUniform("uNormalMap", 1);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, rd.normalTexId);
+            }
+            else {
+                shader.setUniform("uHasNormalMap", 0);
+            }
+            if (rd.mraTexId != 0) {
+                shader.setUniform("uHasMRAMap", 1);
+                shader.setUniform("uMRAMap", 2);
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, rd.mraTexId);
+            }
+            else {
+                shader.setUniform("uHasMRAMap", 0);
+            }
+        }
+
+        glBindVertexArray(rd.vao);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, rd.count);
+        glBindVertexArray(0);
     }
 } // namespace ECS

@@ -441,8 +441,6 @@ namespace ECS {
 		// Custom serialization for BoidFlock
 		inline void to_json(nlohmann::json& j, const BoidFlock& b)
 		{
-			std::string path = ECS::StringTable::Resolve(b.TexturePath);
-
 			j = nlohmann::json{
 				{"count", b.count},
 				{"separationWeight", b.separationWeight},
@@ -453,8 +451,7 @@ namespace ECS {
 				{"maxForce", b.maxForce},
 				{"boidSize", b.boidSize},
 				{"collisionAvoidWeight", b.collisionAvoidWeight},
-				{"collisionAvoidRadius", b.collisionAvoidRadius},
-				{"TexturePath", path}
+				{"collisionAvoidRadius", b.collisionAvoidRadius}
 			};
 		}
 
@@ -473,27 +470,6 @@ namespace ECS {
 			b.maxSpeed = j.value("maxSpeed", 4.0f);
 			b.maxForce = j.value("maxForce", 1.2f);
 			b.boidSize = j.value("boidSize", 1.0f);
-
-			// Texture path
-			std::string path = j.value("TexturePath", std::string());
-			path = NormalizeProjectPathForStorage(path);
-
-			b.TexturePath = path.empty() ? 0 : ECS::StringTable::Intern(path);
-
-			if (!path.empty())
-			{
-				const std::string loadPath = ResolveProjectPathForLoad(path);
-				auto tex = RM.Get<Texture>(loadPath);
-
-				if (tex)
-					b.textureId = static_cast<uint32_t>(tex->ID());
-				else
-					b.textureId = 0;
-			}
-			else
-			{
-				b.textureId = 0;
-			}
 		}
 
 		inline void to_json(nlohmann::json& j, const ParticleEmitter& e)
