@@ -40,6 +40,8 @@ namespace Audio {
         void SetBusVolume(Bus bus, float volume);
         float GetBusVolume(Bus bus) const;
         void FadeBusVolume(Bus bus, float targetVolume, float duration);
+        void SetBusLowPassGain(Bus bus, float gain);
+        float GetBusLowPassGain(Bus bus) const;
 
         void FadeInstance(PlaybackHandle handle, float targetVolume, float duration, bool stopOnComplete);
         void FadeOutAll(float duration);

@@ -371,3 +371,29 @@ INTEROP_API void EngineInterop_Audio_FadeBusVolume(int bus, float targetVolume, 
     }
     Audio::gAudioEngine->FadeBusVolume(static_cast<Audio::Bus>(bus), targetVolume, duration);
 }
+
+/**
+ * @brief Set a mixer bus low-pass gain
+ * @param bus Bus index
+ * @param gain Low-pass gain (1.0 = no filtering, 0.0 = strongest filtering)
+ */
+INTEROP_API void EngineInterop_Audio_SetBusLowPassGain(int bus, float gain) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetBusLowPassGain(static_cast<Audio::Bus>(bus), gain);
+}
+
+/**
+ * @brief Get a mixer bus low-pass gain
+ * @param bus Bus index
+ * @return Current low-pass gain
+ */
+INTEROP_API float EngineInterop_Audio_GetBusLowPassGain(int bus) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+    return Audio::gAudioEngine->GetBusLowPassGain(static_cast<Audio::Bus>(bus));
+}

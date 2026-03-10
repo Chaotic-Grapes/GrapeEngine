@@ -9,8 +9,13 @@
 #include "audio/FmodAudioDevice.h"
 #include "core/Logger.h"
 #include "services/ResourceManager.h"
+#include <cmath>
+#include <fmod_dsp_effects.h>
 
 namespace {
+    constexpr float kMinBusLowPassCutoffHz = 500.0f;
+    constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
+
     // Log FMOD errors and return success/failure.
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
         if (r == FMOD_OK) return true;
@@ -31,6 +36,9 @@ namespace {
 namespace Audio {
 
     bool FmodAudioDevice::Initialize() {
+        m_busGroups.fill(nullptr);
+        m_busLowPassDsps.fill(nullptr);
+
         // Create system and initialize.
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
@@ -42,12 +50,21 @@ namespace Audio {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
+        if (!_initializeBusRouting()) {
+            _shutdownBusRouting();
+            if (m_system) { m_system->close(); m_system->release(); m_system = nullptr; }
+            m_master = nullptr;
+            return false;
+        }
         // Apply cached master volume.
         SetMasterVolume(m_masterVolume);
         return true;
     }
 
     bool FmodAudioDevice::InitializeWithDevice(const std::string& deviceID) {
+        m_busGroups.fill(nullptr);
+        m_busLowPassDsps.fill(nullptr);
+
         // Create FMOD system first.
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
@@ -91,6 +108,12 @@ namespace Audio {
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
+        if (!_initializeBusRouting()) {
+            _shutdownBusRouting();
+            if (m_system) { m_system->close(); m_system->release(); m_system = nullptr; }
+            m_master = nullptr;
+            return false;
+        }
 
         // Apply cached master volume.
         SetMasterVolume(m_masterVolume);
@@ -125,6 +148,8 @@ namespace Audio {
             if (entry.Sound) { entry.Sound->release(); entry.Sound = nullptr; }
         }
         m_cues.clear();
+
+        _shutdownBusRouting();
 
         // Shutdown FMOD.
         if (m_system) {
@@ -179,7 +204,8 @@ namespace Audio {
     }
 
     PlaybackHandle FmodAudioDevice::Play(const std::string& cueId,
-        const PlaySettings& s)
+        const PlaySettings& s,
+        Bus bus)
     {
         const auto it = m_cues.find(cueId);
         if (it == m_cues.end()) return {};
@@ -187,12 +213,17 @@ namespace Audio {
         FMOD::Sound* snd = it->second.Sound;
         if (!snd) return {};
 
+        FMOD::ChannelGroup* targetGroup = _channelGroupForBus(bus);
+        if (!targetGroup) {
+            targetGroup = m_master;
+        }
+
         // Configure looping on the sound.
         snd->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
         snd->setLoopCount(s.Loop ? -1 : 0);
 
         FMOD::Channel* ch = nullptr;
-        if (!FMOD_OK_OR_LOG(m_system->playSound(snd, nullptr, true, &ch), "playSound") || !ch)
+        if (!FMOD_OK_OR_LOG(m_system->playSound(snd, targetGroup, true, &ch), "playSound") || !ch)
             return {};
 
         // Apply channel settings.
@@ -225,14 +256,21 @@ namespace Audio {
 
     PlaybackHandle FmodAudioDevice::PlaySingle(const std::string& cueId,
         const PlaySettings& s,
-        PlayPolicy policy)
+        PlayPolicy policy,
+        Bus bus)
     {
+        FMOD::ChannelGroup* targetGroup = _channelGroupForBus(bus);
+        if (!targetGroup) {
+            targetGroup = m_master;
+        }
+
         if (auto it = m_activeByCue.find(cueId); it != m_activeByCue.end()) {
             if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
                 const bool playing = _is_playing(ch);
                 switch (policy) {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
+                    ch->setChannelGroup(targetGroup);
                     ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
                     if (s.Spatial3D) {
                         // Default falloff tuned for small scenes; adjust if needed.
@@ -248,6 +286,7 @@ namespace Audio {
                 case PlayPolicy::SingleInstanceResume:
                     if (!playing && !s.StartPaused) ch->setPaused(false);
                     if (s.StartPaused) ch->setPaused(true);
+                    ch->setChannelGroup(targetGroup);
                     ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
                     if (s.Spatial3D) {
                         // Default falloff tuned for small scenes; adjust if needed.
@@ -270,7 +309,7 @@ namespace Audio {
                 m_activeByCue.erase(it);
             }
         }
-        auto h = Play(cueId, s);
+        auto h = Play(cueId, s, bus);
         if (h) m_activeByCue[cueId] = h.Id;
         return h;
     }
@@ -308,7 +347,7 @@ namespace Audio {
 
     void FmodAudioDevice::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
         if (auto* ch = _channelFromHandle(handle)) {
-            const float clamped = (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+            const float clamped = _clampLowPassGain(gain);
             FMOD_OK_OR_LOG(ch->setLowPassGain(clamped), "Channel::setLowPassGain");
         }
     }
@@ -327,6 +366,24 @@ namespace Audio {
             return _is_playing(ch);
         }
         return false;
+    }
+
+    void FmodAudioDevice::SetBusLowPassGain(Bus bus, float gain) {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return;
+        }
+
+        m_busLowPassGain[index] = _clampLowPassGain(gain);
+        _applyBusLowPassGain(bus);
+    }
+
+    float FmodAudioDevice::GetBusLowPassGain(Bus bus) const {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return 1.0f;
+        }
+        return m_busLowPassGain[index];
     }
 
     void FmodAudioDevice::SetListener(const ListenerParams& l) {
@@ -416,6 +473,127 @@ namespace Audio {
         if (r != FMOD_OK || !s) return nullptr;
 
         return s;
+    }
+
+    bool FmodAudioDevice::_initializeBusRouting() {
+        if (!m_system || !m_master) {
+            return false;
+        }
+
+        m_busGroups.fill(nullptr);
+        m_busLowPassDsps.fill(nullptr);
+        m_busGroups[static_cast<size_t>(Bus::Master)] = m_master;
+
+        const char* names[kBusCount] = { "Master", "Music", "SFX", "UI", "Ambient" };
+
+        for (size_t index = 0; index < kBusCount; ++index) {
+            FMOD::ChannelGroup* group = nullptr;
+            if (index == static_cast<size_t>(Bus::Master)) {
+                group = m_master;
+            }
+            else {
+                FMOD_RESULT result = m_system->createChannelGroup(names[index], &group);
+                if (result != FMOD_OK || !group) {
+                    LOG_ERROR("FMOD error (createChannelGroup): " << static_cast<int>(result));
+                    return false;
+                }
+
+                result = m_master->addGroup(group, true, nullptr);
+                if (result != FMOD_OK) {
+                    LOG_ERROR("FMOD error (addGroup): " << static_cast<int>(result));
+                    group->release();
+                    return false;
+                }
+
+                m_busGroups[index] = group;
+            }
+
+            FMOD::DSP* dsp = nullptr;
+            FMOD_RESULT result = m_system->createDSPByType(FMOD_DSP_TYPE_LOWPASS, &dsp);
+            if (result != FMOD_OK || !dsp) {
+                LOG_ERROR("FMOD error (createDSPByType LOWPASS): " << static_cast<int>(result));
+                return false;
+            }
+
+            result = group->addDSP(0, dsp);
+            if (result != FMOD_OK) {
+                LOG_ERROR("FMOD error (ChannelGroup::addDSP): " << static_cast<int>(result));
+                dsp->release();
+                return false;
+            }
+
+            m_busLowPassDsps[index] = dsp;
+            _applyBusLowPassGain(static_cast<Bus>(index));
+        }
+
+        return true;
+    }
+
+    void FmodAudioDevice::_shutdownBusRouting() {
+        for (size_t index = 0; index < kBusCount; ++index) {
+            if (FMOD::DSP* dsp = m_busLowPassDsps[index]) {
+                if (FMOD::ChannelGroup* group = m_busGroups[index]) {
+                    group->removeDSP(dsp);
+                }
+                dsp->release();
+                m_busLowPassDsps[index] = nullptr;
+            }
+        }
+
+        for (size_t index = 0; index < kBusCount; ++index) {
+            if (index == static_cast<size_t>(Bus::Master)) {
+                m_busGroups[index] = m_master;
+                continue;
+            }
+
+            if (FMOD::ChannelGroup* group = m_busGroups[index]) {
+                group->release();
+                m_busGroups[index] = nullptr;
+            }
+        }
+    }
+
+    FMOD::ChannelGroup* FmodAudioDevice::_channelGroupForBus(Bus bus) const {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return m_busGroups[static_cast<size_t>(Bus::SFX)];
+        }
+        FMOD::ChannelGroup* group = m_busGroups[index];
+        return group ? group : m_master;
+    }
+
+    void FmodAudioDevice::_applyBusLowPassGain(Bus bus) {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return;
+        }
+
+        FMOD::DSP* dsp = m_busLowPassDsps[index];
+        if (!dsp) {
+            return;
+        }
+
+        const float gain = m_busLowPassGain[index];
+        const float cutoffHz = _lowPassGainToCutoffHz(gain);
+        dsp->setBypass(gain >= 0.999f);
+        FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_CUTOFF, cutoffHz), "DSP::setParameterFloat LOWPASS_CUTOFF");
+    }
+
+    float FmodAudioDevice::_clampLowPassGain(float gain) {
+        return (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+    }
+
+    float FmodAudioDevice::_lowPassGainToCutoffHz(float gain) {
+        const float clamped = _clampLowPassGain(gain);
+        if (clamped <= 0.0f) {
+            return kMinBusLowPassCutoffHz;
+        }
+        if (clamped >= 1.0f) {
+            return kMaxBusLowPassCutoffHz;
+        }
+
+        const float ratio = kMaxBusLowPassCutoffHz / kMinBusLowPassCutoffHz;
+        return kMinBusLowPassCutoffHz * std::pow(ratio, clamped);
     }
 
 } // namespace Audio

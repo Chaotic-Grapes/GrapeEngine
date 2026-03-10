@@ -453,73 +453,16 @@ namespace ECS {
     }
 
     bool AudioSystem::_initializeMasterDsp() {
-        // Make init idempotent by cleaning up any previous DSP first.
-        _shutdownMasterDsp();
-
-        // Resolve FMOD device from service.
-        auto* device = m_audioService.Device();
-        if (!device) {
-            LOG_WARNING("AudioSystem: Cannot initialize master DSP (audio device unavailable)");
-            return false;
-        }
-
-        // Grab low-level FMOD objects needed to build the DSP graph.
-        FMOD::System* system = device->GetSystem();
-        FMOD::ChannelGroup* master = device->GetMasterChannelGroup();
-        if (!system || !master) {
-            LOG_WARNING("AudioSystem: Cannot initialize master DSP (FMOD system/master unavailable)");
-            return false;
-        }
-
-        // Allocate a built-in low-pass DSP unit.
-        FMOD::DSP* dsp = nullptr;
-        FMOD_RESULT result = system->createDSPByType(FMOD_DSP_TYPE_LOWPASS, &dsp);
-        if (result != FMOD_OK || !dsp) {
-            LOG_ERROR("AudioSystem: Failed to create master low-pass DSP (FMOD result " << static_cast<int>(result) << ")");
-            return false;
-        }
-
-        // Start near full-band so audio is unchanged until gameplay drives cutoff.
-        constexpr float kDefaultCutoffHz = 22000.0f;
-        dsp->setParameterFloat(FMOD_DSP_LOWPASS_CUTOFF, kDefaultCutoffHz);
-
-        // Insert at index 0 so it sits early in the master chain.
-        result = master->addDSP(0, dsp);
-        if (result != FMOD_OK) {
-            LOG_ERROR("AudioSystem: Failed to attach master low-pass DSP (FMOD result " << static_cast<int>(result) << ")");
-            // DSP was created but not attached; release immediately.
-            dsp->release();
-            return false;
-        }
-
-        // Store ownership state for runtime use and shutdown cleanup.
-        m_masterLowPassDsp = dsp;
-        m_masterLowPassAttached = true;
-        LOG_INFO("AudioSystem: Master low-pass DSP created and attached");
-        return true;
+        // Device-owned bus DSP routing now owns the master low-pass node.
+        m_masterLowPassDsp = nullptr;
+        m_masterLowPassAttached = false;
+        return m_audioService.Device() != nullptr;
     }
 
     void AudioSystem::_shutdownMasterDsp() {
-        // Nothing to do if DSP was never created.
-        if (!m_masterLowPassDsp) {
-            m_masterLowPassAttached = false;
-            return;
-        }
-
-        // Remove DSP from FMOD graph first, then release object memory.
-        if (m_masterLowPassAttached) {
-            if (auto* device = m_audioService.Device()) {
-                if (FMOD::ChannelGroup* master = device->GetMasterChannelGroup()) {
-                    // Ignore return code here; release below is still required.
-                    master->removeDSP(m_masterLowPassDsp);
-                }
-            }
-            m_masterLowPassAttached = false;
-        }
-
-        // Release FMOD DSP object and clear owning pointer.
-        m_masterLowPassDsp->release();
+        // Device-owned bus DSP routing handles lifetime now.
         m_masterLowPassDsp = nullptr;
+        m_masterLowPassAttached = false;
     }
 
     void AudioSystem::_fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume) {
