@@ -69,6 +69,10 @@ internal partial class AudioAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetInstancePan(ulong handleId, float pan);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstanceLowPassGain")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetInstanceLowPassGain(ulong handleId, float gain);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstancePosition")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetInstancePosition(ulong handleId, float posX, float posY, float posZ, float velX, float velY, float velZ);

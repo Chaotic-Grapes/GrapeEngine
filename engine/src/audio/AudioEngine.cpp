@@ -122,6 +122,13 @@ namespace Audio {
         }
     }
 
+    void AudioEngine::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetInstanceLowPassGain(handle, gain);
+    }
+
     void AudioEngine::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         if (!m_device) {
             return;

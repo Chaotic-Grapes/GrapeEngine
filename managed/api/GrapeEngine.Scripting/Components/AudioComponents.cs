@@ -27,6 +27,8 @@ public record struct AudioSource(uint CueId)
     public bool Spatial3D = true;
     public AudioBus Bus = AudioBus.SFX;
     public float Pan = 0.0f;
+    public bool EnableLowPass = false;
+    public float LowPassGain = 1.0f;
 
     // Fade flags
     public bool EnableFadeIn = false;

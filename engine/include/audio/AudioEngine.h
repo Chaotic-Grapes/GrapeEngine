@@ -33,6 +33,7 @@ namespace Audio {
         void SetInstanceVolume(PlaybackHandle handle, float volume);
         void SetInstancePitch(PlaybackHandle handle, float pitch);
         void SetInstancePan(PlaybackHandle handle, float pan);
+        void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
         void SetListener(const ListenerParams& listener);
 

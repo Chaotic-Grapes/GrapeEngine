@@ -29,6 +29,8 @@ public struct AudioHandle(ulong id)
     public void SetVolume(float volume) => Audio.SetInstanceVolume(this, volume);
     public void SetPitch(float pitch) => Audio.SetInstancePitch(this, pitch);
     public void SetPan(float pan) => Audio.SetInstancePan(this, pan);
+    public void SetLowPassFilter(float gain) => Audio.SetLowPassFilter(this, gain);
+    public void ClearLowPassFilter() => Audio.ClearLowPassFilter(this);
     public void SetPosition(Vector3 position, Vector3 velocity) => Audio.SetInstancePosition(this, position, velocity);
     public void Stop(StopMode mode = StopMode.Immediate) => Audio.Stop(this, mode);
 }
@@ -176,6 +178,24 @@ public static class Audio
     public static void SetInstancePan(AudioHandle handle, float pan)
     {
         AudioAPI.SetInstancePan(handle.Id, pan);
+    }
+
+    /// <summary>
+    /// Set low-pass filter gain for a playing sound instance.
+    /// 1.0 = no filtering, 0.0 = strongest low-pass.
+    /// </summary>
+    public static void SetLowPassFilter(AudioHandle handle, float gain)
+    {
+        float clamped = gain < 0.0f ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+        AudioAPI.SetInstanceLowPassGain(handle.Id, clamped);
+    }
+
+    /// <summary>
+    /// Clear low-pass filtering for a playing sound instance.
+    /// </summary>
+    public static void ClearLowPassFilter(AudioHandle handle)
+    {
+        AudioAPI.SetInstanceLowPassGain(handle.Id, 1.0f);
     }
 
     /// <summary>

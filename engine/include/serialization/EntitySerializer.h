@@ -629,6 +629,8 @@ namespace ECS {
 				{"Spatial3D", src.Spatial3D},
 				{"Bus", src.Bus},
 				{"Pan", src.Pan},
+				{"EnableLowPass", src.EnableLowPass},
+				{"LowPassGain", src.LowPassGain},
 				{"EnableFadeIn", src.EnableFadeIn},
 				{"EnableFadeOut", src.EnableFadeOut},
 				{"FadeInDuration", src.FadeInDuration},
@@ -657,6 +659,8 @@ namespace ECS {
 			src.Spatial3D = j.value("Spatial3D", true);
 			src.Bus = j.value("Bus", static_cast<uint8_t>(Audio::Bus::SFX));
 			src.Pan = j.value("Pan", 0.0f);
+			src.EnableLowPass = j.value("EnableLowPass", false);
+			src.LowPassGain = j.value("LowPassGain", 1.0f);
 			src.EnableFadeIn = j.value("EnableFadeIn", false);
 			src.EnableFadeOut = j.value("EnableFadeOut", false);
 			src.FadeInDuration = j.value("FadeInDuration", 1.0f);

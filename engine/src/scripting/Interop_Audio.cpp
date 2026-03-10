@@ -225,6 +225,22 @@ INTEROP_API void EngineInterop_Audio_SetInstancePan(uint64_t handleId, float pan
 }
 
 /**
+ * @brief Set the low-pass gain of a playing sound instance
+ * @param handleId The handle ID of the playback instance
+ * @param gain The low-pass gain (0.0 = strongest low-pass, 1.0 = bypass)
+ */
+INTEROP_API void EngineInterop_Audio_SetInstanceLowPassGain(uint64_t handleId, float gain) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    Audio::gAudioEngine->SetInstanceLowPassGain(handle, gain);
+}
+
+/**
  * @brief Set the 3D position and velocity of a playing sound instance
  * @param handleId The handle ID of the playback instance
  * @param posX The X position
