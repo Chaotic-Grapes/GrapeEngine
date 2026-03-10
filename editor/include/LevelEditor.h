@@ -149,16 +149,17 @@ private:
         bool Visible = true;
         std::string DisplayName;
         uint8_t ActiveTilesetIndex = 0;
-        uint32_t Generation = 0; // Track entity generation to detect scene reloads.
+        uint32_t Generation = 0; // Track entity generation to detect scene reloads
     };
 
-    // Active tilemap editing context (kept alive for renderer + palette).
+    // Active tilemap editing context (kept alive for renderer + palette)
     std::shared_ptr<TileMap> m_activeTileMap;
     std::shared_ptr<Tileset> m_activeTileset;
     std::string m_activeTileMapPath;
     std::string m_activeTilesetPath;
     EntityId m_activeTileMapEntityId = ECS::Entity::NPOS32;
     std::unordered_map<EntityId, TileMapCacheEntry> m_tileMapCache;
+    std::unordered_map<EntityId, TileMapCacheEntry> m_detachedTileMapCache; // Tilemaps for entities removed by undo, restorable on redo
     std::vector<TilePalettePanel::TileMapListEntry> m_tileMapList;
 
     // Panel registry

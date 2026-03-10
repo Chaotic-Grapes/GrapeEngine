@@ -1142,13 +1142,27 @@ void LevelEditor::_onAssetSelected(const std::string& assetPath) {
 	// Add TileMapComponent to the new entity
     ECS::Entity targetEntity = m_world->Resolve(newId);
 
-	// Initialize TileMapComponent with default values
+    // Only apply and record undo if the entity is still alive (could have been deleted mid-operation)
     if (m_world->IsAlive(targetEntity)) {
+        // Snapshot before so the undo command can restore the original tilemap state
+        std::vector<ECS::SerializedComponent> beforeSnapshot;
+        beforeSnapshot = m_world->CaptureEntityComponents(targetEntity);
+
+        // Apply the dropped tileset asset to the tilemap component
         _applyTilesetToTilemap(targetEntity, assetPath);
+
+        // Snapshot after so the redo command can re-apply the tileset
+        auto afterSnapshot = m_world->CaptureEntityComponents(targetEntity);
+        m_undoSystem.ExecuteCommand(std::make_unique<Editor::EntityComponentsSnapshotCommand>(
+            m_world, targetEntity, std::move(beforeSnapshot), std::move(afterSnapshot)
+        ));
+
+        // Select the newly configured tilemap entity in the inspector
         m_hierarchyWindow.SetSelectedEntity(targetEntity.Index);
         m_inspector.InspectEntity(targetEntity.Index);
     }
-	// Sync viewports to new selection
+
+    // Keep both viewports in sync with the new selection
     if (m_sceneViewport.HasValidWorld()) {
         m_sceneViewport.SetSelectedEntity(newId);
     }
@@ -1240,10 +1254,25 @@ void LevelEditor::_refreshTileMapCache() {
 
         m_tileMapList.push_back({ entity.Index, displayName });
 
+        // Check if this entity already has a live tilemap cache entry
+        auto cacheIt = m_tileMapCache.find(entity.Index);
+        if (cacheIt == m_tileMapCache.end()) {
+            // No live entry found, check the detached cache in case redo just recreated this entity
+            // with a new generation but the same index so we can recover the old map data
+            auto detachedIt = m_detachedTileMapCache.find(entity.Index);
+            if (detachedIt != m_detachedTileMapCache.end()) {
+                // Move the detached data back into the live cache rather than rebuilding from scratch
+                m_tileMapCache.emplace(entity.Index, std::move(detachedIt->second));
+                m_detachedTileMapCache.erase(detachedIt);
+            }
+        }
+
         TileMapCacheEntry& entry = m_tileMapCache[entity.Index];
         const bool generationChanged = (entry.Generation != entity.Generation);
-        if (generationChanged) {
-            // Scene reload can reuse entity indices; reset cache when generation changes.
+        const bool hasPersistentMapPath = (!mapPathOnDisk.empty() || !entry.MapPath.empty());
+        
+        if (generationChanged && hasPersistentMapPath) {
+            // Scene reload can reuse entity indices; reset cache for file-backed tilemaps
             entry.Map.reset();
             entry.Tilesets.clear();
             entry.TilesetPaths.clear();
@@ -1257,7 +1286,9 @@ void LevelEditor::_refreshTileMapCache() {
             !legacyTilesetPath.empty() &&
             // Skip entries that already exist.
             std::filesystem::exists(mapPathOnDisk));
-        const bool mapNeedsReload = generationChanged ||
+
+        const bool mapNeedsReload =
+            (generationChanged && hasPersistentMapPath) ||
             (!entry.Map) ||
             (!mapPathOnDisk.empty() && entry.MapPath != mapPathOnDisk) ||
             missingTilesetList ||
@@ -1433,8 +1464,11 @@ void LevelEditor::_refreshTileMapCache() {
 
     for (auto it = m_tileMapCache.begin(); it != m_tileMapCache.end(); ) {
         if (!seen.contains(it->first)) {
-            it = m_tileMapCache.erase(it); // Drop cache entries for deleted tilemaps.
-        } else {
+            // Keep removed tilemaps around so undo/redo recreation can restore painted in-memory data
+            m_detachedTileMapCache[it->first] = std::move(it->second);
+            it = m_tileMapCache.erase(it);
+        } 
+        else {
             ++it;
         }
     }
@@ -1773,6 +1807,7 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_activeTilesetPath.clear();
     m_activeTileMapEntityId = ECS::Entity::NPOS32;
     m_tileMapCache.clear(); // Drop cached tilemaps when changing scenes.
+    m_detachedTileMapCache.clear(); // Drop detached undo/redo tilemap cache when changing scenes
     m_tileMapList.clear();  // Drop tilemap list for the new scene.
     m_tilePalette.ClearTilePreviewSizeCache(); // Reset per-scene tile preview size cache.
     const std::vector<std::shared_ptr<Tileset>> emptyTilesets;
