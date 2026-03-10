@@ -199,7 +199,7 @@ namespace Editor {
         glm::vec3 m_focusTarget = glm::vec3(0.0f);
         float m_focusDistance = 0.0f;
         float m_focusOrthoSize = 0.0f;
-        float m_focusLerpSpeed = 10.0f;
+        float m_focusLerpSpeed = 4.0f;
         bool m_hadNavigationInput = false;
 
         // Constraints

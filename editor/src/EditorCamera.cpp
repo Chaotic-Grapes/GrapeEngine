@@ -90,6 +90,12 @@ namespace Editor {
         if (!m_isViewportFocused) {
             // still keep mouse-first flag reset so mouse delta won't jump when focus returns
             m_firstMouse = true;
+
+            // Allow hierarchy-triggered focus to animate even when viewport is not focused
+            if (m_focusActive) {
+                _applyFocusSmoothing(dt);
+                _applySmoothing(dt);
+            }
             return;
         }
 
@@ -390,7 +396,7 @@ namespace Editor {
             desiredDistance = 8.0f;
         }
 
-        // Recompute yaw/pitch from position->target
+        // Smoothly focus towards the target
         m_focusTarget = desiredTarget;
         m_focusDistance = desiredDistance;
         m_focusOrthoSize = m_camera.OrthoSize;
