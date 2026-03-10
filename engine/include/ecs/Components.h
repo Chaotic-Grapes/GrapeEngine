@@ -629,9 +629,7 @@ namespace ECS {
             float maxForce          = 1.2f;
             float boidSize          = 1.0f;     // world-space size of each boid quad
 
-
-            uint32_t textureId      = 0;    // runtime only
-            uint32_t TexturePath    = 0;    // Persistent texture path IDs (StringTable). 0 = invalid.
+            // No TexturePath / textureId — uses SpriteRenderer2D on the same entity
         };
         static_assert(std::is_trivially_copyable_v<BoidFlock>, "BoidFlock must be trivially copyable");
 

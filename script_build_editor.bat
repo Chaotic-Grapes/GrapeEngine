@@ -1,6 +1,6 @@
 @echo off
 set CONFIG=%1
-if "%CONFIG%"=="" set CONFIG=Debug
+if "%CONFIG%"=="" set CONFIG=RELEASE
 
 TITLE Build Editor (%CONFIG%)
 
