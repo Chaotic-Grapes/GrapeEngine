@@ -377,14 +377,20 @@ namespace Editor {
         std::vector<ECS::SerializedComponent> after
     )
         : m_world(world)
-        , m_entity(entity)
+        , m_entityId(entity.Index)
         , m_before(std::move(before))
         , m_after(std::move(after))
     {
     }
 
     void EntityComponentsSnapshotCommand::Execute() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+        if (!m_world || m_entityId == ECS::Entity::NPOS32) {
+            LOG_WARNING("[UndoSystem] Cannot execute component snapshot - entity invalid");
+            return;
+        }
+
+        ECS::Entity entity = m_world->Resolve(m_entityId);
+        if (entity.IsNull() || !m_world->IsAlive(entity)) {
             LOG_WARNING("[UndoSystem] Cannot execute component snapshot - entity invalid");
             return;
         }
@@ -395,15 +401,15 @@ namespace Editor {
             restoreIds.insert(sc.Id);
         }
 
-        auto existing = m_world->GetEntityComponents(m_entity);
+        auto existing = m_world->GetEntityComponents(entity);
         for (auto id : existing) {
             if (restoreIds.find(id) == restoreIds.end()) {
-                m_world->RemoveById(m_entity, id);
+                m_world->RemoveById(entity, id);
             }
         }
 
         for (const auto& sc : m_after) {
-            void* ptr = m_world->GetRawComponentPtr(m_entity, sc.Id);
+            void* ptr = m_world->GetRawComponentPtr(entity, sc.Id);
             if (ptr) {
                 const auto& meta = ECS::ComponentRegistry::Meta(sc.Id);
                 const size_t copySize = meta.Size > 0
@@ -413,14 +419,20 @@ namespace Editor {
                     std::memcpy(ptr, sc.Data.data(), copySize);
                 }
             } else {
-                m_world->AddComponentById(m_entity, sc.Id,
+                m_world->AddComponentById(entity, sc.Id,
                     const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
             }
         }
     }
 
     void EntityComponentsSnapshotCommand::Undo() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+        if (!m_world || m_entityId == ECS::Entity::NPOS32) {
+            LOG_WARNING("[UndoSystem] Cannot undo component snapshot - entity invalid");
+            return;
+        }
+
+        ECS::Entity entity = m_world->Resolve(m_entityId);
+        if (entity.IsNull() || !m_world->IsAlive(entity)) {
             LOG_WARNING("[UndoSystem] Cannot undo component snapshot - entity invalid");
             return;
         }
@@ -431,15 +443,15 @@ namespace Editor {
             restoreIds.insert(sc.Id);
         }
 
-        auto existing = m_world->GetEntityComponents(m_entity);
+        auto existing = m_world->GetEntityComponents(entity);
         for (auto id : existing) {
             if (restoreIds.find(id) == restoreIds.end()) {
-                m_world->RemoveById(m_entity, id);
+                m_world->RemoveById(entity, id);
             }
         }
 
         for (const auto& sc : m_before) {
-            void* ptr = m_world->GetRawComponentPtr(m_entity, sc.Id);
+            void* ptr = m_world->GetRawComponentPtr(entity, sc.Id);
             if (ptr) {
                 const auto& meta = ECS::ComponentRegistry::Meta(sc.Id);
                 const size_t copySize = meta.Size > 0
@@ -449,7 +461,7 @@ namespace Editor {
                     std::memcpy(ptr, sc.Data.data(), copySize);
                 }
             } else {
-                m_world->AddComponentById(m_entity, sc.Id,
+                m_world->AddComponentById(entity, sc.Id,
                     const_cast<uint8_t*>(sc.Data.data()), sc.Data.size());
             }
         }
@@ -490,6 +502,63 @@ namespace Editor {
         }
         m_after = after;
         return true;
+    }
+
+    // ========================================================================
+    // ReparentEntityCommand Implementation
+    // ========================================================================
+
+    // Store all IDs needed to apply and reverse the reparent operation
+    ReparentEntityCommand::ReparentEntityCommand(
+        ECS::World* world,
+        EntityId childId,
+        EntityId oldParentId,
+        EntityId newParentId
+    )
+        : m_world(world)
+        , m_childId(childId)
+        , m_oldParentId(oldParentId)
+        , m_newParentId(newParentId)
+    {
+    }
+
+    // Shared logic for both Execute and Undo, attaches child to parentId or detaches if parentId is NPOS32
+    void ReparentEntityCommand::ApplyParent(EntityId parentId) {
+        // Bail if world is gone or child ID was never set
+        if (!m_world || m_childId == ECS::Entity::NPOS32) {
+            return;
+        }
+
+        // Resolve the child entity and verify it still exists in the world
+        ECS::Entity child = m_world->Resolve(m_childId);
+        if (child.IsNull() || !m_world->IsAlive(child)) {
+            return;
+        }
+
+        if (parentId == ECS::Entity::NPOS32) {
+            // NPOS32 means no parent, so promote child to a root entity
+            m_world->Detach(child);
+            return;
+        }
+
+        // Resolve the target parent and verify it still exists before attaching
+        ECS::Entity parent = m_world->Resolve(parentId);
+        if (parent.IsNull() || !m_world->IsAlive(parent)) {
+            return;
+        }
+
+        // Attach the child under the resolved parent, updating hierarchy indices internally
+        m_world->Attach(child, parent);
+    }
+
+    // Applies the reparent by moving the child under newParentId
+    void ReparentEntityCommand::Execute() {
+        ApplyParent(m_newParentId);
+    }
+
+    // Reverses the reparent by restoring the child to oldParentId
+    void ReparentEntityCommand::Undo() {
+        ApplyParent(m_oldParentId);
     }
 
     // ========================================================================
@@ -636,6 +705,45 @@ namespace Editor {
 		// Notify via callback
         if (m_onTileChanged) {
             m_onTileChanged(m_x, m_y, m_oldTile);
+        }
+    }
+
+    // ========================================================================
+    // TileCollisionPaintCommand Implementation
+    // ========================================================================
+
+    // Store the tile coordinates, before/after masks, and the callback needed to notify the scene of changes
+    TileCollisionPaintCommand::TileCollisionPaintCommand(
+        std::shared_ptr<TileMap> map,
+        int32_t x, int32_t y,
+        uint8_t oldMask,
+        uint8_t newMask,
+        std::function<void(int32_t, int32_t, uint8_t)> onCollisionChanged
+    )
+        : m_map(std::move(map))
+        , m_x(x)
+        , m_y(y)
+        , m_oldMask(oldMask)
+        , m_newMask(newMask)
+        , m_onCollisionChanged(std::move(onCollisionChanged))
+    {
+    }
+
+    // Applies the new collision mask to the tile and fires the changed callback so the scene is marked dirty
+    void TileCollisionPaintCommand::Execute() {
+        if (!m_map) return;
+        m_map->SetCollisionMaskSigned(m_x, m_y, m_newMask);
+        if (m_onCollisionChanged) {
+            m_onCollisionChanged(m_x, m_y, m_newMask); // Notify listeners that collision data changed
+        }
+    }
+
+    // Restores the tile's previous collision mask and fires the changed callback to keep save state consistent
+    void TileCollisionPaintCommand::Undo() {
+        if (!m_map) return;
+        m_map->SetCollisionMaskSigned(m_x, m_y, m_oldMask);
+        if (m_onCollisionChanged) {
+            m_onCollisionChanged(m_x, m_y, m_oldMask); // Notify listeners that collision data was reverted
         }
     }
 
@@ -842,6 +950,39 @@ namespace Editor {
         TrimUndoStack();
 
         LOG_DEBUG("[UndoSystem] Entity deletion recorded. Undo stack size: " << m_undoStack.size());
+    }
+
+    // Creates and pushes a ReparentEntityCommand so hierarchy drag/drops can be undone and redone
+    void UndoSystem::RecordEntityReparent(EntityId childId, EntityId oldParentId, EntityId newParentId) {
+        // World must be set before any undo recording can happen
+        if (!m_world) {
+            LOG_WARNING("[UndoSystem] Cannot record entity reparent - world not initialized");
+            return;
+        }
+
+        // Skip if child is invalid or the parent didn't actually change
+        if (childId == ECS::Entity::NPOS32 || oldParentId == newParentId) {
+            return;
+        }
+
+        // Verify the child entity is still alive before recording
+        ECS::Entity child = m_world->Resolve(childId);
+        if (child.IsNull() || !m_world->IsAlive(child)) {
+            LOG_WARNING("[UndoSystem] Cannot record entity reparent - child is invalid");
+            return;
+        }
+
+        // Build the command with the before/after parent IDs so it can restore either direction
+        auto command = std::make_unique<ReparentEntityCommand>(m_world, childId, oldParentId, newParentId);
+        m_undoStack.push_back(std::move(command));
+
+        // Any new action invalidates the redo history
+        m_redoStack.clear();
+
+        // Keep the undo stack within its configured size limit
+        TrimUndoStack();
+
+        LOG_DEBUG("[UndoSystem] Entity reparent recorded. Undo stack size: " << m_undoStack.size());
     }
 
     bool UndoSystem::CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after) {

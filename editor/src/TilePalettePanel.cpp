@@ -880,13 +880,25 @@ bool TilePalettePanel::OnViewportCollisionClick(const glm::vec2& worldPos)
         return false;
     }
 
-	// Apply the new collision mask to the tilemap
-    m_tileMap->SetCollisionMaskSigned(tx, ty, newMask);
+    // Broadcast scene modified and autosave the tilemap whenever a collision tile is painted
+    auto onCollisionChanged = [this](int32_t, int32_t, uint8_t) {
+        Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap collision"));
+        if (!m_tileMapPath.empty()) {
+            m_tileMap->SaveMap(m_tileMapPath);
+        }
+        };
 
-	// Mark the scene dirty to enable saves and track changes
-    Messaging::MessageSystem::Notify(Messaging::SceneModified("Tilemap collision"));
-    if (!m_tileMapPath.empty()) {
-        m_tileMap->SaveMap(m_tileMapPath);
+    // Route through undo system so collision paints can be undone/redone
+    if (m_undoSystem) {
+        auto command = std::make_unique<Editor::TileCollisionPaintCommand>(
+            m_tileMap, tx, ty, oldMask, newMask, onCollisionChanged
+        );
+        m_undoSystem->ExecuteCommand(std::move(command));
+    }
+    else {
+        // No undo system available, apply the mask directly
+        m_tileMap->SetCollisionMaskSigned(tx, ty, newMask);
+        onCollisionChanged(tx, ty, newMask);
     }
 
 	// Update paint tracking state for collision editing to optimize drag painting and avoid redundant updates

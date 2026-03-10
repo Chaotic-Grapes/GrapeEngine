@@ -256,20 +256,27 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
     if (!m_scene) return;
     ECS::World& world = m_scene->GetWorld();
 
+    // Resolve the child entity and bail if it no longer exists
     ECS::Entity childEntity = world.Resolve(child);
     if (childEntity.IsNull() || !world.IsAlive(childEntity)) return;
 
-    // Handle setting a new parent
+    // Save the current parent before any changes so undo knows where to restore to
+    const ECS::Entity currentParentEntity = world.ParentOf(childEntity);
+    const EntityId oldParent = currentParentEntity.IsNull() ? ECS::Entity::NPOS32 : currentParentEntity.Index;
+
+    bool changed = false;
+
     if (newParent != ECS::Entity::NPOS32) {
+        // Resolve the target parent and bail if it no longer exists
         ECS::Entity newParentEntity = world.Resolve(newParent);
         if (newParentEntity.IsNull() || !world.IsAlive(newParentEntity)) return;
 
-        // Check for circular parenting (child cannot be ancestor of new parent)
+        // Walk up the new parent's ancestor chain to check if child appears in it
+        // If it does, attaching would create a cycle (e.g. A -> B -> A)
         bool isDescendant = false;
         ECS::Entity checkParent = newParentEntity;
         while (!checkParent.IsNull()) {
             if (checkParent.Index == child) {
-                // Circular dependency detected
                 isDescendant = true;
                 break;
             }
@@ -277,18 +284,36 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         }
 
         if (!isDescendant) {
-            // Use Attach to set the new parent (handles hierarchy index updates automatically)
+            // Safe to attach: attach handles hierarchy index updates internally
             world.Attach(childEntity, newParentEntity);
+            changed = true;
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
         }
     }
     else {
-        // Use Detach to remove parent (make root entity)
+        // newParent is NPOS32, so promote child to a root entity with no parent
         world.Detach(childEntity);
+        changed = true;
     }
 
-    // MARK SCENE AS DIRTY (only if operation succeeded)
-    MarkSceneDirtyIfNeeded(m_fileMenu);
+    // Re-resolve after Attach/Detach since internal indices may have shifted
+    const ECS::Entity updatedChild = world.Resolve(child);
+    const ECS::Entity updatedParentEntity = (!updatedChild.IsNull() && world.IsAlive(updatedChild))
+        ? world.ParentOf(updatedChild)
+        : ECS::NULL_ENTITY;
+
+    // Confirm what the parent actually is post-operation (may differ if Attach failed silently)
+    const EntityId actualParent = updatedParentEntity.IsNull() ? ECS::Entity::NPOS32 : updatedParentEntity.Index;
+
+    // Only push an undo entry if the hierarchy actually changed
+    if (changed && actualParent != oldParent && m_undoSystem) {
+        m_undoSystem->RecordEntityReparent(child, oldParent, actualParent);
+    }
+
+    // Mark the scene dirty so unsaved changes are detected
+    if (changed && actualParent != oldParent) {
+        MarkSceneDirtyIfNeeded(m_fileMenu);
+    }
 }

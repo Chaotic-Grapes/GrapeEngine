@@ -1900,6 +1900,11 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         meta.Flags = 0;  // Not modified yet
         m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
+        if (m_undoSystem) {
+            // Treat prefab instantiation like entity creation for undo/redo
+            m_undoSystem->RecordEntityCreation(rootEntity.Index);
+        }
+
         // Mark scene as dirty
         if (m_fileMenu) {
             m_fileMenu->MarkSceneDirty();

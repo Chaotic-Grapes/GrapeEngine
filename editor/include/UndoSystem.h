@@ -183,7 +183,7 @@ namespace Editor {
 
     private:
         ECS::World* m_world;
-        ECS::Entity m_entity;
+        EntityId m_entityId = ECS::Entity::NPOS32;
         std::vector<ECS::SerializedComponent> m_before;
         std::vector<ECS::SerializedComponent> m_after;
     };
@@ -211,6 +211,32 @@ namespace Editor {
         std::function<void(const std::vector<EntityId>&)> m_applyOrder; // Apply hook for order updates.
         std::vector<EntityId> m_before; // Original order for undo.
         std::vector<EntityId> m_after; // New order for redo.
+    };
+
+    // ========================================================================
+    // Entity Reparent Command
+    // ========================================================================
+
+    class ReparentEntityCommand : public ICommand {
+    public:
+        // Moves an entity to a different parent in the scene hierarchy
+        ReparentEntityCommand(
+            ECS::World* world,
+            EntityId childId,
+            EntityId oldParentId,
+            EntityId newParentId
+        );
+
+        void Execute() override;                      // Detaches the child from oldParent, attaches it under newParent
+        void Undo() override;                         // Detaches from newParent, reattaches under oldParent
+
+    private:
+        void ApplyParent(EntityId parentId);          // Shared logic used by both Execute and Undo
+
+        ECS::World* m_world = nullptr;
+        EntityId m_childId = ECS::Entity::NPOS32;     // Entity being reparented
+        EntityId m_oldParentId = ECS::Entity::NPOS32; // Previous parent, used for undo
+        EntityId m_newParentId = ECS::Entity::NPOS32; // Target parent, used for execute
     };
 
     // ========================================================================
@@ -308,6 +334,34 @@ namespace Editor {
 		uint32_t m_newTile;              // New tile ID.
 		std::function<void(int32_t, int32_t, uint32_t)> m_onTileChanged;  // Callback after tile change.
     };
+
+    // ========================================================================
+    // Tile Collision Paint Command
+    // ========================================================================
+
+    class TileCollisionPaintCommand : public ICommand {
+    public:
+        // Paint a single collision mask cell with undo/redo support
+        TileCollisionPaintCommand(
+            std::shared_ptr<TileMap> map, 
+            int32_t x, 
+            int32_t y, 
+            uint8_t oldMask, 
+            uint8_t newMask, 
+            std::function<void(int32_t, int32_t, uint8_t)> onCollisionChanged
+        );
+
+        void Execute() override;         // Execute the collision paint (redo)
+        void Undo() override;            // Undo the collision paint
+
+    private:
+        std::shared_ptr<TileMap> m_map;  // Target tilemap
+        int32_t m_x;                     // Tile X coordinate
+        int32_t m_y;                     // Tile Y coordinate
+        uint8_t m_oldMask;               // Previous collision mask
+        uint8_t m_newMask;               // New collision mask
+        std::function<void(int32_t, int32_t, uint8_t)> m_onCollisionChanged;  // Callback after collision change
+    };
     // ========================================================================
     // Undo System Manager
     // ========================================================================
@@ -379,7 +433,8 @@ namespace Editor {
 
         void RecordEntityCreation(EntityId entityId);
         void RecordEntityDeletion(EntityId entityId);
-        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command.
+        void RecordEntityReparent(EntityId childId, EntityId oldParentId, EntityId newParentId);
+        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command
 
         // Property edit API
         void BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& oldValue);
