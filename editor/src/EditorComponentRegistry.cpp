@@ -593,7 +593,9 @@ Without these, the macro would end early and break the expansion
                 {"Alignment", 0},
                 {"ZOrder", 0},
                 {"Margin", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}},
-                {"Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}}
+                {"Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}}},
+                {"AnchorMin", {{"X", 0.0f}, {"Y", 0.0f}}},
+                {"AnchorMax", {{"X", 0.0f}, {"Y", 0.0f}}}
             };
             };
         }
@@ -1148,7 +1150,9 @@ static void _initializeDefaultRegistry() {
                 { "Alignment", 0 },
                 { "ZOrder", 0 },
                 { "Margin", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} },
-                { "Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} }
+                { "Padding", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f}} },
+                { "AnchorMin", {{"X", 0.0f}, {"Y", 0.0f}} },
+                { "AnchorMax", {{"X", 0.0f}, {"Y", 0.0f}} }
             }; }),
             COMPONENT_OPS_HASH(GUIElement, kHashGUIElement)
         },

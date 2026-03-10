@@ -253,6 +253,8 @@ public enum GUIAlignment : byte
         public short ZOrder;
         public Vector4 Margin;
         public Vector4 Padding;
+        public Vector2 AnchorMin;
+        public Vector2 AnchorMax;
         public Vector2 ResolvedPosition;
         public Vector2 ResolvedSize;
         public Vector2 ContentPosition;

@@ -37,6 +37,22 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace {
     constexpr const char* kGameViewportName = "Game";
+
+    float ResolveSelectedAspectRatio(int selectedAspectRatio, bool freeAspect, int width, int height) {
+        if (freeAspect) {
+            return (height > 0) ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
+        }
+
+        switch (selectedAspectRatio) {
+        case 1: return 16.0f / 9.0f;
+        case 2: return 16.0f / 10.0f;
+        case 3: return 4.0f / 3.0f;
+        case 4: return 5.0f / 4.0f;
+        case 5: return 21.0f / 9.0f;
+        case 6: return 1.0f;
+        default: return 16.0f / 9.0f;
+        }
+    }
 }
 
 void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
@@ -122,21 +138,12 @@ void GameViewport::PrepareFrame() {
         return;
     }
 
-    const bool useFreeAspect = m_freeAspect || m_immersiveMode;
-    float targetRatio = 1.0f;
-    if (useFreeAspect) {
-        targetRatio = (vp->Size.y > 0) ? static_cast<float>(vp->Size.x) / static_cast<float>(vp->Size.y) : 1.0f;
-    } else {
-        switch (m_selectedAspectRatio) {
-            case 1: targetRatio = 16.0f / 9.0f; break;
-            case 2: targetRatio = 16.0f / 10.0f; break;
-            case 3: targetRatio = 4.0f / 3.0f; break;
-            case 4: targetRatio = 5.0f / 4.0f; break;
-            case 5: targetRatio = 21.0f / 9.0f; break;
-            case 6: targetRatio = 1.0f; break;
-            default: targetRatio = 16.0f / 9.0f; break;
-        }
-    }
+    const float targetRatio = ResolveSelectedAspectRatio(
+        m_selectedAspectRatio,
+        m_freeAspect,
+        vp->Size.x,
+        vp->Size.y
+    );
 
     if (activeCamera) {
         activeCamera->AspectRatio = targetRatio;
@@ -150,7 +157,7 @@ void GameViewport::PrepareFrame() {
     // This aligns editor Game view behavior with standalone runtime.
     ImVec2 guiOrigin = m_sceneDrawPos;
     ImVec2 guiSize = m_sceneDrawSize;
-    if (m_immersiveMode || guiSize.x <= 1.0f || guiSize.y <= 1.0f) {
+    if (guiSize.x <= 1.0f || guiSize.y <= 1.0f) {
         guiOrigin = ImVec2(0.0f, 0.0f);
         guiSize = ImVec2(static_cast<float>(vp->Size.x), static_cast<float>(vp->Size.y));
     }
@@ -341,20 +348,16 @@ void GameViewport::_renderViewport() {
             
             // Calculate display size based on aspect ratio
             ImVec2 displaySize = availableSize;
-            float targetRatio = availableSize.x / availableSize.y;
-            
-            if (!m_freeAspect && !renderImmersive) {
-                switch (m_selectedAspectRatio) {
-                    case 1: targetRatio = 16.0f / 9.0f; break;   // 16:9
-                    case 2: targetRatio = 16.0f / 10.0f; break;  // 16:10
-                    case 3: targetRatio = 4.0f / 3.0f; break;    // 4:3
-                    case 4: targetRatio = 5.0f / 4.0f; break;    // 5:4
-                    case 5: targetRatio = 21.0f / 9.0f; break;   // 21:9
-                    case 6: targetRatio = 1.0f; break;           // 1:1
-                }
-                
-                const float availableRatio = availableSize.x / availableSize.y;
-                
+            const float availableHeight = std::max(1.0f, availableSize.y);
+            const float availableRatio = availableSize.x / availableHeight;
+            const float targetRatio = ResolveSelectedAspectRatio(
+                m_selectedAspectRatio,
+                m_freeAspect,
+                static_cast<int>(availableSize.x),
+                static_cast<int>(availableHeight)
+            );
+
+            if (!m_freeAspect) {
                 if (availableRatio > targetRatio) {
                     // Available space is wider - constrain width
                     displaySize.x = availableSize.y * targetRatio;
@@ -365,7 +368,7 @@ void GameViewport::_renderViewport() {
                     displaySize.x = availableSize.x;
                     displaySize.y = availableSize.x / targetRatio;
                 }
-                
+
                 // Center the viewport
                 const float offsetX = (availableSize.x - displaySize.x) * 0.5f;
                 const float offsetY = (availableSize.y - displaySize.y) * 0.5f;

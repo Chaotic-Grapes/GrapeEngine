@@ -3707,13 +3707,17 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
     if (!data.contains("ZOrder")) data["ZOrder"] = 0;
     if (!data.contains("Margin")) data["Margin"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
     if (!data.contains("Padding")) data["Padding"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 0.0f} };
+    if (!data.contains("AnchorMin")) data["AnchorMin"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("AnchorMax")) data["AnchorMax"] = { {"X", 0.0f}, {"Y", 0.0f} };
 
     // Begin property section.
-    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Alignment", "Z Order", "Margin", "Padding" });
+    EditorUI::BeginPropertySection({ "Position", "Size", "Visible", "Anchor Min", "Anchor Max", "Alignment", "Z Order", "Margin", "Padding" });
     EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
     // Render vector 2 drow.
     EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
     EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
+    EditorUI::RenderVector2DRow("Anchor Min", data["AnchorMin"], "X", "Y", 0.01f);
+    EditorUI::RenderVector2DRow("Anchor Max", data["AnchorMax"], "X", "Y", 0.01f);
     const char* alignmentOptions[] = {
         "Top Left", "Top", "Top Right",
         "Left", "Center", "Right",

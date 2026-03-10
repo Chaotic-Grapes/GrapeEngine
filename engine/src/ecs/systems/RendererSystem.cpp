@@ -2040,7 +2040,7 @@ namespace ECS {
         }
 
         // TileMapRenderer::Submit expects raw pointers, but the entry owns the
-        // tilesets as unique_ptrs — build a temporary view without transferring ownership
+        // tilesets as unique_ptrs - build a temporary view without transferring ownership
         std::vector<const Tileset*> rawTilesets;
         rawTilesets.reserve(entry.Tilesets.size());
         for (const auto& tileset : entry.Tilesets) {
@@ -2625,7 +2625,8 @@ namespace ECS {
                 if (text.text.empty()) continue;
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
                 const Vector2D textPosScaled = scalePos(text.position);
-                const float textPixelSize = text.pixelSize * std::min(guiScaleX, guiScaleY);
+                // Keep GUI text size in absolute pixels regardless of viewport remapping.
+                const float textPixelSize = text.pixelSize;
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(textPixelSize)));
                 if (!font) continue;
                 const float scale = textPixelSize / static_cast<float>(font->getPixelSize());

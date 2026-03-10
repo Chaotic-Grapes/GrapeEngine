@@ -181,22 +181,31 @@ private:
 
     // Scene manager used to create, load, and save scenes
     Scenes::SceneManager* m_sceneManager = nullptr;
+
     // Hierarchy panel for entity order preservation
     HierarchyPanel* m_hierarchyPanel = nullptr;
+
     // Undo system for edit actions
     Editor::UndoSystem* m_undoSystem = nullptr;
+
     // Getter used to query current EditorState; optional (defaults to Edit)
     std::function<EditorState()> m_getEditorState = nullptr;
+
     // Optional callback to clear playback snapshot on in-place reload.
     std::function<void()> m_clearPlaybackSnapshot;
+
     // Optional callback to sync external assets before scene serialization.
     std::function<void(const std::string&)> m_preSaveCallback;
+
     // Optional callback to open the project browser.
     std::function<void()> m_requestProjectBrowser;
+
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
+
     // Track whether current scene has unsaved changes
     bool m_hasUnsavedChanges = false;
+    
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;

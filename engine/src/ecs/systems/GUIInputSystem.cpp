@@ -17,6 +17,7 @@ pointer capture within the GUI system.
 #include "ecs/systems/GUIInputSystem.h"
 #include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
+#include "graphics/renderer.hpp"
 #include "services/Input.h"
 
 namespace ECS {
@@ -166,10 +167,10 @@ namespace ECS {
                         ? (element.ScreenSize.Y / element.ResolvedSize.Y)
                         : 1.0f;
                     const Vector4D padding = { // Scale padding from element space to screen space for hit testing.
-                        slider.Padding.X * screenScaleX,
-                        slider.Padding.Y * screenScaleY,
-                        slider.Padding.Z * screenScaleX,
-                        slider.Padding.W * screenScaleY
+                        PixelsToUnits(slider.Padding.X) * screenScaleX,
+                        PixelsToUnits(slider.Padding.Y) * screenScaleY,
+                        PixelsToUnits(slider.Padding.Z) * screenScaleX,
+                        PixelsToUnits(slider.Padding.W) * screenScaleY
                     };
                     trackPos = { // Screen-space position of the track rect, accounting for padding.
                         element.ScreenPosition.X + padding.X,

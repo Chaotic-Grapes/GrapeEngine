@@ -334,7 +334,8 @@ namespace ECS {
                                                 ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                                                 : textFontPath;
                 const std::string fontLoadPath = ResolveProjectPathForLoad(fontPath);
-                const float pixelSize = isWorldSpace ? PixelsToUnits(text.FontSize) : (text.FontSize * scaleX);
+                // Keep screen-space text size in absolute pixels; do not scale with layout.
+                const float pixelSize = isWorldSpace ? PixelsToUnits(text.FontSize) : text.FontSize;
                 const float fontPixelSize = isWorldSpace ? text.FontSize : pixelSize;
                 const int fontSize = std::max(1, static_cast<int>(std::round(fontPixelSize)));
                 auto font = RM.GetFont(fontLoadPath, fontSize);
@@ -546,19 +547,24 @@ namespace ECS {
                 }
 
                 // Offset content by button padding to keep labels/icons aligned.
+                const float buttonPadLeft = isWorldSpace ? PixelsToUnits(button.Padding.X) : button.Padding.X * scaleX;
+                const float buttonPadTop = isWorldSpace ? PixelsToUnits(button.Padding.Y) : button.Padding.Y * scaleY;
+                const float buttonPadRight = isWorldSpace ? PixelsToUnits(button.Padding.Z) : button.Padding.Z * scaleX;
+                const float buttonPadBottom = isWorldSpace ? PixelsToUnits(button.Padding.W) : button.Padding.W * scaleY;
                 const Vector2D innerPos = {
-                    element.ContentPosition.X + button.Padding.X * scaleX,
-                    element.ContentPosition.Y + button.Padding.Y * scaleY * ySign
+                    element.ContentPosition.X + buttonPadLeft,
+                    element.ContentPosition.Y + buttonPadTop * ySign
                 };
                 const Vector2D innerSize = {
-                    std::max(0.0f, element.ContentSize.X - (button.Padding.X + button.Padding.Z) * scaleX),
-                    std::max(0.0f, element.ContentSize.Y - (button.Padding.Y + button.Padding.W) * scaleY)
+                    std::max(0.0f, element.ContentSize.X - buttonPadLeft - buttonPadRight),
+                    std::max(0.0f, element.ContentSize.Y - buttonPadTop - buttonPadBottom)
                 };
 
                 const std::string label = button.TextId ? ECS::StringTable::Resolve(button.TextId) : std::string();
                 if (!label.empty()) {
                     // Label text is anchored at the inner content origin.
-                    const float labelSize = isWorldSpace ? PixelsToUnits(button.FontSize) : (button.FontSize * scaleX);
+                    // Keep screen-space button label size in absolute pixels; do not scale with layout.
+                    const float labelSize = isWorldSpace ? PixelsToUnits(button.FontSize) : button.FontSize;
                     const std::string buttonFontPath = button.FontPathId ? ECS::StringTable::Resolve(button.FontPathId) : std::string();
                     const std::string buttonFontLoadPath = ResolveProjectPathForLoad(buttonFontPath);
                     if (isWorldSpace) {
@@ -574,10 +580,14 @@ namespace ECS {
                     if (!iconLoadPath.empty()) {
                         auto iconTex = RM.Get<Texture>(iconLoadPath);
                         if (iconTex) {
-                            const Vector2D iconSize = { button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
+                            const Vector2D iconSize = isWorldSpace
+                                ? Vector2D{ PixelsToUnits(button.IconSize.X), PixelsToUnits(button.IconSize.Y) }
+                                : Vector2D{ button.IconSize.X * scaleX, button.IconSize.Y * scaleY };
+                            const float iconOffsetX = isWorldSpace ? PixelsToUnits(button.IconOffset.X) : button.IconOffset.X * scaleX;
+                            const float iconOffsetY = isWorldSpace ? PixelsToUnits(button.IconOffset.Y) : button.IconOffset.Y * scaleY;
                             const Vector2D iconPos = {
-                                innerPos.X + button.IconOffset.X * scaleX,
-                                innerPos.Y + button.IconOffset.Y * scaleY * ySign
+                                innerPos.X + iconOffsetX,
+                                innerPos.Y + iconOffsetY * ySign
                             };
                             // Icons are drawn as a tinted image over the button.
                             if (isWorldSpace) {
@@ -595,14 +605,12 @@ namespace ECS {
             case RenderItem::Type::Slider: {
                 auto& slider = world.Get<Components::GUISlider>(item.entity);
                 // Use padding to keep the track away from element edges.
-                const Vector2D padding = {
-                    slider.Padding.X * scaleX,
-                    slider.Padding.Y * scaleY
-                };
-                const Vector2D paddingOpposite = {
-                    slider.Padding.Z * scaleX,
-                    slider.Padding.W * scaleY
-                };
+                const Vector2D padding = isWorldSpace
+                    ? Vector2D{ PixelsToUnits(slider.Padding.X), PixelsToUnits(slider.Padding.Y) }
+                    : Vector2D{ slider.Padding.X * scaleX, slider.Padding.Y * scaleY };
+                const Vector2D paddingOpposite = isWorldSpace
+                    ? Vector2D{ PixelsToUnits(slider.Padding.Z), PixelsToUnits(slider.Padding.W) }
+                    : Vector2D{ slider.Padding.Z * scaleX, slider.Padding.W * scaleY };
                 Vector2D trackPos = {
                     element.ContentPosition.X + padding.X,
                     element.ContentPosition.Y + padding.Y * ySign
@@ -636,7 +644,9 @@ namespace ECS {
                 }
 
                 // Knob is centered at the end of the fill for consistent dragging.
-                Vector2D knobSize = { slider.KnobSize.X * scaleX, slider.KnobSize.Y * scaleY };
+                Vector2D knobSize = isWorldSpace
+                    ? Vector2D{ PixelsToUnits(slider.KnobSize.X), PixelsToUnits(slider.KnobSize.Y) }
+                    : Vector2D{ slider.KnobSize.X * scaleX, slider.KnobSize.Y * scaleY };
                 Vector2D knobPos = trackPos;
                 if (slider.Horizontal) {
                     knobPos.X = trackPos.X + trackSize.X * t - knobSize.X * 0.5f;

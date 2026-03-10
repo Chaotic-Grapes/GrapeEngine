@@ -780,6 +780,30 @@ namespace ECS {
 	inline void from_json(const nlohmann::json& j, GUIRenderMode& mode) {
 		mode.Space = static_cast<GUIRenderSpace>(j.value("Space", static_cast<uint8_t>(GUIRenderSpace::Screen)));
 	}
+
+	inline Vector2D LegacyAnchorFromAlignment(GUIAlignment alignment) {
+		switch (alignment) {
+		case GUIAlignment::Top:
+			return { 0.5f, 0.0f };
+		case GUIAlignment::TopRight:
+			return { 1.0f, 0.0f };
+		case GUIAlignment::Left:
+			return { 0.0f, 0.5f };
+		case GUIAlignment::Center:
+			return { 0.5f, 0.5f };
+		case GUIAlignment::Right:
+			return { 1.0f, 0.5f };
+		case GUIAlignment::BottomLeft:
+			return { 0.0f, 1.0f };
+		case GUIAlignment::Bottom:
+			return { 0.5f, 1.0f };
+		case GUIAlignment::BottomRight:
+			return { 1.0f, 1.0f };
+		case GUIAlignment::TopLeft:
+		default:
+			return { 0.0f, 0.0f };
+		}
+	}
 	inline void to_json(nlohmann::json& j, const GUIElement& element) {
 		j = nlohmann::json{
 			{"Position", element.Position},
@@ -788,7 +812,9 @@ namespace ECS {
 			{"Alignment", static_cast<uint8_t>(element.Alignment)},
 			{"ZOrder", element.ZOrder},
 			{"Margin", element.Margin},
-			{"Padding", element.Padding}
+			{"Padding", element.Padding},
+			{"AnchorMin", element.AnchorMin},
+			{"AnchorMax", element.AnchorMax}
 		};
 	}
 
@@ -800,6 +826,21 @@ namespace ECS {
 		element.ZOrder = static_cast<int16_t>(j.value("ZOrder", 0));
 		element.Margin = j.contains("Margin") ? j.at("Margin").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
 		element.Padding = j.contains("Padding") ? j.at("Padding").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+		if (j.contains("AnchorMin")) {
+			element.AnchorMin = j.at("AnchorMin").get<Vector2D>();
+		}
+		if (j.contains("AnchorMax")) {
+			element.AnchorMax = j.at("AnchorMax").get<Vector2D>();
+		}
+		if (!j.contains("AnchorMin") && !j.contains("AnchorMax")) {
+			const Vector2D legacy = LegacyAnchorFromAlignment(element.Alignment);
+			element.AnchorMin = legacy;
+			element.AnchorMax = legacy;
+		} else if (j.contains("AnchorMin") && !j.contains("AnchorMax")) {
+			element.AnchorMax = element.AnchorMin;
+		} else if (!j.contains("AnchorMin") && j.contains("AnchorMax")) {
+			element.AnchorMin = element.AnchorMax;
+		}
 	}
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)

@@ -683,6 +683,8 @@ namespace ECS {
             int16_t ZOrder = 0;                        // draw order within GUI pass
             Vector4D Margin{ 0.0f, 0.0f, 0.0f, 0.0f };  // left, top, right, bottom
             Vector4D Padding{ 0.0f, 0.0f, 0.0f, 0.0f }; // left, top, right, bottom
+            Vector2D AnchorMin{ 0.0f, 0.0f };         // normalized min anchor in parent/canvas
+            Vector2D AnchorMax{ 0.0f, 0.0f };         // normalized max anchor in parent/canvas
 
             // Runtime layout results (not serialized)
             Vector2D ResolvedPosition{ 0.0f, 0.0f }; // top-left in viewport space

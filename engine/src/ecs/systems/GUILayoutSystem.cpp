@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/GUILayoutSystem.h"
 #include "ecs/systems/GUIRenderUtils.h"
 #include "ecs/systems/RendererSystem.h"
+#include "graphics/renderer.hpp"
 
 namespace ECS {
     void GUILayoutSystem::OnCreate(World& world) {
@@ -99,6 +100,57 @@ namespace ECS {
         }
     }
 
+    static void NormalizeAnchorRange(Vector2D& anchorMin, Vector2D& anchorMax) {
+        anchorMin.X = std::clamp(anchorMin.X, 0.0f, 1.0f);
+        anchorMin.Y = std::clamp(anchorMin.Y, 0.0f, 1.0f);
+        anchorMax.X = std::clamp(anchorMax.X, 0.0f, 1.0f);
+        anchorMax.Y = std::clamp(anchorMax.Y, 0.0f, 1.0f);
+        if (anchorMin.X > anchorMax.X) std::swap(anchorMin.X, anchorMax.X);
+        if (anchorMin.Y > anchorMax.Y) std::swap(anchorMin.Y, anchorMax.Y);
+    }
+
+    static bool TryResolveInheritedCanvas(const World& world, Entity entity, Components::GUICanvas& outCanvas) {
+        Entity current = entity;
+        int depth = 0;
+        while (!current.IsNull() && depth < 64) {
+            if (world.Has<Components::GUICanvas>(current)) {
+                outCanvas = world.Get<Components::GUICanvas>(current);
+                return true;
+            }
+            if (!world.Has<Components::Parent>(current)) {
+                break;
+            }
+            const auto& parent = world.Get<Components::Parent>(current);
+            current = parent.ParentEntity;
+            if (current.IsNull() || !world.IsAlive(current)) {
+                break;
+            }
+            ++depth;
+        }
+        return false;
+    }
+
+    static Entity FindAnchorParentEntity(const World& world, Entity entity, Components::GUIRenderSpace targetSpace) {
+        Entity current = entity;
+        int depth = 0;
+        while (!current.IsNull() && depth < 64) {
+            if (!world.Has<Components::Parent>(current)) {
+                break;
+            }
+            const auto& parent = world.Get<Components::Parent>(current);
+            current = parent.ParentEntity;
+            if (current.IsNull() || !world.IsAlive(current)) {
+                break;
+            }
+            if (world.Has<Components::GUIElement>(current) &&
+                ResolveGUIRenderSpace(world, current) == targetSpace) {
+                return current;
+            }
+            ++depth;
+        }
+        return NULL_ENTITY;
+    }
+
     void GUILayoutSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
@@ -113,29 +165,20 @@ namespace ECS {
             viewport.Size = renderSize;
         }
 
-        // Use the first canvas found; if none exists, fall back to viewport size.
-        Components::GUICanvas canvas{};
+        // Cache a default canvas; elements may still inherit a nearer one from hierarchy.
+        Components::GUICanvas defaultCanvas{};
         bool foundCanvas = false;
         world.Each<Components::GUICanvas>([&](Entity, const Components::GUICanvas& c) {
-            canvas = c;
-            foundCanvas = true;
+            if (!foundCanvas) {
+                defaultCanvas = c;
+                foundCanvas = true;
+            }
         });
         if (!foundCanvas) {
-            canvas.ReferenceSize = viewport.Size;
-            canvas.Offset = { 0.0f, 0.0f };
-            canvas.ScaleMode = Components::GUIScaleMode::Fit;
+            defaultCanvas.ReferenceSize = viewport.Size;
+            defaultCanvas.Offset = { 0.0f, 0.0f };
+            defaultCanvas.ScaleMode = Components::GUIScaleMode::Fit;
         }
-
-        // Compute scale from reference size and scale mode.
-        const Vector2D scale = ComputeScale(canvas, viewport.Size);
-        const Vector2D contentSize = {
-            canvas.ReferenceSize.X * scale.X,
-            canvas.ReferenceSize.Y * scale.Y
-        };
-        const Vector2D contentOrigin = {
-            viewport.Origin.X + (viewport.Size.X - contentSize.X) * 0.5f,
-            viewport.Origin.Y + (viewport.Size.Y - contentSize.Y) * 0.5f
-        };
 
         // Cache camera basis for world-space GUI layout.
         glm::vec3 cameraRight(1.0f, 0.0f, 0.0f);
@@ -228,58 +271,69 @@ namespace ECS {
                     return offsetWorld2(origin, size.X * xFactor, size.Y * yFactor);
                 };
 
-                // Determine anchor origin and size based on parent if exists, otherwise use world position as origin with zero size.
-                Vector2D anchorOrigin{ 0.0f, 0.0f };
-                Vector2D anchorSize{ 0.0f, 0.0f };
+                // Determine parent/canvas anchor rect in world space.
+                Vector2D anchorBaseOrigin{ 0.0f, 0.0f };
+                Vector2D anchorBaseSize{ 0.0f, 0.0f };
                 bool hasParentAnchor = false;
                 const bool hasTransform = world.Has<Components::WorldTransform>(entity)
                     || world.Has<Components::LocalTransform>(entity);
                 Vector3D baseWorld = hasTransform ? getWorldPosition(entity) : Vector3D{ 0.0f, 0.0f, 0.0f };
                 glm::vec3 baseWorld3{ baseWorld.X, baseWorld.Y, baseWorld.Z };
 
-                // Recursively resolve parent first to ensure correct layout results, then derive anchor from parent element if valid.
-                if (world.Has<Components::Parent>(entity)) {
-                    const auto& parent = world.Get<Components::Parent>(entity);
-                    const Entity parentEntity = parent.ParentEntity;
-                    if (!parentEntity.IsNull() && world.IsAlive(parentEntity) &&
-                        world.Has<Components::GUIElement>(parentEntity)) {
-                        self(self, parentEntity);
-                        const auto& parentElement = world.Get<Components::GUIElement>(parentEntity);
-                        anchorOrigin = parentElement.ContentPosition;
-                        anchorSize = parentElement.ContentSize;
-                        hasParentAnchor = true;
-                        if (!hasTransform) {
-                            baseWorld = getWorldPosition(parentEntity);
-                            baseWorld3 = glm::vec3(baseWorld.X, baseWorld.Y, baseWorld.Z);
-                        }
+                // Resolve against nearest GUIElement ancestor in the same render space.
+                const Entity parentAnchorEntity = FindAnchorParentEntity(world, entity, Components::GUIRenderSpace::World);
+                if (!parentAnchorEntity.IsNull()) {
+                    self(self, parentAnchorEntity);
+                    const auto& parentElement = world.Get<Components::GUIElement>(parentAnchorEntity);
+                    anchorBaseOrigin = parentElement.ContentPosition;
+                    anchorBaseSize = parentElement.ContentSize;
+                    hasParentAnchor = true;
+                    if (!hasTransform) {
+                        baseWorld = getWorldPosition(parentAnchorEntity);
+                        baseWorld3 = glm::vec3(baseWorld.X, baseWorld.Y, baseWorld.Z);
                     }
                 }
 
                 // If no valid parent anchor, use world position as origin with zero size (i.e. align to world position based on element alignment).
                 if (!hasParentAnchor) {
-                    anchorOrigin = { baseWorld.X, baseWorld.Y };
-                    anchorSize = { 0.0f, 0.0f };
+                    anchorBaseOrigin = { baseWorld.X, baseWorld.Y };
+                    anchorBaseSize = { 0.0f, 0.0f };
                 }
 
-                // Compute size and margins/padding in world space (no canvas scaling).
-                const float marginLeft = element.Margin.X;
-                const float marginRight = element.Margin.Z;
-                const float marginTop = element.Margin.Y;
-                const float marginBottom = element.Margin.W;
-                const float paddingLeft = element.Padding.X;
-                const float paddingRight = element.Padding.Z;
-                const float paddingTop = element.Padding.Y;
-                const float paddingBottom = element.Padding.W;
+                Vector2D anchorMin = element.AnchorMin;
+                Vector2D anchorMax = element.AnchorMax;
+                NormalizeAnchorRange(anchorMin, anchorMax);
+                const Vector2D anchorOrigin = offsetWorld2(
+                    anchorBaseOrigin,
+                    anchorBaseSize.X * anchorMin.X,
+                    anchorBaseSize.Y * anchorMin.Y
+                );
+                const Vector2D anchorSize = {
+                    anchorBaseSize.X * (anchorMax.X - anchorMin.X),
+                    anchorBaseSize.Y * (anchorMax.Y - anchorMin.Y)
+                };
+
+                // World-space GUI uses pixel-authored values converted into world units.
+                const float marginLeft = PixelsToUnits(element.Margin.X);
+                const float marginRight = PixelsToUnits(element.Margin.Z);
+                const float marginTop = PixelsToUnits(element.Margin.Y);
+                const float marginBottom = PixelsToUnits(element.Margin.W);
+                const float paddingLeft = PixelsToUnits(element.Padding.X);
+                const float paddingRight = PixelsToUnits(element.Padding.Z);
+                const float paddingTop = PixelsToUnits(element.Padding.Y);
+                const float paddingBottom = PixelsToUnits(element.Padding.W);
+                const float positionX = PixelsToUnits(element.Position.X);
+                const float positionY = PixelsToUnits(element.Position.Y);
 
                 // Calculate size after margins.
-                Vector2D size = { element.Size.X, element.Size.Y };
+                Vector2D size = { PixelsToUnits(element.Size.X), PixelsToUnits(element.Size.Y) };
                 size.X = std::max(0.0f, size.X - marginLeft - marginRight);
                 size.Y = std::max(0.0f, size.Y - marginTop - marginBottom);
 
                 // Calculate anchor point in world space based on alignment, then offset by element position.
                 const Vector2D anchor = alignAnchorWorld(anchorOrigin, anchorSize, element.Alignment);
-                Vector2D position = offsetWorld2(anchor, element.Position.X, element.Position.Y);
-                glm::vec3 position3 = offsetWorld3(glm::vec3(anchor.X, anchor.Y, baseWorld3.z), element.Position.X, element.Position.Y);
+                Vector2D position = offsetWorld2(anchor, positionX, positionY);
+                glm::vec3 position3 = offsetWorld3(glm::vec3(anchor.X, anchor.Y, baseWorld3.z), positionX, positionY);
                 switch (element.Alignment) {
                 case Components::GUIAlignment::Top:
                     position = offsetWorld2(position, -size.X * 0.5f + (marginLeft - marginRight) * 0.5f, marginTop);
@@ -367,23 +421,43 @@ namespace ECS {
                     element.ScreenSize = { 0.0f, 0.0f };
                 }
             } else {
-                // Default anchor origin and size come from canvas space.
-                Vector2D anchorOrigin = { contentOrigin.X + canvas.Offset.X, contentOrigin.Y + canvas.Offset.Y };
-                Vector2D anchorSize = contentSize;
+                Components::GUICanvas activeCanvas = defaultCanvas;
+                (void)TryResolveInheritedCanvas(world, entity, activeCanvas);
 
-                // If has parent, resolve parent first and use its content rect as anchor.
-                if (world.Has<Components::Parent>(entity)) {
-                    const auto& parent = world.Get<Components::Parent>(entity);
-                    const Entity parentEntity = parent.ParentEntity;
-                    if (!parentEntity.IsNull() && world.IsAlive(parentEntity) &&
-                        world.Has<Components::GUIElement>(parentEntity)) {
-                        // Ensure parent is laid out before applying child offsets.
-                        self(self, parentEntity);
-                        const auto& parentElement = world.Get<Components::GUIElement>(parentEntity);
-                        anchorOrigin = parentElement.ContentPosition;
-                        anchorSize = parentElement.ContentSize;
-                    }
+                const Vector2D scale = ComputeScale(activeCanvas, viewport.Size);
+                const Vector2D canvasContentSize = {
+                    activeCanvas.ReferenceSize.X * scale.X,
+                    activeCanvas.ReferenceSize.Y * scale.Y
+                };
+                const Vector2D canvasContentOrigin = {
+                    viewport.Origin.X + (viewport.Size.X - canvasContentSize.X) * 0.5f + activeCanvas.Offset.X,
+                    viewport.Origin.Y + (viewport.Size.Y - canvasContentSize.Y) * 0.5f + activeCanvas.Offset.Y
+                };
+
+                // Default anchor origin and size come from canvas space.
+                Vector2D anchorBaseOrigin = canvasContentOrigin;
+                Vector2D anchorBaseSize = canvasContentSize;
+
+                // Resolve against nearest GUIElement ancestor in the same render space.
+                const Entity parentAnchorEntity = FindAnchorParentEntity(world, entity, Components::GUIRenderSpace::Screen);
+                if (!parentAnchorEntity.IsNull()) {
+                    self(self, parentAnchorEntity);
+                    const auto& parentElement = world.Get<Components::GUIElement>(parentAnchorEntity);
+                    anchorBaseOrigin = parentElement.ContentPosition;
+                    anchorBaseSize = parentElement.ContentSize;
                 }
+
+                Vector2D anchorMin = element.AnchorMin;
+                Vector2D anchorMax = element.AnchorMax;
+                NormalizeAnchorRange(anchorMin, anchorMax);
+                const Vector2D anchorOrigin = {
+                    anchorBaseOrigin.X + anchorBaseSize.X * anchorMin.X,
+                    anchorBaseOrigin.Y + anchorBaseSize.Y * anchorMin.Y
+                };
+                const Vector2D anchorSize = {
+                    anchorBaseSize.X * (anchorMax.X - anchorMin.X),
+                    anchorBaseSize.Y * (anchorMax.Y - anchorMin.Y)
+                };
 
                 // Apply scale to size and margin/padding so layout matches rendering.
                 Vector2D size = { element.Size.X * scale.X, element.Size.Y * scale.Y };
