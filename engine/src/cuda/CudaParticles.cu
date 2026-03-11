@@ -383,6 +383,8 @@ namespace CudaParticles {
         void* d_scanTemp,
         size_t scanTempBytes)
     {
+        (void)maxParticles;
+
         if (aliveCount <= 0) return 0;
 
         int threads = 256;

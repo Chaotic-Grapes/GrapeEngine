@@ -60,9 +60,9 @@ namespace ECS {
     }
 
     void ParticleSystem::OnUpdate(World& world) {
-        const float dt = TimeSystem::Instance().GetDeltaTime();
-        const float totalTime = (float)TimeSystem::Instance().GetTotalTime();
-        const unsigned int frameCount = (unsigned int)TimeSystem::Instance().GetFrameCount();
+        const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        const float totalTime = static_cast<float>(TimeSystem::Instance().GetTotalTime());
+        const unsigned int frameCount = static_cast<unsigned int>(TimeSystem::Instance().GetFrameCount());
 
         // Track which emitters are still alive
         std::unordered_map<uint32_t, bool> alive;
@@ -430,7 +430,6 @@ namespace ECS {
         if (masks.empty()) return;
 
         const size_t byteCount = masks.size();
-        const uint32_t newWidth = tileMap.CollisionWidth();
 
         if (!m_collisionGrid.d_masks ||
             (size_t)(m_collisionGrid.width * m_collisionGrid.height) != masks.size())
