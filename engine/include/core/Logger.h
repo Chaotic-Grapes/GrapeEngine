@@ -1,3 +1,25 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Logger.h
+\author Samantha Leong Sher Yen (100%)
+\par    s.leong@digipen.edu
+\brief  
+Logger class for logging messages with different severity levels to console and 
+files. Supports logging from both engine and script sources, with customizable log 
+file names and console output. Includes a console callback for editor integration 
+and timestamped log entries.
+
+Usage:
+- Use the LOG_* macros to log messages at different severity levels 
+(e.g., LOG_INFO("This is an info message")).
+- Configure log file names and console output using the Logger class methods.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef LOGGER_H
 #define LOGGER_H
 

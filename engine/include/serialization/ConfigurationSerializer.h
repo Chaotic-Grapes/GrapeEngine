@@ -1,5 +1,26 @@
-#ifndef SERIALIZATION_H
-#define SERIALIZATION_H
+/* Start Header *****************************************************************/
+/*!
+\file   ConfigurationSerializer.h
+\author Daniel Kay Neo Zuo Feng (30%)
+        Muhammad Nur Fadzly Bin Zulkifli (70%)
+\par    k.danielneozuofeng@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+\brief
+Defines the ConfigurationSerializer class for loading and saving project settings
+from JSON files. This class is used by both the engine runtime and editor to 
+manage project configuration, such as window settings, physics parameters, audio 
+levels, and performance options. The ConfigurationSerializer provides methods to 
+load settings from a file, save settings to a file, and validate the settings 
+structure.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#ifndef CONFIGURATION_SERIALIZER_H
+#define CONFIGURATION_SERIALIZER_H
 
 #include <nlohmann/json.hpp>
 #include <algorithm>
