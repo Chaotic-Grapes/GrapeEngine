@@ -31,30 +31,38 @@ struct BoidParams {
     float   collisionAvoidWeight;
     float   collisionAvoidRadius;
     unsigned int frameCount;  // set from TimeSystem::Instance().GetFrameCount()
+
+    // Spatial hashing
+    float    cellSize;       // should equal visualRange
+    int      hashTableSize;  // prime number, e.g. 100003 for 100K boids
+
+    uint32_t* d_cellIds;    // [count] cell id per boid
+    uint32_t* d_boidIds;    // [count] boid indices sorted by cell  
+    uint32_t* d_cellStart;  // [hashTableSize] where each cell starts in sorted array
 };
 
 namespace CudaBoids {
 
-    // Launch the boids simulation kernel.
-    //
-    // d_posVel:     device pointer to float4 array (mapped from GL VBO)
-    //               xy = position, zw = velocity
-    // d_posVelPrev: device pointer to float4 array (previous frame, CUDA-only)
-    //               The kernel reads from prev and writes to posVel.
-    // params:       simulation parameters for this frame
-    //
-    // After the kernel, the caller should swap the buffers or copy posVel -> posVelPrev.
+    // After the kernel, the caller swaps bufferIndex (no copy needed).
+    // Both buffers are GL VBOs accessed via CUDA interop.
     void Launch(float4* d_posVel,
-                const float4* d_posVelPrev,
-                const BoidParams& params);
+        const float4* d_posVelPrev,
+        const BoidParams& params,
+        cudaStream_t stream = 0);
 
     // Initialize boid positions/velocities randomly within bounds.
     void InitRandom(float4* d_posVel,
-                    int count,
-                    float minX, float minY,
-                    float maxX, float maxY,
-                    float maxSpeed,
-                    uint32_t entitySeed = 0);
+        int count,
+        float minX, float minY,
+        float maxX, float maxY,
+        float maxSpeed,
+        uint32_t entitySeed = 0,
+        const uint8_t* collisionMasks = nullptr,
+        int collisionWidth = 0,
+        int collisionHeight = 0,
+        int collisionOriginX = 0,
+        int collisionOriginY = 0,
+        float tileSize = 0.0f);
 
 } // namespace CudaBoids
 

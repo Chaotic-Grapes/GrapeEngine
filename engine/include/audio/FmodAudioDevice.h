@@ -28,6 +28,7 @@
 #ifndef FMODAUDIODEVICE_H
 #define FMODAUDIODEVICE_H
 
+#include <array>
 #include <unordered_map>
 #include <string>
 #include <fmod.hpp>
@@ -59,7 +60,7 @@ namespace Audio {
 
     class GRAPEENGINE_API FmodAudioDevice final {
     public:
-        FmodAudioDevice() = default; // POD-like; call Initialize() before use
+        FmodAudioDevice() { m_busLowPassGain.fill(1.0f); } // POD-like; call Initialize() before use
 
         // Lifecycle
         bool Initialize();
@@ -73,13 +74,14 @@ namespace Audio {
         bool HasCue(const std::string& cueId) const;
 
         // Playback
-        PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings);
+        PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings, Bus bus = Bus::SFX);
         void Stop(PlaybackHandle handle, StopMode mode);
 
         // Single-instance helpers (stop stacking, make Stop reliable by cue)
         PlaybackHandle PlaySingle(const std::string& cueId,
             const PlaySettings& settings,
-            PlayPolicy policy = PlayPolicy::SingleInstanceRestart);
+            PlayPolicy policy = PlayPolicy::SingleInstanceRestart,
+            Bus bus = Bus::SFX);
         void StopCue(const std::string& cueId, StopMode mode);
         bool IsCuePlaying(const std::string& cueId) const;
 
@@ -90,6 +92,10 @@ namespace Audio {
         void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
         bool IsHandlePlaying(PlaybackHandle handle) const;
+
+        // Bus-level controls routed through FMOD channel groups and DSPs.
+        void SetBusLowPassGain(Bus bus, float gain);
+        float GetBusLowPassGain(Bus bus) const;
 
         // Listener and master
         void SetListener(const ListenerParams& listener);
@@ -108,10 +114,15 @@ namespace Audio {
         FMOD::ChannelGroup* GetMasterChannelGroup() const { return m_master; }
 
     private:
+        static constexpr size_t kBusCount = static_cast<size_t>(Bus::Count);
+
         // FMOD objects
         FMOD::System* m_system = nullptr;
         FMOD::ChannelGroup* m_master = nullptr;
         float               m_masterVolume = 1.0f;
+        std::array<FMOD::ChannelGroup*, kBusCount> m_busGroups{};
+        std::array<FMOD::DSP*, kBusCount> m_busLowPassDsps{};
+        std::array<float, kBusCount> m_busLowPassGain{};
 
         // Maps
         std::unordered_map<uint64_t, FMOD::Channel*> m_channels;  // active channels keyed by handle id
@@ -131,6 +142,12 @@ namespace Audio {
         FMOD::Sound* _createSoundFromMemory(const std::string& cueId,
             const std::string& path,
             const SoundParams& params);
+        bool _initializeBusRouting();
+        void _shutdownBusRouting();
+        FMOD::ChannelGroup* _channelGroupForBus(Bus bus) const;
+        void _applyBusLowPassGain(Bus bus);
+        static float _clampLowPassGain(float gain);
+        static float _lowPassGainToCutoffHz(float gain);
     };
 
 } // namespace Audio

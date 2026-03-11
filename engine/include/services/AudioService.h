@@ -110,6 +110,8 @@ namespace Services {
 		void SetBusVolume(Audio::Bus bus, float volume) const { if (m_engine) m_engine->SetBusVolume(bus, volume); }
 		float GetBusVolume(Audio::Bus bus) const { return m_engine ? m_engine->GetBusVolume(bus) : 1.0f; }
 		void FadeBusVolume(Audio::Bus bus, float targetVolume, float duration) const { if (m_engine) m_engine->FadeBusVolume(bus, targetVolume, duration); }
+		void SetBusLowPassGain(Audio::Bus bus, float gain) const { if (m_engine) m_engine->SetBusLowPassGain(bus, gain); }
+		float GetBusLowPassGain(Audio::Bus bus) const { return m_engine ? m_engine->GetBusLowPassGain(bus) : 1.0f; }
 
 
 		// -----------------------------------------------------------------

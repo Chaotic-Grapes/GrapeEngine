@@ -788,6 +788,26 @@ namespace ECS {
                         SubmitRuntimeTileMapEntity(entity);
                         SubmitDebugTileMapEntity(world, entity);
 
+                        // Boid flock entity — flush batch, draw instanced at correct Z
+                        if (world.Has<Components::BoidFlock>(entity)) {
+                            m_renderer->endFrame();
+
+                            if (m_boidSystem && m_boidShader) {
+                                m_boidShader->use();
+                                m_boidShader->setMat4("uViewProj", viewProj);
+                                m_lightManager.Bind(*m_boidShader);
+                                m_boidSystem->DrawFlockForEntity(entity.Index, *m_boidShader);
+                            }
+
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 1);
+                            m_lightManager.Bind(*m_shader);
+                            m_renderer->beginFrame();
+                            continue;
+                        }
+
                         // Fetch transform
                         auto& lt = world.Get<Components::LocalTransform>(entity);
                         Vector3D position, scale; Quaternion rotation;
@@ -911,13 +931,6 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-
-                    // --- Boids on this layer ---
-                    if (m_boidSystem && m_boidShader) {
-                        m_boidShader->use();
-                        m_boidShader->setMat4("uViewProj", viewProj);
-                        m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
-                    }
 
                     // --- Particles on this layer ---
                     if (m_particleSystem && m_particleShader) {
@@ -2352,6 +2365,26 @@ namespace ECS {
                 SubmitRuntimeTileMapEntity(entity);
                 SubmitDebugTileMapEntity(world, entity);
 
+                // Boid flock entity — flush batch, draw instanced at correct Z
+                if (world.Has<Components::BoidFlock>(entity)) {
+                    m_renderer->endFrame();
+
+                    if (m_boidSystem && m_boidShader) {
+                        m_boidShader->use();
+                        m_boidShader->setMat4("uViewProj", viewProj);
+                        m_lightManager.Bind(*m_boidShader);
+                        m_boidSystem->DrawFlockForEntity(entity.Index, *m_boidShader);
+                    }
+
+                    m_shader->use();
+                    m_shader->setMat4("uViewProj", viewProj);
+                    m_shader->setUniform("uPicking", 0);
+                    m_shader->setUniform("uLightingEnabled", 1);
+                    m_lightManager.Bind(*m_shader);
+                    m_renderer->beginFrame();
+                    continue;
+                }
+
                 auto& lt = world.Get<Components::LocalTransform>(entity);
                 Vector3D position, scale; Quaternion rotation;
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
@@ -2432,13 +2465,6 @@ namespace ECS {
                 }
             }
               m_renderer->endFrame();
-
-              // --- Boids on this layer ---
-              if (m_boidSystem && m_boidShader) {
-                  m_boidShader->use();
-                  m_boidShader->setMat4("uViewProj", viewProj);
-                  m_boidSystem->DrawFlocksByLayer(layerId, *m_boidShader, viewProj);
-              }
 
               // --- Particles on this layer ---
               if (m_particleSystem && m_particleShader) {

@@ -244,6 +244,32 @@ public static class Audio
     }
 
     /// <summary>
+    /// Set low-pass filtering for a specific mixer bus.
+    /// 1.0 = no filtering, 0.0 = strongest filtering.
+    /// </summary>
+    public static void SetBusLowPassFilter(AudioBus bus, float gain)
+    {
+        float clamped = gain < 0.0f ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+        AudioAPI.SetBusLowPassGain((int)bus, clamped);
+    }
+
+    /// <summary>
+    /// Clear low-pass filtering for a mixer bus.
+    /// </summary>
+    public static void ClearBusLowPassFilter(AudioBus bus)
+    {
+        AudioAPI.SetBusLowPassGain((int)bus, 1.0f);
+    }
+
+    /// <summary>
+    /// Get the current low-pass filter gain for a mixer bus.
+    /// </summary>
+    public static float GetBusLowPassFilter(AudioBus bus)
+    {
+        return AudioAPI.GetBusLowPassGain((int)bus);
+    }
+
+    /// <summary>
     /// Set the 3D audio listener position, velocity, and orientation.
     /// </summary>
     /// <param name="position">Listener position.</param>

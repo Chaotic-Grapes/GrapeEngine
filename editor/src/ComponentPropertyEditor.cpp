@@ -1669,8 +1669,6 @@ void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity enti
 
 // Renders the CircleCollider2D component
 void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
-    (void)entity;
-    (void)world;
     ImGuiIdScope id("CircleCollider2D");
     // Group rows for trigger, offset, radius and layer mask together
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer Mask" });
@@ -1708,18 +1706,46 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entit
                 }
             }
             if (!dataPtr) return;
-            bool enabled = v.is_boolean() ? v.get<bool>() : false;
             int f = (*dataPtr).value("Flags", 0);
-            if (enabled) f |= 0x1; else f &= ~0x1;
+            if (v.is_boolean()) {
+                bool enabled = v.get<bool>();
+                if (enabled) f |= 0x1; else f &= ~0x1;
+            }
+            else if (v.is_number_integer() || v.is_number_unsigned()) {
+                f = v.get<int>();
+            }
+            else {
+                return;
+            }
             (*dataPtr)["Flags"] = f;
             uiMeta->ApplyToEntity(world, e, *dataPtr);
         };
-        // Use a transient key to render checkbox; do not alter Flags here directly.
-        nlohmann::json& transient = data;
-        transient["IsTrigger"] = isTrigger;
-        EditorUI::RenderCheckboxProperty("Is Trigger##Circle", transient, "IsTrigger",
-            m_undo, world, entity.Index, compId, "Flags", applyFn);
-        // Keep the JSON clean by not relying on transient "IsTrigger" downstream.
+        if (EditorUI::RenderCheckboxPropertyReturn("Is Trigger##Circle", isTrigger)) {
+            const int newFlags = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+            data["Flags"] = newFlags;
+
+            if (m_undo && world && compId != ECS::NULL_COMPONENT_ID) {
+                const bool isMultiSelect = m_selectedEntities && m_selectedEntities->size() > 1 && m_selectedEntities->count(entity.Index);
+                if (isMultiSelect) {
+                    m_undo->BeginBatchPropertyEdit(*m_selectedEntities, compId, "Flags");
+                    m_undo->EndBatchPropertyEdit(*m_selectedEntities, compId, "Flags", isTrigger,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                        });
+                }
+                else {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "Flags", flags, newFlags,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                        });
+                }
+            }
+            else if (world && compId != ECS::NULL_COMPONENT_ID) {
+                applyFn(world, entity.Index, compId, "Flags", newFlags);
+            }
+        }
     }
 
     // Offset moves the collider shape relative to the entity origin (with undo)
@@ -1860,16 +1886,46 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 }
             }
             if (!dataPtr) return;
-            bool enabled = v.is_boolean() ? v.get<bool>() : false;
             int f = (*dataPtr).value("Flags", 0);
-            if (enabled) f |= 0x1; else f &= ~0x1;
+            if (v.is_boolean()) {
+                bool enabled = v.get<bool>();
+                if (enabled) f |= 0x1; else f &= ~0x1;
+            }
+            else if (v.is_number_integer() || v.is_number_unsigned()) {
+                f = v.get<int>();
+            }
+            else {
+                return;
+            }
             (*dataPtr)["Flags"] = f;
             uiMeta->ApplyToEntity(world, e, *dataPtr);
         };
-        nlohmann::json& transient = data;
-        transient["IsTrigger"] = isTrigger;
-        EditorUI::RenderCheckboxProperty("Is Trigger##Box", transient, "IsTrigger",
-            m_undo, world, entity.Index, compId, "Flags", applyFn);
+        if (EditorUI::RenderCheckboxPropertyReturn("Is Trigger##Box", isTrigger)) {
+            const int newFlags = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+            data["Flags"] = newFlags;
+
+            if (m_undo && world && compId != ECS::NULL_COMPONENT_ID) {
+                const bool isMultiSelect = m_selectedEntities && m_selectedEntities->size() > 1 && m_selectedEntities->count(entity.Index);
+                if (isMultiSelect) {
+                    m_undo->BeginBatchPropertyEdit(*m_selectedEntities, compId, "Flags");
+                    m_undo->EndBatchPropertyEdit(*m_selectedEntities, compId, "Flags", isTrigger,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                        });
+                }
+                else {
+                    m_undo->RecordPropertyChange(entity.Index, compId, "Flags", flags, newFlags,
+                        [applyFn](ECS::World* w, ECS::Entity e, ECS::ComponentTypeId cid,
+                                  const std::string& p, const nlohmann::json& v) {
+                            applyFn(reinterpret_cast<void*>(w), e.Index, cid, p, v);
+                        });
+                }
+            }
+            else if (world && compId != ECS::NULL_COMPONENT_ID) {
+                applyFn(world, entity.Index, compId, "Flags", newFlags);
+            }
+        }
     }
 
     // Offset moves the box shape relative to the entity origin (with undo)
@@ -5159,31 +5215,6 @@ void ComponentUI::RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS:
 
     EditorUI::RenderFloatRow("Boid Size", "", data, "boidSize", 0.01f, 0.0f, 100.0f);
 
-    // Texture drag-drop (like SpriteRenderer2D)
-    std::string texPath = data.value("TexturePath", "");
-    std::string label = texPath.empty()
-        ? "None (drag texture here)"
-        : std::filesystem::path(texPath).filename().string();
-
-    EditorUI::RenderStaticValueRow("Texture", label, texPath.empty());
-
-    HandleAssetDragDropTarget(kImageExtensions,
-        [&](const std::string& droppedPath)
-        {
-            auto tex = RM.Get<Texture>(droppedPath);
-            if (tex)
-            {
-                data["TexturePath"] = droppedPath;
-                data["textureId"] = static_cast<uint32_t>(tex->ID());
-                return true;
-            }
-            return false;
-        },
-        [&](const std::string& rejectedPath)
-        {
-            QueueAssetDropError(rejectedPath, kImageExtensions);
-        });
-
     EditorUI::EndPropertySection();
 }
 
@@ -5232,7 +5263,7 @@ void ComponentUI::RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity
     if (!data.contains("rotationSpeedMax"))  data["rotationSpeedMax"] = 0.0f;
 
     EditorUI::BeginPropertySection({
-        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active", "Texture",
+        "Preset", "Max Particles", "Emission Rate", "Burst Count", "Particle Size", "Active",
         "Speed Min", "Speed Max", "Gravity X", "Gravity Y", "Drag", "Turbulence",
         "Wobble Frequency", "Wobble Amplitude", "Size Start", "Size End",
         "Lifetime Min", "Lifetime Max", "Emission Angle", "Emission Spread",

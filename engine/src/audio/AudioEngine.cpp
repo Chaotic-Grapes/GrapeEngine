@@ -175,6 +175,20 @@ namespace Audio {
         state.Fade.StopOnComplete = false;
     }
 
+    void AudioEngine::SetBusLowPassGain(Bus bus, float gain) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetBusLowPassGain(bus, gain);
+    }
+
+    float AudioEngine::GetBusLowPassGain(Bus bus) const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetBusLowPassGain(bus);
+    }
+
     void AudioEngine::FadeInstance(PlaybackHandle handle, float targetVolume, float duration, bool stopOnComplete) {
         auto it = m_instances.find(handle.Id);
         if (it == m_instances.end()) {

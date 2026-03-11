@@ -100,6 +100,14 @@ internal partial class AudioAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_FadeBusVolume")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void FadeBusVolume(int bus, float targetVolume, float duration);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetBusLowPassGain")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetBusLowPassGain(int bus, float gain);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetBusLowPassGain")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetBusLowPassGain(int bus);
 }
 
 
