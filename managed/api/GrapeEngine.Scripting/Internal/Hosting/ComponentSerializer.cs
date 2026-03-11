@@ -18,6 +18,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -28,6 +31,11 @@ namespace GrapeEngine.Scripting.Internal.Hosting;
 internal static class ComponentSerializer
 {
     private static readonly ConcurrentDictionary<uint, Type> _types = new();
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        IncludeFields = true
+    };
 
     // Delegate used for reverse-P/Invoke from native (serialization)
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -55,6 +63,14 @@ internal static class ComponentSerializer
     public static void RegisterManagedType(uint hash, Type t)
     {
         _types[hash] = t;
+    }
+
+    internal static bool TryDeserializeFromJson(uint typeHash, IntPtr data, int size, string jsonString)
+    {
+        if (!_types.TryGetValue(typeHash, out var t))
+            return false;
+
+        return TryDeserializeToNative(t, data, size, jsonString);
     }
 
     /// <summary>
@@ -85,11 +101,25 @@ internal static class ComponentSerializer
             if (!_types.TryGetValue(typeHash, out var t))
                 return IntPtr.Zero;
 
-            // Marshal native bytes into managed object
-            var obj = Marshal.PtrToStructure(data, t)!;
+            // Prefer blittable byte copy to avoid marshal layout remapping (bool/order issues).
+            object? obj = null;
+            try
+            {
+                obj = CreateManagedObjectFromNative(t, data, size);
+            }
+            catch
+            {
+                // Fallback to marshal path for unexpected edge cases.
+                obj = Marshal.PtrToStructure(data, t);
+            }
 
-            // Serialize to JSON
-            var json = JsonSerializer.Serialize(obj, t);
+            if (obj == null)
+                return IntPtr.Zero;
+
+            // Serialize through JSON-compatible primitives/objects so System.Text.Json
+            // does not cache reflection-emit accessors for collectible script types.
+            object? jsonValue = ToJsonCompatibleValue(obj, t);
+            var json = JsonSerializer.Serialize(jsonValue, _jsonOptions);
 
             // Return as CoTaskMem UTF8
             return StringToCoTaskMemUTF8(json);
@@ -114,27 +144,301 @@ internal static class ComponentSerializer
             // Marshal JSON string from native
             string jsonString = Marshal.PtrToStringUTF8(jsonStr) ?? "{}";
 
-            // Deserialize from JSON
-            var options = new JsonSerializerOptions 
-            { 
-                PropertyNameCaseInsensitive = true,
-                IncludeFields = true
-            };
-            var obj = JsonSerializer.Deserialize(jsonString, t, options);
-
-            if (obj == null)
+            if (TryDeserializeToNative(t, data, size, jsonString))
             {
-                Logging.LogInternal($"[ComponentSerializer] Failed to deserialize type {t.Name}", LogLevel.Warning);
                 return;
             }
-
-            // Copy deserialized object back to native memory
-            Marshal.StructureToPtr(obj, data, false);
         }
         catch (Exception ex)
         {
             Logging.LogInternal($"[ComponentSerializer] Deserialize error: {ex.Message}", LogLevel.Error);
         }
+    }
+
+    private static unsafe object? CreateManagedObjectFromNative(Type t, IntPtr data, int size)
+    {
+        if (size <= 0)
+            return null;
+
+        object boxed = RuntimeHelpers.GetUninitializedObject(t);
+        GCHandle handle = default;
+        try
+        {
+            handle = GCHandle.Alloc(boxed, GCHandleType.Pinned);
+            IntPtr boxedPtr = handle.AddrOfPinnedObject();
+            int managedSize = Marshal.SizeOf(t);
+            if (size < managedSize)
+            {
+                Logging.LogInternal($"[ComponentSerializer] Serialize size mismatch for {t.Name}: native={size}, managed={managedSize}", LogLevel.Warning);
+                return null;
+            }
+
+            Buffer.MemoryCopy((void*)data, (void*)boxedPtr, managedSize, managedSize);
+            return boxed;
+        }
+        finally
+        {
+            if (handle.IsAllocated)
+                handle.Free();
+        }
+    }
+
+    private static unsafe bool TryDeserializeToNative(Type t, IntPtr data, int size, string jsonString)
+    {
+        object? obj;
+        try
+        {
+            obj = CreateManagedObjectFromNative(t, data, size);
+        }
+        catch
+        {
+            obj = RuntimeHelpers.GetUninitializedObject(t);
+        }
+
+        if (obj == null)
+            return false;
+
+        using JsonDocument document = JsonDocument.Parse(jsonString);
+        if (!ApplyJsonToObject(t, document.RootElement, obj))
+        {
+            Logging.LogInternal($"[ComponentSerializer] Failed to deserialize type {t.Name}", LogLevel.Warning);
+            return false;
+        }
+
+        GCHandle handle = default;
+        try
+        {
+            handle = GCHandle.Alloc(obj, GCHandleType.Pinned);
+            IntPtr boxedPtr = handle.AddrOfPinnedObject();
+            int managedSize = Marshal.SizeOf(t);
+            if (size < managedSize)
+            {
+                Logging.LogInternal($"[ComponentSerializer] Deserialize size mismatch for {t.Name}: native={size}, managed={managedSize}", LogLevel.Warning);
+                return false;
+            }
+
+            Buffer.MemoryCopy((void*)boxedPtr, (void*)data, managedSize, managedSize);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Keep compatibility with prior behavior if pin/copy fails.
+            Logging.LogInternal($"[ComponentSerializer] Byte-copy deserialize fallback for {t.Name}: {ex.Message}", LogLevel.Debug);
+            try
+            {
+                Marshal.StructureToPtr(obj, data, false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        finally
+        {
+            if (handle.IsAllocated)
+                handle.Free();
+        }
+    }
+
+    private static object? ToJsonCompatibleValue(object value, Type type)
+    {
+        // Nullable<T>
+        Type? nullableUnderlying = Nullable.GetUnderlyingType(type);
+        if (nullableUnderlying != null)
+        {
+            return ToJsonCompatibleValue(value, nullableUnderlying);
+        }
+
+        if (type.IsEnum)
+            return Convert.ChangeType(value, Enum.GetUnderlyingType(type));
+
+        if (type == typeof(bool) || type == typeof(byte) || type == typeof(sbyte) ||
+            type == typeof(short) || type == typeof(ushort) || type == typeof(int) ||
+            type == typeof(uint) || type == typeof(long) || type == typeof(ulong) ||
+            type == typeof(float) || type == typeof(double) || type == typeof(decimal) ||
+            type == typeof(char) || type == typeof(string))
+        {
+            return value;
+        }
+
+        if (type.IsValueType)
+        {
+            var map = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!prop.CanRead || prop.GetIndexParameters().Length != 0)
+                    continue;
+
+                object? propVal = prop.GetValue(value);
+                if (propVal == null)
+                    continue;
+
+                map[prop.Name] = ToJsonCompatibleValue(propVal, prop.PropertyType);
+            }
+
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (field.IsStatic)
+                    continue;
+
+                if (field.Name.Contains("k__BackingField", StringComparison.Ordinal))
+                    continue;
+
+                // Prefer property view when both exist.
+                if (map.ContainsKey(field.Name))
+                    continue;
+
+                object? fieldVal = field.GetValue(value);
+                if (fieldVal == null)
+                    continue;
+
+                map[field.Name] = ToJsonCompatibleValue(fieldVal, field.FieldType);
+            }
+
+            return map;
+        }
+
+        // Should never happen for unmanaged components, but keep fallback safe.
+        return value.ToString();
+    }
+
+    private static bool ApplyJsonToObject(Type targetType, JsonElement element, object target)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            return false;
+
+        var properties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetIndexParameters().Length == 0)
+            .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
+
+        var fields = targetType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f => !f.IsStatic)
+            .ToDictionary(f => f.Name, f => f, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var jsonProp in element.EnumerateObject())
+        {
+            if (properties.TryGetValue(jsonProp.Name, out var prop))
+            {
+                if (!TryConvertJsonToType(jsonProp.Value, prop.PropertyType, out object? converted))
+                    continue;
+
+                // For record-struct init-only properties, write backing field directly.
+                string backingName = $"<{prop.Name}>k__BackingField";
+                if (fields.TryGetValue(backingName, out var backingField))
+                {
+                    backingField.SetValue(target, converted);
+                }
+                else if (prop.CanWrite)
+                {
+                    prop.SetValue(target, converted);
+                }
+
+                continue;
+            }
+
+            if (fields.TryGetValue(jsonProp.Name, out var field))
+            {
+                if (field.Name.Contains("k__BackingField", StringComparison.Ordinal))
+                    continue;
+
+                if (!TryConvertJsonToType(jsonProp.Value, field.FieldType, out object? converted))
+                    continue;
+
+                field.SetValue(target, converted);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryConvertJsonToType(JsonElement element, Type targetType, out object? value)
+    {
+        value = null;
+
+        Type? nullableUnderlying = Nullable.GetUnderlyingType(targetType);
+        if (nullableUnderlying != null)
+        {
+            if (element.ValueKind == JsonValueKind.Null)
+            {
+                value = null;
+                return true;
+            }
+            targetType = nullableUnderlying;
+        }
+
+        try
+        {
+            if (targetType == typeof(bool))
+            {
+                value = element.GetBoolean();
+                return true;
+            }
+            if (targetType == typeof(byte)) { value = element.GetByte(); return true; }
+            if (targetType == typeof(sbyte)) { value = element.GetSByte(); return true; }
+            if (targetType == typeof(short)) { value = element.GetInt16(); return true; }
+            if (targetType == typeof(ushort)) { value = element.GetUInt16(); return true; }
+            if (targetType == typeof(int)) { value = element.GetInt32(); return true; }
+            if (targetType == typeof(uint)) { value = element.GetUInt32(); return true; }
+            if (targetType == typeof(long)) { value = element.GetInt64(); return true; }
+            if (targetType == typeof(ulong)) { value = element.GetUInt64(); return true; }
+            if (targetType == typeof(float)) { value = element.GetSingle(); return true; }
+            if (targetType == typeof(double)) { value = element.GetDouble(); return true; }
+            if (targetType == typeof(decimal)) { value = element.GetDecimal(); return true; }
+            if (targetType == typeof(char))
+            {
+                string s = element.GetString() ?? string.Empty;
+                if (s.Length == 1)
+                {
+                    value = s[0];
+                    return true;
+                }
+                return false;
+            }
+            if (targetType == typeof(string))
+            {
+                value = element.GetString() ?? string.Empty;
+                return true;
+            }
+
+            if (targetType.IsEnum)
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    string? s = element.GetString();
+                    if (s != null && Enum.TryParse(targetType, s, ignoreCase: true, out object? enumObj))
+                    {
+                        value = enumObj;
+                        return true;
+                    }
+                    return false;
+                }
+
+                var underlying = Enum.GetUnderlyingType(targetType);
+                if (!TryConvertJsonToType(element, underlying, out object? enumRaw))
+                    return false;
+
+                value = Enum.ToObject(targetType, enumRaw!);
+                return true;
+            }
+
+            if (targetType.IsValueType && element.ValueKind == JsonValueKind.Object)
+            {
+                object boxed = RuntimeHelpers.GetUninitializedObject(targetType);
+                if (!ApplyJsonToObject(targetType, element, boxed))
+                    return false;
+
+                value = boxed;
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private static IntPtr StringToCoTaskMemUTF8(string? str)

@@ -186,7 +186,9 @@ internal static class AssemblyManager
                 return false;
             }
 
-            var (assembly, loadContext) = entry;
+            Assembly? assembly = entry.Assembly;
+            ScriptLoadContext? loadContext = entry.Context;
+            string unloadedAssemblyName = assembly?.FullName ?? trackingKey;
 
             Logging.LogInternal($"[AssemblyManager] Unloading assembly: {trackingKey}", LogLevel.Info);
 
@@ -217,6 +219,11 @@ internal static class AssemblyManager
                 }
             }
 
+            // Drop strong references before forcing GC.
+            // Keeping assembly/loadContext locals alive here can prevent collectible ALC unload.
+            assembly = null;
+            loadContext = null;
+
             // Force GC to complete finalization and allow the ALC to unload.
             // Increased iterations and sleep time to handle cached references from World wrappers
             // and other assembly types. CoreCLR finalizers are asynchronous.
@@ -246,7 +253,7 @@ internal static class AssemblyManager
                 Logging.LogInternal($"[AssemblyManager] Confirmed: Assembly AssemblyLoadContext collected and unloaded: {trackingKey}", LogLevel.Info);
             }
 
-            Logging.LogInternal($"[AssemblyManager] Unloaded: {assembly.FullName}", LogLevel.Info);
+            Logging.LogInternal($"[AssemblyManager] Unloaded: {unloadedAssemblyName}", LogLevel.Info);
             return true;
         }
         catch (Exception ex)

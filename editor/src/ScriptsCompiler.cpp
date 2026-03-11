@@ -458,17 +458,11 @@ void ScriptsCompiler::_mainThreadLoad() {
 
     ECS::World* targetWorld = _getTargetWorld();
 
-    // 1. Clear managed components
-    if (auto clear = m_scriptManager->GetClearAllManagedComponentsFunc()) {
-        clear(targetWorld);
-        LOG_INFO("[ScriptsCompiler] Cleared all C# components");
-    }
-
-    // 2. Unregister old systems
+    // 1. Unregister old systems
     m_engine->GetSystemManager().UnregisterScriptedSystems(*targetWorld);
     LOG_INFO("[ScriptsCompiler] Unregistered old scripted systems");
 
-    // 3. Load new assembly
+    // 2. Load new assembly
     if (!m_scriptManager->LoadAssembly(m_pendingScriptsOutput)) {
         std::lock_guard<std::mutex> lock(m_stateMutex);
         m_hotReloadState = HotReloadState::Failed;
@@ -480,7 +474,7 @@ void ScriptsCompiler::_mainThreadLoad() {
 
     LOG_INFO("[ScriptsCompiler] Loaded new script assembly");
 
-    // 4. Register new systems
+    // 3. Register new systems
     int count = m_scriptManager->RegisterScriptedSystems(
         m_engine->GetSystemManager(), targetWorld);
 

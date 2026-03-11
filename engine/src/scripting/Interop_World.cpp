@@ -896,8 +896,25 @@ INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size,
     // Check if already registered in the C++ ComponentRegistry
     ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeNameHash);
     if (id != ECS::NULL_COMPONENT_ID) {
-        LOG_INFO("[WorldInterop_RegisterComponent] Already registered with ID " << id);
-        return true; // Already registered in C++ registry
+        const auto& existingMeta = ECS::ComponentRegistry::Meta(id);
+
+        if (existingMeta.IsManaged) {
+            // Hot reload path: refresh size/alignment for an existing managed hash.
+            if (typeName && typeName[0] != '\0') {
+                ECS::ComponentRegistry::RegisterCSharpComponentWithName(typeNameHash, size, alignment, typeName);
+            } else {
+                ECS::ComponentRegistry::RegisterCSharpComponent(typeNameHash, size, alignment);
+            }
+
+            const auto& updatedMeta = ECS::ComponentRegistry::Meta(id);
+            LOG_INFO("[WorldInterop_RegisterComponent] Updated existing managed component ID " << id
+                << " (size " << existingMeta.Size << " -> " << updatedMeta.Size
+                << ", align " << existingMeta.Align << " -> " << updatedMeta.Align << ")");
+            return true;
+        }
+
+        LOG_INFO("[WorldInterop_RegisterComponent] Already registered with native component ID " << id << ", keeping existing metadata");
+        return true;
     }
     
     // Register as a C# component in the native ComponentRegistry

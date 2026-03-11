@@ -74,6 +74,8 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 /// </summary>
 public static class ScriptHost
 {
+    private readonly record struct ManagedComponentSchema(uint Hash, int Size, string Signature, string Name);
+    private readonly record struct ManagedComponentSnapshot(ulong EntityId, string Json);
     /// <summary>
     /// Extract the original assembly path from a versioned path.
     /// GameScripts_hotreload_1.dll -> GameScripts.dll
@@ -141,6 +143,10 @@ public static class ScriptHost
     /// This is set before hot reload so we can clear components from the active world during unload.
     /// </summary>
     private static IntPtr _currentWorldPtr = IntPtr.Zero;
+    private static IntPtr _reconcileWorldPtr = IntPtr.Zero;
+    private static Dictionary<uint, ManagedComponentSchema> _preUnloadManagedSchemas = new();
+    private static Dictionary<uint, List<ManagedComponentSnapshot>> _preUnloadComponentSnapshots = new();
+    private static bool _hasPendingSchemaReconcile = false;
 
     /// <summary>
     /// Set the current active world pointer for hot reload operations.
@@ -263,6 +269,7 @@ public static class ScriptHost
             {
                 // Discover and register all components in loaded assemblies
                 ComponentDiscovery.DiscoverAndRegisterAll();
+                ReconcileManagedComponentsAfterReload();
                 return 0;
             }
             return -1;
@@ -287,19 +294,13 @@ public static class ScriptHost
 
             Logging.LogInternal($"[ScriptHost] Unloading assembly: {assemblyPath}", LogLevel.Info);
             
-            // IMPORTANT: Clear managed components from entities FIRST if we have a world pointer.
-            // This must happen before any cache clearing, as component removal still needs type information.
-            if (_currentWorldPtr != IntPtr.Zero)
-            {
-                Logging.LogInternal($"[ScriptHost] Clearing managed components from current world before unload", LogLevel.Info);
-                ClearAllManagedComponentsInternal();
-                _currentWorldPtr = IntPtr.Zero;
-            }
-            else
-            {
-                Logging.LogInternal($"[ScriptHost] WARNING: No world pointer set for hot reload component clearing. " +
-                    "Components may not be cleared from entities, preventing hot reload.", LogLevel.Warning);
-            }
+            // Capture current managed component schemas before cache clear.
+            // We will remove only deleted/changed components after the new assembly is loaded.
+            _preUnloadManagedSchemas = CaptureManagedComponentSchemas();
+            _reconcileWorldPtr = _currentWorldPtr;
+            _preUnloadComponentSnapshots = CaptureManagedComponentSnapshots(_reconcileWorldPtr, _preUnloadManagedSchemas.Keys);
+            _hasPendingSchemaReconcile = true;
+            _currentWorldPtr = IntPtr.Zero;
             
             // Clear World wrapper cache (holds instances that reference assembly types)
             ClearWorldCache();
@@ -410,6 +411,7 @@ public static class ScriptHost
             // Re-discover and register all components in loaded assemblies
             // This is CRITICAL for hot reload - C++ needs updated component definitions
             ComponentDiscovery.DiscoverAndRegisterAll();
+            ReconcileManagedComponentsAfterReload();
             Logging.LogInternal($"[ScriptHost] Re-discovered components after reload", LogLevel.Info);
 
             // Clear discovered systems before discovering new ones to avoid duplication
@@ -1218,6 +1220,187 @@ public static class ScriptHost
         _requireForUpdateCache.Clear();
     }
 
+    private static Dictionary<uint, ManagedComponentSchema> CaptureManagedComponentSchemas()
+    {
+        var schemas = new Dictionary<uint, ManagedComponentSchema>();
+
+        foreach (var type in ComponentDiscovery.TypeHashToType.Values)
+        {
+            try
+            {
+                uint hash = ComponentTypeHelper.GetTypeHash(type);
+                int size = Marshal.SizeOf(type);
+                string signature = BuildComponentSignature(type);
+                string name = type.FullName ?? type.Name;
+                schemas[hash] = new ManagedComponentSchema(hash, size, signature, name);
+            }
+            catch (Exception ex)
+            {
+                Logging.LogInternal($"[ScriptHost] Failed to capture schema for {type.FullName}: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
+        return schemas;
+    }
+
+    private static unsafe Dictionary<uint, List<ManagedComponentSnapshot>> CaptureManagedComponentSnapshots(
+        IntPtr worldPtr,
+        IEnumerable<uint> componentHashes)
+    {
+        var snapshots = new Dictionary<uint, List<ManagedComponentSnapshot>>();
+        if (worldPtr == IntPtr.Zero)
+            return snapshots;
+
+        void* nativeWorldPtr = (void*)worldPtr;
+
+        foreach (uint hash in componentHashes)
+        {
+            QueryIterator iterator = default;
+            uint queryHash = hash;
+            if (!QueryInteropAPI.CreateQuery(nativeWorldPtr, &queryHash, 1, null, 0, null, 0, &iterator))
+                continue;
+
+            List<ManagedComponentSnapshot> perHash = new();
+            ulong entityId = 0;
+            while (QueryInteropAPI.QueryNext(&iterator, &entityId))
+            {
+                nint jsonPtr = WorldAPI.SerializeComponentToJson(nativeWorldPtr, entityId, hash);
+                if (jsonPtr == IntPtr.Zero)
+                    continue;
+
+                try
+                {
+                    string json = Marshal.PtrToStringUTF8(jsonPtr) ?? "{}";
+                    perHash.Add(new ManagedComponentSnapshot(entityId, json));
+                }
+                finally
+                {
+                    WorldAPI.FreeSerializedString(jsonPtr);
+                }
+            }
+
+            if (perHash.Count > 0)
+            {
+                snapshots[hash] = perHash;
+            }
+        }
+
+        return snapshots;
+    }
+
+    private static string BuildComponentSignature(Type componentType)
+    {
+        var props = componentType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetIndexParameters().Length == 0)
+            .OrderBy(p => p.MetadataToken)
+            .Select(p => $"P:{p.Name}:{p.PropertyType.FullName}");
+
+        var fields = componentType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+            .Where(f => !f.IsStatic && !f.Name.Contains("k__BackingField", StringComparison.Ordinal))
+            .OrderBy(f => f.MetadataToken)
+            .Select(f => $"F:{f.Name}:{f.FieldType.FullName}");
+
+        return string.Join("|", props.Concat(fields));
+    }
+
+    private static void ReconcileManagedComponentsAfterReload()
+    {
+        if (!_hasPendingSchemaReconcile)
+            return;
+
+        if (_nativeRemoveComponentCallback == IntPtr.Zero)
+        {
+            Logging.LogInternal("[ScriptHost] Cannot reconcile managed components: remove callback not registered", LogLevel.Warning);
+            _reconcileWorldPtr = IntPtr.Zero;
+            _preUnloadComponentSnapshots.Clear();
+            _hasPendingSchemaReconcile = false;
+            _preUnloadManagedSchemas.Clear();
+            return;
+        }
+
+        var newSchemas = CaptureManagedComponentSchemas();
+        var hashesToRemove = new HashSet<uint>();
+        var hashesToRestore = new HashSet<uint>();
+
+        foreach (var (hash, oldSchema) in _preUnloadManagedSchemas)
+        {
+            if (!newSchemas.TryGetValue(hash, out var newSchema))
+            {
+                // Component deleted from scripts.
+                hashesToRemove.Add(hash);
+                continue;
+            }
+
+            // Component shape changed (size or member layout).
+            if (oldSchema.Size != newSchema.Size || !string.Equals(oldSchema.Signature, newSchema.Signature, StringComparison.Ordinal))
+            {
+                hashesToRemove.Add(hash);
+                hashesToRestore.Add(hash);
+            }
+        }
+
+        if (hashesToRemove.Count > 0)
+        {
+            var callback = Marshal.GetDelegateForFunctionPointer<NativeRemoveComponentCallback>(_nativeRemoveComponentCallback);
+            foreach (uint hash in hashesToRemove)
+            {
+                try
+                {
+                    callback?.Invoke(hash);
+                    Logging.LogInternal($"[ScriptHost] Removed outdated managed component hash 0x{hash:X8}", LogLevel.Info);
+                }
+                catch (Exception ex)
+                {
+                    Logging.LogInternal($"[ScriptHost] Failed removing managed component hash 0x{hash:X8}: {ex.Message}", LogLevel.Warning);
+                }
+            }
+        }
+
+        // Restore changed components on entities that previously had them.
+        // Deleted components are intentionally not restored.
+        if (_reconcileWorldPtr != IntPtr.Zero && hashesToRestore.Count > 0)
+        {
+            unsafe
+            {
+                void* nativeWorld = (void*)_reconcileWorldPtr;
+                foreach (uint hash in hashesToRestore)
+                {
+                    if (!_preUnloadComponentSnapshots.TryGetValue(hash, out var entitySnapshots))
+                        continue;
+                    if (!newSchemas.TryGetValue(hash, out var schema))
+                        continue;
+
+                    foreach (var snap in entitySnapshots)
+                    {
+                        try
+                        {
+                            if (!WorldAPI.IsEntityAlive(nativeWorld, snap.EntityId))
+                                continue;
+
+                            if (!WorldAPI.HasComponent(nativeWorld, snap.EntityId, hash))
+                            {
+                                WorldAPI.AddComponent(nativeWorld, snap.EntityId, hash, null, schema.Size);
+                            }
+
+                            WorldAPI.DeserializeComponentFromJson(nativeWorld, snap.EntityId, hash, snap.Json);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.LogInternal(
+                                $"[ScriptHost] Failed restoring component hash 0x{hash:X8} on entity {snap.EntityId}: {ex.Message}",
+                                LogLevel.Warning);
+                        }
+                    }
+                }
+            }
+        }
+
+        _reconcileWorldPtr = IntPtr.Zero;
+        _preUnloadComponentSnapshots.Clear();
+        _preUnloadManagedSchemas.Clear();
+        _hasPendingSchemaReconcile = false;
+    }
+
     // Get the required component hashes for update for a system, using a cache to avoid repeated reflection
     private static uint[] GetRequireForUpdateHashes(ulong handle)
     {
@@ -1448,33 +1631,17 @@ public static class ScriptHost
 
             var jsonStr = Marshal.PtrToStringUTF8(jsonStrPtr) ?? "{}";
 
-            // Try to get the registered type for this hash
-            if (!ComponentDiscovery.TypeHashToType.TryGetValue(typeHash, out var componentType))
+            // Prefer serializer's byte-copy path to preserve blittable layout exactly.
+            if (ComponentSerializer.TryDeserializeFromJson(typeHash, componentPtr, size, jsonStr))
             {
-                Logging.LogInternal($"[ScriptHost] DeserializeComponentFromJson: No type registered for hash 0x{typeHash:X8}", LogLevel.Warning);
                 return;
             }
 
-            // Deserialize JSON to the component type using reflection
-            var options = new System.Text.Json.JsonSerializerOptions 
-            { 
-                PropertyNameCaseInsensitive = true,
-                // Allow reading properties that match fields
-                IncludeFields = true
-            };
-            
-            var deserializedObj = System.Text.Json.JsonSerializer.Deserialize(jsonStr, componentType, options);
-
-            if (deserializedObj == null)
-            {
-                Logging.LogInternal($"[ScriptHost] DeserializeComponentFromJson: Failed to deserialize type {componentType.Name}", LogLevel.Warning);
-                return;
-            }
-
-            // Copy the deserialized object back to the native component memory
-            // This works for both mutable structs and record structs
-            Marshal.StructureToPtr(deserializedObj, componentPtr, false);
-            // Logging.LogInternal($"[ScriptHost] Applied component {componentType.Name} from JSON", LogLevel.Info);
+            // Avoid direct System.Text.Json type-based deserialization here.
+            // It can retain reflection-emit caches across collectible ALC unload.
+            Logging.LogInternal(
+                $"[ScriptHost] DeserializeComponentFromJson: No serializer mapping for hash 0x{typeHash:X8}",
+                LogLevel.Warning);
         }
         catch (Exception ex)
         {
