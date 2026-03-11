@@ -1,9 +1,14 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Interop_StateMachine.cpp
-\author Dalton Koh 
+\author  Dalton Koh 
+\par     d.koh@digipen.edu
 \brief
 Interop bindings for the C++ Brain/StateMachine used by gameplay scripts.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 

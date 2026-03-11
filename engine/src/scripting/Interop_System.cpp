@@ -1,8 +1,14 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Interop_System.cpp
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
 \brief
 C API exports for system-level scripting controls.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 

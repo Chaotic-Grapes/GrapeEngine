@@ -9,6 +9,10 @@
 Declares shared editor color styles for consistent UI theming.
 These colors are used across multiple editor panels for actions like dangerous
 operations (deletions, exits) to maintain a uniform look and feel.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 

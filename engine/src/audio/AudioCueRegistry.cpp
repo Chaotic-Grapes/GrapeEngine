@@ -1,7 +1,10 @@
-/*
-* @file AudioCueRegistry.cpp
-* @brief Shared audio cue registry implementation.
-*/
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file   AudioCueRegistry.cpp
+ *
+ * @brief  Shared audio cue registry implementation.
+ */
 
 #include "audio/AudioCueRegistry.h"
 #include <filesystem>

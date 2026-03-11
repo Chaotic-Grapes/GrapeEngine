@@ -1,7 +1,10 @@
-/*
-* @file AudioCueRegistry.h
-* @brief Shared audio cue registry for consistent CueId/path resolution.
-*/
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file   AudioCueRegistry.h
+ *
+ * @brief  Shared audio cue registry for consistent CueId/path resolution.
+ */
 
 #ifndef AUDIO_CUE_REGISTRY_H
 #define AUDIO_CUE_REGISTRY_H
