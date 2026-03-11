@@ -596,6 +596,21 @@ void EditorService::Render() {
         }
     }
 
+    // Global Ctrl+A for active text inputs
+    // Run this after all UI is built so the current frame's focused input field
+    // is known (e.g. clicking into "New Entity" then pressing Ctrl+A)
+    const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+    const bool superDown = Input::IsKeyDown(KEY_LEFT_SUPER) || Input::IsKeyDown(KEY_RIGHT_SUPER);
+    const bool selectAllPressed = Input::IsKeyPressed(KEY_A);
+
+    if ((ctrlDown || superDown) && selectAllPressed) {
+        ImGuiContext& g = *GImGui;
+        if (g.InputTextState.ID != 0) {
+            g.InputTextState.SelectAll();
+            g.InputTextState.CursorAnimReset();
+        }
+    }
+
     ImGui::EndFrame();
     ImGui::Render();
 

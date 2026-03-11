@@ -252,7 +252,7 @@ void ConsolePanel::_renderMessages(const std::vector<ConsoleMessage>& snapshot) 
 
     // Ctrl+A to select all visible messages
     ImGuiIO& io = ImGui::GetIO();
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A) && !io.WantTextInput) {
         m_selectedMessageIds.clear();
 
         // Select all messages in all render rows (collapsed or not)

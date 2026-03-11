@@ -801,18 +801,24 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
         // Set next item width.
         ImGui::SetNextItemWidth(-1);
-        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
-            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
-            // Apply rename on Enter
-            if (strlen(m_renameBuffer) > 0) {
-                Editor::ECSUtils::SetEntityName(*m_world, entity, m_renameBuffer);
-            }
+
+        // Submit not only by enter but also by clicking out of the input text field
+        const bool submittedByEnter = ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
+            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+        const bool cancelledByEscape = ImGui::IsKeyPressed(ImGuiKey_Escape);
+        const bool submittedByDefocus = ImGui::IsItemDeactivatedAfterEdit();
+
+        // Escape cancels the rename
+        if (cancelledByEscape) {
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
 
-        // Cancel rename on Escape or click away
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape) ||
-            (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsItemHovered())) {
+        // Enter or clicking away after editing commits the rename
+        else if (submittedByEnter || submittedByDefocus) {
+            if (strlen(m_renameBuffer) > 0) {
+                Editor::ECSUtils::SetEntityName(*m_world, entity, m_renameBuffer);
+            }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
     }
