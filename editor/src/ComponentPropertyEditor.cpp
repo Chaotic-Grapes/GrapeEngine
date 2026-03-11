@@ -301,12 +301,16 @@ namespace {
         const std::function<bool(const std::string&)>& onAccepted,
         const std::function<void()>& onClear) {
         EditorUI::RenderStaticValueRow(label, valueText, isEmpty);
+
+        // Begin a drag-and-drop target zone on the last ImGui item
+        // Returns true only if a payload was accepted (valid extension + onAccepted callback returned true)
+        const bool accepted = HandleAssetDragDropTarget(allowedExtensions, onAccepted, [&](const std::string& rejectedPath) {
+            QueueAssetDropError(rejectedPath, allowedExtensions);
+        });
         if (!isEmpty && RenderClearTrashButton(clearId, clearTooltip, symbolsFont)) {
             onClear();
         }
-        return HandleAssetDragDropTarget(allowedExtensions, onAccepted, [&](const std::string& rejectedPath) {
-            QueueAssetDropError(rejectedPath, allowedExtensions);
-        });
+        return accepted;
     }
 
     // Update sprite animation preview.
