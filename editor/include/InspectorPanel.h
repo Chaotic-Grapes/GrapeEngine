@@ -5,7 +5,7 @@
         Samantha Leong (20%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
-\date   15th November 2025
+\date   11th March 2026
 
 \brief
 Editor panel for viewing and editing game entities and prefab assets.
@@ -54,33 +54,38 @@ public:
     // Lifecycle Management
     // -------------------------------------------------------------------------
 
-    // Initializes the inspector panel with required fonts and world reference
+    // Initialize the inspector panel with required fonts and world reference
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
-    // Updates the world context for entity operations (so inspector can work on
-    // different world instances dynamically)
+    // Update the world context when switching between scene instances
     void SetWorld(ECS::World* world);
 
-    // Set the prefab manager for displaying prefab instance information
+    // Set the prefab manager for prefab path lookup and instance management
     void SetPrefabManager(ECS::PrefabManager* manager) { m_prefabManager = manager; }
+
+    // Set the file menu reference for dirty state tracking
+    void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
+
+    // Set the undo system for recording component edits
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
     // -------------------------------------------------------------------------
     // Selection Management
     // -------------------------------------------------------------------------
 
-    // Sets the inspector to inspect a specific entity by ID
+    // Set the inspector to inspect a specific entity by ID
     void InspectEntity(EntityId id);
 
-    // Sets the list of all currently selected entities (for multi-select edits)
+    // Set the list of all currently selected entities for multi-select edits
     void SetSelectedEntities(const std::unordered_set<EntityId>& ids);
 
-    // Sets the inspector to inspect a specific prefab file by path
+    // Set the inspector to inspect a specific prefab file by path
     void InspectPrefab(const std::string& path);
 
-    // Returns the currently inspected prefab path, empty if not inspecting a prefab
+    // Return the currently inspected prefab path, empty if not inspecting a prefab
     std::string GetInspectedPrefabPath() const { return m_prefabPath; }
 
-    // Clears the current selection and resets the inspector state
+    // Clear the current selection and reset the inspector state
     void ClearSelection();
 
     // Request focus for the inspector window on the next render pass
@@ -90,88 +95,78 @@ public:
     // Rendering
     // -------------------------------------------------------------------------
 
-    // Renders the inspector panel interface based on current mode
-    // Either entity or prefab
+    // Render the inspector panel interface based on current inspection mode
     void Render();
 
     // -------------------------------------------------------------------------
     // State Query
     // -------------------------------------------------------------------------
 
-    // Returns the current inspection mode to determine context
+    // Return the current inspection mode to determine context
     InspectionMode GetMode() const { return m_mode; }
-
-    // Set file menu reference for dirty tracking
-    void SetFileMenu(EditorFileMenu * fileMenu) { m_fileMenu = fileMenu; }
-
-    // -------------------------------------------------------------------------
-    // Undo system support
-    // -------------------------------------------------------------------------
-
-    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
 private:
     // -------------------------------------------------------------------------
     // Entity Inspector Implementation
     // -------------------------------------------------------------------------
 
-    // Renders the complete entity inspector interface with header and components
+    // Render the complete entity inspector interface with header and components
     void _renderEntityInspector();
 
-    // Renders the entity header section with name display and prefab linkage
+    // Render the entity header section with name display and prefab linkage
     void _renderEntityHeader(ECS::Entity entity);
 
-    // Renders all components attached to the entity using component sections
+    // Render all components attached to the entity using component sections
     void _renderEntityComponents(ECS::Entity entity);
 
-    // Renders the Add Component button and dropdown menu with all available types
+    // Render the Add Component button and dropdown menu with all available types
     void _renderAddComponentButton(ECS::Entity entity);
 
     // -------------------------------------------------------------------------
     // Prefab Inspector Implementation
     // -------------------------------------------------------------------------
 
-    // Renders the complete prefab inspector interface with header and components
+    // Render the complete prefab inspector interface with header and components
     void _renderPrefabInspector();
 
-    // Renders the prefab header section with file path information
+    // Render the prefab header section with file path information
     void _renderPrefabHeader();
 
-    // Renders all components defined in the prefab JSON data
+    // Render all components defined in the prefab JSON data
     void _renderPrefabComponents();
 
-    // Renders prefab specific action buttons including Save and Apply
+    // Render prefab-specific action buttons including Save and Apply
     void _renderPrefabActions();
 
-    // Returns true if prefab data is stored in hierarchical {"Entity": {...}} format
+    // Return true if prefab data is stored in hierarchical {"Entity": {...}} format
     bool _isHierarchicalPrefab() const;
 
-    // Returns selected prefab node from path (or root fallback)
+    // Return the selected prefab node from path, or root if path is empty
     nlohmann::json* _getSelectedPrefabNode();
     const nlohmann::json* _getSelectedPrefabNode() const;
 
-    // Returns the selected node Components array
+    // Return the Components array for the selected prefab node
     nlohmann::json* _getSelectedPrefabComponents(bool createIfMissing);
     const nlohmann::json* _getSelectedPrefabComponents() const;
 
-    // Resolves a readable name for prefab node selector display
+    // Resolve a readable display name for a prefab node in the selector popup
     std::string _getPrefabNodeDisplayName(const nlohmann::json& node) const;
 
-	// Data structure for prefab node selection items in the popup menu
+    // Data structure for prefab node selection items in the popup menu
     struct PrefabNodeSelectionItem {
-        std::vector<size_t> Path;
-        std::string Label;
-		int Depth = 0;  // Depth in the hierarchy for indentation display
+        std::vector<size_t> Path;   // Index path from root to this node
+        std::string Label;          // Display name shown in the popup
+        int Depth = 0;              // Depth in the hierarchy for indentation display
     };
 
-    // Builds root + full descendant list for popup node selection
+    // Build root and full descendant list for popup node selection
     std::vector<PrefabNodeSelectionItem> _buildPrefabNodeSelectionItems() const;
 
     // -------------------------------------------------------------------------
     // Component Section Rendering (Template Implementation)
     // -------------------------------------------------------------------------
 
-    // Renders a collapsible component section with consistent styling and delete button
+    // Render a collapsible component section with consistent styling and delete button
     template <typename T>
     void _renderComponentSection(const std::string& headerName, const std::string& componentType,
         nlohmann::json& data, T renderContent, bool canDelete, const nlohmann::json* defaults);
@@ -180,119 +175,118 @@ private:
     // Component Menu Management
     // -------------------------------------------------------------------------
 
-    // Renders a single component option in the Add Component menu
+    // Render a single component option in the Add Component menu
     void _renderComponentMenuItem(const char* displayName, const char* componentType);
 
     // -------------------------------------------------------------------------
     // Prefab Data Management
     // -------------------------------------------------------------------------
 
-    // Saves modified prefab data back to disk with change tracking
+    // Save modified prefab data back to disk with change tracking
     void _savePrefabData();
 
-    // Exports an entity as a new prefab asset in the assets/prefabs directory
+    // Export an entity as a new prefab asset in the assets/prefabs directory
     void _saveEntityAsPrefab(ECS::Entity entity);
 
-    // Applies prefab changes to all existing instances in the current world
+    // Apply prefab changes to all existing instances in the current world
     void _applyPrefabToInstances();
 
-    // Applies one prefab node's component data to an entity
+    // Apply one prefab node's component data to an entity
     void _applyPrefabDataToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform);
 
-    // Recursively applies prefab node + descendants to entity hierarchy
+    // Recursively apply a prefab node and its descendants to an entity hierarchy
     void _applyPrefabHierarchyToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform);
 
     // -------------------------------------------------------------------------
     // Entity Component Management
     // -------------------------------------------------------------------------
 
-    // Adds a component of specified type to an entity using registry metadata
+    // Add a component of the specified type to an entity using registry metadata
     bool _addComponentToEntity(const std::string& componentType, bool recordUndo = true);
 
-    // Removes a component of specified type from an entity
+    // Remove a component of the specified type from an entity
     void _removeComponentFromEntity(const std::string& componentType, bool recordUndo = true);
 
-    // Checks if an entity has a specific component type using registry queries
+    // Return true if the entity has a specific component type
     bool _entityHasComponent(EntityId id, const std::string& componentType);
 
     // -------------------------------------------------------------------------
     // Prefab Component Management
     // -------------------------------------------------------------------------
 
-    // Adds a component definition to the prefab with default values
+    // Add a component definition with default values to the prefab JSON
     bool _addComponentToPrefab(const std::string& componentType);
 
-    // Removes a component definition from the prefab JSON data
+    // Remove a component definition from the prefab JSON data
     void _removeComponentFromPrefab(const std::string& componentType);
 
-    // Resets a component on all selected entities to defaults
+    // Reset a component on all selected entities to its default values
     void _resetComponentOnSelectedEntities(const std::string& componentType, nlohmann::json& data, const nlohmann::json& defaults);
 
-    // Checks if the prefab contains a specific component type definition
+    // Return true if the prefab contains a specific component type definition
     bool _prefabHasComponent(const std::string& componentType);
 
     // -------------------------------------------------------------------------
     // Status Management
     // -------------------------------------------------------------------------
 
-    // Renders the status bar with messages and notifications
+    // Render the status bar with messages and notifications
     void _renderStatusBar();
 
     // -------------------------------------------------------------------------
     // Member Variables
     // -------------------------------------------------------------------------
 
-    // Font references for UI styling
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_boldFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
+    ImFont* m_mainFont = nullptr;       // Main body font
+    ImFont* m_boldFont = nullptr;       // Bold font for section headers
+    ImFont* m_symbolsFont = nullptr;    // Symbols/icon font for icon-only buttons
 
     // System references
-    ECS::World* m_world = nullptr;
-    ComponentUI m_componentUI;
-    EditorFileMenu* m_fileMenu = nullptr;
-    Editor::UndoSystem* m_undoSystem = nullptr;
-    ECS::PrefabManager* m_prefabManager = nullptr; // Prefab manager (for prefab path lookup / instance management)
+    ECS::World* m_world = nullptr;                      // ECS world containing all entities and components
+    ComponentUI m_componentUI;                          // Component property editor for all component types
+    EditorFileMenu* m_fileMenu = nullptr;               // File menu reference for dirty state tracking
+    Editor::UndoSystem* m_undoSystem = nullptr;         // Undo system for recording component edits
+    ECS::PrefabManager* m_prefabManager = nullptr;      // Prefab manager for path lookup and instance management
 
     // Selection state
-    InspectionMode m_mode = InspectionMode::None;  // Current inspection context
-    EntityId m_entityId = 0;                       // Currently inspected entity ID (the "primary" selection)
-    std::unordered_set<EntityId> m_selectedEntities; // All currently selected entities for multi-edit support
+    InspectionMode m_mode = InspectionMode::None;       // Current inspection context
+    EntityId m_entityId = 0;                            // Primary inspected entity ID
+    std::unordered_set<EntityId> m_selectedEntities;    // All selected entities for multi-edit support
 
     // File path and data
-    std::string m_prefabPath;                      // Path to prefab asset file
-    nlohmann::json m_prefabData;                   // Loaded JSON data for editing  
-    size_t m_lastSavedPrefabHash = 0;              // Hash of last saved state
-    std::vector<size_t> m_selectedPrefabNodePath;  // Selected prefab node path from root (empty = root)
+    std::string m_prefabPath;                           // Path to the currently inspected prefab asset
+    nlohmann::json m_prefabData;                        // Loaded JSON data for editing
+    size_t m_lastSavedPrefabHash = 0;                   // Hash of the last saved prefab state for dirty detection
+    std::vector<size_t> m_selectedPrefabNodePath;       // Index path to selected prefab node (empty = root)
 
     // UI state
-    std::vector<std::string> m_componentsToDelete; // Components scheduled for removal
-    std::string m_statusMessage;                   // Current status message 
-    float m_statusTimer = 0.0f;                    // Timer for status message
+    std::vector<std::string> m_componentsToDelete;      // Components scheduled for removal at end of frame
+    std::string m_statusMessage;                        // Current status bar message
+    float m_statusTimer = 0.0f;                         // Remaining display time for the status message
 
     // Add Component popup search state
-    char m_addComponentSearchBuffer[128] = {0};    // Temporary input buffer for search
-    std::string m_addComponentSearchFilter;        // Filter string used to match component names
+    char m_addComponentSearchBuffer[128] = { 0 };       // Input buffer for Add Component search
+    std::string m_addComponentSearchFilter;             // Active filter string for matching component names
 
-    // Component/property filter state for the inspector list
-    char m_componentFilterBuffer[128] = {0};       // Temporary input buffer for component/property filtering
-    std::string m_componentFilter;                 // Active filter used in component/property list
-    bool m_focusComponentFilter = false;           // Keyboard focus request for the filter input
-    bool m_focusAddComponentSearch = false;        // Keyboard focus request for Add Component search
-    bool m_openAddComponentPopup = false;          // Deferred popup open flag for keyboard shortcuts
-    bool m_focusOnNextRender = false;              // Window focus request for the inspector panel
+    // Component/property filter state
+    char m_componentFilterBuffer[128] = { 0 };          // Input buffer for component/property filtering
+    std::string m_componentFilter;                      // Active filter string for the component list
+    bool m_focusComponentFilter = false;                // Focus request for the component filter input
+    bool m_focusAddComponentSearch = false;             // Focus request for the Add Component search input
+    bool m_openAddComponentPopup = false;               // Deferred popup open flag for keyboard shortcuts
+    bool m_focusOnNextRender = false;                   // Window focus request for the inspector panel
 
-    // Undo - edit tracking
+    // Edit state snapshot for undo recording
     struct EditState {
-        EntityId entityId = 0;
-        Vector3D startPosition;
-        Quaternion startRotation;
-        Vector3D startScale;
-        std::vector<ECS::SerializedComponent> startComponents;
-        bool hasSnapshot = false;
-        bool isEditing = false;
+        EntityId entityId = 0;                                      // Entity being edited
+        Vector3D startPosition;                                     // Transform position at edit start
+        Quaternion startRotation;                                   // Transform rotation at edit start
+        Vector3D startScale;                                        // Transform scale at edit start
+        std::vector<ECS::SerializedComponent> startComponents;      // Full component snapshot at edit start
+        bool hasSnapshot = false;                                   // Whether a snapshot has been taken
+        bool isEditing = false;                                     // Whether an edit is currently in progress
     };
-    EditState m_editState;
+    EditState m_editState; // Tracks pre-edit snapshot for undo recording
 };
 
 // -------------------------------------------------------------------------
@@ -345,8 +339,6 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
-        // ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
 
         // Use symbol font for the reset icon
@@ -391,8 +383,6 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
-        // ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
         // Remove component if button is clicked

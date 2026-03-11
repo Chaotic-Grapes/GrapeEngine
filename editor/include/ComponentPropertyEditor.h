@@ -3,7 +3,7 @@
 \file   ComponentPropertyEditor.h
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   3rd November 2025
+\date   11th March 2026
 
 \brief
 Provides unified component rendering UI for both entity inspection and prefab editing.
@@ -33,10 +33,13 @@ public:
     // Initialization
     // -------------------------------------------------------------------------
 
-    // Sets fonts for component UI rendering to maintain visual consistency across 
-    // all inspectors
+    // Initialize fonts for component UI rendering to maintain visual consistency
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+
+    // Connect the undo system to record component edits
     void SetUndoSystem(Editor::UndoSystem* undo) { m_undo = undo; }
+
+    // Update the set of currently selected entities for multi-edit support
     void SetSelectedEntities(const std::unordered_set<EntityId>* entities);
 
     // -------------------------------------------------------------------------
@@ -97,46 +100,68 @@ public:
     // Renders Z-index for controlling 2D rendering order
     void RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders 2D light component for lighting effects
+    // Renders 2D light properties including color, intensity and radius
     void RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders text component for displaying text on screen
+    // Renders text component properties including string content and font settings
     void RenderText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders animation state for sprite sheet animation playback
+    // Renders animation state properties for sprite sheet playback control
     void RenderAnimationState2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders AudioSource for component 
+    // Renders audio source properties including clip reference and playback settings
     void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-    
-    // Renders entity layer
+
+    // Renders layer index for controlling entity collision and rendering layer assignment
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders tilemap component with collision edit entry point
     void RenderTileMapComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Generic renderer for unknown (C#) components. Uses JSON field types to
-    // render simple editors for booleans, integers, floats and strings.
+    // Generic renderer for unknown (C#) components
+    // Uses JSON field types to render simple editors for booleans, integers, floats and strings
     void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world, bool addSpacing = true);
 
     // Renders material component for assigning materials to renderers
-	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+    void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders boid flock properties including separation, alignment and cohesion weights
     void RenderBoidFlock(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders particle emitter properties including spawn rate, lifetime and velocity range
     void RenderParticleEmitter(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Apply a preset configuration to the given JSON data by preset ID
     void _ApplyPresetToJson(nlohmann::json& data, int presetId);
 
+    // Renders GUI canvas root properties including render mode and sort order
     void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI render mode selection for screen-space or world-space canvas
     void RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders base GUI element properties including anchors, pivot and rect offset
     void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI panel properties including background color and image reference
     void RenderGUIPanel(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI text properties including string content, font and alignment
     void RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI image properties including sprite reference and color tint
     void RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI input field properties including placeholder text and input type
     void RenderGUIInput(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI state style properties for normal, hovered and pressed visual states
     void RenderGUIStateStyle(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI button properties including click callbacks and transition style
     void RenderGUIButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI slider properties including min, max and current value
     void RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders drag/drop validation feedback popups triggered by asset fields
@@ -147,12 +172,14 @@ private:
     // State
     // -------------------------------------------------------------------------
 
-    // Font references for UI styling
-    ImFont* m_mainFont;
-    ImFont* m_boldFont;
-    ImFont* m_symbolsFont;
-    Editor::UndoSystem* m_undo = nullptr;
-    const std::unordered_set<EntityId>* m_selectedEntities = nullptr;
+    // Fonts used for all UI text and icons
+    ImFont* m_mainFont = nullptr;                                       
+    ImFont* m_boldFont = nullptr;                                       
+    ImFont* m_symbolsFont = nullptr;                
+
+    // System references
+    Editor::UndoSystem* m_undo = nullptr;                               // Undo system for recording edits
+    const std::unordered_set<EntityId>* m_selectedEntities = nullptr;   // Currently selected entities for multi-edit
 };
 
 #endif

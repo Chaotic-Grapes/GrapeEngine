@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   UndoSystem.h
-\author Samantha Leong Sher Yen
-\par    s.leong@digipen.edu
-\date   21th January 2026
+\file    UndoSystem.h
+\author  Samantha Leong Sher Yen (70%)
+         Foo Rui Qin (30%)
+\par     s.leong@digipen.edu
+         ruiqin.foo@digipen.edu
+\date    11th March 2026
 \brief
 Declaration of the undo/redo command system used by the editor.
 
@@ -43,11 +45,11 @@ class TileMap;
 
 namespace Editor {
 
-    // Snapshot of a single entity for undo/redo restore operations.
+    // Snapshot of a single entity used for undo/redo restore operations
     struct EntitySnapshot {
-        EntityId Id = ECS::Entity::NPOS32;
-        EntityId ParentId = ECS::Entity::NPOS32;
-        std::vector<ECS::SerializedComponent> Components;
+        EntityId Id = ECS::Entity::NPOS32;                  // Entity ID being snapshotted
+        EntityId ParentId = ECS::Entity::NPOS32;            // Parent entity ID at snapshot time
+        std::vector<ECS::SerializedComponent> Components;   // Full component data at snapshot time
     };
 
     // ========================================================================
@@ -57,9 +59,18 @@ namespace Editor {
     class ICommand {
     public:
         virtual ~ICommand() = default;
+
+        // Execute the command (apply the action)
         virtual void Execute() = 0;
+
+        // Undo the command (reverse the action)
         virtual void Undo() = 0;
+
+        // Redo the command (defaults to re-executing)
         virtual void Redo() { Execute(); }
+
+        // Attempt to merge this command with a newer one of the same type
+        // Returns true if coalesced successfully, false otherwise
         virtual bool Coalesce(ICommand* other) { (void)other; return false; }
     };
 
@@ -67,24 +78,35 @@ namespace Editor {
     // Macro Command (group multiple commands into one)
     // ========================================================================
 
+    // Groups multiple commands into a single undoable unit
     class MacroCommand : public ICommand {
     public:
         MacroCommand() = default;
+
+        // Append a command to the end of the macro group
         void AddCommand(std::unique_ptr<ICommand> command) { m_commands.push_back(std::move(command)); }
-        
+
+        // Execute all commands in forward order
         void Execute() override { for (auto& cmd : m_commands) cmd->Execute(); }
+
+        // Undo all commands in reverse order
         void Undo() override { for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it) (*it)->Undo(); }
+
+        // Redo all commands in forward order
         void Redo() override { for (auto& cmd : m_commands) cmd->Redo(); }
+
+        // Return true if the macro contains no commands
         bool IsEmpty() const { return m_commands.empty(); }
 
     private:
-        std::vector<std::unique_ptr<ICommand>> m_commands;
+        std::vector<std::unique_ptr<ICommand>> m_commands;  // Ordered list of grouped commands
     };
 
     // ========================================================================
     // Transform Change Command
     // ========================================================================
 
+    // Records and reverses a change to an entity's local transform
     class TransformChangeCommand : public ICommand {
     public:
         TransformChangeCommand(
@@ -102,24 +124,23 @@ namespace Editor {
         void Undo() override;
 
     private:
-        ECS::World* m_world;
-        ECS::Entity m_entity;
+        ECS::World* m_world;        // ECS world containing the entity
+        ECS::Entity m_entity;       // Entity whose transform is being modified
 
-        // Old state
-        Vector3D m_oldPosition;
-        Quaternion m_oldRotation;
-        Vector3D m_oldScale;
+        Vector3D m_oldPosition;     // Position before the change
+        Quaternion m_oldRotation;   // Rotation before the change
+        Vector3D m_oldScale;        // Scale before the change
 
-        // New state
-        Vector3D m_newPosition;
-        Quaternion m_newRotation;
-        Vector3D m_newScale;
+        Vector3D m_newPosition;     // Position after the change
+        Quaternion m_newRotation;   // Rotation after the change
+        Vector3D m_newScale;        // Scale after the change
     };
 
     // ========================================================================
     // Entity Creation Command
     // ========================================================================
 
+    // Records and reverses an entity creation action
     class CreateEntityCommand : public ICommand {
     public:
         CreateEntityCommand(
@@ -132,21 +153,17 @@ namespace Editor {
         void Undo() override;       // Delete entity
 
     private:
-        ECS::World* m_world;
-        EntityId m_entityId = ECS::Entity::NPOS32;
-        std::function<void()> m_onEntityDeleted;
-        std::vector<EntitySnapshot> m_snapshots;
+        ECS::World* m_world;                            // ECS world containing the entity
+        EntityId m_entityId = ECS::Entity::NPOS32;      // ID of the created entity
+        std::function<void()> m_onEntityDeleted;        // Optional callback fired when entity is deleted on undo
+        std::vector<EntitySnapshot> m_snapshots;        // Snapshots of the entity and its descendants
     };
 
     // ========================================================================
     // Entity Deletion Command
     // ========================================================================
 
-    /*!
-    \class DeleteEntityCommand
-    \brief Handles undo/redo for entity deletion.
-    Stores entity state for restoration.
-    */
+    // Records and reverses an entity deletion action, storing entity state for restoration
     class DeleteEntityCommand : public ICommand {
     public:
         DeleteEntityCommand(
@@ -155,20 +172,21 @@ namespace Editor {
             std::function<void()> onEntityRestored = nullptr
         );
 
-        void Execute() override;   // Delete entity
-        void Undo() override;      // Restore entity
+        void Execute() override;    // Delete entity
+        void Undo() override;       // Restore entity
 
     private:
-        ECS::World* m_world;
-        EntityId m_entityId = ECS::Entity::NPOS32;
-        std::function<void()> m_onEntityRestored;
-        std::vector<EntitySnapshot> m_snapshots;
+        ECS::World* m_world;                            // ECS world containing the entity
+        EntityId m_entityId = ECS::Entity::NPOS32;      // ID of the deleted entity
+        std::function<void()> m_onEntityRestored;       // Optional callback fired when entity is restored on undo
+        std::vector<EntitySnapshot> m_snapshots;        // Snapshots of the entity and its descendants
     };
 
     // ========================================================================
     // Component Snapshot Command (generic component edits/add/remove)
     // ========================================================================
 
+    // Records and reverses a bulk component state change on an entity
     class EntityComponentsSnapshotCommand : public ICommand {
     public:
         EntityComponentsSnapshotCommand(
@@ -178,20 +196,21 @@ namespace Editor {
             std::vector<ECS::SerializedComponent> after
         );
 
-        void Execute() override;
-        void Undo() override;
+        void Execute() override;    // Apply the after-state components
+        void Undo() override;       // Restore the before-state components
 
     private:
-        ECS::World* m_world;
-        EntityId m_entityId = ECS::Entity::NPOS32;
-        std::vector<ECS::SerializedComponent> m_before;
-        std::vector<ECS::SerializedComponent> m_after;
+        ECS::World* m_world;                                    // ECS world containing the entity
+        EntityId m_entityId = ECS::Entity::NPOS32;              // ID of the affected entity
+        std::vector<ECS::SerializedComponent> m_before;         // Component state before the change
+        std::vector<ECS::SerializedComponent> m_after;          // Component state after the change
     };
 
     // ========================================================================
     // Entity Reorder Command
     // ========================================================================
 
+    // Records and reverses a reorder of entities under a common parent
     class ReorderEntitiesCommand : public ICommand {
     public:
         ReorderEntitiesCommand(
@@ -201,25 +220,27 @@ namespace Editor {
             std::vector<EntityId> after
         );
 
-        void Execute() override;
-        void Undo() override;
+        void Execute() override;    // Apply the new order
+        void Undo() override;       // Restore the original order
 
-        bool UpdateAfter(EntityId parentId, const std::vector<EntityId>& after); // Coalesce to new "after".
+        // Coalesce a subsequent reorder into this command by updating the after-state
+        // Returns true if the parent matches and the update was applied
+        bool UpdateAfter(EntityId parentId, const std::vector<EntityId>& after);
 
     private:
-        EntityId m_parentId = ECS::Entity::NPOS32; // Parent id that owns the order list.
-        std::function<void(const std::vector<EntityId>&)> m_applyOrder; // Apply hook for order updates.
-        std::vector<EntityId> m_before; // Original order for undo.
-        std::vector<EntityId> m_after; // New order for redo.
+        EntityId m_parentId = ECS::Entity::NPOS32;                          // Parent entity that owns the order list
+        std::function<void(const std::vector<EntityId>&)> m_applyOrder;     // Callback to apply a new order
+        std::vector<EntityId> m_before;                                     // Original entity order for undo
+        std::vector<EntityId> m_after;                                      // New entity order for redo
     };
 
     // ========================================================================
     // Entity Reparent Command
     // ========================================================================
 
+    // Records and reverses moving an entity to a different parent in the hierarchy
     class ReparentEntityCommand : public ICommand {
     public:
-        // Moves an entity to a different parent in the scene hierarchy
         ReparentEntityCommand(
             ECS::World* world,
             EntityId childId,
@@ -227,22 +248,24 @@ namespace Editor {
             EntityId newParentId
         );
 
-        void Execute() override;                      // Detaches the child from oldParent, attaches it under newParent
-        void Undo() override;                         // Detaches from newParent, reattaches under oldParent
+        void Execute() override;    // Detach from old parent and attach under new parent
+        void Undo() override;       // Detach from new parent and reattach under old parent
 
     private:
-        void ApplyParent(EntityId parentId);          // Shared logic used by both Execute and Undo
+        // Shared logic used by both Execute and Undo to apply a parent assignment
+        void ApplyParent(EntityId parentId);
 
         ECS::World* m_world = nullptr;
-        EntityId m_childId = ECS::Entity::NPOS32;     // Entity being reparented
-        EntityId m_oldParentId = ECS::Entity::NPOS32; // Previous parent, used for undo
-        EntityId m_newParentId = ECS::Entity::NPOS32; // Target parent, used for execute
+        EntityId m_childId = ECS::Entity::NPOS32;       // Entity being reparented
+        EntityId m_oldParentId = ECS::Entity::NPOS32;   // Previous parent used for undo
+        EntityId m_newParentId = ECS::Entity::NPOS32;   // Target parent used for execute
     };
 
     // ========================================================================
     // Component Property Command
     // ========================================================================
 
+    // Records and reverses a single property change on a component
     class ComponentPropertyCommand : public ICommand {
     public:
         using ApplyFn = std::function<void(ECS::World*, ECS::Entity, ECS::ComponentTypeId, const std::string&, const nlohmann::json&)>;
@@ -257,32 +280,34 @@ namespace Editor {
             ApplyFn applyFn
         );
 
-        void Execute() override;
-        void Undo() override;
-        bool Coalesce(ICommand* other) override;
+        void Execute() override;                 // Apply the new property value
+        void Undo() override;                    // Restore the old property value
+        bool Coalesce(ICommand* other) override; // Merge with a newer edit on the same property
 
     private:
         ECS::World* m_world = nullptr;
-        EntityId m_entityId = ECS::Entity::NPOS32;
-        ECS::ComponentTypeId m_componentId = 0;
-        std::string m_propertyPath;
-        nlohmann::json m_oldValue;
-        nlohmann::json m_newValue;
-        ApplyFn m_applyFn;
+        EntityId m_entityId = ECS::Entity::NPOS32;      // Entity whose component is being edited
+        ECS::ComponentTypeId m_componentId = 0;         // Type ID of the affected component
+        std::string m_propertyPath;                     // JSON path to the property being changed
+        nlohmann::json m_oldValue;                      // Property value before the change
+        nlohmann::json m_newValue;                      // Property value after the change
+        ApplyFn m_applyFn;                              // Callback to apply a value to the live component
     };
 
     // ========================================================================
     // Batch Component Property Command
     // ========================================================================
 
+    // Records and reverses a property change applied to multiple entities at once
     class BatchComponentPropertyCommand : public ICommand {
     public:
         using ApplyFn = ComponentPropertyCommand::ApplyFn;
 
+        // Per-entity old/new value pair for the batch edit
         struct Entry {
-            EntityId Entity = ECS::Entity::NPOS32;
-            nlohmann::json OldValue;
-            nlohmann::json NewValue;
+            EntityId Entity = ECS::Entity::NPOS32;  // Entity being edited
+            nlohmann::json OldValue;                // Property value before the change
+            nlohmann::json NewValue;                // Property value after the change
         };
 
         BatchComponentPropertyCommand(
@@ -293,25 +318,25 @@ namespace Editor {
             ApplyFn applyFn
         );
 
-        void Execute() override;
-        void Undo() override;
-        bool Coalesce(ICommand* other) override;
+        void Execute() override;                 // Apply new values to all entities
+        void Undo() override;                    // Restore old values to all entities
+        bool Coalesce(ICommand* other) override; // Merge with a newer batch edit on the same property
 
     private:
         ECS::World* m_world = nullptr;
-        ECS::ComponentTypeId m_componentId = 0;
-        std::string m_propertyPath;
-        std::vector<Entry> m_entries;
-        ApplyFn m_applyFn;
+        ECS::ComponentTypeId m_componentId = 0;     // Type ID of the affected component
+        std::string m_propertyPath;                 // JSON path to the property being changed
+        std::vector<Entry> m_entries;               // Per-entity old/new value pairs
+        ApplyFn m_applyFn;                          // Callback to apply a value to a live component
     };
 
     // ========================================================================
     // Tile Paint Command
     // ========================================================================
 
+    // Records and reverses a single tile paint or erase on a tilemap
     class TilePaintCommand : public ICommand {
     public:
-		// Paint a single tile with undo/redo support.
         TilePaintCommand(
             std::shared_ptr<TileMap> map,
             int32_t x, int32_t y,
@@ -320,147 +345,168 @@ namespace Editor {
             std::function<void(int32_t, int32_t, uint32_t)> onTileChanged
         );
 
-		// Execute the tile paint (redo).
-        void Execute() override;
-
-		// Undo the tile paint.
-        void Undo() override;
+        void Execute() override;    // Apply the new tile (redo)
+        void Undo() override;       // Restore the old tile
 
     private:
-		std::shared_ptr<TileMap> m_map;  // Target tilemap.
-		int32_t m_x;                     // Tile X coordinate.
-		int32_t m_y;                     // Tile Y coordinate.
-		uint32_t m_oldTile;              // Previous tile ID.
-		uint32_t m_newTile;              // New tile ID.
-		std::function<void(int32_t, int32_t, uint32_t)> m_onTileChanged;  // Callback after tile change.
+        std::shared_ptr<TileMap> m_map;                                         // Target tilemap
+        int32_t m_x;                                                            // Tile X coordinate
+        int32_t m_y;                                                            // Tile Y coordinate
+        uint32_t m_oldTile;                                                     // Tile ID before the paint
+        uint32_t m_newTile;                                                     // Tile ID after the paint
+        std::function<void(int32_t, int32_t, uint32_t)> m_onTileChanged;        // Callback fired after each tile change
     };
 
     // ========================================================================
     // Tile Collision Paint Command
     // ========================================================================
 
+    // Records and reverses a single collision mask paint on a tilemap
     class TileCollisionPaintCommand : public ICommand {
     public:
-        // Paint a single collision mask cell with undo/redo support
         TileCollisionPaintCommand(
-            std::shared_ptr<TileMap> map, 
-            int32_t x, 
-            int32_t y, 
-            uint8_t oldMask, 
-            uint8_t newMask, 
+            std::shared_ptr<TileMap> map,
+            int32_t x,
+            int32_t y,
+            uint8_t oldMask,
+            uint8_t newMask,
             std::function<void(int32_t, int32_t, uint8_t)> onCollisionChanged
         );
 
-        void Execute() override;         // Execute the collision paint (redo)
-        void Undo() override;            // Undo the collision paint
+        void Execute() override;    // Apply the new collision mask (redo)
+        void Undo() override;       // Restore the old collision mask
 
     private:
-        std::shared_ptr<TileMap> m_map;  // Target tilemap
-        int32_t m_x;                     // Tile X coordinate
-        int32_t m_y;                     // Tile Y coordinate
-        uint8_t m_oldMask;               // Previous collision mask
-        uint8_t m_newMask;               // New collision mask
-        std::function<void(int32_t, int32_t, uint8_t)> m_onCollisionChanged;  // Callback after collision change
+        std::shared_ptr<TileMap> m_map;                                               // Target tilemap
+        int32_t m_x;                                                                  // Tile X coordinate
+        int32_t m_y;                                                                  // Tile Y coordinate
+        uint8_t m_oldMask;                                                            // Collision mask before the paint
+        uint8_t m_newMask;                                                            // Collision mask after the paint
+        std::function<void(int32_t, int32_t, uint8_t)> m_onCollisionChanged;          // Callback fired after each collision change
     };
+
     // ========================================================================
     // Undo System Manager
     // ========================================================================
 
+    // Central undo/redo history manager for all reversible editor actions
     class UndoSystem {
     public:
-        /*!
-        \brief Initialize the undo system.
-        \param world The ECS world to operate on.
-        \param maxStackSize Maximum number of undo steps to a minimum of 20.
-        */
+        // -------------------------------------------------------------------------
+        // Lifecycle
+        // -------------------------------------------------------------------------
+
+        // Initialize the undo system with the given world and maximum stack size
         void Initialize(ECS::World* world, size_t maxStackSize = 50);
 
-        /*!
-        \brief Process keyboard input for undo/redo.
-        Call this every frame to check for CTRL+Z / CTRL+Y.
-        */
+        // Process keyboard input for undo/redo (Ctrl+Z / Ctrl+Y) — call every frame
         void Update();
 
-        /*!
-        \brief Execute a command and add it to the undo stack.
-        \param command The command to execute.
-        */
+        // -------------------------------------------------------------------------
+        // Core Operations
+        // -------------------------------------------------------------------------
+
+        // Execute a command and push it onto the undo stack
         void ExecuteCommand(std::unique_ptr<ICommand> command);
 
-        /*!
-        \brief Undo the last command.
-        \return True if undo was successful, false if stack is empty.
-        */
+        // Undo the last command; returns true if successful, false if stack is empty
         bool Undo();
 
-        /*!
-        \brief Redo the last undone command.
-        \return True if redo was successful, false if nothing to redo.
-        */
+        // Redo the last undone command; returns true if successful, false if nothing to redo
         bool Redo();
 
-        /*!
-        \brief Clear all undo/redo history.
-        */
+        // Clear all undo and redo history
         void Clear();
 
-        /*!
-        \brief Check if undo is available.
-        */
+        // -------------------------------------------------------------------------
+        // State Query
+        // -------------------------------------------------------------------------
+
+        // Return true if there are commands available to undo
         bool CanUndo() const { return !m_undoStack.empty(); }
 
-        /*!
-        \brief Check if redo is available.
-        */
+        // Return true if there are commands available to redo
         bool CanRedo() const { return !m_redoStack.empty(); }
 
-        /*!
-        \brief Get the number of available undo steps.
-        */
+        // Return the number of available undo steps
         size_t GetUndoCount() const { return m_undoStack.size(); }
 
-        /*!
-        \brief Get the number of available redo steps.
-        */
+        // Return the number of available redo steps
         size_t GetRedoCount() const { return m_redoStack.size(); }
 
-        // Convenience methods for common operations
+        // -------------------------------------------------------------------------
+        // Convenience Recording Methods
+        // -------------------------------------------------------------------------
+
+        // Record and execute a transform change for an entity
         void RecordTransformChange(
             EntityId entityId,
             const Vector3D& oldPos, const Quaternion& oldRot, const Vector3D& oldScale,
             const Vector3D& newPos, const Quaternion& newRot, const Vector3D& newScale
         );
 
+        // Record and execute an entity creation action
         void RecordEntityCreation(EntityId entityId);
+
+        // Record and execute an entity deletion action
         void RecordEntityDeletion(EntityId entityId);
+
+        // Record and execute an entity reparent action
         void RecordEntityReparent(EntityId childId, EntityId oldParentId, EntityId newParentId);
-        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command
 
-        // Property edit API
-        void BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& oldValue);
-        void EndPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
-            ComponentPropertyCommand::ApplyFn applyFn);
+        // Attempt to merge a reorder into the last command on the stack
+        // Returns true if the coalesce was successful
+        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after);
 
-        // Batch property edit API (for multi-select)
-        void BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath);
-        void EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
-            ComponentPropertyCommand::ApplyFn applyFn);
+        // -------------------------------------------------------------------------
+        // Property Edit API
+        // -------------------------------------------------------------------------
 
+        // Begin tracking a property edit, storing the old value for undo
+        void BeginPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, 
+            const nlohmann::json& oldValue);
+
+        // Finalize a property edit, storing the new value and pushing the command
+        void EndPropertyEdit(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath, 
+            const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn);
+
+        // Begin tracking a batch property edit across multiple entities
+        void BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, 
+            const std::string& propertyPath);
+
+        // Finalize a batch property edit and push the command
+        void EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, 
+            const std::string& propertyPath, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn);
+
+        // Record an immediate single-step property change without begin/end tracking
         void RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
             const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn);
 
-        // Property-level tracking to avoid double-undo with snapshot system
+        // Return true and reset the emission flag if a property edit was emitted this frame
+        // Used to avoid double-undo with the snapshot system
         bool ConsumePropertyEditEmission();
 
     private:
-        ECS::World* m_world = nullptr;
-        size_t m_maxStackSize = 50;
+        // -------------------------------------------------------------------------
+        // Internal Helpers
+        // -------------------------------------------------------------------------
 
-        std::deque<std::unique_ptr<ICommand>> m_undoStack;
-        std::deque<std::unique_ptr<ICommand>> m_redoStack;
+        // Trim the undo stack to the maximum size, discarding the oldest entries
+        void TrimUndoStack();
 
-        bool m_propertyEditEmitted = false;
+        // -------------------------------------------------------------------------
+        // State
+        // -------------------------------------------------------------------------
 
+        ECS::World* m_world = nullptr;                              // ECS world for entity operations
+        size_t m_maxStackSize = 50;                                 // Maximum number of undo steps retained
+
+        std::deque<std::unique_ptr<ICommand>> m_undoStack;          // Stack of executed commands (oldest at front)
+        std::deque<std::unique_ptr<ICommand>> m_redoStack;          // Stack of undone commands (most recent at front)
+
+        bool m_propertyEditEmitted = false;                         // Whether a property edit command was pushed this frame
+
+        // Composite key identifying a specific property on a specific entity's component
         struct PropertyKey {
             EntityId Entity;
             ECS::ComponentTypeId Component;
@@ -470,6 +516,7 @@ namespace Editor {
             }
         };
 
+        // Hash functor for PropertyKey used in unordered_map
         struct PropertyKeyHasher {
             size_t operator()(const PropertyKey& k) const {
                 size_t h1 = std::hash<uint32_t>{}(k.Entity);
@@ -479,10 +526,8 @@ namespace Editor {
             }
         };
 
+        // In-progress property edits keyed by entity/component/property, storing old values
         std::unordered_map<PropertyKey, nlohmann::json, PropertyKeyHasher> m_activePropertyEdits;
-
-        // Maintain redo stack when clearing old undo entries
-        void TrimUndoStack();
     };
 
 } // namespace Editor

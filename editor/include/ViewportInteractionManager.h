@@ -1,8 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ViewportInteractionManager.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
+\file    ViewportInteractionManager.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (95%)
+         Foo Rui Qin (5%)
+\par     muhammadnurfadzly.b@digipen.edu
+         ruiqin.foo@digipen.edu
+\date    11th March 2026
 \brief
 Coordinates gizmo rendering, interaction state, and object picking for a viewport.
 
@@ -48,52 +51,23 @@ namespace ECS {
 
 namespace Editor {
 
-    /**
-     * @brief Manages viewport interaction: gizmo, picking, and selection
-     * 
-     * This manager is responsible for:
-     * 1. Rendering gizmo handles via GizmoRenderer
-     * 2. Detecting interaction state via GizmoInteractionController
-     * 3. Requesting entity picks via PickingQueryManager
-     * 4. Updating entity selection based on picks
-     * 5. Applying gizmo-computed transforms to ECS entities
-     * 6. Notifying listeners when transforms change (for undo system)
-     * 
-     * The manager maintains per-frame state:
-     * - Current selected entity ID
-     * - Viewport bounds (position and size)
-     * - Camera matrices (view and projection)
-     * - Whether gizmo is in orthographic mode
-     * 
-     * Interaction Flow:
-     * 1. On mouse click: Request pick from GPU
-     * 2. When pick result ready: Update selection
-     * 3. If gizmo hovering: Don't select, let gizmo handle input
-     * 4. When gizmo dragging: GizmoInteractionController fires events
-     * 5. On drag end: Apply final transform, notify undo system
-     * 
-     * Does NOT manage:
-     * - Entity creation/deletion
-     * - Viewport camera movement
-     * - UI synchronization (hierarchy, inspector)
-     */
+    // Manages viewport interaction: gizmo rendering, entity picking and selection updates
+    // Applies gizmo-computed transforms to ECS entities and notifies the undo system on drag end
     class ViewportInteractionManager {
     public:
+        // -------------------------------------------------------------------------
+        // Lifecycle
+        // -------------------------------------------------------------------------
+
         ViewportInteractionManager();
         ~ViewportInteractionManager();
 
-        /**
-         * @brief Prepare viewport for a frame
-         * 
-         * Must be called once per frame before Update().
-         * Sets up viewport bounds and camera matrices.
-         * 
-         * @param viewportPos Top-left corner in screen space
-         * @param viewportSize Viewport dimensions in pixels
-         * @param viewMatrix Camera view matrix
-         * @param projMatrix Camera projection matrix
-         * @param isPerspective Whether camera is perspective (true) or orthographic (false)
-         */
+        // -------------------------------------------------------------------------
+        // Per-Frame Update
+        // -------------------------------------------------------------------------
+
+        // Set up viewport bounds and camera matrices for the current frame
+        // Must be called once per frame before Update()
         void PrepareFrame(
             const glm::vec2& viewportPos,
             const glm::vec2& viewportSize,
@@ -101,61 +75,32 @@ namespace Editor {
             const glm::mat4& projMatrix,
             bool isPerspective);
 
-        /**
-         * @brief Update interaction state and apply changes to ECS
-         * 
-         * This is the main update method called each frame. It:
-         * 1. Polls pending pick requests
-         * 2. Updates gizmo interaction state
-         * 3. Applies gizmo transforms to entities
-         * 4. Handles new picks (updates selection)
-         * 
-         * @param world ECS world to query/modify
-         * @param selectedEntityId Currently selected entity
-         * @return Updated selected entity ID (may change due to picks)
-         */
+        // Poll pending picks, update gizmo interaction state and apply transforms to entities
+        // Returns the updated selected entity ID (may change due to picks)
         uint32_t Update(ECS::World& world, uint32_t selectedEntityId);
 
-        /**
-         * @brief Render the gizmo for the selected entity
-         * 
-         * Must be called during ImGui rendering phase.
-         * Typically called from ShowEditorWindows().
-         * 
-         * @param world ECS world (for reading entity transforms)
-         * @param selectedEntityId Entity to show gizmo for
-         */
+        // Render the gizmo for the selected entity; call during ImGui rendering phase
         void RenderGizmo(ECS::World& world, uint32_t selectedEntityId);
 
-        /**
-         * @brief Reset interaction state (e.g., when selection changes externally)
-         * 
-         * Aborts any ongoing drag and returns to idle state.
-         * Call this when selection changes from UI, not from picking.
-         */
+        // Abort any ongoing drag and return to idle state
+        // Call when selection changes from UI rather than from picking
         void ResetInteraction();
 
-        // ====================================================================
+        // -------------------------------------------------------------------------
         // Gizmo Configuration
-        // ====================================================================
+        // -------------------------------------------------------------------------
 
-        /**
-         * @brief Set the gizmo operation mode
-         */
+        // Set the gizmo operation mode (translate, rotate, scale)
         void SetGizmoOperation(GizmoRenderer::Operation op) {
             m_gizmo.SetOperation(op);
         }
 
-        /**
-         * @brief Set the gizmo coordinate mode
-         */
+        // Set the gizmo coordinate mode (local or world space)
         void SetGizmoMode(GizmoRenderer::Mode mode) {
             m_gizmo.SetMode(mode);
         }
 
-        /**
-         * @brief Configure gizmo snapping behavior
-         */
+        // Configure gizmo snapping behavior for translate, rotate and scale axes
         void SetGizmoSnap(bool enabled, float translate, float rotate, float scale) {
             m_snapEnabled = enabled;
             m_snapTranslate = translate;
@@ -163,147 +108,103 @@ namespace Editor {
             m_snapScale = scale;
         }
 
-        /**
-         * @brief Get the current gizmo operation
-         */
+        // Return the current gizmo operation mode
         GizmoRenderer::Operation GetGizmoOperation() const {
             return m_gizmo.GetOperation();
         }
 
-        /**
-         * @brief Get the current gizmo mode
-         */
+        // Return the current gizmo coordinate mode
         GizmoRenderer::Mode GetGizmoMode() const {
             return m_gizmo.GetMode();
         }
 
-        /**
-         * @brief Check if gizmo should block input (being used or hovered)
-         */
+        // Return true if the gizmo is being used or hovered and should block input
         bool ShouldBlockInput() const {
             return m_gizmo.ShouldBlockInput();
         }
 
-        /**
-         * @brief Request a pick at the given screen position
-         * 
-         * @param screenX Absolute screen X coordinate
-         * @param screenY Absolute screen Y coordinate
-         * @param rendererSystem Renderer system to query from
-         */
+        // -------------------------------------------------------------------------
+        // Picking
+        // -------------------------------------------------------------------------
+
+        // Request a GPU entity pick at the given absolute screen coordinates
         void RequestPick(float screenX, float screenY, ECS::RendererSystem* rendererSystem);
 
-        /**
-         * @brief Set a fallback entity ID to use if the next pick returns no result
-         *
-         * If the subsequent RequestPick finds no entity at the given screen position,
-         * the provided entity ID will be used as the pick result instead of returning
-         * an empty/invalid pick.
-         *
-         * @param entityId Entity ID to fall back to on a failed pick
-         */
+        // Set a fallback entity ID to use if the next pick returns no result
         void SetNextPickFallback(uint32_t entityId);
 
-        // ====================================================================
+        // -------------------------------------------------------------------------
         // Event Callbacks
-        // ====================================================================
+        // -------------------------------------------------------------------------
 
-        /**
-         * @brief Callback fired when entity selection changes
-         * 
-         * Parameters: (oldEntityId, newEntityId)
-         * Viewport can use this to sync hierarchy, inspector, etc.
-         */
+        // Fired when entity selection changes; parameters are (oldEntityId, newEntityId)
         std::function<void(uint32_t, uint32_t)> OnSelectionChanged;
 
-        /**
-         * @brief Callback fired when a gizmo drag completes
-         * 
-         * Parameters: (entityId, initialTransform, finalTransform, delta)
-         * Viewport/undo system can use this to create undo commands.
-         */
+        // Fired when a gizmo drag completes; parameters are (entityId, initialTransform, finalTransform, delta)
         std::function<void(uint32_t, const CachedTransformState&, const CachedTransformState&, const TransformDelta&)> OnTransformChanged;
 
     private:
-        // Components owned by this manager
-        GizmoRenderer m_gizmo;
-        GizmoInteractionController m_gizmoController;
-        std::unique_ptr<PickingQueryManager> m_pickingManager;
+        // -------------------------------------------------------------------------
+        // Internal Helpers
+        // -------------------------------------------------------------------------
 
-        // Per-frame state
-        glm::vec2 m_viewportPos{0.0f, 0.0f};
-        glm::vec2 m_viewportSize{1920.0f, 1080.0f};
-        glm::mat4 m_viewMatrix = glm::mat4(1.0f);
-        glm::mat4 m_projMatrix = glm::mat4(1.0f);
-        bool m_isPerspective = false;
-        // Per-frame snap configuration for ImGuizmo.
-        bool m_snapEnabled = false;
-        float m_snapTranslate = 1.0f;
-        float m_snapRotate = 15.0f;
-        float m_snapScale = 0.1f;
-
-        // Interaction state
-        uint32_t m_selectedEntityId = 0;
-        uint32_t m_pendingPickRequestId = 0;  // 0 = no pending request
-        uint32_t m_nextPickFallbackId = ECS::Entity::NPOS32;
-
-        /**
-         * @brief Handle a completed pick result
-         * @param pickedEntityId Entity ID from pick, or 0 if nothing picked
-         * @param shouldUpdateSelection Whether to update selection (false if dragging)
-         * @return New selected entity ID
-         */
+        // Handle a completed pick result and optionally update the selection
+        // Returns the new selected entity ID
         uint32_t _handlePickResult(uint32_t pickedEntityId, bool shouldUpdateSelection);
 
-        /**
-         * @brief Apply gizmo-computed transform to the entity
-         */
+        // Apply a gizmo-computed transform matrix to the given entity
         void _applyGizmoTransform(ECS::World& world, uint32_t entityId, const glm::mat4& transformMatrix);
 
-        /**
-         * @brief Extract LocalTransform from entity
-         */
+        // Read and return the current LocalTransform of an entity as a CachedTransformState
         CachedTransformState _getEntityTransform(ECS::World& world, uint32_t entityId) const;
 
-        /**
-         * @brief Set entity's LocalTransform from CachedTransformState
-         */
+        // Write a CachedTransformState back to an entity's LocalTransform component
         void _setEntityTransform(ECS::World& world, uint32_t entityId, const CachedTransformState& state);
 
-        // ====================================================================
-        // Helper functions for matrix decomposition and coordinate conversion
-        // ====================================================================
-
-        /**
-         * @brief Extract position (translation) from a 4x4 matrix
-         */
+        // Extract the translation component from a 4x4 matrix
         glm::vec3 _extractPositionFromMatrix(const glm::mat4& matrix) const;
 
-        /**
-         * @brief Extract scale from a 4x4 matrix (column magnitudes)
-         */
+        // Extract the per-axis scale from a 4x4 matrix using column magnitudes
         glm::vec3 _extractScaleFromMatrix(const glm::mat4& matrix) const;
 
-        /**
-         * @brief Extract rotation quaternion from a 4x4 matrix
-         */
+        // Extract the rotation quaternion from a 4x4 matrix
         glm::quat _extractRotationFromMatrix(const glm::mat4& matrix) const;
 
-        /**
-         * @brief Convert world-space position to local-space for child entities
-         * Takes into account parent's position, rotation, and scale
-         */
+        // Convert a world-space position to local space, accounting for parent transform
         glm::vec3 _convertWorldToLocalPosition(ECS::World& world, ECS::Entity entity, const glm::vec3& worldPosition) const;
 
-        /**
-         * @brief Extract parent entity's scale from its WorldTransform matrix
-         */
+        // Extract the scale component from a parent entity's WorldTransform matrix
         glm::vec3 _extractParentScale(const Matrix4x4& parentMatrix) const;
 
-        /**
-         * @brief Extract parent entity's rotation from its WorldTransform matrix
-         */
+        // Extract the rotation quaternion from a parent entity's WorldTransform matrix
         glm::quat _extractParentRotation(const Matrix4x4& parentMatrix, const glm::vec3& parentScale) const;
+
+        // -------------------------------------------------------------------------
+        // State
+        // -------------------------------------------------------------------------
+
+        // Owned subsystems
+        GizmoRenderer m_gizmo;                              // ImGuizmo rendering and transform computation
+        GizmoInteractionController m_gizmoController;       // Interaction state machine (idle/hover/drag/release)
+        std::unique_ptr<PickingQueryManager> m_pickingManager; // GPU-based entity picking
+
+        // Per-frame viewport and camera state
+        glm::vec2 m_viewportPos{ 0.0f, 0.0f };              // Top-left corner of the viewport in screen space
+        glm::vec2 m_viewportSize{ 1920.0f, 1080.0f };       // Viewport dimensions in pixels
+        glm::mat4 m_viewMatrix = glm::mat4(1.0f);           // Camera view matrix
+        glm::mat4 m_projMatrix = glm::mat4(1.0f);           // Camera projection matrix
+        bool m_isPerspective = false;                       // True for perspective, false for orthographic
+
+        // Per-frame snap configuration
+        bool m_snapEnabled = false;                         // Whether snapping is enabled
+        float m_snapTranslate = 1.0f;                       // Translation snap increment in world units
+        float m_snapRotate = 15.0f;                         // Rotation snap increment in degrees
+        float m_snapScale = 0.1f;                           // Scale snap increment
+
+        // Interaction state
+        uint32_t m_selectedEntityId = 0;                    // Currently selected entity ID
+        uint32_t m_pendingPickRequestId = 0;                // ID of the pending pick request; 0 if none
+        uint32_t m_nextPickFallbackId = ECS::Entity::NPOS32; // Fallback entity ID if the next pick returns nothing
     };
 
 }  // namespace Editor
