@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file     CudaParticles.cu
-\author   Choi Meng Yew
+\author   Choi Meng Yew (100%)
 \date     28th February 2026
 \brief
 CUDA particle system kernels. Four kernels:
@@ -16,9 +16,6 @@ Particle layout (3 x float4 per particle, SoA):
   posVel[i]:    { pos.x, pos.y, vel.x, vel.y }
   lifeColor[i]: { life,  maxLife, colorR, colorG }
   sizeRot[i]:   { colorB, colorA, size, rotation }
-
-TO-DO:
-Please add ping-pong buffers!!!
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

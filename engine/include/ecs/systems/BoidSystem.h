@@ -1,3 +1,43 @@
+/* Start Header *****************************************************************/
+/*!
+\file   BoidSystem.h
+\author Choi Meng Yew (100%)
+\date   26th February 2026
+\brief
+Declares the BoidSystem ECS system responsible for managing and
+simulating large-scale boid flocking using GPU acceleration.
+
+BoidSystem integrates CUDA compute with OpenGL rendering through
+CUDA–OpenGL interoperability, allowing boid simulation data to remain
+entirely on the GPU. Each BoidFlock entity owns a dedicated GPU-backed
+flock whose position and velocity data are updated every frame by
+CUDA kernels implementing the classic boid steering rules:
+
+    - Separation
+    - Alignment
+    - Cohesion
+
+The system maintains GPU buffers and render data required for drawing
+flocks via instanced rendering. Simulation results are written directly
+into OpenGL vertex buffers, enabling a zero-copy pipeline where CUDA
+updates boid state and the RendererSystem consumes the same buffers
+for rendering.
+
+Additional responsibilities include:
+    - Managing per-flock GPU resources
+    - Providing render data for the RendererSystem
+    - Maintaining spatial collision data derived from TileMap geometry
+    - Supporting layered rendering and material parameters for boids
+
+This header defines the public interface and GPU data structures used
+by BoidSystem within the ECS framework.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include "ecs/ISystem.h"
