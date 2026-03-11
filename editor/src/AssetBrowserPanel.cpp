@@ -761,11 +761,6 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             _clearSelection();
             _notifySelectionChanged();
-
-            // Clear
-            if (m_inspector) {
-                m_inspector->ClearSelection();
-            }
         }
 
         // Right-click on empty space to create new assets
@@ -1633,11 +1628,6 @@ void AssetBrowserPanel::_selectEmptySpace() {
     {
         _clearSelection();
         _notifySelectionChanged();
-
-        // Clear prefab editor if it exists (no need to clear property inspector here)
-        if (m_inspector) {
-            m_inspector->ClearSelection();
-        }
     }
 }
 
