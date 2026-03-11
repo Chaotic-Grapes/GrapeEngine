@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   EntityUtils.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Provides utility functions for working with entities in the ECS system, including
+packing and unpacking entity IDs and resolving entities within a world context. 
+
+This is meant to be a lightweight utility class that can be used by both engine 
+and editor code without introducing heavy dependencies, especially to avoid 
+pulling in editor-specific headers into engine code.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef ENTITYUTILS_H
 #define ENTITYUTILS_H
 
