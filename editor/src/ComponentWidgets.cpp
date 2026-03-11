@@ -1022,7 +1022,6 @@ namespace EditorUI {
 
         if (undoSystemPtr && worldPtr && componentTypeId != 0 && !propertyPath.empty()) {
             auto* undo = reinterpret_cast<Editor::UndoSystem*>(undoSystemPtr);
-            auto* world = reinterpret_cast<ECS::World*>(worldPtr);
             bool isMultiSelect = s_selectedEntities && s_selectedEntities->size() > 1 && s_selectedEntities->count(entityId);
 
             if (ImGui::IsItemActivated()) {
@@ -1265,6 +1264,7 @@ namespace EditorUI {
         const std::string& propertyPath,
         const std::function<void(void*, uint32_t, uint32_t, const std::string&, const nlohmann::json&)>& applyFn)
     {
+        (void)worldPtr;
         if (!_filterAllowsLabel(label)) {
             return;
         }
