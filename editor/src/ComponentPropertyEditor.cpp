@@ -2050,6 +2050,13 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 int pixelWidth = sprite->Width;
                 int pixelHeight = sprite->Height;
 
+                // Usual checks
+                if (pixelWidth <= 0 || pixelHeight <= 0) {
+                    LOG_WARNING("Generate AABB: sprite dimensions are invalid (width=" << pixelWidth
+                        << ", height=" << pixelHeight << "). Assign a valid sprite texture first.");
+                    return;
+                }
+
                 // If the entity already has a BoxCollider2D, update it. Otherwise add one.
                 const ECS::ComponentTypeId colliderId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
                 if (colliderId == ECS::NULL_COMPONENT_ID) {
@@ -2058,11 +2065,24 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 }
 
                 auto* col = static_cast<BoxCollider2D*>(world->GetRawComponentPtr(entity, colliderId));
-                const Vector2D newHalfExtents{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+
+                // Match the rendered sprite quad footprint in local space
+                // Renderer uses LocalTransform.Scale for size, while physics later applies scale to collider,
+                // so local half-extents should be normalized (0.5 base) with only sprite aspect applied
+                float aspect = 1.0f;
+                if (pixelWidth > 0 && pixelHeight > 0) {
+                    aspect = static_cast<float>(pixelWidth) / static_cast<float>(pixelHeight);
+                    if (!std::isfinite(aspect) || aspect <= 0.0f) {
+                        aspect = 1.0f;
+                    }
+                }
+                const Vector2D newHalfExtents{ 0.5f * aspect, 0.5f };
                 if (col) {
                     // Update the collider's half-extents based on the sprite size
                     if (col->HalfExtents.X != newHalfExtents.X || col->HalfExtents.Y != newHalfExtents.Y) {
                         col->HalfExtents = newHalfExtents;
+                        data["HalfExtents"]["X"] = newHalfExtents.X;
+                        data["HalfExtents"]["Y"] = newHalfExtents.Y;
                         changed = true;
                     }
                 }
@@ -2071,11 +2091,13 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                     BoxCollider2D newCol;
                     newCol.HalfExtents = newHalfExtents;
                     world->AddComponentById(entity, colliderId, &newCol, sizeof(newCol));
+                    data["HalfExtents"]["X"] = newHalfExtents.X;
+                    data["HalfExtents"]["Y"] = newHalfExtents.Y;
                     changed = true;
                 }
             }
         }
-
+        
         // Only record an undo entry if something actually changed
         if (changed && m_undo && world && world->IsAlive(entity)) {
             // Capture post-change state for redo
