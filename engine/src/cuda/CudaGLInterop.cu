@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   CudaGLInterop.cu
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   03/03/2026 DD/MM/YYYY
 \brief
 Provides CUDA–OpenGL interoperability utilities for registering,

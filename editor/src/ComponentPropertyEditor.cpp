@@ -39,7 +39,6 @@ prefab assets use the same UI path.
 #include "core/Application.h"
 #include "UndoSystem.h"
 #include "EditorComponentRegistry.h"
-#include "serialization/EntitySerializer.h"
 
 namespace {
     constexpr int kMaxAnimSegments = 8;
