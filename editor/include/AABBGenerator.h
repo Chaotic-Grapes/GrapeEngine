@@ -1,6 +1,3 @@
-
-
-
 /**
  * @Name: Samantha Leong, 2403088
  * @email: s.leong@digipen.edu

@@ -1,7 +1,10 @@
-/*
-* @file AudioEngine.h
-* @brief High-level audio runtime for mixing, fades, and policy.
-*/
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file   AudioEngine.h
+ *
+ * @brief  High-level audio runtime for mixing, fades, and policy.
+ */
 
 #ifndef AUDIO_ENGINE_H
 #define AUDIO_ENGINE_H

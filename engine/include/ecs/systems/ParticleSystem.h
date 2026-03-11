@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file     ParticleSystem.h
-\author   Choi Meng Yew
+\author   Choi Meng Yew (100%)
 \date     28th February 2026
 \brief
 ECS system header for GPU-accelerated particles. Mirrors BoidSystem's

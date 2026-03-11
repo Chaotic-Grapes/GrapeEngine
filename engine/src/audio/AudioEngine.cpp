@@ -1,7 +1,10 @@
-/*
-* @file AudioEngine.cpp
-* @brief High-level audio runtime for mixing, fades, and policy.
-*/
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file   AudioEngine.cpp
+ *
+ * @brief  High-level audio runtime for mixing, fades, and policy.
+ */
 
 #include "audio/AudioEngine.h"
 

@@ -1,8 +1,17 @@
-/*
- * CompilePanel.cpp
- * Implements a small modal UI that shows compilation status/progress
- * and logs diagnostics to the engine logger so ConsolePanel captures them.
- */
+/* Start Header *****************************************************************/
+/*!
+\file    CompilePanel.cpp
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file defines the CompilePanel class which is responsible for displaying 
+compilation status, progress, and logging diagnostics to the engine logger.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "CompilePanel.h"
 #include "core/Application.h"

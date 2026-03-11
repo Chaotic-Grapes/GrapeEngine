@@ -39,7 +39,6 @@ prefab assets use the same UI path.
 #include "core/Application.h"
 #include "UndoSystem.h"
 #include "EditorComponentRegistry.h"
-#include "serialization/EntitySerializer.h"
 
 namespace {
     constexpr int kMaxAnimSegments = 8;
@@ -1057,6 +1056,7 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -1685,6 +1685,7 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entit
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -1866,6 +1867,7 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -2673,6 +2675,7 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3028,6 +3031,7 @@ void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::W
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3522,6 +3526,7 @@ void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::Worl
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3655,6 +3660,7 @@ void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS:
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3729,6 +3735,7 @@ void ComponentUI::RenderGUIRenderMode(nlohmann::json& data, ECS::Entity entity, 
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3820,6 +3827,7 @@ void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -3992,6 +4000,7 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -4051,6 +4060,7 @@ void ComponentUI::RenderGUIText(nlohmann::json& data, ECS::Entity entity, ECS::W
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -4148,6 +4158,7 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -4211,6 +4222,7 @@ void ComponentUI::RenderGUIImage(nlohmann::json& data, ECS::Entity entity, ECS::
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -4639,6 +4651,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
             if (!world) return;
             ECS::Entity e = world->Resolve(entityId);
             if (!world->IsAlive(e)) return;
+            (void)path;
             const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
             std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
             const auto* uiMeta = ComponentRegistryUI::Find(compShortName);
@@ -4886,6 +4899,7 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
                     if (!world) return;
                     ECS::Entity e = world->Resolve(entityId);
                     if (!world->IsAlive(e)) return;
+                    (void)path;
                     const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
                     std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
                     const auto* uiMeta = ComponentRegistryUI::Find(compShortName);

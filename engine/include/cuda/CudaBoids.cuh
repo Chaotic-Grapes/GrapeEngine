@@ -1,3 +1,44 @@
+/* Start Header *****************************************************************/
+/*!
+\file   CudaBoids.cuh
+\author Choi Meng Yew (100%)
+\date   3rd March 2026
+\brief
+Declares the CUDA interface used for GPU-accelerated boid simulation
+within GrapeEngine.
+
+This module defines the parameter structure and host-side launch
+functions required to execute the boid simulation kernels on the GPU.
+The simulation updates boid position and velocity data stored in
+OpenGL vertex buffers via CUDA–OpenGL interoperability.
+
+Each CUDA thread simulates a single boid using classic flocking
+behaviors:
+
+    - Separation
+    - Alignment
+    - Cohesion
+
+Additional behaviors supported by the simulation include:
+
+    - Spatial hashing for efficient neighbor lookup
+    - Tile-based collision avoidance
+    - World boundary wrapping
+    - Randomized initialization of flock states
+
+The BoidParams structure encapsulates all simulation parameters and
+device buffers required by the CUDA kernels, allowing the BoidSystem
+to configure and launch the simulation each frame.
+
+This header exposes the host-side CUDA API used by the ECS BoidSystem
+while keeping kernel implementations isolated within the CUDA module.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #ifdef GRAPE_HAS_CUDA
