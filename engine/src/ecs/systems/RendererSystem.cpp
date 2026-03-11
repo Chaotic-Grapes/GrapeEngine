@@ -1125,6 +1125,22 @@ namespace ECS {
                             DebugDraw2D::RectFill(*m_renderer, min, max, idColor, static_cast<GLuint>(-1));
                         }
 
+                        // Render LINES with ID color
+                        if (world.Has<Components::ShapeLine2D>(entity)) {
+                            const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                            const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                            const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
+                            const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
+                            DebugDraw2D::Line(
+                                *m_renderer,
+                                ToGlm(Vector2D{ worldA.X, worldA.Y }),
+                                ToGlm(Vector2D{ worldB.X, worldB.Y }),
+                                sl.Thickness,
+                                idColor,
+                                static_cast<GLuint>(-1)
+                            );
+                        }
+
                         // Render SPRITES with ID color
                         if (world.Has<Components::SpriteRenderer2D>(entity)) {
                             const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
@@ -1135,9 +1151,9 @@ namespace ECS {
                             m_renderer->submitSprite({
                                 ToGlm(Vector2D{position.X, position.Y}),
                                 ToGlm(Vector2D{scale.X, scale.Y}),
-                                {0.f, 0.f, 1.f, 1.f},
+                                {sr.Offset.X, sr.Offset.Y, sr.Offset.X + sr.Tiling.X, sr.Offset.Y + sr.Tiling.Y},
                                 idColor,
-                                sr.TextureId,
+                                static_cast<GLuint>(-1), // Solid ID quad for robust picking (no alpha discard).
                                 angleZ,
                                 1.0f,
                                 0,      // emissiveTextureId (no emissive in picking pass)
@@ -2817,7 +2833,8 @@ namespace ECS {
                     float angleZ = std::atan2(2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
                     m_renderer->submitSprite({ ToGlm(Vector2D{position.X, position.Y}), ToGlm(Vector2D{scale.X, scale.Y}),
-                        {0,0,1,1}, idColor, sr.TextureId, angleZ, 1.0f,
+                        {sr.Offset.X, sr.Offset.Y, sr.Offset.X + sr.Tiling.X, sr.Offset.Y + sr.Tiling.Y},
+                        idColor, static_cast<GLuint>(-1), angleZ, 1.0f,
                         0, 0.0f,
                         0, 0,
                         0, 0,
@@ -2832,6 +2849,22 @@ namespace ECS {
                     glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
                     // Submit filled rectangle geometry.
                     DebugDraw2D::RectFill(*m_renderer, center - he, center + he, idColor, static_cast<GLuint>(-1));
+                }
+
+                if (world.Has<Components::ShapeLine2D>(entity)) {
+                    const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                    const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                    const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
+                    const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
+                    // Submit line geometry.
+                    DebugDraw2D::Line(
+                        *m_renderer,
+                        ToGlm(Vector2D{ worldA.X, worldA.Y }),
+                        ToGlm(Vector2D{ worldB.X, worldB.Y }),
+                        sl.Thickness,
+                        idColor,
+                        static_cast<GLuint>(-1)
+                    );
                 }
             }
         }
