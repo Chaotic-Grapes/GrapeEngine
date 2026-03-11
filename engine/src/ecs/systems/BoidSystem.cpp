@@ -34,7 +34,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
-#include "services/TimeSystem.h"
 #include "Core/World/TileMap.hpp"
 
 #ifdef GRAPE_HAS_CUDA
@@ -442,6 +441,8 @@ namespace ECS {
     }
 
     void BoidSystem::DrawFlocksByLayer(uint16_t layerId, Shader& shader, const glm::mat4& viewProj) {
+        (void)viewProj;
+
         for (const auto& [id, rd] : m_renderData) {
             if (rd.layerId != layerId) continue;
             if (rd.count <= 0 || rd.vao == 0) continue;
