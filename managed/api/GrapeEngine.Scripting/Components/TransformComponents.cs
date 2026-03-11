@@ -15,6 +15,17 @@ using System.Runtime.InteropServices;
 namespace GrapeEngine.Scripting.Components;
 
 [StructLayout(LayoutKind.Sequential)]
+public record struct Layer
+{
+    public ushort Id;
+
+    public Layer(ushort id)
+    {
+        Id = id;
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public record struct LocalTransform(
     Vector3 Position = default,
     Quaternion Rotation = default,
