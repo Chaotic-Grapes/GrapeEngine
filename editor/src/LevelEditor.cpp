@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   LevelEditor.cpp
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+        s.leong@digipen.edu
+\date   12th March 2026
 \brief
 Implements the LevelEditor class - main orchestrator for the game editor interface.
 Manages docking layout, panel coordination, entity selection, and playback controls.

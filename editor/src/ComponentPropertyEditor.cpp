@@ -5,7 +5,7 @@
         Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
-\date   3rd November 2025
+\date   12th March 2026
 
 \brief
 Implements the ComponentUI class which draws the editor UI for every component type.

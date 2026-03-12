@@ -5,7 +5,7 @@
         Foo Rui Qin    (50%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
-\date   3rd November 2025
+\date   12th March 2026
 \brief
 SceneViewport class for the editor viewport with editor camera, entity selection,
 gizmo manipulation, and drag-to-move functionality.
