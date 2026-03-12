@@ -70,8 +70,8 @@ namespace Audio {
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
 
-        // Convert device ID string to integer index
-        // Device IDs from DeviceManager are typically formatted as numeric strings or device names
+        // Device IDs can arrive either as numeric index or display name depending
+        // on where selection originated (settings UI, bootstrap config, etc).
         int driverIndex = 0;
         try {
             // Try to parse as integer first (0, 1, 2, etc.)
@@ -125,7 +125,8 @@ namespace Audio {
         // Pump FMOD update.
         if (m_system) m_system->update();
 
-        // Prune finished singletons.
+        // Keep single-instance map clean so subsequent PlaySingle() policy decisions
+        // are based on currently alive channels only.
         for (auto it = m_activeByCue.begin(); it != m_activeByCue.end(); ) {
             FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second });
             if (!ch || !_is_playing(ch)) it = m_activeByCue.erase(it);
@@ -168,7 +169,7 @@ namespace Audio {
         if (!m_system) return false;
         if (m_cues.count(cueId)) return true; // already loaded
 
-        // Try ResourceManager memory path.
+        // Prefer in-memory load via ResourceManager so packed/virtualized assets work.
         if (auto audioBytes = RM.Get<AudioData>(filePath)) {
             if (audioBytes->IsValid && !audioBytes->Data.empty()) {
                 if (FMOD::Sound* s = _createSoundFromMemory(cueId, filePath, params)) {
@@ -181,7 +182,7 @@ namespace Audio {
             }
         }
 
-        // Fallback: create from file path.
+        // Fallback to direct file path when memory-backed load is unavailable.
         FMOD::Sound* s = nullptr;
         auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
         mode |= params.Is3D ? FMOD_3D : FMOD_2D;
@@ -268,6 +269,7 @@ namespace Audio {
         if (auto it = m_activeByCue.find(cueId); it != m_activeByCue.end()) {
             if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
                 const bool playing = _is_playing(ch);
+                // Policy decides whether to restart, resume, ignore, or spawn a new instance.
                 switch (policy) {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
@@ -285,6 +287,8 @@ namespace Audio {
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceResume:
+                    // Resume only affects paused/stopped state; we still reapply routing
+                    // and current play settings so behavior stays consistent with fresh Play().
                     if (!playing && !s.StartPaused) ch->setPaused(false);
                     if (s.StartPaused) ch->setPaused(true);
                     ch->setChannelGroup(targetGroup);
@@ -300,9 +304,11 @@ namespace Audio {
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceIgnore:
+                    // Keep current playback untouched while active.
                     if (playing) return PlaybackHandle{ it->second };
                     break;
                 case PlayPolicy::NewInstance:
+                    // Fall through to normal Play() below.
                     break;
                 }
             }
@@ -487,6 +493,7 @@ namespace Audio {
 
         const char* names[kBusCount] = { "Master", "Music", "SFX", "UI", "Ambient" };
 
+        // Build a simple bus tree under master and attach one low-pass DSP per bus.
         for (size_t index = 0; index < kBusCount; ++index) {
             FMOD::ChannelGroup* group = nullptr;
             if (index == static_cast<size_t>(Bus::Master)) {
@@ -531,6 +538,7 @@ namespace Audio {
     }
 
     void FmodAudioDevice::_shutdownBusRouting() {
+        // Release DSPs first, then release non-master channel groups.
         for (size_t index = 0; index < kBusCount; ++index) {
             if (FMOD::DSP* dsp = m_busLowPassDsps[index]) {
                 if (FMOD::ChannelGroup* group = m_busGroups[index]) {
@@ -576,6 +584,7 @@ namespace Audio {
 
         const float gain = m_busLowPassGain[index];
         const float cutoffHz = _lowPassGainToCutoffHz(gain);
+        // Bypass DSP near unity gain to avoid unnecessary filter work on the bus.
         dsp->setBypass(gain >= 0.999f);
         FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_CUTOFF, cutoffHz), "DSP::setParameterFloat LOWPASS_CUTOFF");
     }

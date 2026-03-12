@@ -1247,6 +1247,8 @@ public static class ScriptHost
         IntPtr worldPtr,
         IEnumerable<uint> componentHashes)
     {
+        // Capture JSON snapshots keyed by component hash so changed schemas can be restored
+        // onto surviving entities after assembly reload.
         var snapshots = new Dictionary<uint, List<ManagedComponentSnapshot>>();
         if (worldPtr == IntPtr.Zero)
             return snapshots;
@@ -1264,6 +1266,7 @@ public static class ScriptHost
             ulong entityId = 0;
             while (QueryInteropAPI.QueryNext(&iterator, &entityId))
             {
+                // Serializer allocates UTF-8 memory on the native side; always free in finally.
                 nint jsonPtr = WorldAPI.SerializeComponentToJson(nativeWorldPtr, entityId, hash);
                 if (jsonPtr == IntPtr.Zero)
                     continue;
@@ -1308,6 +1311,9 @@ public static class ScriptHost
         if (!_hasPendingSchemaReconcile)
             return;
 
+        // Reconcile in two phases:
+        // 1) remove deleted/shape-changed component hashes globally
+        // 2) restore JSON snapshots only for shape-changed hashes
         if (_nativeRemoveComponentCallback == IntPtr.Zero)
         {
             Logging.LogInternal("[ScriptHost] Cannot reconcile managed components: remove callback not registered", LogLevel.Warning);
@@ -1326,12 +1332,12 @@ public static class ScriptHost
         {
             if (!newSchemas.TryGetValue(hash, out var newSchema))
             {
-                // Component deleted from scripts.
+                // Component removed from scripts: remove from all entities, do not restore.
                 hashesToRemove.Add(hash);
                 continue;
             }
 
-            // Component shape changed (size or member layout).
+            // Same hash but different layout: remove stale bytes, then restore via JSON.
             if (oldSchema.Size != newSchema.Size || !string.Equals(oldSchema.Signature, newSchema.Signature, StringComparison.Ordinal))
             {
                 hashesToRemove.Add(hash);
@@ -1374,11 +1380,13 @@ public static class ScriptHost
                     {
                         try
                         {
+                            // Entity may have been destroyed during reload window.
                             if (!WorldAPI.IsEntityAlive(nativeWorld, snap.EntityId))
                                 continue;
 
                             if (!WorldAPI.HasComponent(nativeWorld, snap.EntityId, hash))
                             {
+                                // Add zeroed storage with the new size before JSON patching.
                                 WorldAPI.AddComponent(nativeWorld, snap.EntityId, hash, null, schema.Size);
                             }
 
@@ -1431,7 +1439,7 @@ public static class ScriptHost
             return true;
         }
 
-        // Perform a query to check if any entities match the required component hashes 
+        // A system should run only if at least one entity satisfies RequireForUpdate.
         fixed (uint* reqPtr = requiredHashes)
         {
             QueryIterator iterator = default;

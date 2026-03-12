@@ -198,6 +198,7 @@ namespace Audio {
             return;
         }
         InstanceState& state = it->second;
+        // Start from the currently interpolated value so chaining fades is smooth.
         state.Fade.Active = true;
         state.Fade.FromVolume = _computePreMixVolume(state);
         state.Fade.ToVolume = targetVolume;
@@ -207,6 +208,7 @@ namespace Audio {
     }
 
     void AudioEngine::FadeOutAll(float duration) {
+        // Mark all active instances for terminal fade -> stop.
         for (auto& [id, state] : m_instances) {
             state.Fade.Active = true;
             state.Fade.FromVolume = _computePreMixVolume(state);
@@ -296,6 +298,7 @@ namespace Audio {
 
     float AudioEngine::_computePreMixVolume(const InstanceState& instance) const {
         if (instance.Fade.Active) {
+            // Fade interpolation runs in instance-local volume space before bus/master gain.
             float t = instance.Fade.Duration > 0.0f ? (instance.Fade.Elapsed / instance.Fade.Duration) : 1.0f;
             if (t > 1.0f) {
                 t = 1.0f;
@@ -318,6 +321,7 @@ namespace Audio {
                 continue;
             }
 
+            // Bus fades are independent from per-instance fades and multiply later.
             state.Fade.Elapsed += deltaTime;
             float t = state.Fade.Duration > 0.0f ? (state.Fade.Elapsed / state.Fade.Duration) : 1.0f;
             if (t >= 1.0f) {
@@ -333,6 +337,7 @@ namespace Audio {
         std::vector<uint64_t> toStop;
         for (auto& [id, state] : m_instances) {
             if (!state.Fade.Active) {
+                // Even without an active fade, final gain is still affected by bus/master mix.
                 float finalVolume = _computePreMixVolume(state) * _computeBusVolume(state);
                 m_device->SetInstanceVolume(state.Handle, finalVolume);
                 if (!state.Spatial3D) {
@@ -357,9 +362,11 @@ namespace Audio {
             if (t >= 1.0f) {
                 state.Fade.Active = false;
                 if (state.Fade.StopOnComplete) {
+                    // Defer stop/removal until after iteration to avoid iterator invalidation.
                     toStop.push_back(id);
                 }
                 else {
+                    // Non-terminal fades commit their end value as the new steady base volume.
                     state.BaseVolume = state.Fade.ToVolume;
                 }
             }

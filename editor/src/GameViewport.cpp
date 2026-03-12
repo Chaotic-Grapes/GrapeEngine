@@ -112,6 +112,7 @@ void GameViewport::PrepareFrame() {
     const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
 
     if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
+        // Pick the first active Camera3D as the render source for the Game viewport.
         m_world->Each([&](ECS::Entity e) {
             if (!m_world->HasById(e, cameraId)) {
                 return;
@@ -151,6 +152,7 @@ void GameViewport::PrepareFrame() {
 
     const bool synced = (activeCamera != nullptr) &&
         _syncGameCamera(activeCameraEntity, *activeCamera, targetRatio);
+    // Use a detached runtime camera copy so editor-side camera data remains authoritative.
     Graphics::ViewportManager::SetCamera(kGameViewportName, synced ? &m_gameCamera : nullptr);
 
     // Keep GUI layout/input in the same coordinate space as the visible Game viewport image.
@@ -200,6 +202,8 @@ bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Ca
 
     bool useWorld = (worldTransform != nullptr);
     if (worldTransform && localTransform) {
+        // If WorldTransform is still at origin but LocalTransform is meaningful,
+        // prefer local data to avoid one-frame lag during transform propagation.
         const float localLenSq = localTransform->Position.X * localTransform->Position.X +
             localTransform->Position.Y * localTransform->Position.Y +
             localTransform->Position.Z * localTransform->Position.Z;
@@ -234,6 +238,7 @@ void GameViewport::_renderViewport() {
     ImGuiWindowFlags windowFlags = 0;
     const bool renderImmersive = m_immersiveMode;
     if (!renderImmersive && m_requestRestore && m_restoreDockValid) {
+        // Restore previous dock/size when exiting immersive fullscreen mode.
         if (m_restoreDockId != 0) {
             ImGui::SetNextWindowDockID(m_restoreDockId, ImGuiCond_Always);
         } else {
@@ -242,6 +247,7 @@ void GameViewport::_renderViewport() {
         }
         m_requestRestore = false;
     } else if (renderImmersive) {
+        // Immersive mode turns the Game window into a borderless overlay of the main viewport.
         ImGuiViewport* vp = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(vp->Pos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(vp->Size, ImGuiCond_Always);
@@ -369,7 +375,7 @@ void GameViewport::_renderViewport() {
                     displaySize.y = availableSize.x / targetRatio;
                 }
 
-                // Center the viewport
+                // Letterbox/pillarbox by centering the constrained draw region.
                 const float offsetX = (availableSize.x - displaySize.x) * 0.5f;
                 const float offsetY = (availableSize.y - displaySize.y) * 0.5f;
                 ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
@@ -389,6 +395,7 @@ void GameViewport::_renderViewport() {
             if (textureId > 0) {
                 ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
                 const bool isGameImageHovered = ImGui::IsItemHovered();
+                // Hover state is consumed by higher-level input routing for viewport focus.
                 m_isViewportHovered = isGameImageHovered;
                 m_sceneDrawPos = ImGui::GetItemRectMin();
                 m_sceneDrawSize = displaySize;
@@ -399,6 +406,7 @@ void GameViewport::_renderViewport() {
             }
 
             if (displaySize.x > 1.0f && displaySize.y > 1.0f) {
+                // Keep render target resolution aligned with the displayed image region.
                 if (!rendererSystem->GetViewport(kGameViewportName)) {
                     Graphics::ViewportManager::Create(kGameViewportName, nullptr,
                         static_cast<int>(displaySize.x), static_cast<int>(displaySize.y));
