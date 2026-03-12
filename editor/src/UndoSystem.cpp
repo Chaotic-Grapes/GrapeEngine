@@ -31,11 +31,26 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using Json = nlohmann::json;
 
+/**
+ * @brief Compares two JSON values with tolerance for floating point numbers.
+ *
+ * Performs a recursive comparison between two JSON objects. Floating point
+ * numbers are compared using an epsilon tolerance to avoid precision issues,
+ * while arrays and objects are compared element-by-element.
+ *
+ * @param a First JSON value to compare.
+ * @param b Second JSON value to compare.
+ * @param epsilon Allowed floating-point difference tolerance.
+ * @return True if the JSON values are approximately equal, otherwise false.
+ */
 static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, float epsilon = 1e-5f) {
+    // If the types differ, they cannot be equal
     if (a.type() != b.type()) return false;
+    // Handle floating point comparison with epsilon tolerance
     if (a.is_number_float()) {
         return std::abs(a.get<float>() - b.get<float>()) < epsilon;
     }
+    // Recursively compare arrays
     if (a.is_array()) {
         if (a.size() != b.size()) return false;
         for (size_t i = 0; i < a.size(); i++) {
@@ -43,6 +58,7 @@ static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, fl
         }
         return true;
     }
+    // Recursively compare objects
     if (a.is_object()) {
         if (a.size() != b.size()) return false;
         for (auto& [key, val] : a.items()) {
@@ -50,7 +66,7 @@ static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, fl
         }
         return true;
     }
-    return a == b;
+    return a == b; // Default comparison for integers, strings, booleans, etc.
 }
 
 namespace Editor {
@@ -565,6 +581,20 @@ namespace Editor {
     // ComponentPropertyCommand Implementation
     // ========================================================================
 
+    /**
+    * @brief Constructs a command representing a component property change.
+    *
+    * Stores the entity, component, property path, and both the old and new values.
+    * These values are later used for undo and redo operations.
+    *
+    * @param world Pointer to the ECS world.
+    * @param entityId ID of the entity whose property is modified.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property.
+    * @param oldValue Original value of the property.
+    * @param newValue Updated value of the property.
+    * @param applyFn Function used to apply the property value.
+    */
     ComponentPropertyCommand::ComponentPropertyCommand(
         ECS::World* world,
         EntityId entityId,
@@ -584,35 +614,65 @@ namespace Editor {
     {
     }
 
+    /**
+    * @brief Executes the command by applying the new property value.
+    *
+    * Applies the stored new value to the specified component property
+    * of the target entity.
+    */
     void ComponentPropertyCommand::Execute() {
-        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
-        ECS::Entity e = m_world->Resolve(m_entityId);
-        if (!m_world->IsAlive(e)) return;
-        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_newValue);
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return; // Ensure the world and apply function are valid
+        ECS::Entity e = m_world->Resolve(m_entityId); // Resolve the entity from its ID
+        if (!m_world->IsAlive(e)) return; // Skip if the entity no longer exists
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_newValue); // Apply the new value to the property
     }
 
+    /**
+    * @brief Reverts the property change by restoring the old value.
+    *
+    * This method is called when performing an undo operation.
+    */
     void ComponentPropertyCommand::Undo() {
-        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
-        ECS::Entity e = m_world->Resolve(m_entityId);
-        if (!m_world->IsAlive(e)) return;
-        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_oldValue);
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return; // Ensure the world and apply function are valid
+        ECS::Entity e = m_world->Resolve(m_entityId); // Resolve the entity
+        if (!m_world->IsAlive(e)) return; // Skip if the entity no longer exists
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_oldValue); // Restore the previous value
     }
 
+    /**
+    * @brief Attempts to merge this command with another command.
+    *
+    * If both commands modify the same entity, component, and property,
+    * the commands can be merged so that only the latest value is kept.
+    *
+    * @param other Another command to attempt merging with.
+    * @return True if the commands were successfully merged.
+    */
     bool ComponentPropertyCommand::Coalesce(ICommand* other) {
         auto* o = dynamic_cast<ComponentPropertyCommand*>(other);
-        if (!o) return false;
+        if (!o) return false; // Ensure the other command is compatible
         if (m_world != o->m_world) return false;
         if (m_entityId != o->m_entityId) return false;
         if (m_componentId != o->m_componentId) return false;
         if (m_propertyPath != o->m_propertyPath) return false;
-        m_newValue = o->m_newValue;
+        m_newValue = o->m_newValue; // Update the final value to the most recent change
         return true;
     }
 
     // ========================================================================
     // BatchComponentPropertyCommand Implementation
     // ========================================================================
-
+    
+    /**
+    * @brief Constructs a batch command representing property changes
+    * for multiple entities.
+    *
+    * @param world Pointer to the ECS world.
+    * @param componentId Identifier of the component being modified.
+    * @param propertyPath Dot-separated path to the property.
+    * @param entries Collection of entity property changes.
+    * @param applyFn Function used to apply property values.
+    */
     BatchComponentPropertyCommand::BatchComponentPropertyCommand(
         ECS::World* world,
         ECS::ComponentTypeId componentId,
@@ -628,17 +688,24 @@ namespace Editor {
     {
     }
 
+    /**
+    * @brief Applies the new property value to all entities in the batch.
+    */
     void BatchComponentPropertyCommand::Execute() {
         if (!m_world || !m_applyFn) return;
-        for (const auto& it : m_entries) {
+        for (const auto& it : m_entries) { // Apply the new value for each entity
             ECS::Entity e = m_world->Resolve(it.Entity);
             if (!m_world->IsAlive(e)) continue;
             m_applyFn(m_world, e, m_componentId, m_propertyPath, it.NewValue);
         }
     }
 
+    /**
+    * @brief Restores the original property values for all entities in the batch.
+    */
     void BatchComponentPropertyCommand::Undo() {
         if (!m_world || !m_applyFn) return;
+        // Restore the old value for each entity
         for (const auto& it : m_entries) {
             ECS::Entity e = m_world->Resolve(it.Entity);
             if (!m_world->IsAlive(e)) continue;
@@ -646,6 +713,15 @@ namespace Editor {
         }
     }
 
+    /**
+    * @brief Attempts to merge two batch commands.
+    *
+    * If both commands modify the same component property for the same
+    * set of entities, the latest values are merged into this command.
+    *
+    * @param other Another command to attempt merging with.
+    * @return True if the commands were successfully merged.
+    */
     bool BatchComponentPropertyCommand::Coalesce(ICommand* other) {
         auto* o = dynamic_cast<BatchComponentPropertyCommand*>(other);
         if (!o) return false;
@@ -653,9 +729,11 @@ namespace Editor {
         if (m_componentId != o->m_componentId) return false;
         if (m_propertyPath != o->m_propertyPath) return false;
         if (m_entries.size() != o->m_entries.size()) return false;
+        // Ensure entity ordering matches
         for (size_t i = 0; i < m_entries.size(); ++i) {
             if (m_entries[i].Entity != o->m_entries[i].Entity) return false;
         }
+        // Update new values with the latest command values
         for (size_t i = 0; i < m_entries.size(); ++i) {
             m_entries[i].NewValue = o->m_entries[i].NewValue;
         }
@@ -798,16 +876,19 @@ namespace Editor {
 
         command->Execute();
 
+        // Detect whether the command modifies component properties
         if (dynamic_cast<ComponentPropertyCommand*>(command.get()) != nullptr ||
             dynamic_cast<BatchComponentPropertyCommand*>(command.get()) != nullptr) {
-            m_propertyEditEmitted = true;
+            m_propertyEditEmitted = true; // Mark that a property edit has occurred
         }
 
+        // Attempt to merge the new command with the most recent undo command
         if (!m_undoStack.empty()) {
             auto* tail = m_undoStack.back().get();
             if (tail && tail->Coalesce(command.get())) {
+                // Clear redo history since a new command modifies the timeline
                 m_redoStack.clear();
-                TrimUndoStack();
+                TrimUndoStack(); // Ensure undo stack does not exceed its maximum size
                 return;
             }
         }
