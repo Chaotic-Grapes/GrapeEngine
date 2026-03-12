@@ -29,7 +29,6 @@ Launches the application in editor mode with the level editor interface.
 #include "core/Logger.h"
 #include "scripting/ScriptsCompiler.h"
 #include "ecs/events/EventDispatcher.h"
-#include "services/MemoryManager.h"
 
 extern "C" {
     // Forward declare the component deserialize callback registration function
@@ -94,11 +93,6 @@ int main() {
 
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
-    size_t playEntryMemoryUsage = 0;
-    bool hasPlayEntrySnapshot = false;
-
-    // Ignore tiny allocator drift/caching noise
-    constexpr size_t kLeakToleranceBytes = 16 * 1024; 
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
@@ -188,53 +182,6 @@ int main() {
         const bool isInEdit = (state == EditorState::Edit);
 
         if (stateChanged) {
-            if (wasInEdit && !isInEdit) {
-                // Snapshot memory the moment we enter play mode, this is the baseline
-                // we diff against when play stops so anything allocated during the
-                // play session shows up as a positive delta
-                playEntryMemoryUsage = MemoryManager::GetInstance().GetCurrentUsage();
-                hasPlayEntrySnapshot = true;
-                LOG_INFO("[MemoryLeakCheck] Play mode baseline captured at " << playEntryMemoryUsage << " bytes");
-            }
-            else if (!wasInEdit && isInEdit) {
-                const size_t memoryAfterStop = MemoryManager::GetInstance().GetCurrentUsage();
-
-                if (hasPlayEntrySnapshot) {
-                    if (memoryAfterStop > playEntryMemoryUsage) {
-                        const size_t leakedBytes = memoryAfterStop - playEntryMemoryUsage;
-
-                        if (leakedBytes > kLeakToleranceBytes) {
-                            // Delta exceeds tolerance, likely a real leak from play session
-                            // allocations that weren't freed on scene or entity teardown
-                            LOG_ERROR("[MemoryLeakCheck] Possible leak after leaving Play mode: +"
-                                << leakedBytes << " bytes (before = " << playEntryMemoryUsage
-                                << ", after = " << memoryAfterStop << ", tolerance = "
-                                << kLeakToleranceBytes << ")");
-                        }
-                        else {
-                            // Delta is positive but within tolerance, expected residual from
-                            // allocator bookkeeping, static caches or alignment padding
-                            LOG_INFO("[MemoryLeakCheck][SUCCESS] No leak detected after leaving Play mode "
-                                "(delta " << leakedBytes << " bytes is within tolerance "
-                                << kLeakToleranceBytes << ")");
-                        }
-                    }
-                    else {
-                        // Memory at stop is <= baseline meaning the play session either
-                        // broke even or net freed (e.g. lazy init caches that now persist
-                        // in edit mode were already counted in the baseline)
-                        LOG_INFO("[MemoryLeakCheck][SUCCESS] No leak detected after leaving Play mode (before = "
-                            << playEntryMemoryUsage << ", after = " << memoryAfterStop << ")");
-                    }
-                }
-                else {
-                    // Snapshot was never set, play mode entry transition was missed
-                    // so we have no baseline to diff against
-                    LOG_WARNING("[MemoryLeakCheck] No play baseline snapshot found when leaving Play mode");
-                }
-                // Reset so a subsequent play session starts fresh and doesn't reuse a stale baseline
-                hasPlayEntrySnapshot = false;
-            }
             // Advance state tracker so the next frame's transition detection is correct
             previousState = state;
         }

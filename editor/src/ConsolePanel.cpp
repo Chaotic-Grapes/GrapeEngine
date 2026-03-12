@@ -604,10 +604,8 @@ void ConsolePanel::AddMessage(LogLevel level, LogSource source, const std::strin
     }
 
     if ((level == LogLevel::INFO || level == LogLevel::DEBUG) && source != LogSource::SCRIPT) {
-        // Keep engine INFO/DEBUG noise out of the console, but always surface memory leak checks
-        if (message.find("[MemoryLeakCheck]") == std::string::npos) {
-            return; 
-        }
+        // Keep engine INFO/DEBUG noise out of the console
+        return;
     }
 
     // Guard all message containers and selection ids during insertion
