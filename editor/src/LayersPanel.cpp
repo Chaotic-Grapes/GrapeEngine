@@ -489,53 +489,64 @@ void LayersPanel::_renderCollisionMatrix() {
                 // Checkbox is checked if BOTH directions allow collision (symmetrical matrix)
                 bool collides = ((rowMask & bitForCol) != 0u) && ((colMask & bitForRow) != 0u);
 
-                // Lower triangle (including diagonal): interactive checkbox to toggle collision
-                bool prevState = collides;
-                ImGui::Checkbox("##cell", &collides);
-                    
-                // If state changed, update both layers' masks (symmetrical)
-                if (collides != prevState) {
-                    uint32_t prevRowMask = lm.GetLayerMask(rowId);
-                    uint32_t prevColMask = lm.GetLayerMask(colId);
-
-                    uint32_t newRowMask = prevRowMask;
-                    uint32_t newColMask = prevColMask;
-
-                    // Update both masks to maintain symmetry
-                    if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }  // Enable collision
-                    else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }         // Disable collision
-
-                    // Apply masks with world sync so colliders get updated immediately
-                    lm.SetLayerMask(rowId, newRowMask, &m_scene->GetWorld());
-                    lm.SetLayerMask(colId, newColMask, &m_scene->GetWorld());
-
-                    if (m_undoSystem) {
-                        // Command
-                        struct CollisionCmd : public Editor::ICommand {
-                            Scenes::Scene* scene; uint16_t a; uint16_t b; uint32_t prevA; uint32_t prevB; uint32_t nextA; uint32_t nextB;
-                            CollisionCmd(Scenes::Scene* s, uint16_t aa, uint16_t bb, uint32_t pA, uint32_t pB, uint32_t nA, uint32_t nB)
-                                : scene(s), a(aa), b(bb), prevA(pA), prevB(pB), nextA(nA), nextB(nB) {}
-
-                            void Execute() override {
-                                if (!scene)
-                                    return;
-
-                                scene->GetLayers().SetLayerMask(a, nextA, &scene->GetWorld());
-                                scene->GetLayers().SetLayerMask(b, nextB, &scene->GetWorld());
-                            }
-
-                            void Undo() override {
-                                if (!scene)
-                                    return;
-
-                                scene->GetLayers().SetLayerMask(a, prevA, &scene->GetWorld());
-                                scene->GetLayers().SetLayerMask(b, prevB, &scene->GetWorld());
-                            }
-                        };
-                        auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
-                        m_undoSystem->ExecuteCommand(std::move(cmd));
+                const bool unsupportedPair = (rowId >= 32u) || (colId >= 32u);
+                if (unsupportedPair) {
+                    bool disabledCell = false;
+                    ImGui::BeginDisabled();
+                    ImGui::Checkbox("##cell", &disabledCell);
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("Layer collision matrix supports layer IDs 0-31 only.");
                     }
-                    if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+                } else {
+                    // Lower triangle (including diagonal): interactive checkbox to toggle collision
+                    bool prevState = collides;
+                    ImGui::Checkbox("##cell", &collides);
+
+                    // If state changed, update both layers' masks (symmetrical)
+                    if (collides != prevState) {
+                        uint32_t prevRowMask = lm.GetLayerMask(rowId);
+                        uint32_t prevColMask = lm.GetLayerMask(colId);
+
+                        uint32_t newRowMask = prevRowMask;
+                        uint32_t newColMask = prevColMask;
+
+                        // Update both masks to maintain symmetry
+                        if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }  // Enable collision
+                        else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }         // Disable collision
+
+                        // Apply masks with world sync so colliders get updated immediately
+                        lm.SetLayerMask(rowId, newRowMask, &m_scene->GetWorld());
+                        lm.SetLayerMask(colId, newColMask, &m_scene->GetWorld());
+
+                        if (m_undoSystem) {
+                            // Command
+                            struct CollisionCmd : public Editor::ICommand {
+                                Scenes::Scene* scene; uint16_t a; uint16_t b; uint32_t prevA; uint32_t prevB; uint32_t nextA; uint32_t nextB;
+                                CollisionCmd(Scenes::Scene* s, uint16_t aa, uint16_t bb, uint32_t pA, uint32_t pB, uint32_t nA, uint32_t nB)
+                                    : scene(s), a(aa), b(bb), prevA(pA), prevB(pB), nextA(nA), nextB(nB) {}
+
+                                void Execute() override {
+                                    if (!scene)
+                                        return;
+
+                                    scene->GetLayers().SetLayerMask(a, nextA, &scene->GetWorld());
+                                    scene->GetLayers().SetLayerMask(b, nextB, &scene->GetWorld());
+                                }
+
+                                void Undo() override {
+                                    if (!scene)
+                                        return;
+
+                                    scene->GetLayers().SetLayerMask(a, prevA, &scene->GetWorld());
+                                    scene->GetLayers().SetLayerMask(b, prevB, &scene->GetWorld());
+                                }
+                            };
+                            auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
+                            m_undoSystem->ExecuteCommand(std::move(cmd));
+                        }
+                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+                    }
                 }
             }
             ImGui::NextColumn();
