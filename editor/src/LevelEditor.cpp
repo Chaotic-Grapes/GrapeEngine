@@ -1,8 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   LevelEditor.cpp
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
+        s.leong@digipen.edu
 \date   12th March 2026
 \brief
 Implements the LevelEditor class: main orchestrator for the game editor interface.

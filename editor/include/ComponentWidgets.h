@@ -1,9 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentWidgets.h
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
-\date   11th March 2026
+        s.leong@digipen.edu
 
 \brief
 Reusable ImGui helper functions for editing JSON-backed properties.

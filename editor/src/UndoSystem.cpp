@@ -33,17 +33,26 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using Json = nlohmann::json;
 
-// Compares JSON values recursively with epsilon tolerance for floating point fields
+/**
+ * @brief Compares two JSON values with tolerance for floating point numbers.
+ *
+ * Performs a recursive comparison between two JSON objects. Floating point
+ * numbers are compared using an epsilon tolerance to avoid precision issues,
+ * while arrays and objects are compared element-by-element.
+ *
+ * @param a First JSON value to compare.
+ * @param b Second JSON value to compare.
+ * @param epsilon Allowed floating-point difference tolerance.
+ * @return True if the JSON values are approximately equal, otherwise false.
+ */
 static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, float epsilon = 1e-5f) {
-    // Types must match first so numeric and object forms are never treated as equivalent
+    // If the types differ, they cannot be equal
     if (a.type() != b.type()) return false;
-
-    // Float comparison uses epsilon to avoid tiny serialization noise creating false diffs
+    // Handle floating point comparison with epsilon tolerance
     if (a.is_number_float()) {
         return std::abs(a.get<float>() - b.get<float>()) < epsilon;
     }
-
-    // Arrays are compared element by element in order because property arrays are positional
+    // Recursively compare arrays
     if (a.is_array()) {
         if (a.size() != b.size()) return false;
         for (size_t i = 0; i < a.size(); i++) {
@@ -51,8 +60,7 @@ static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, fl
         }
         return true;
     }
-
-    // Objects require same key count and recursive key value equality
+    // Recursively compare objects
     if (a.is_object()) {
         if (a.size() != b.size()) return false;
         for (auto& [key, val] : a.items()) {
@@ -60,9 +68,7 @@ static bool JsonApproxEqual(const nlohmann::json& a, const nlohmann::json& b, fl
         }
         return true;
     }
-
-    // Primitive non float values use exact equality
-    return a == b;
+    return a == b; // Default comparison for integers, strings, booleans, etc.
 }
 
 namespace Editor {
@@ -617,7 +623,20 @@ namespace Editor {
     // ComponentPropertyCommand Implementation
     // ========================================================================
 
-    // Stores old and new JSON value for one property on one component instance
+    /**
+    * @brief Constructs a command representing a component property change.
+    *
+    * Stores the entity, component, property path, and both the old and new values.
+    * These values are later used for undo and redo operations.
+    *
+    * @param world Pointer to the ECS world.
+    * @param entityId ID of the entity whose property is modified.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property.
+    * @param oldValue Original value of the property.
+    * @param newValue Updated value of the property.
+    * @param applyFn Function used to apply the property value.
+    */
     ComponentPropertyCommand::ComponentPropertyCommand(
         ECS::World* world,
         EntityId entityId,
@@ -637,47 +656,65 @@ namespace Editor {
     {
     }
 
-    // Writes new property value into component through injected apply function
+    /**
+    * @brief Executes the command by applying the new property value.
+    *
+    * Applies the stored new value to the specified component property
+    * of the target entity.
+    */
     void ComponentPropertyCommand::Execute() {
-        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
-
-        // Resolve from stable id each call so undo remains valid even after handle churn
-        ECS::Entity e = m_world->Resolve(m_entityId);
-        if (!m_world->IsAlive(e)) return;
-        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_newValue);
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return; // Ensure the world and apply function are valid
+        ECS::Entity e = m_world->Resolve(m_entityId); // Resolve the entity from its ID
+        if (!m_world->IsAlive(e)) return; // Skip if the entity no longer exists
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_newValue); // Apply the new value to the property
     }
 
-    // Writes previous property value back into component through same apply path
+    /**
+    * @brief Reverts the property change by restoring the old value.
+    *
+    * This method is called when performing an undo operation.
+    */
     void ComponentPropertyCommand::Undo() {
-        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return;
-
-        // Use identical write path as execute so serialization and side effects remain consistent
-        ECS::Entity e = m_world->Resolve(m_entityId);
-        if (!m_world->IsAlive(e)) return;
-        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_oldValue);
+        if (!m_world || m_entityId == ECS::Entity::NPOS32 || !m_applyFn) return; // Ensure the world and apply function are valid
+        ECS::Entity e = m_world->Resolve(m_entityId); // Resolve the entity
+        if (!m_world->IsAlive(e)) return; // Skip if the entity no longer exists
+        m_applyFn(m_world, e, m_componentId, m_propertyPath, m_oldValue); // Restore the previous value
     }
 
-    // Merges sequential edits on the same property by keeping old value and replacing only latest new value
+    /**
+    * @brief Attempts to merge this command with another command.
+    *
+    * If both commands modify the same entity, component, and property,
+    * the commands can be merged so that only the latest value is kept.
+    *
+    * @param other Another command to attempt merging with.
+    * @return True if the commands were successfully merged.
+    */
     bool ComponentPropertyCommand::Coalesce(ICommand* other) {
         auto* o = dynamic_cast<ComponentPropertyCommand*>(other);
-        if (!o) return false;
-
-        // Commands must target the exact same world entity component and property path to be mergeable
+        if (!o) return false; // Ensure the other command is compatible
         if (m_world != o->m_world) return false;
         if (m_entityId != o->m_entityId) return false;
         if (m_componentId != o->m_componentId) return false;
         if (m_propertyPath != o->m_propertyPath) return false;
-
-        // Keep original old value and promote latest new value to collapse drag noise
-        m_newValue = o->m_newValue;
+        m_newValue = o->m_newValue; // Update the final value to the most recent change
         return true;
     }
 
     // ========================================================================
     // BatchComponentPropertyCommand Implementation
     // ========================================================================
-
-    // Stores a batch of entity property edits for multi select inspector operations
+    
+    /**
+    * @brief Constructs a batch command representing property changes
+    * for multiple entities.
+    *
+    * @param world Pointer to the ECS world.
+    * @param componentId Identifier of the component being modified.
+    * @param propertyPath Dot-separated path to the property.
+    * @param entries Collection of entity property changes.
+    * @param applyFn Function used to apply property values.
+    */
     BatchComponentPropertyCommand::BatchComponentPropertyCommand(
         ECS::World* world,
         ECS::ComponentTypeId componentId,
@@ -693,21 +730,24 @@ namespace Editor {
     {
     }
 
-    // Applies batched new values across all valid entities
+    /**
+    * @brief Applies the new property value to all entities in the batch.
+    */
     void BatchComponentPropertyCommand::Execute() {
         if (!m_world || !m_applyFn) return;
-
-        for (const auto& it : m_entries) {
+        for (const auto& it : m_entries) { // Apply the new value for each entity
             ECS::Entity e = m_world->Resolve(it.Entity);
             if (!m_world->IsAlive(e)) continue;
             m_applyFn(m_world, e, m_componentId, m_propertyPath, it.NewValue);
         }
     }
 
-    // Restores batched old values across all valid entities
+    /**
+    * @brief Restores the original property values for all entities in the batch.
+    */
     void BatchComponentPropertyCommand::Undo() {
         if (!m_world || !m_applyFn) return;
-
+        // Restore the old value for each entity
         for (const auto& it : m_entries) {
             ECS::Entity e = m_world->Resolve(it.Entity);
             if (!m_world->IsAlive(e)) continue;
@@ -715,7 +755,15 @@ namespace Editor {
         }
     }
 
-    // Coalesces compatible multi entity edits by preserving original old values and replacing latest new values
+    /**
+    * @brief Attempts to merge two batch commands.
+    *
+    * If both commands modify the same component property for the same
+    * set of entities, the latest values are merged into this command.
+    *
+    * @param other Another command to attempt merging with.
+    * @return True if the commands were successfully merged.
+    */
     bool BatchComponentPropertyCommand::Coalesce(ICommand* other) {
         auto* o = dynamic_cast<BatchComponentPropertyCommand*>(other);
         if (!o) return false;
@@ -725,13 +773,11 @@ namespace Editor {
         if (m_componentId != o->m_componentId) return false;
         if (m_propertyPath != o->m_propertyPath) return false;
         if (m_entries.size() != o->m_entries.size()) return false;
-
-        // Preserve entity order contract so each entry old and new values map to same target entity
+        // Ensure entity ordering matches
         for (size_t i = 0; i < m_entries.size(); ++i) {
             if (m_entries[i].Entity != o->m_entries[i].Entity) return false;
         }
-
-        // Keep initial old values and refresh only new values from latest command
+        // Update new values with the latest command values
         for (size_t i = 0; i < m_entries.size(); ++i) {
             m_entries[i].NewValue = o->m_entries[i].NewValue;
         }
@@ -880,18 +926,19 @@ namespace Editor {
 
         command->Execute();
 
-        // Emit property edit flag for inspector refresh flows that listen to aggregate property commits
+        // Detect whether the command modifies component properties
         if (dynamic_cast<ComponentPropertyCommand*>(command.get()) != nullptr ||
             dynamic_cast<BatchComponentPropertyCommand*>(command.get()) != nullptr) {
-            m_propertyEditEmitted = true;
+            m_propertyEditEmitted = true; // Mark that a property edit has occurred
         }
 
-        // Coalesce with stack tail to merge drag style edits into one undo entry
+        // Attempt to merge the new command with the most recent undo command
         if (!m_undoStack.empty()) {
             auto* tail = m_undoStack.back().get();
             if (tail && tail->Coalesce(command.get())) {
+                // Clear redo history since a new command modifies the timeline
                 m_redoStack.clear();
-                TrimUndoStack();
+                TrimUndoStack(); // Ensure undo stack does not exceed its maximum size
                 return;
             }
         }
@@ -1143,32 +1190,43 @@ namespace Editor {
         m_activePropertyEdits.erase(it);
     }
 
-    // Captures per entity old values for a multi entity property edit session
+    /**
+    * @brief Begins a batch property edit for multiple entities.
+    * Captures the current value of a specific component property for each entity
+    * so it can be used as the "before" state when generating undo commands.
+    *
+    * @param entities Set of entity IDs whose component property will be edited.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property inside the component (e.g. "Position.X").
+    */
     void UndoSystem::BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath) {
-        if (!m_world) return;
+        if (!m_world) return; // Ensure the world context exists before continuing
 
         // Resolve component short name from registry so we can locate matching component JSON in serialization
         const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
         const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
-        if (compShortName.empty()) {
+        if (compShortName.empty()) { // If the component name cannot be resolved, abort
             return;
         }
 
         // Capture each entity current property value as before state for batch undo
         for (EntityId id : entities) {
-            ECS::Entity entity = m_world->Resolve(id);
-            if (!m_world->IsAlive(entity)) continue;
+            ECS::Entity entity = m_world->Resolve(id); // Resolve the runtime entity handle from its ID
+            if (!m_world->IsAlive(entity)) continue; // Skip entities that are no longer alive
 
-            // Serialize entity once so path extraction uses consistent data shape with inspector serializer
+            // Serialize the entity into JSON so its components can be inspected
             nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
             nlohmann::json* componentData = nullptr;
 
-            // Locate target component payload by typename and keep pointer to its Data object
+            // Locate the desired component within the serialized entity JSON
             if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
                 for (auto& comp : entityJson["Components"]) {
+                    // Ensure the component entry contains a valid type name
                     if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
                     std::string typeName = comp["TypeName"];
+                    // Match either the short name or fully-qualified name
                     if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                        // Retrieve the component's data block
                         if (comp.contains("Data") && comp["Data"].is_object()) {
                             componentData = &comp["Data"];
                         }
@@ -1180,24 +1238,24 @@ namespace Editor {
             nlohmann::json propertyVal;
 
             if (componentData) {
-                // Walk dotted path tokens like Position.X to extract nested property value
-                propertyVal = *componentData;
+                // Extract the specific property from the component JSON
+                // propertyPath is like "Position.X"
+                propertyVal = *componentData; // Start from the component's JSON data
                 size_t start = 0;
                 size_t end = propertyPath.find('.');
                 while (end != std::string::npos) {
                     std::string part = propertyPath.substr(start, end - start);
+                    // Traverse the JSON hierarchy
                     if (propertyVal.is_object() && propertyVal.contains(part)) {
                         propertyVal = propertyVal[part];
-                    }
-                    else {
-                        propertyVal = nlohmann::json();
+                    } else {
+                        propertyVal = nlohmann::json(); // Invalid path segment
                         break;
                     }
                     start = end + 1;
                     end = propertyPath.find('.', start);
                 }
-
-                // Resolve final token after loop and clear value when path does not exist
+                // Resolve the final property in the path
                 if (!propertyVal.is_null()) {
                     std::string lastPart = propertyPath.substr(start);
                     if (propertyVal.is_object() && propertyVal.contains(lastPart)) {
@@ -1207,41 +1265,47 @@ namespace Editor {
                         propertyVal = nlohmann::json();
                     }
                 }
-            }
-            else {
-                propertyVal = nlohmann::json();
+            } else {
+                propertyVal = nlohmann::json(); // Component was not found; store an empty value
             }
 
-            // Reuse single property tracking map to store each entity before value
-            BeginPropertyEdit(id, componentId, propertyPath, propertyVal);
+            BeginPropertyEdit(id, componentId, propertyPath, propertyVal); // Store the captured property value as the starting state
         }
     }
 
-    // Ends a multi entity property edit by creating one batch command for all changed entities
+    /**
+    * @brief Ends a batch property edit and creates a single undo command.
+    * Compares stored original values with the final value and records
+    * all changes into a batch undo command.
+    *
+    * @param entities Set of entity IDs affected by the edit.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property inside the component.
+    * @param newValue The updated value of the property after editing.
+    * @param applyFn Function used to apply the property during undo/redo operations.
+    */
     void UndoSystem::EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
         ComponentPropertyCommand::ApplyFn applyFn) {
-        if (!m_world || !applyFn) return;
+        if (!m_world || !applyFn) return; // Ensure required systems and callbacks are valid
 
         std::vector<BatchComponentPropertyCommand::Entry> entries;
-
-        // Collect changed entries only so no op entities do not create unnecessary undo payload data
-        for (EntityId id : entities) {
+        for (EntityId id : entities) { // Iterate through entities to determine which values actually changed
             PropertyKey key{ id, componentId, propertyPath };
             auto it = m_activePropertyEdits.find(key);
             if (it == m_activePropertyEdits.end()) continue;
 
             const nlohmann::json& oldVal = it->second;
+            // Skip recording if the value did not change
             if (JsonApproxEqual(oldVal, newValue)) {
                 m_activePropertyEdits.erase(it);
                 continue;
             }
 
-            entries.push_back({ id, oldVal, newValue });
-            m_activePropertyEdits.erase(it);
+            entries.push_back({ id, oldVal, newValue }); // Store the change entry
+            m_activePropertyEdits.erase(it); // Remove the active edit record
         }
 
-        // Emit one batch command only when at least one entity changed
-        if (!entries.empty()) {
+        if (!entries.empty()) { // If any entities changed, generate a batch undo command
             auto cmd = std::make_unique<BatchComponentPropertyCommand>(
                 m_world, componentId, propertyPath, std::move(entries), std::move(applyFn)
             );
@@ -1249,22 +1313,37 @@ namespace Editor {
         }
     }
 
-    // Records a one shot property change when caller already has old and new values
+    /**
+    * @brief Records a property change for a single entity.
+    * Generates an undoable command if the old and new values differ.
+    *
+    * @param entityId ID of the entity whose property changed.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property.
+    * @param oldValue Previous value of the property.
+    * @param newValue Updated value of the property.
+    * @param applyFn Function used to apply the property during undo/redo.
+    */
     void UndoSystem::RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
         const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn) {
-        if (!m_world) return;
-        if (JsonApproxEqual(oldValue, newValue)) return;
-        auto cmd = std::make_unique<ComponentPropertyCommand>(
+        if (!m_world) return; // Ensure the world exists
+        if (JsonApproxEqual(oldValue, newValue)) return; // Ignore if the value has not changed
+        auto cmd = std::make_unique<ComponentPropertyCommand>( // Create a command representing this property modification
             m_world, entityId, componentId, propertyPath, oldValue, newValue, std::move(applyFn)
         );
-        ExecuteCommand(std::move(cmd));
+        ExecuteCommand(std::move(cmd)); // Execute and register the command with the undo system
     }
 
-    // Returns and resets the property edit emission flag used by editor UI refresh logic
+    /**
+    * @brief Consumes the property edit emission flag.
+    * Returns whether a property edit event was emitted and resets the flag.
+    *
+    * @return True if a property edit event occurred since the last call.
+    */
     bool UndoSystem::ConsumePropertyEditEmission() {
         // Consume semantics ensure callers observe each emitted flag transition only once
         bool was = m_propertyEditEmitted;
-        m_propertyEditEmitted = false;
+        m_propertyEditEmitted = false;     // Reset the emission flag
         return was;
     }
 

@@ -1,9 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentPropertyEditor.h
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
-\date   11th March 2026
+        s.leong@digipen.edu
 
 \brief
 Provides unified component rendering UI for both entity inspection and prefab editing.
