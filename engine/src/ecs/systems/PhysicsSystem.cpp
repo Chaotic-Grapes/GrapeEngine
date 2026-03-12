@@ -1,10 +1,13 @@
 /* Start Header *****************************************************************/
 /*!
 \file   PhysicsSystem.cpp
-\author Dalton Koh Shi Hao (90%)
+\author Dalton Koh Shi Hao (80%)
         Muhammad Nur Fadzly Bin Zulkifli (10%)
+        Foo Rui Qin (10%)
 \par    d.koh@digipen.edu
         muhammadnurfadzly.b@digipen.edu
+        ruiqin.foo@digipen.edu
+\date   12th March 2026
 
 \brief
 Broad/narrow-phase utilities and per-frame 2D physics update loop.
@@ -78,60 +81,44 @@ extern Audio::FmodAudioDevice* gAudioDevice;
 #define PHYSICS_AUDIO_DEVICE (gAudioDevice)
 #endif
 
-/**
-* @brief: Class that divides active world into a grid to quickly find entities. Application of this
-* in relation to the broad-narrow phase collision detection
-*/
+// Divides active world space into fixed cells so broad-phase can query nearby entities efficiently
 class SpatialPartitioning {
 public:
-    // cell sizes in float to determine the space size 
-    // Tune this based on typical collider sizes / scene density.
+
+    // Cell size controls broad-phase granularity and should reflect typical collider footprints
+    // Larger cells reduce grid bookkeeping while smaller cells reduce candidate pair fanout
     static constexpr float CELL_SIZE = 16.0f;
 
-    // represents grid cords (x,y)
+    // Stores integer grid coordinates for one spatial cell
     struct CellCoord {
         int x, y;
 
-        // operator to help this = other object cords
+        // Compares cell coordinates so map lookups can match exact cell keys
         bool operator==(const CellCoord& other) const { return x == other.x && y == other.y; }
     };
 
-    // Hash function for CellCord so it can be used as unoredered_map key
+    // Hashes cell coordinates for unordered_map key usage
     struct CellHash {
         size_t operator()(const CellCoord& c) const noexcept {
 
-            // combine x and y cords into single hash
-            // the XOR with shifted Y prevents collisions
+            // Mix x and y so adjacent cells spread across buckets instead of clustering by one axis
             return std::hash<int>{}(c.x) ^ (std::hash<int>{}(c.y) << 1);
         }
     };
 
-
-
-    /**
-    * @brief: Inserts entity into spatial grid where we calculate which grid cells
-    * the entity overlaps.
-    *
-    * example: Entity at (100,100) with radius 50 and Cellsize previously declared as 64
-    * - overlaps cells: (0,0), (1,0),(0,1),(1,1)
-    * - gets inserted into all those 4 cells
-    */
+    // Inserts a radius-based collider by mapping its AABB bounds into all overlapped grid cells
     void Insert(const ECS::Entity entity, const Vector3D& position, float radius) {
-        //std::floor calculates the minimum value from float to int when you convert so basically
-        // 15.75 -> becomes 15 instead of 16 so basically count down. 
 
-        // calculate whats the spacial area minimum X and max X covers 
-        // so like spacially you can imagine how the covered area fits 
+        // floor converts coordinate to containing cell index so negative positions still map correctly
+        // Compute min and max cell coverage along x from radius-expanded center
         int minX = static_cast<int>(std::floor((position.X - radius) / CELL_SIZE));
         int maxX = static_cast<int>(std::floor((position.X + radius) / CELL_SIZE));
 
-        // same thing as above but for the Y axis area expansion
+        // Compute min and max cell coverage along y from radius-expanded center
         int minY = static_cast<int>(std::floor((position.Y - radius) / CELL_SIZE));
         int maxY = static_cast<int>(std::floor((position.Y + radius) / CELL_SIZE));
 
-        // use for loop to iterate from minimum to maximum x/y cords for 3d and push it back
-        // onto a grid (m_grid). so right now they will be placed onto a reference grid
-        // to be accessed later for grid check into collision checks.
+        // Insert entity into each covered cell so nearby queries can find this collider quickly
         for (int cx = minX; cx <= maxX; ++cx) {
             for (int cy = minY; cy <= maxY; ++cy) {
                 m_grid[CellCoord{ cx, cy }].push_back(entity);
@@ -139,7 +126,9 @@ public:
         }
     }
 
+    // Inserts a box collider by mapping its AABB extents into all overlapped grid cells
     void InsertBox(const ECS::Entity entity, const Vector3D& position, const Vector2D& halfExtents) {
+
         // Calculate the actual AABB bounds for the box
         float minX = position.X - halfExtents.X;
         float maxX = position.X + halfExtents.X;
@@ -160,30 +149,32 @@ public:
         }
     }
 
-    // to access the internal grid 
+    // Returns mutable access to grid for broad-phase pair enumeration
     std::unordered_map<CellCoord, std::vector<ECS::Entity>, CellHash>& Grid() { return m_grid; }
 
 private:
-    // the spatial grid: maps cell cordinates to list of entities in cell;
-    // eg. m_grid[{0,1}] = [entity1, 2, etc]
+
+    // Maps each occupied cell to the entities whose broad-phase bounds overlap that cell
     std::unordered_map<CellCoord, std::vector<ECS::Entity>, CellHash> m_grid;
 };
 
 namespace {
+
     // Collision bitmask definitions for tile corners (2x2 subcells)
-	constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;  // Bit 0: Bottom-left corner
-	constexpr uint8_t kCollisionMaskBottomRight = 1 << 1; // Bit 1: Bottom-right corner
-	constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;     // Bit 2: Top-left corner
-	constexpr uint8_t kCollisionMaskTopRight = 1 << 3;    // Bit 3: Top-right corner
+    constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;  // Bit 0: Bottom-left corner
+    constexpr uint8_t kCollisionMaskBottomRight = 1 << 1; // Bit 1: Bottom-right corner
+    constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;     // Bit 2: Top-left corner
+    constexpr uint8_t kCollisionMaskTopRight = 1 << 3;    // Bit 3: Top-right corner
 
     // Resolve a project-relative path to an absolute path for loading assets
     std::string ResolveProjectPathForLoad(const std::string& path) {
-		// If path is empty or project paths not initialized, return as-is (likely to fail later)
+
+        // If path is empty or project paths not initialized, return as-is (likely to fail later)
         if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
             return path;
         }
 
-		// If already absolute, return as-is
+        // If already absolute, return as-is
         std::filesystem::path fsPath(path);
         if (fsPath.is_absolute()) {
             return path;
@@ -198,12 +189,14 @@ namespace {
     static void GetTileMapTransform(ECS::World& world, const ECS::Entity entity, const ECS::Components::LocalTransform& lt, 
         Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) 
     {
-		// If the entity has a WorldTransform, decompose it to get the effective position/rotation/scale
+
+        // If the entity has a WorldTransform, decompose it to get the effective position/rotation/scale
         if (world.Has<ECS::Components::WorldTransform>(entity)) {
             const auto& wt = world.Get<ECS::Components::WorldTransform>(entity);
             TransformUtils::DecomposeTRS(wt.Matrix, outPosition, outRotation, outScale);
         }
-		// Otherwise, use the LocalTransform directly
+
+        // Otherwise use LocalTransform directly when world transform is unavailable
         else {
             outPosition = lt.Position;
             outRotation = lt.Rotation;
@@ -212,25 +205,17 @@ namespace {
     }
 }
 
-/**
- * @brief: main physics update function
- * called every frame to:
- * 1. integrate velocities
- * 2. build spatial grid
- * 3. generate collision pairs
- * 4. resolve collisions
- */
-
-
- // Build an effective world-space transform from current local + parent hierarchy
- // This avoids relying on WorldTransform snapshots, which can be stale during physics substeps
+// Builds effective world transform from local hierarchy so physics uses current parent chain state
+// Avoids stale WorldTransform snapshots during substeps where transforms are being modified
 static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity, ECS::Components::LocalTransform& outTransform) {
     const auto* localTransform = world.TryGet<ECS::Components::LocalTransform>(entity);
     if (!localTransform) {
+
         // No local transform means this entity isn't positioned relative to a parent,
         // so fall back to whatever world transform it has directly
         if (!world.Has<ECS::Components::WorldTransform>(entity)) {
-            // Entity has neither local nor world transform — nothing we can reconstruct from
+
+            // Entity has neither local nor world transform so reconstruction cannot continue
             return false;
         }
 
@@ -246,12 +231,14 @@ static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity
 
     while (!parent.IsNull()) {
         if (const auto* parentLocal = world.TryGet<ECS::Components::LocalTransform>(parent)) {
+
             // Parent has a local transform, so keep walking up; pre-multiply to accumulate
             // parent-space contribution correctly (parent TRS applied before child's)
             const Matrix4x4 parentMatrix = TransformUtils::MakeTRS(parentLocal->Position, parentLocal->Rotation, parentLocal->Scale);
             worldMatrix = parentMatrix * worldMatrix;
         }
         else if (world.Has<ECS::Components::WorldTransform>(parent)) {
+
             // Parent already has a baked world matrix; treat it as a root anchor and stop;
             // no point walking further since everything above is already in world space
             const auto& parentWorld = world.Get<ECS::Components::WorldTransform>(parent);
@@ -259,6 +246,7 @@ static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity
             break;
         }
         else {
+
             // Parent has no transform data at all; hierarchy is broken here, stop walking
             break;
         }
@@ -273,8 +261,10 @@ static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity
 
 namespace ECS {
 
+    // Declares scheduler metadata including component access requirements and run policy
     SystemMetadata PhysicsSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Physics");
+
         // Read accesses
         builder.ReadComponent<Components::LocalTransform>();
         builder.ReadComponent<Components::CircleCollider2D>();
@@ -282,9 +272,11 @@ namespace ECS {
         builder.ReadComponent<Components::Rigidbody2D>();
         builder.ReadComponent<Components::Active>();
         builder.ReadComponent<Components::Parent>();
+
         // Write accesses
         builder.WriteComponent<Components::LocalTransform>();
         builder.WriteComponent<Components::Rigidbody2D>();
+
         // Execution parameters
         builder.SetExecutionOrder(0);
         builder.SetGroup(SystemGroup::Physics);
@@ -292,46 +284,48 @@ namespace ECS {
         return builder.Build();
     }
 
+    // Clears cached collision and tilemap runtime state when system is destroyed
     void PhysicsSystem::OnDestroy(World& /*world*/) {
         m_previousCollisions.clear();
         m_previousTriggerOverlaps.clear();
         m_runtimeTileMaps.clear();
     }
 
-	// Refresh the runtime tilemap cache to synchronize with any changes to tilemap components in the world
+    // Refreshes runtime tilemap cache so physics uses current tilemap components and paths
     void PhysicsSystem::RefreshRuntimeTileMaps(World& world) {
-		// Track which entities we see with tilemap components to detect removals
+
+        // Track entities observed this frame so stale cache entries can be removed later
         std::unordered_set<EntityId> seen;
 
-		// Iterate all entities with TileMapComponent to update or create runtime cache entries
+        // Iterate tilemap components and update or rebuild cache entries as needed
         world.Each<ECS::Components::TileMapComponent>([this, &seen, &world](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
-			// Mark this entity as seen for cache synchronization
+
+            // Mark entity as seen so we can keep only active tilemap entries
             seen.insert(entity.Index);
 
-			// Lookup or create the runtime tilemap entry for this entity
+            // Lookup or create cache entry keyed by entity id
             RuntimeTileMapEntry& entry = m_runtimeTileMaps[entity.Index];
 
-			// Check if the tilemap generation has changed, which indicates the tilemap component was modified or replaced
+            // Generation mismatch means the component was replaced or structurally updated
             const bool generationChanged = (entry.Generation != entity.Generation);
 
-			// If so, reset the entry to force a reload
-            // Handles cases where the tilemap component is replaced with a new one (e.g. via prefab instantiation or component swapping)
+            // Reset entry on generation change so all derived fields rebuild from fresh component data
             if (generationChanged) {
                 entry = RuntimeTileMapEntry{};
             }
 
-			// Update the generation to match the current component, so we can detect future changes
+            // Cache current generation value for change detection in subsequent frames
             entry.Generation = entity.Generation;
 
-			// Resolve the tilemap path from the string table and project paths
+            // Resolve path token into loadable project absolute path
             std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath);
             mapPath = ResolveProjectPathForLoad(mapPath);
 
-			// Check if we need to reload the tilemap asset due to changes in the component or path
+            // Reload map when path dimensions tile size or generation diverge from cache
             const bool mapNeedsReload = generationChanged || entry.MapPath != mapPath || entry.TileWorldSize != comp.TileWorldSize ||
                 entry.DefaultWidth != comp.DefaultWidth || entry.DefaultHeight != comp.DefaultHeight;
 
-			// If so, reload the tilemap asset and update the cache entry
+            // Rebuild map handle and metadata when reload conditions are met
             if (mapNeedsReload) {
                 entry.Map.reset();
                 entry.MapPath = mapPath;
@@ -339,28 +333,27 @@ namespace ECS {
                 entry.DefaultWidth = comp.DefaultWidth;
                 entry.DefaultHeight = comp.DefaultHeight;
 
-				// Attempt to load the tilemap from the specified path if it exists
+                // Try loading from disk when path exists
                 if (!mapPath.empty() && std::filesystem::exists(mapPath)) {
                     entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
 
-					// If loading fails (e.g. invalid file), reset the map pointer to ensure we have a valid empty tilemap later
+                    // Reset on load failure so fallback initialization path can create a valid map
                     if (!entry.Map->LoadMap(mapPath)) {
                         entry.Map.reset();
                     }
                 }
 
-				// If loading failed (e.g. invalid path), ensure we have a valid empty tilemap to avoid null references in physics updates
+                // Fallback map prevents null dereference in physics loops when asset load fails
                 if (!entry.Map) {
                     entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
                     entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
                 }
             }
 
-			// Calculate the tilemap origin based on the entity's transform (world or local)
+            // Compute tilemap origin in world space from effective transform
             Vector2D origin{ 0.0f, 0.0f };
 
-			// If the entity has a LocalTransform, use it to calculate the origin
-            // This allows tilemaps to be positioned/scaled/rotated in the world
+            // Use effective transform path so parented tilemaps collide at correct world coordinates
             if (world.Has<ECS::Components::LocalTransform>(entity)) {
                 const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
                 Vector3D position, scale;
@@ -369,14 +362,13 @@ namespace ECS {
                 origin = Vector2D(position.X, position.Y);
             }
 
-			// Update the cache entry with the calculated origin and enabled state based on visibility and hierarchy
+            // Cache origin plus enabled state and layer id for tile collision checks
             entry.Origin = origin;
             entry.Enabled = comp.Visible && world.IsActiveInHierarchy(entity);
             entry.LayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
         });
 
-		// Remove any runtime tilemap entries for entities that no longer have a TileMapComponent (i.e. were destroyed or 
-        // had the component removed)
+        // Remove cache entries for entities that no longer expose TileMapComponent
         for (auto it = m_runtimeTileMaps.begin(); it != m_runtimeTileMaps.end(); ) {
             if (!seen.contains(it->first)) {
                 it = m_runtimeTileMaps.erase(it);
@@ -391,20 +383,19 @@ namespace ECS {
     // Narrow-phase helpers
     // =====================================================================
 
+    // Returns 2D dot product used in SAT projection and basis transformation math
     static float Dot2D(const Vector2D& a, const Vector2D& b) {
         return a.X * b.X + a.Y * b.Y;
     }
 
-    /**
-    * @brief Circle-circle overlap test with normal/depth output (using world-space shapes).
-    * @return true if overlapping; normal points A->B, depth is penetration.
-    */
+    // Tests world-space circle-circle overlap and outputs normal from A to B plus penetration depth
     bool TestCircleCircle(
         const Engine::WorldCircle& circleA,
         const Engine::WorldCircle& circleB,
         Vector2D& outNormal,
         float& outDepth)
     {
+
         // Collision test using pre-computed world-space circles
         const float dx = circleB.Center.X - circleA.Center.X;
         const float dy = circleB.Center.Y - circleA.Center.Y;
@@ -422,18 +413,15 @@ namespace ECS {
             outNormal = Vector2D(dx / dist, dy / dist);
         }
         else {
-            // Arbitrary axis when centers coincide.
+
+            // Arbitrary axis when centers coincide
             outNormal = Vector2D(1.0f, 0.0f);
         }
         outDepth = radiiSum - dist;
         return true;
     }
 
-    /**
-    * @brief Circle-circle overlap test with normal/depth output.
-    * @return true if overlapping; normal points A->B, depth is penetration.
-    * @deprecated Use the WorldCircle version instead
-    */
+    // Deprecated overload that converts local transform circle inputs into world circles then delegates
     bool TestCircleCircle(
         const Components::CircleCollider2D& circleA,
         const Components::LocalTransform& transformA,
@@ -442,19 +430,19 @@ namespace ECS {
         Vector2D& outNormal,
         float& outDepth)
     {
+
         // Compute world-space circles and delegate to the world-space version
         Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(circleA, transformA);
         Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(circleB, transformB);
         return TestCircleCircle(wcA, wcB, outNormal, outDepth);
     }
 
-    /**
-     * @brief Test box-box collision using SAT on oriented boxes (world-space shapes).
-     */
+    // Tests world-space OBB overlap with SAT and returns manifold with normal penetration and contact point
     Engine::Collision::ContactManifold TestBoxBox(
         const Engine::WorldOBB& obbA,
         const Engine::WorldOBB& obbB)
     {
+
         // Collision test using Separating Axis Theorem (SAT) for OBBs
         Engine::Collision::ContactManifold manifold;
         manifold.pointCount = 0;
@@ -470,6 +458,7 @@ namespace ECS {
         // Iterate over all axes
         // The four axes to test are the normals of the edges of both boxes
         for (const auto& axis : axes) {
+
             // Project both boxes onto the axis
             const float rA =
                 obbA.HalfExtents.X * std::abs(Dot2D(axis, obbA.AxisX)) +
@@ -519,10 +508,7 @@ namespace ECS {
         return manifold;
     }
 
-    /**
-     * @brief Test box-box collision using Collision utility
-     * @deprecated Use the world-space OBB version instead
-     */
+    // Deprecated overload that builds world OBB values from component plus transform inputs
     [[deprecated("Use the world-space OBB version instead")]]
     Engine::Collision::ContactManifold TestBoxBox(
         const Components::BoxCollider2D& boxA,
@@ -530,15 +516,14 @@ namespace ECS {
         const Components::BoxCollider2D& boxB,
         const Components::LocalTransform& transformB)
     {
+
         // Compute world-space OBBs and delegate to the world-space version
         const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(boxA, transformA);
         const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(boxB, transformB);
         return TestBoxBox(obbA, obbB);
     }
 
-    /**
-     * @brief Test circle-box collision using OBB (using world-space shapes)
-     */
+    // Tests world-space circle-OBB overlap with axis-aligned fast path and local-space fallback path
     bool TestCircleBox(
         const Engine::WorldCircle& circle,
         const Engine::WorldOBB& box,
@@ -546,6 +531,7 @@ namespace ECS {
         float& outDepth,
         Vector2D& outContact)
     {
+
         // Fast path for axis-aligned boxes
         if (std::abs(box.Rotation) < 1e-6f) {
             Engine::Collision::AABB aabb = Engine::Collision::MakeAABBCenterSize(
@@ -601,10 +587,7 @@ namespace ECS {
         return true;
     }
 
-    /**
-     * @brief Test circle-box collision using Collision utility
-     * @deprecated Use the WorldCircle/WorldAABB version instead
-     */
+    // Deprecated overload that converts local component inputs into world-space circle and OBB
     [[deprecated("Use the WorldCircle/WorldAABB version instead")]]
     bool TestCircleBox(
         const Components::CircleCollider2D& circle,
@@ -615,6 +598,7 @@ namespace ECS {
         float& outDepth,
         Vector2D& outContact)
     {
+
         // Compute world-space shapes and delegate to the world-space version
         Engine::WorldCircle wc = Engine::Physics::GetWorldCircle(circle, circleTransform);
         Engine::WorldOBB obb = Engine::Physics::GetWorldOBB(box, boxTransform);
@@ -633,12 +617,10 @@ namespace ECS {
     }
 
     // =====================================================================
-    // PhysicsSystem::Update - main per-frame step
+    // PhysicsSystem::Update (main per-frame step)
     // =====================================================================
 
-    /**
-    * @brief Integrate dynamics, build broad phase, test narrow phase, resolve.
-    */
+    // Runs full physics frame integration broad-phase narrow-phase resolution and event dispatch
     void PhysicsSystem::OnUpdate(World& world) {
         const double dtd = TimeSystem::Instance().GetDeltaTime();
         const float dt = static_cast<float>(dtd);
@@ -656,14 +638,15 @@ namespace ECS {
         // =====================
         // Simulation Settings
         // =====================
-        // Choose substep count; make it a tunable or cvar if you like.
+
+        // Choose substep count; make it a tunable or cvar if you like
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
         // Create event dispatcher for firing collision events
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
-        // Track collisions and trigger overlaps for the whole frame (across substeps).
+        // Track collisions and trigger overlaps for the whole frame (across substeps)
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> frameCollisions;
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> currentTriggerOverlaps;
 
@@ -674,19 +657,20 @@ namespace ECS {
         // Get LayerManager for layer-wide physics gating
         auto* layerManager = world.GetLayerManager();
 
-        // Sync runtime tilemap cache for grid-based collisions.
+        // Sync runtime tilemap cache for grid-based collisions
         RefreshRuntimeTileMaps(world);
 
         // =====================
         // Entity Collection
         // =====================
-        // Collect entity sets once per frame (usually fine).
-        // AngularVelocity2D, Layer, and Active are now optional.
+
+        // Collect entity sets once per frame (usually fine)
+        // AngularVelocity2D, Layer, and Active are now optional
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);
 
-        // Iterates all entities that have rigidbody, linear velocity, and transform.
-        // Optional: AngularVelocity2D (for rotation), Layer (for collision filtering), Active (for enable/disable).
+        // Iterates all entities that have rigidbody, linear velocity, and transform
+        // Optional: AngularVelocity2D (for rotation), Layer (for collision filtering), Active (for enable/disable)
         world.Each<Components::Rigidbody2D, Components::LinearVelocity2D, Components::LocalTransform>(
             [&](const Entity e,
                 const Components::Rigidbody2D& rb,
@@ -697,8 +681,10 @@ namespace ECS {
                     }
                     
                     if (rb.Mass <= 0.0f) return; // only dynamics here
-                    
+
                     // === Layer-wide physics gating (optional) ===
+
+
                     if (layerManager) {
                         const auto* layer = world.TryGet<Components::Layer>(e);
                         const uint16_t layerId = layer ? layer->Id : 0;
@@ -706,12 +692,11 @@ namespace ECS {
                         if (!layerData.physicsEnabled)
                             return;  // Skip physics simulation for this layer
                     }
-                    
+
                     // Must have some collider to participate in broad-phase
                     if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) return;
                     dynamicEntities.push_back(e);
             });
-
 
         // Find and stores static entities
         std::vector<Entity> staticEntities;
@@ -722,8 +707,8 @@ namespace ECS {
                 if (!world.IsActiveInHierarchy(e)) {
                     return;
                 }
-                
-                // === Layer-wide physics gating for static entities ===
+
+                // Layer-wide physics gating for static entities
                 if (layerManager) {
                     const auto* layer = world.TryGet<Components::Layer>(e);
                     const uint16_t layerId = layer ? layer->Id : 0;
@@ -741,7 +726,7 @@ namespace ECS {
         for (const auto& e : dynamicEntities) broadphaseIds.insert(e.Index);
         for (const auto& e : staticEntities) broadphaseIds.insert(e.Index);
 
-        // Include non-rigidbody colliders (triggers or static colliders without a Rigidbody2D).
+        // Include non-rigidbody colliders (triggers or static colliders without a Rigidbody2D)
         world.Each<Components::LocalTransform>([&](const Entity e, const Components::LocalTransform&) {
             if (broadphaseIds.find(e.Index) != broadphaseIds.end())
                 return;
@@ -768,9 +753,10 @@ namespace ECS {
             broadphaseIds.insert(e.Index);
         });
 
-        // Substep loop: integrate and resolve in smaller time slices.
+        // Substep loop: integrate and resolve in smaller time slices
         for (int step = 0; step < substeps; ++step) {
-            // Integrate dynamics with subDt and apply optional world bounds.
+
+            // Integrate dynamics with subDt and apply optional world bounds
             // AngularVelocity2D is optional
             world.Each<Components::Rigidbody2D, Components::LinearVelocity2D, Components::LocalTransform>(
                     [&](const Entity e,
@@ -821,6 +807,7 @@ namespace ECS {
                                     xf.Position.X = pos2D.X; xf.Position.Y = pos2D.Y; linVel.Value = vel2D;
                                 }
                             }
+
                             //world bounds if box collider
                             else if (const auto* b = world.TryGet<Components::BoxCollider2D>(e)) {
                                 const float approxR = std::max(b->HalfExtents.X, b->HalfExtents.Y);
@@ -836,17 +823,20 @@ namespace ECS {
             // =====================
             // Broad Phase (Uniform Grid)
             // =====================
-            // Rebuild grid each substep because poses changed.
+
+            // Rebuild grid each substep because poses changed
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
                 Components::LocalTransform worldTransform{};
                 if (!GetPhysicsWorldTransform(world, e, worldTransform)) return;
                 if (const auto* c = world.TryGet<Components::CircleCollider2D>(e)) {
+
                     // Step 2: Use world-space circle (includes scale and offset)
                     Engine::WorldCircle wc = Engine::Physics::GetWorldCircle(*c, worldTransform);
                     grid.Insert(e, Vector3D(wc.Center.X, wc.Center.Y, 0.0f), wc.Radius);
                 }
                 else if (const auto* b = world.TryGet<Components::BoxCollider2D>(e)) {
+
                     // Step 2: Use world-space AABB (includes scale and offset)
                     Engine::WorldAABB wa = Engine::Physics::GetWorldAABB(*b, worldTransform);
                     grid.InsertBox(e, Vector3D(wa.Center.X, wa.Center.Y, 0.0f), wa.HalfExtents);
@@ -858,19 +848,22 @@ namespace ECS {
             // =====================
             // Pair Generation
             // =====================
-            // Candidate pairs deduped per substep.
+
+            // Candidate pairs deduped per substep
             std::vector<std::pair<Entity, Entity>> pairs;
             std::unordered_set<PackedEntityPair, PackedEntityPairHash> seen;
             pairs.reserve(dynamicEntities.size() * 4);
             seen.reserve(dynamicEntities.size() * 4);
 
-            // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells.
-            // Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell.
+            // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells
+            // Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell
             for (const auto& cell : grid.Grid()) {
                 const auto& ents = cell.second;
-                // Enumerate all unordered pairs within the cell by running i from 0..n-2 and j from i+1..n-1.
+
+                // Enumerate all unordered pairs within the cell by running i from 0..n-2 and j from i+1..n-1
                 for (size_t i = 0; i + 1 < ents.size(); ++i) {
                     for (size_t j = i + 1; j < ents.size(); ++j) {
+
                         //Packs the pair (ents[i], ents[j]) into the 64-bit canonical key using pairKey
                         const PackedEntityPair key = MakeCollisionPair(
                             ECS::EntityUtils::Pack(ents[i]),
@@ -883,45 +876,52 @@ namespace ECS {
             // =====================
             // Narrow Phase + Resolution
             // =====================
-            // You can reduce the inner iterative solver because substeps already help stability.
 
+            // You can reduce the inner iterative solver because substeps already help stability
             const int solverIters = 4;
 
-            // run several small correction passes to improve stability.
+            // run several small correction passes to improve stability
             for (int it = 0; it < solverIters; ++it) {
                 int resolved = 0;
-                // Iterate all broad-phase candidate pairs (A,B).
+
+                // Iterate all broad-phase candidate pairs (A,B)
                 for (auto [A, B] : pairs) {
-                    // Skip if either entity got destroyed during earlier steps.
+
+                    // Skip if either entity got destroyed during earlier steps
                     if (!world.IsAlive(A) || !world.IsAlive(B)) continue;
-                    // Fetch transforms; narrow phase needs world-space poses.
+
+                    // Fetch transforms; narrow phase needs world-space poses
                     auto* tA = world.TryGet<Components::LocalTransform>(A);
                     auto* tB = world.TryGet<Components::LocalTransform>(B);
+
                     // cannot resolve without positions
                     if (!tA || !tB) continue;
                     Components::LocalTransform tAWorld{};
                     Components::LocalTransform tBWorld{};
                     if (!GetPhysicsWorldTransform(world, A, tAWorld)) continue;
                     if (!GetPhysicsWorldTransform(world, B, tBWorld)) continue;
-                    // Honor Active flags (including parents): if disabled, skip.
+
+                    // Honor Active flags (including parents): if disabled, skip
                     if (!world.IsActiveInHierarchy(A)) continue;
                     if (!world.IsActiveInHierarchy(B)) continue;
 
-                    // Query collider shapes present on each entity.
+                    // Query collider shapes present on each entity
                     const auto* circA = world.TryGet<Components::CircleCollider2D>(A);
                     const auto* boxA = world.TryGet<Components::BoxCollider2D>(A);
                     const auto* circB = world.TryGet<Components::CircleCollider2D>(B);
                     const auto* boxB = world.TryGet<Components::BoxCollider2D>(B);
-                    // If either side has no collider, this pair cannot collide.
+
+                    // If either side has no collider, this pair cannot collide
                     if ((!circA && !boxA) || (!circB && !boxB)) continue;
 
                     // =====================
                     // Layer Mask
                     // =====================
+
                     // Check if both entities have Layer components
                     const auto* la = world.TryGet<Components::Layer>(A);
                     const auto* lb = world.TryGet<Components::Layer>(B);
-                    
+
                     // If either entity is missing a Layer component, skip collision
                     // (Entities must be explicitly assigned to a layer to participate in layer-based collision)
                     if (!la || !lb)
@@ -937,21 +937,22 @@ namespace ECS {
                     uint16_t layerAId = la->Id;
                     uint16_t layerBId = lb->Id;
 
-                    // Read collision masks directly from LayerManager (not from collider components).
+                    // Read collision masks directly from LayerManager (not from collider components)
                     // This ensures we always use current, authoritative layer collision settings
-                    // regardless of whether collider masks have been synced yet.
+                    // regardless of whether collider masks have been synced yet
                     uint32_t maskA = layerManager->GetLayerMask(layerAId);
                     uint32_t maskB = layerManager->GetLayerMask(layerBId);
 
-                    // If masks/layers indicate no collision, skip early.
+                    // If masks/layers indicate no collision, skip early
                     if (!Engine::CanCollide(maskA, layerAId, maskB, layerBId))
                         continue;
 
-                    // Narrow phase: run the appropriate shape test to get contact normal and depth.
+                    // Narrow phase: run the appropriate shape test to get contact normal and depth
                     Engine::Collision::ContactManifold manifold;
                     bool hasCollision = false;
 
                     if (circA && circB) {
+
                         // Circle-circle: single contact point (keep old method for now)
                         Vector2D n;
                         float depth;
@@ -968,6 +969,7 @@ namespace ECS {
                         }
                     }
                     else if (boxA && boxB) {
+
                         // Box-box: use new manifold generation
                         const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, tAWorld);
                         const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, tBWorld);
@@ -977,6 +979,7 @@ namespace ECS {
                         hasCollision = (manifold.pointCount > 0);
                     }
                     else if (circA && boxB) {
+
                         // Circle-box: single contact point
                         Vector2D n;
                         float depth;
@@ -997,6 +1000,7 @@ namespace ECS {
                         }
                     }
                     else if (boxA && circB) {
+
                         // Box-circle: single contact point
                         Vector2D n;
                         float depth;
@@ -1022,6 +1026,7 @@ namespace ECS {
                     // =====================
                     // Trigger Handling (no resolution)
                     // =====================
+
                     // Check for triggers on either side
                     const bool isTriggerA = (circA && (circA->Flags & 0x1u)) || (boxA && (boxA->Flags & 0x1u));
                     const bool isTriggerB = (circB && (circB->Flags & 0x1u)) || (boxB && (boxB->Flags & 0x1u));
@@ -1029,6 +1034,7 @@ namespace ECS {
                     // Handle trigger overlaps (no resolution)
                     if (isTriggerA || isTriggerB) {
                         if (isTriggerA) {
+
                             // Store trigger overlap pair (A is trigger)
                             const PackedEntityPair key = MakeTriggerPair(
                                 ECS::EntityUtils::Pack(A),
@@ -1036,6 +1042,7 @@ namespace ECS {
                             currentTriggerOverlaps.insert(key);
                         }
                         if (isTriggerB) {
+
                             // Store trigger overlap pair (B is trigger)
                             const PackedEntityPair key = MakeTriggerPair(
                                 ECS::EntityUtils::Pack(B),
@@ -1048,7 +1055,8 @@ namespace ECS {
                     // =====================
                     // Constraint Resolution
                     // =====================
-                    // Require at least one side to be physically simulated (has rb + velocity).
+
+                    // Require at least one side to be physically simulated (has rb + velocity)
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                     const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
                     if (!hasPhysA && !hasPhysB)
@@ -1063,27 +1071,29 @@ namespace ECS {
 
                     const PackedEntityPair pairID = MakeCollisionPair(
                         ECS::EntityUtils::Pack(A),
-                        ECS::EntityUtils::Pack(B));
+                        ECS::EntityUtils::Pack(B)
+                    );
+
                     const bool firstSeenThisFrame = frameCollisions.insert(pairID).second;
                     const bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
 
-                    // Fire collision events once per frame for new pairs.
+                    // Fire collision events once per frame for new pairs
                     if (firstSeenThisFrame && isNewCollision) {
                         eventDispatcher.FireCollisionEvent(
                             ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B),
                             Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
                             Vector3D(manifold.normal.X, manifold.normal.Y, 0.0f),
-                            Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
-                            0.0f  // TODO: Compute impact magnitude
+                            Vector3D(0.0f, 0.0f, 0.0f), 
+                            0.0f  
                         );
                         collisionEnterCount++;
                     }
 
-                    // Gather physics state (by value) and current velocities; some may be missing.
+                    // Gather physics state (by value) and current velocities; some may be missing
                     Components::Rigidbody2D      rbA{ 0 }, rbB{ 0 };
                     Components::LinearVelocity2D vA{ {0,0} }, vB{ {0,0} };
 
-                    // Read component pointers; if present, copy their values into locals.
+                    // Read component pointers; if present, copy their values into locals
                     const auto* rbAp = world.TryGet<Components::Rigidbody2D>(A);
                     const auto* rbBp = world.TryGet<Components::Rigidbody2D>(B);
                     auto* vAp = world.TryGet<Components::LinearVelocity2D>(A);
@@ -1091,8 +1101,8 @@ namespace ECS {
                     if (rbAp) rbA = *rbAp; if (rbBp) rbB = *rbBp;
                     if (vAp)  vA = *vAp;  if (vBp)  vB = *vBp;
 
-                    // Fetch materials (friction, restitution, position-correction factor).
-                    // Use sensible defaults if an entity has no material component.
+                    // Fetch materials (friction, restitution, position-correction factor)
+                    // Use sensible defaults if an entity has no material component
                     Components::PhysicsMaterial2D mA{ 0.2f,0.5f,0.5f }, mB{ 0.2f,0.5f,0.5f };
                     if (const auto* mpA = world.TryGet<Components::PhysicsMaterial2D>(A)) mA = *mpA;
                     if (const auto* mpB = world.TryGet<Components::PhysicsMaterial2D>(B)) mB = *mpB;
@@ -1107,7 +1117,7 @@ namespace ECS {
                         (mA.PositionCorrectPercent + mB.PositionCorrectPercent) * 0.5f
                     };
 
-                    // Resolve velocity + positional correction for this manifold.
+                    // Resolve velocity + positional correction for this manifold
                     Engine::Physics::ResolveCollisionManifold(rbA, rbB, vA, vB, *tA, *tB, manifold, mCombined);
 
                     // Write back
@@ -1116,15 +1126,17 @@ namespace ECS {
 
                     ++resolved;
                     {
-                        // Compute impact magnitude from relative velocity along normal before the next iteration changes it further.
+
+                        // Compute impact magnitude from relative velocity along normal before the next iteration changes it further
                         const Vector2D rel = vB.Value - vA.Value;
                         const float vn = rel.X * manifold.normal.X + rel.Y * manifold.normal.Y;
                         const float    impactSpeed = std::abs(vn);
 
-                        // Filter tiny contacts to avoid spam; tune as needed.
+                        // Filter tiny contacts to avoid spam; tune as needed
                         constexpr float kImpactThreshold = 80.0f;
 
                         if (impactSpeed >= kImpactThreshold) {
+
                             // Per-frame dedupe for this pair
                             static uint64_t s_lastFrameSeen = 0;
                             static std::unordered_set<PackedEntityPair, PackedEntityPairHash> sfxPlayedThisFrame;
@@ -1133,18 +1145,21 @@ namespace ECS {
                             }
                             const PackedEntityPair pk = MakeCollisionPair(
                                 ECS::EntityUtils::Pack(A),
-                                ECS::EntityUtils::Pack(B));
+                                ECS::EntityUtils::Pack(B)
+                            );
+
                             if (sfxPlayedThisFrame.insert(pk).second) {
                                 if (auto* audio = PHYSICS_AUDIO_DEVICE) {
                                     const std::string cue = "sfx_collide";
-                                    const std::string path =
-                                        std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
+                                    const std::string path = std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
                                     Audio::SoundParams sp; sp.Stream = false; sp.Is3D = false;
+
                                     // Preload is cheap after first time; keep for safety:
                                     audio->LoadCue(cue, path, sp);
 
                                     Audio::PlaySettings ps;
                                     ps.Loop = false;
+
                                     // Scale volume by impact; clamp to [0.2, 1.0]
                                     ps.Volume = std::max(0.2f, std::min(impactSpeed / 350.0f, 1.0f));
                                     ps.Pitch = 1.0f;
@@ -1161,14 +1176,17 @@ namespace ECS {
             // =====================
             // Tilemap Collisions (Grid Query)
             // =====================
+
             // For each dynamic entity, query the spatial partitioning for nearby tiles and test collisions against them
             if (!m_runtimeTileMaps.empty()) {
+
                 // Small epsilon to prevent edge cases where an entity is exactly on the boundary between two tiles, 
                 // which could cause it to miss colliding with one of them due to floating-point precision issues
                 constexpr float kTileCoordEpsilon = 1e-4f;
 
                 // Iterate all dynamic entities and check for collisions against nearby tiles in enabled tilemaps
                 for (Entity e : dynamicEntities) {
+
                     // Skip if entity got destroyed during earlier steps
                     if (!world.IsAlive(e)) continue;
                     if (!world.IsActiveInHierarchy(e)) continue;
@@ -1254,12 +1272,14 @@ namespace ECS {
                             continue;
                         }
                         if (circA) {
+
                             // Circle AABB: centered on the circle's world position, half-extents equal to radius on both axes
                             const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, tAWorld);
                             worldAABB.Center = worldCircle.Center;
                             worldAABB.HalfExtents = Vector2D(worldCircle.Radius, worldCircle.Radius);
                         }
                         else {
+
                             // Box AABB: derived from the OBB in world space (accounts for rotation)
                             worldAABB = Engine::Physics::GetWorldAABB(*boxA, tAWorld);
                         }
@@ -1277,7 +1297,7 @@ namespace ECS {
                         const float localMaxX = maxX - entry.Origin.X - kTileCoordEpsilon;
                         const float localMaxY = maxY - entry.Origin.Y - kTileCoordEpsilon;
 
-                        // Convert local coordinates to integer tile indices.
+                        // Convert local coordinates to integer tile indices
                         // WorldToTileSigned handles negative coordinates (tiles to the left/below origin)
                         int32_t tileMinX = entry.Map->WorldToTileSigned(localMinX);
                         int32_t tileMinY = entry.Map->WorldToTileSigned(localMinY);
@@ -1289,8 +1309,8 @@ namespace ECS {
                         if (tileMaxY < tileMinY) std::swap(tileMaxY, tileMinY);
 
                         // Precompute tile geometry constants used across all tiles in this tilemap:
-                        // * tileHalf: half the tile size — center offset and full-tile half-extents
-                        // * subHalf: quarter of the tile size — used for sub-tile collision cells (half-tile quadrants)
+                        // * tileHalf: half the tile size ? center offset and full-tile half-extents
+                        // * subHalf: quarter of the tile size ? used for sub-tile collision cells (half-tile quadrants)
                         // * subHalfExtents: half-extents for a single quadrant collision cell
                         const float tileHalf = tileSize * 0.5f;
                         const float subHalf = tileSize * 0.25f;
@@ -1299,6 +1319,7 @@ namespace ECS {
                         // Iterate over every tile in the AABB's tile range
                         for (int32_t ty = tileMinY; ty <= tileMaxY; ++ty) {
                             for (int32_t tx = tileMinX; tx <= tileMaxX; ++tx) {
+
                                 // Skip empty tiles; no geometry to collide against
                                 if (entry.Map->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
                                     continue;
@@ -1330,6 +1351,7 @@ namespace ECS {
                                     }
 
                                     if (circA) {
+
                                         // Circle vs. tile cell OBB test
                                         // Build an axis-aligned OBB for the cell (rotation = 0, standard axes)
                                         const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, cellWorldTransform);
@@ -1354,6 +1376,7 @@ namespace ECS {
                                         manifold.pointCount = 1;
                                     }
                                     else {
+
                                         // Box vs. tile cell OBB test (entity box may be rotated; tile cell is always axis-aligned)
                                         const Engine::WorldOBB worldObb = Engine::Physics::GetWorldOBB(*boxA, cellWorldTransform);
                                         Engine::WorldOBB tileObb;
@@ -1387,7 +1410,6 @@ namespace ECS {
                                 // Dispatch collision cells based on the tile's collision mask
                                 // Masks define which portions of the tile are solid
                                 // We map them to axis-aligned rectangular cells and resolve each independently
-
                                 // Full tile solid (all 4 quadrants); treat as one full-size box
                                 if (mask == 0x0F) {
                                     resolveCell(tileHalf, tileHalf, Vector2D(tileHalf, tileHalf));
@@ -1396,22 +1418,24 @@ namespace ECS {
 
                                 // Half-tile combinations: merge two quadrants into one wider/taller box
                                 // to avoid resolving two adjacent cells with a seam between them
-
                                 // Bottom half (BL + BR): full width, bottom half height
                                 if (mask == (kCollisionMaskBottomLeft | kCollisionMaskBottomRight)) {
                                     resolveCell(tileHalf, subHalf, Vector2D(tileHalf, subHalf));
                                     continue;
                                 }
+
                                 // Top half (TL + TR): full width, top half height
                                 if (mask == (kCollisionMaskTopLeft | kCollisionMaskTopRight)) {
                                     resolveCell(tileHalf, tileSize - subHalf, Vector2D(tileHalf, subHalf));
                                     continue;
                                 }
+
                                 // Left half (BL + TL): left half width, full height
                                 if (mask == (kCollisionMaskBottomLeft | kCollisionMaskTopLeft)) {
                                     resolveCell(subHalf, tileHalf, Vector2D(subHalf, tileHalf));
                                     continue;
                                 }
+
                                 // Right half (BR + TR): right half width, full height
                                 if (mask == (kCollisionMaskBottomRight | kCollisionMaskTopRight)) {
                                     resolveCell(tileSize - subHalf, tileHalf, Vector2D(subHalf, tileHalf));
@@ -1439,7 +1463,7 @@ namespace ECS {
             }
         }
 
-        // Emit collision exits once per frame (after all substeps).
+        // Emit collision exits once per frame (after all substeps)
         for (const PackedEntityPair& pairID : m_previousCollisions) {
             if (frameCollisions.find(pairID) == frameCollisions.end()) {
                 Entity entityA = ECS::EntityUtils::Unpack(pairID.A);
@@ -1459,6 +1483,7 @@ namespace ECS {
 
         // Handle trigger events
         for (const PackedEntityPair& pairID : currentTriggerOverlaps) {
+
             // Check if was overlapping last frame
             const bool wasOverlapping = (m_previousTriggerOverlaps.find(pairID) != m_previousTriggerOverlaps.end());
             const PackedEntityId triggerId = pairID.A;
@@ -1500,5 +1525,4 @@ namespace ECS {
         m_previousTriggerOverlaps = std::move(currentTriggerOverlaps);
 
     }
-}// namespace ECS
-
+}  // namespace ECS

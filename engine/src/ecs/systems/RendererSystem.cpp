@@ -1,8 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.cpp
-\author Choi Meng Yew
-\date   31st January 2026
+\author Choi Meng Yew (90%)
+        Foo Rui Qin (10%)
+\date   12th March 2026
+\par    choi.m@digipen.edu
+        ruiqin.foo@digipen.edu
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline
 for the ECS. Manages shader programs, framebuffers, and the RenderGraph
@@ -92,73 +95,73 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3.h>
 
 namespace {
-	// Resolve a project-relative path to an absolute path for loading assets (for existing maps)
+    // Resolve a project-relative path to an absolute path for loading assets (for existing maps)
     std::string ResolveProjectPathForLoad(const std::string& path) {
         if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
             return path;
         }
 
-		// Only convert to absolute if the path is relative, otherwise assume it's already absolute to avoid messing with non-project paths
+        // Only convert to absolute if the path is relative, otherwise assume it's already absolute to avoid messing with non-project paths
         std::filesystem::path fsPath(path);
         if (fsPath.is_absolute()) {
             return path;
         }
 
-		// Convert to absolute path based on project directory and normalize it to remove redundant components
+        // Convert to absolute path based on project directory and normalize it to remove redundant components
         std::filesystem::path absolute = Engine::ProjectPaths::ToAbsolutePath(path);
         return absolute.lexically_normal().string();
     }
 
-	// Build a tileset from a texture by slicing it into a grid of tile UVs based on the specified tile pixel size
+    // Build a tileset from a texture by slicing it into a grid of tile UVs based on the specified tile pixel size
     std::shared_ptr<Tileset> BuildTilesetFromTexture(const std::string& texturePath, uint32_t tilePixelSize) {
-		// Load the texture using RM
+        // Load the texture using RM
         auto texture = RM.Get<Texture>(texturePath);
         if (!texture) {
             LOG_WARNING("[TileMap] Failed to load tileset texture: " << texturePath);
             return nullptr;
         }
 
-		// Compute the number of columns and rows of tiles based on the texture dimensions and tile pixel size
+        // Compute the number of columns and rows of tiles based on the texture dimensions and tile pixel size
         const uint32_t texWidth = static_cast<uint32_t>(texture->Width());
         const uint32_t texHeight = static_cast<uint32_t>(texture->Height());
         const uint32_t tilePx = std::max(1u, tilePixelSize);
         const uint32_t cols = texWidth / tilePx;
         const uint32_t rows = texHeight / tilePx;
 
-		// If the texture is too small to fit even one tile, log a warning and return null to indicate failure
+        // If the texture is too small to fit even one tile, log a warning and return null to indicate failure
         if (cols == 0 || rows == 0) {
             LOG_WARNING("[TileMap] Tileset texture too small for tile size: " << texturePath);
             return nullptr;
         }
 
-		// Create tileset
+        // Create tileset
         // Tile IDs are assigned sequentially starting from 0
         auto tileset = std::make_shared<Tileset>(static_cast<uint32_t>(texture->ID()));
         TileID id = 0;
 
-		// Iterate over the grid of tiles in row-major order and compute UV coordinates for each tile
+        // Iterate over the grid of tiles in row-major order and compute UV coordinates for each tile
         for (uint32_t row = 0; row < rows; row++) {
-			// For each tile, compute the UV coordinates based on its position in the texture
+            // For each tile, compute the UV coordinates based on its position in the texture
             for (uint32_t col = 0; col < cols; col++) {
-				// Tile IDs are limited to 12 bits (see TileTypes.hpp), so if we exceed that, we stop defining more tiles
+                // Tile IDs are limited to 12 bits (see TileTypes.hpp), so if we exceed that, we stop defining more tiles
                 if (id >= TILE_ID_MASK) {
                     return tileset;
                 }
 
-				// Compute UVs with row 0 at the top of the texture
+                // Compute UVs with row 0 at the top of the texture
                 // OpenGL expects (0,0) at the bottom-left, so we flip the V coordinate
                 const float u0 = static_cast<float>(col * tilePx) / static_cast<float>(texWidth);
                 const float u1 = static_cast<float>((col + 1) * tilePx) / static_cast<float>(texWidth);
                 const float v1 = 1.0f - static_cast<float>(row * tilePx) / static_cast<float>(texHeight);
                 const float v0 = 1.0f - static_cast<float>((row + 1) * tilePx) / static_cast<float>(texHeight);
 
-				// Define the tile in the tileset with the computed UVs and no collision by default
+                // Define the tile in the tileset with the computed UVs and no collision by default
                 TileUV uv{ u0, v0, u1, v1 };
                 tileset->DefineTile(id, uv, CollisionType::NONE);
                 id++;
             }
         }
-		// Return the constructed tileset
+        // Return the constructed tileset
         return tileset;
     }
 }
@@ -174,7 +177,7 @@ namespace ECS {
         return g_rendererSystemInstance;
     }
 
-    // GUI viewport management
+    // Apply editor-provided GUI viewport mapping used by screen-space GUI passes
     void RendererSystem::SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale) {
         m_guiViewport.Origin = origin;
         m_guiViewport.Size = size;
@@ -182,7 +185,7 @@ namespace ECS {
         m_guiViewport.Active = true;
     }
 
-    // Reset GUI viewport to full render target size
+    // Reset GUI viewport mapping so GUI coordinates target the full render buffer
     void RendererSystem::ResetGUIViewport() {
         m_guiViewport.Origin = { 0.0f, 0.0f };
         m_guiViewport.Size = m_renderTargetSize;
@@ -208,7 +211,7 @@ namespace ECS {
         m_guiViewport.Active = true;
     }
 
-    // Convert world coordinates to screen space.
+    // Convert world coordinates to screen space
     bool RendererSystem::WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
         const Vector2D& viewportSize, Vector2D& outScreen) {
         glm::mat4 view(1.0f);
@@ -234,7 +237,7 @@ namespace ECS {
         return true;
     }
 
-    // Return camera basis.
+    // Return camera basis
     bool RendererSystem::GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp) {
         glm::mat4 view(1.0f);
         glm::mat4 projection(1.0f);
@@ -267,20 +270,20 @@ namespace ECS {
         }
     }
 
-    // Return metadata.
+    // Return metadata
     SystemMetadata RendererSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Renderer");
         // Note: RendererSystem reads many components (SpriteRenderer2D, WorldTransform, etc.)
-        // but uses them through world iteration rather than static declaration.
-        // For now, marking as read-only with minimal dependency tracking.
-        // Full component access list documented in OnUpdate().
+        // but uses them through world iteration rather than static declaration
+        // For now, marking as read-only with minimal dependency tracking
+        // Full component access list documented in OnUpdate()
         builder.SetExecutionOrder(0);
         builder.SetGroup(SystemGroup::Render);
         builder.SetRunMode(SystemRunMode::Always);
         return builder.Build();
     }
 
-    // Initialize system state.
+    // Initialize system state
     void RendererSystem::OnCreate(World& /*world*/) {
         if (m_initialized)
             return;
@@ -400,12 +403,12 @@ namespace ECS {
         m_lightManager.Initialize();
     }
 
-    // Bind world.
+    // Bind world
     void RendererSystem::BindWorld(World& world) {
         (void)world; // Currently unused
     }
 
-    // Return camera matrices.
+    // Return camera matrices
     bool RendererSystem::GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize) {
         // Default fallback
         outView = glm::mat4(1.0f);
@@ -447,13 +450,15 @@ namespace ECS {
                     }
                     if (useWorld) {
                         Vector3D scale;
-                        // Decompose transform matrix into TRS components.
+                        // Decompose transform matrix into TRS components
                         TransformUtils::DecomposeTRS(wt.Matrix, position, rotation, scale);
-                    } else {
+                    }
+                    else {
                         position = transform.Position;
                         rotation = transform.Rotation;
                     }
-                } else {
+                }
+                else {
                     position = transform.Position;
                     rotation = transform.Rotation;
                 }
@@ -464,10 +469,10 @@ namespace ECS {
                 const glm::vec3 up = rot * glm::vec3(0.0f, 1.0f, 0.0f);
                 outView = glm::lookAt(eye, eye + forward, up);
 
-                // --- Projection
+                // Projection
                 // In standalone runtime (no editor-managed viewports), render against
                 // the current render-target aspect so serialized camera aspect values
-                // don't distort the final image when window settings differ.
+                // don't distort the final image when window settings differ
                 float effectiveAspect = camera.AspectRatio;
                 if (!m_activeCamera && m_viewports.empty() && m_renderTargetSize.Y > 0.0f) {
                     effectiveAspect = m_renderTargetSize.X / m_renderTargetSize.Y;
@@ -517,7 +522,7 @@ namespace ECS {
         return false;
     }
 
-    // Update system state for this frame.
+    // Update system state for this frame
     void RendererSystem::OnUpdate(World& world) {
         if (!m_renderer)
             return;
@@ -528,7 +533,7 @@ namespace ECS {
 
         if (m_windowAspectDirty && m_viewports.empty() && !m_activeCamera) {
             const float aspect = (m_windowAspectRatio > 0.0f) ? m_windowAspectRatio : 1.0f;
-            // Render 3D camera passes.
+            // Render 3D camera passes
             world.Each<ECS::Components::Camera3D>([&](ECS::Entity /*e*/, ECS::Components::Camera3D& camera)
                 {
                     camera.AspectRatio = aspect;
@@ -536,12 +541,12 @@ namespace ECS {
             m_windowAspectDirty = false;
         }
 
-		// For game mode, sync the runtime tilemap cache with the current world state
+        // For game mode, sync the runtime tilemap cache with the current world state
         // This will add new tilemaps, update changed ones and remove deleted ones
         if (Engine::CORE->GetMode() == Engine::EngineMode::Game) {
             RefreshRuntimeTileMaps(world);
         } 
-		// For editor mode, we rely on the debug tilemap list which is manually managed by the editor (no automatic syncing)
+        // For editor mode, we rely on the debug tilemap list which is manually managed by the editor (no automatic syncing)
         else if (!m_runtimeTileMaps.empty()) {
             m_runtimeTileMaps.clear();
         }
@@ -590,7 +595,7 @@ namespace ECS {
             m_worldGuiImageQueue.clear();
             m_worldGuiTextQueue.clear();
 
-            // Unbind the current render target.
+            // Unbind the current render target
             Framebuffer::Unbind();
             return;  // EXIT HERE - skip RenderGraph path
         }
@@ -615,8 +620,7 @@ namespace ECS {
 
         // NOTE: we remove the duplicate light collection and entity bucketing
         // since we now do it above. The RenderGraph passes can use the
-        // already-populated `buckets` and `maxLayerId` variables.
-
+        // already-populated `buckets` and `maxLayerId` variables
         // Reusable temporary buffers to avoid per-entity allocations
         std::vector<glm::vec2> transformedCorners;
         std::vector<glm::vec2> polyPoints;
@@ -638,7 +642,7 @@ namespace ECS {
                     return;
                 }
 
-                // Because of tone-mapping, the background will appear slightly lighter.
+                // Because of tone-mapping, the background will appear slightly lighter
                 // I chose a slightly brighter neutral gray for a nicer look
                 hdrFbo->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
 
@@ -649,17 +653,16 @@ namespace ECS {
                 std::vector<uint16_t> renderOrder;
                 if (layerManager) {
                     renderOrder = layerManager->DrawOrder();
-                } else {
+                }
+                else {
                     // Fallback: manually iterate from 0 to maxLayerId
                     for (int layer = 0; layer <= maxLayerId; ++layer) {
                         renderOrder.push_back(static_cast<uint16_t>(layer));
                     }
                 }
 
-                // ---------------------------------------
-                // Layered rendering: SDF first, then batch
-                // Use LayerManager's render order
-                // ---------------------------------------
+                // Layered rendering order
+                // Draw SDF primitives first, then batched geometry using LayerManager order
                 for (uint16_t layerId : renderOrder) {
                     // === Check layer visibility and render enabled ===
                     if (layerManager) {
@@ -674,7 +677,7 @@ namespace ECS {
                     // Make a local copy of the bucket so we can sort by ZIndex2D
                     auto list = buckets[layer];
                     // Sort by ZIndex2D.ZOrder ascending (smaller drawn first). Entities
-                    // without ZIndex2D are treated as ZOrder = 0.
+                    // without ZIndex2D are treated as ZOrder = 0
                     std::sort(list.begin(), list.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
                         int za = 0, zb = 0;
                         if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
@@ -686,7 +689,7 @@ namespace ECS {
 
                     glm::mat4 layerViewProj = viewProj;
 
-                    // --- Sub-pass 1: SDF circles on this layer ---
+                    // Sub-pass 1: SDF circles on this layer
                     m_sdfCircleShader->use();
                     m_sdfCircleShader->setMat4("uViewProj", viewProj);
                     m_sdfCircleShader->setUniform("uStrokePx", 0.0f);
@@ -718,7 +721,7 @@ namespace ECS {
 
                     m_renderer->endFrame(); // flush SDF for this layer
 
-                    // --- Sub-pass 2: everything else on this layer ---
+                    // Sub-pass 2: everything else on this layer
                     m_shader->use();
                     m_shader->setMat4("uViewProj", viewProj);
                     m_shader->setUniform("uPicking", 0);
@@ -733,7 +736,7 @@ namespace ECS {
 
                     if (m_debugTileMap && m_debugTileset)
                     {
-                        // Backward-compatible single debug tilemap path.
+                        // Backward-compatible single debug tilemap path
                         TileMapRenderer tileRenderer;
                         const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
                         tileRenderer.Submit(
@@ -750,7 +753,7 @@ namespace ECS {
                         // Entity-owned debug tilemaps are submitted in Z-sorted order below
                         TileMapRenderer tileRenderer;
 
-                        // For each debug tilemap entry...
+                        // For each debug tilemap entry
                         for (const auto& entry : m_debugTileMaps) {
                             // Skip if source entity is specified but not active/alive (e.g. deleted map)
                             if (!entry.SourceEntity.IsNull()) {
@@ -788,7 +791,7 @@ namespace ECS {
                         SubmitRuntimeTileMapEntity(entity);
                         SubmitDebugTileMapEntity(world, entity);
 
-                        // Boid flock entity — flush batch, draw instanced at correct Z
+                        // Boid flock entity  flush batch, draw instanced at correct Z
                         if (world.Has<Components::BoidFlock>(entity)) {
                             m_renderer->endFrame();
 
@@ -841,12 +844,12 @@ namespace ECS {
                                     transformedCorners.push_back(ToGlm(Vector2D{ hc.X, hc.Y }) + ToGlm(sb.Offset));
                                 }
                                 if (sb.Filled) {
-                                    // Submit polygon geometry.
+                                    // Submit polygon geometry
                                     DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                                 }
                                 else {
                                     for (int i = 0; i < 4; ++i)
-                                        // Submit line geometry.
+                                        // Submit line geometry
                                         DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                                 }
                             }
@@ -863,7 +866,7 @@ namespace ECS {
                             const Vector4D worldA = m * Vector4D{sl.A.X, sl.A.Y, 0.0f, 1.0f};
                             const Vector4D worldB = m * Vector4D{sl.B.X, sl.B.Y, 0.0f, 1.0f};
                             
-                            // Submit line geometry.
+                            // Submit line geometry
                             DebugDraw2D::Line(*m_renderer,
                                 ToGlm(Vector2D{worldA.X, worldA.Y}),
                                 ToGlm(Vector2D{worldB.X, worldB.Y}),
@@ -932,7 +935,7 @@ namespace ECS {
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
 
-                    // --- Particles on this layer ---
+                    // Particles on this layer
                     if (m_particleSystem && m_particleShader) {
                         m_particleShader->use();
                         m_particleShader->setMat4("uViewProj", viewProj);
@@ -943,7 +946,7 @@ namespace ECS {
                     }
                 }
 
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -958,8 +961,7 @@ namespace ECS {
                 // unconditionally skipped when m_activeCamera was present
                 // prevented the editor from picking. The pass below will
                 // early-return when there's no interactive click and no
-                // pending request.
-
+                // pending request
                 (void)res;
                 // Allow the picking pass to run if there is a pending async request or mouse click
                 if (!Input::IsMousePressed(MOUSE_LEFT) && m_pendingPickRequests.empty() && !m_currentPickRequest.has_value() && !m_inFlightPick.has_value()) return;
@@ -976,12 +978,12 @@ namespace ECS {
                 // By default the picking FBO covers the full window. If an
                 // async pick request was submitted by the editor for a
                 // sub-region viewport, use that viewport's rect for mapping
-                // screen coordinates into FBO texels.
+                // screen coordinates into FBO texels
                 glm::vec2 viewportMin(0, 0);
                 glm::vec2 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
                 glm::dvec2 mousePos;
-                // Return mouse position.
+                // Return mouse position
                 Input::GetMousePosition(mousePos.x, mousePos.y);
 
                 // If there is a current async pick request being processed, 
@@ -1005,12 +1007,9 @@ namespace ECS {
                     m_pickingFBO.Resize(vpWidth, vpHeight, false, false);
                 }
 
-                // ----------------------------------------------------------------
-                // If a previous pick request was submitted last frame, its PBO
-                // now contains the pixel result. Map that PBO and move the
-                // decoded entity id into m_completedPickResults so clients can
-                // poll via TryGetPickResult().
-                // ----------------------------------------------------------------
+                // Resolve previous async pick readback
+                // If last frame submitted a pick request, its PBO now holds the result
+                // Decode that pixel and store requestId to entityId for TryGetPickResult polling
                 if (m_inFlightPick.has_value()) {
                     const int idx = m_inFlightPick->PBOIndex;
                     if (idx >= 0 && idx < 2) {
@@ -1075,7 +1074,7 @@ namespace ECS {
                         GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                         const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
-                        // Submit circle geometry.
+                        // Submit circle geometry
                         DebugDraw2D::Circle(
                             *m_renderer,
                             ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
@@ -1132,9 +1131,9 @@ namespace ECS {
                             const glm::vec2 min = center - halfExtents;
                             const glm::vec2 max = center + halfExtents;
 
-                            // Use -1 so the shader treats this as a solid-color shape (no texture sampling).
-                            // In the picking shader, texIndex >= 0 samples a texture and may alpha-discard.
-                            // Negative indices skip sampling and always write the ID color.
+                            // Use -1 so the shader treats this as a solid-color shape (no texture sampling)
+                            // In the picking shader, texIndex >= 0 samples a texture and may alpha-discard
+                            // Negative indices skip sampling and always write the ID color
                             DebugDraw2D::RectFill(*m_renderer, min, max, idColor, static_cast<GLuint>(-1));
                         }
 
@@ -1192,8 +1191,8 @@ namespace ECS {
                 // READ PIXEL (now in FBO-local coordinates)
                 // ============================================================
                 // Determine which screen coordinates to sample. If a current
-                // pick request is being processed, use its coordinates.
-                // Otherwise use the current mouse position (interactive click).
+                // pick request is being processed, use its coordinates
+                // Otherwise use the current mouse position (interactive click)
                 glm::vec2 sampleScreenPos;
                 bool usingCurrentPickRequest = false;
                 if (m_currentPickRequest.has_value()) {
@@ -1242,7 +1241,7 @@ namespace ECS {
 
                 // If this read corresponds to a current async pick request,
                 // mark it as in-flight and associate it with the current PBO
-                // so the result can be consumed on the next frame.
+                // so the result can be consumed on the next frame
                 if (usingCurrentPickRequest) {
                     m_inFlightPick = InFlightPick{ m_currentPickRequest->RequestId, m_currentPBO };
                     m_currentPickRequest.reset();
@@ -1255,7 +1254,7 @@ namespace ECS {
                 // Restore blending state
                 if (blendWasEnabled) glEnable(GL_BLEND);
 
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
@@ -1292,7 +1291,7 @@ namespace ECS {
                     m_bloomExtractShader->setUniform("uScene", 0);
                     hdrFbo->BindColorTexture(0);                            // texture unit 0 in shader
                     m_renderer->drawFullscreenQuad();
-                    // Unbind the current render target.
+                    // Unbind the current render target
                     Framebuffer::Unbind();
                 });
 
@@ -1312,7 +1311,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -1333,7 +1332,7 @@ namespace ECS {
 
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -1359,7 +1358,7 @@ namespace ECS {
                 bloom->BindColorTexture(0, 1);
 
                 m_renderer->drawFullscreenQuad();
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -1415,7 +1414,7 @@ namespace ECS {
                         m_sdfCircleShader->setUniform("uPicking", 0);
                         m_renderer->beginFrame();
 
-                        // Submit circle geometry.
+                        // Submit circle geometry
                         DebugDraw2D::Circle(*m_renderer,
                             sub.center,
                             sub.radius,
@@ -1438,14 +1437,14 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.filled && sub.vertices.size() >= 3) {
-                            // Submit polygon geometry.
+                            // Submit polygon geometry
                             DebugDraw2D::Polygon(*m_renderer, sub.vertices, sub.color, 0);
                         }
                         else if (sub.vertices.size() >= 2) {
                             for (size_t i = 0; i < sub.vertices.size(); ++i) {
                                 size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                                 if (next < sub.vertices.size()) {
-                                    // Submit line geometry.
+                                    // Submit line geometry
                                     DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
                                         sub.thickness, sub.color, 0);
                                 }
@@ -1465,7 +1464,7 @@ namespace ECS {
                         m_renderer->beginFrame();
 
                         if (sub.vertices.size() == 2) {
-                            // Submit line geometry.
+                            // Submit line geometry
                             DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
                                 sub.thickness, sub.color, 0);
                         }
@@ -1489,7 +1488,7 @@ namespace ECS {
                                     uint32_t idx0 = sub.indices[i];
                                     uint32_t idx1 = sub.indices[i + 1];
                                     if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
-                                        // Submit line geometry.
+                                        // Submit line geometry
                                         DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
                                             sub.thickness, sub.color, 0);
                                     }
@@ -1521,11 +1520,11 @@ namespace ECS {
                             const auto& min = sub.vertices[0];
                             const auto& max = sub.vertices[2];
                             if (sub.filled) {
-                                // Submit filled rectangle geometry.
+                                // Submit filled rectangle geometry
                                 DebugDraw2D::RectFill(*m_renderer, min, max, sub.color, 0);
                             }
                             else {
-                                // Submit rectangle outline geometry.
+                                // Submit rectangle outline geometry
                                 DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
                             }
                         }
@@ -1544,7 +1543,7 @@ namespace ECS {
                 // Restore blend state
                 if (!blendWasEnabled) glDisable(GL_BLEND);
 
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -1570,10 +1569,10 @@ namespace ECS {
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-                // Orthographic projection for GUI panels/images (top-left origin).
+                // Orthographic projection for GUI panels/images (top-left origin)
                 glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
 
-                // Setup scissor test based on GUI viewport.
+                // Setup scissor test based on GUI viewport
                 bool scissorEnabled = false;
                 GUIViewport viewport = m_guiViewport;
                 if (!viewport.Active || viewport.Size.X <= 0.0f || viewport.Size.Y <= 0.0f) {
@@ -1581,7 +1580,7 @@ namespace ECS {
                     viewport.Size = { width, height };
                 }
 
-                // Enable scissor test if viewport size is valid.
+                // Enable scissor test if viewport size is valid
                 if (viewport.Size.X > 0.0f && viewport.Size.Y > 0.0f) {
                     glEnable(GL_SCISSOR_TEST);
                     scissorEnabled = true;
@@ -1597,7 +1596,7 @@ namespace ECS {
                     return;
                 }
 
-                // Render GUI panels (solid quads with optional corner radius).
+                // Render GUI panels (solid quads with optional corner radius)
                 if (!m_guiPanelQueue.empty()) {
                     Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
                     if (guiShader) {
@@ -1618,7 +1617,7 @@ namespace ECS {
                     guiRenderer->endFrame();
                 }
 
-                // Render GUI images/icons (textured quads).
+                // Render GUI images/icons (textured quads)
                 if (!m_guiImageQueue.empty()) {
                     Shader* guiShader = m_guiShader ? m_guiShader.get() : m_shader.get();
                     if (guiShader) {
@@ -1632,7 +1631,7 @@ namespace ECS {
                                                image.position.Y + image.size.Y * 0.5f);
                         const glm::vec2 size(image.size.X, image.size.Y);
                         const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                        // GUI projection uses Y-down; flip V to keep textures upright.
+                        // GUI projection uses Y-down; flip V to keep textures upright
                         const glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
                         const GLuint textureId = image.textureId;
                         guiRenderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
@@ -1641,7 +1640,7 @@ namespace ECS {
                     guiRenderer->endFrame();
                 }
 
-                // Render GUI text (SDF font rendering in screen space).
+                // Render GUI text (SDF font rendering in screen space)
                 if (!m_guiTextQueue.empty()) {
                     const glm::mat4 textOrtho = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
                     if (m_textShader) {
@@ -1654,7 +1653,7 @@ namespace ECS {
                             continue;
                         }
 
-                        // Load font (fallback to default if path is empty).
+                        // Load font (fallback to default if path is empty)
                         const std::string fontPath = text.fontPath.empty()
                             ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                             : text.fontPath;
@@ -1664,7 +1663,7 @@ namespace ECS {
                             continue;
                         }
 
-                        // Calculate text position (flip Y for GUI space, anchor from top).
+                        // Calculate text position (flip Y for GUI space, anchor from top)
                         const float scale = text.pixelSize / static_cast<float>(font->getPixelSize());
                         const float ascent = font->getAscent() * scale;
                         const glm::vec2 textPos(text.position.X, height - text.position.Y - ascent);
@@ -1674,12 +1673,12 @@ namespace ECS {
                     guiRenderer->endFrame();
                 }
 
-                // Disable scissor test if it was enabled.
+                // Disable scissor test if it was enabled
                 if (scissorEnabled) {
                     glDisable(GL_SCISSOR_TEST);
                 }
 
-                // Clear GUI queues for next frame.
+                // Clear GUI queues for next frame
                 m_guiPanelQueue.clear();
                 m_guiImageQueue.clear();
                 m_guiTextQueue.clear();
@@ -1688,7 +1687,7 @@ namespace ECS {
                 m_worldGuiTextQueue.clear();
 
                 if (!blendWasEnabled) glDisable(GL_BLEND);
-                // Unbind the current render target.
+                // Unbind the current render target
                 Framebuffer::Unbind();
             });
 
@@ -1699,7 +1698,7 @@ namespace ECS {
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
 
-                // Bind default.
+                // Bind default
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
@@ -1734,7 +1733,7 @@ namespace ECS {
         }
     }
 
-    // Tear down system state.
+    // Tear down system state
     void RendererSystem::OnDestroy(World& world) {
         (void)world;
         // Cleanup rendering resources
@@ -1759,10 +1758,12 @@ namespace ECS {
     // Viewport Management Implementation
     // ====================================================================
 
+    // Create or replace a named viewport and allocate all pass framebuffers for it
     void RendererSystem::AddViewport(const std::string& name, Engine::Camera* camera, int w, int h) {
         // Check if viewport already exists
         for (auto& vp : m_viewports) {
             if (vp.Name == name) {
+                // Keep the viewport slot but swap camera and resize render targets in place
                 vp.Camera = camera;
                 ResizeViewport(name, w, h);
                 return;
@@ -1776,12 +1777,15 @@ namespace ECS {
         vp.Active = true;
 
         // Create per-viewport FBOs
+        // HDR stores lit scene data in high precision before post processing
         vp.HDR = std::make_unique<Framebuffer>();
         vp.HDR->Create(vp.Size.x, vp.Size.y, true, true, 1);
 
+        // LDR stores final tone-mapped output used by editor panels and presentation
         vp.LDR = std::make_unique<Framebuffer>();
         vp.LDR->Create(vp.Size.x, vp.Size.y, false, false, 1);
 
+        // Bloom passes run at half resolution to reduce fill cost while preserving soft glow
         vp.BloomExtract = std::make_unique<Framebuffer>();
         vp.BloomExtract->Create(vp.Size.x / 2, vp.Size.y / 2, true, false, 1);
 
@@ -1796,10 +1800,10 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Created '" << name << "' (" << w << "x" << h << ")");
     }
 
-    // Remove viewport.
+    // Remove viewport
     void RendererSystem::RemoveViewport(const std::string& name) {
         m_viewports.erase(
-            // Remove items that no longer match filters.
+            // Remove items that no longer match filters
             std::remove_if(m_viewports.begin(), m_viewports.end(),
                 [&](const Viewport& vp) { return vp.Name == name; }),
             m_viewports.end());
@@ -1807,7 +1811,7 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Removed '" << name << "'");
     }
 
-    // Resize viewport.
+    // Resize viewport
     void RendererSystem::ResizeViewport(const std::string& name, int w, int h) {
         Viewport* vp = GetViewport(name);
         if (!vp) return;
@@ -1828,20 +1832,20 @@ namespace ECS {
         LOG_DEBUG("[Viewport] Resized '" << name << "' to " << w << "x" << h);
     }
 
-    // Set viewport camera.
+    // Set viewport camera
     void RendererSystem::SetViewportCamera(const std::string& name, Engine::Camera* camera) {
         if (Viewport* vp = GetViewport(name))
             vp->Camera = camera;
     }
 
-    // Return viewport.
+    // Return viewport
     RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
         for (auto& vp : m_viewports)
             if (vp.Name == name) return &vp;
         return nullptr;
     }
 
-    // Return viewport texture.
+    // Return viewport texture
     GLuint RendererSystem::GetViewportTexture(const std::string& name) const {
         for (const auto& vp : m_viewports)
             if (vp.Name == name && vp.LDR)
@@ -1853,44 +1857,44 @@ namespace ECS {
     // Extracted Render Helpers
     // ====================================================================
 
-	// Refresh or load tilemaps for all entities that have a TileMapComponent
+    // Refresh or load tilemaps for all entities that have a TileMapComponent
     void RendererSystem::RefreshRuntimeTileMaps(World& world) {
-		// Only refresh tilemaps in Game mode
+        // Only refresh tilemaps in Game mode
         // In Editor mode, tilemaps are managed by the editor and should not be overridden by runtime loading logic
         if (Engine::CORE->GetMode() != Engine::EngineMode::Game) {
             return;
         }
 
-		// Track which entities we've seen with TileMapComponents to identify removed ones
+        // Track which entities we've seen with TileMapComponents to identify removed ones
         std::unordered_set<EntityId> seen;
         world.Each<ECS::Components::TileMapComponent>([this, &seen, &world](const ECS::Entity entity, ECS::Components::TileMapComponent& comp) {
-			// Mark this entity as seen
+            // Mark this entity as seen
             seen.insert(entity.Index);
 
-			// Find or create runtime entry for this entity
+            // Find or create runtime entry for this entity
             RuntimeTileMapEntry& entry = m_runtimeTileMaps[entity.Index];
             const bool generationChanged = (entry.Generation != entity.Generation);
 
-			// If the generation has changed, it means the entity was destroyed and possibly recreated
+            // If the generation has changed, it means the entity was destroyed and possibly recreated
             // In that case, we should reset the entry to avoid carrying over stale data from a previous entity with the same index
             if (generationChanged) {
                 entry = RuntimeTileMapEntry{};
             }
-			// Update generation to current entity generation
+            // Update generation to current entity generation
             entry.Generation = entity.Generation;
 
-			// Resolve paths
+            // Resolve paths
             std::string mapPath = ECS::StringTable::Resolve(comp.TileMapPath);
             std::string legacyTilesetPath = ECS::StringTable::Resolve(comp.TilesetTexturePath);
             mapPath = ResolveProjectPathForLoad(mapPath);
             legacyTilesetPath = ResolveProjectPathForLoad(legacyTilesetPath);
             const bool legacyTilesetExists = (!legacyTilesetPath.empty() && std::filesystem::exists(legacyTilesetPath));
 
-			// Determine if we need to reload the map based on changes to the map path, tile world size or default dimensions
+            // Determine if we need to reload the map based on changes to the map path, tile world size or default dimensions
             const bool mapNeedsReload = generationChanged || entry.MapPath != mapPath || entry.TileWorldSize != comp.TileWorldSize ||
                 entry.DefaultWidth != comp.DefaultWidth || entry.DefaultHeight != comp.DefaultHeight;
 
-			// Reload map if needed
+            // Reload map if needed
             if (mapNeedsReload) {
                 entry.Map.reset();
                 entry.Tilesets.clear();
@@ -1900,81 +1904,81 @@ namespace ECS {
                 entry.DefaultWidth = comp.DefaultWidth;
                 entry.DefaultHeight = comp.DefaultHeight;
 
-				// First try loading the map from the specified path
+                // First try loading the map from the specified path
                 // If that fails and a legacy tileset path is provided, we'll attempt to load the map without tileset references, relying on fallback logic to find the tileset
                 if (!mapPath.empty() && std::filesystem::exists(mapPath)) {
                     entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
-					// If loading fails
+                    // If loading fails
                     // Reset the map pointer to ensure we don't keep an invalid map
                     if (!entry.Map->LoadMap(mapPath)) {
                         LOG_WARNING("[TileMap] (Runtime) Failed to load tilemap: " << mapPath);
                         entry.Map.reset();
                     }
                 } 
-				// If the map path is specified but the file doesn't exist
+                // If the map path is specified but the file doesn't exist
                 else if (!mapPath.empty()) {
                     LOG_WARNING("[TileMap] (Runtime) Tilemap file does not exist: " << mapPath);
                 }
 
-				// If we don't have a valid map loaded but we have tile world size and default dimensions, create an empty map so the game can still run with a blank tilemap
+                // If we don't have a valid map loaded but we have tile world size and default dimensions, create an empty map so the game can still run with a blank tilemap
                 if (!entry.Map) {
                     entry.Map = std::make_shared<TileMap>(comp.TileWorldSize);
                     entry.Map->AddLayer(comp.DefaultWidth, comp.DefaultHeight);
                 }
                 
-				// Log the result of the loading attempt
+                // Log the result of the loading attempt
                 if (entry.Map) {
                     LOG_INFO("[TileMap] (Runtime) Loaded tilemap: " << mapPath << " layers=" << entry.Map->LayerCount());
                 }
             }
 
-			// Next, resolve tileset paths and determine if we need to rebuild tilesets
+            // Next, resolve tileset paths and determine if we need to rebuild tilesets
             std::vector<std::string> tilesetPaths;
 
-			// If the map loaded successfully, get tileset paths from the map dat
+            // If the map loaded successfully, get tileset paths from the map dat
             // This allows the map to specify multiple tilesets and their paths
             if (entry.Map) {
                 tilesetPaths = entry.Map->GetTilesetPaths();
             }
 
-			// Resolve the tileset paths to actual file system paths, and check if they exist
+            // Resolve the tileset paths to actual file system paths, and check if they exist
             std::vector<std::string> resolvedTilesetPaths;
             resolvedTilesetPaths.reserve(tilesetPaths.size());
 
-			// We prioritize the tileset paths specified in the map data
+            // We prioritize the tileset paths specified in the map data
             for (const auto& path : tilesetPaths) {
                 const std::string resolvedPath = ResolveProjectPathForLoad(path);
-				// Only add to the list of tilesets if the resolved path is valid and the file exists
+                // Only add to the list of tilesets if the resolved path is valid and the file exists
                 if (!resolvedPath.empty() && std::filesystem::exists(resolvedPath)) {
                     resolvedTilesetPaths.push_back(resolvedPath);
                 }
             }
 
-			// If no valid tileset paths were found from the map data, but a legacy tileset path is provided, attempt to resolve and use that as a fallback
+            // If no valid tileset paths were found from the map data, but a legacy tileset path is provided, attempt to resolve and use that as a fallback
             if (resolvedTilesetPaths.empty() && legacyTilesetExists) {
                 resolvedTilesetPaths.push_back(legacyTilesetPath);
             }
 
-			// Determine if we need to rebuild the tilesets based on changes to the tileset paths or tile pixel size
+            // Determine if we need to rebuild the tilesets based on changes to the tileset paths or tile pixel size
             const bool tilesetsNeedRebuild = entry.TilePixelSize != comp.TilePixelSize || entry.TilesetPaths != resolvedTilesetPaths;
 
-			// Rebuild tilesets if needed
+            // Rebuild tilesets if needed
             if (tilesetsNeedRebuild) {
                 entry.Tilesets.clear();
                 entry.TilesetPaths = resolvedTilesetPaths;
                 entry.Tilesets.reserve(entry.TilesetPaths.size());
 
-				// Build tilesets from the resolved paths
+                // Build tilesets from the resolved paths
                 // The BuildTilesetFromTexture function will attempt to load the texture and create a tileset based on the specified tile pixel size
                 for (const auto& tilesetPath : entry.TilesetPaths) {
                     entry.Tilesets.push_back(BuildTilesetFromTexture(tilesetPath, comp.TilePixelSize));
                 }
 
-				// If we have a map but no valid tilesets, we can still run the game, but the tilemap will not render any tiles since it has 
+                // If we have a map but no valid tilesets, we can still run the game, but the tilemap will not render any tiles since it has 
                 // no tileset to reference for tile definitions
                 entry.TilePixelSize = comp.TilePixelSize;
 
-				// Check if we have at least one valid tileset after attempting to build from the resolved paths
+                // Check if we have at least one valid tileset after attempting to build from the resolved paths
                 bool hasValidTileset = false;
                 for (const auto& tileset : entry.Tilesets) {
                     if (tileset) {
@@ -1983,7 +1987,7 @@ namespace ECS {
                     }
                 }
 
-				// If we don't have any valid tilesets from the map data or legacy path, log a warning
+                // If we don't have any valid tilesets from the map data or legacy path, log a warning
                 // The tilemap will still function but won't render any tiles
                 if (!hasValidTileset && legacyTilesetExists) {
                     entry.Tilesets.clear();
@@ -1998,10 +2002,10 @@ namespace ECS {
                 LOG_INFO("[TileMap] (Runtime) Tileset rebuild entity " << entity.Index << " count=" << entry.Tilesets.size() << " valid=" << (hasValidTileset ? "yes" : "no"));
             }
 
-			// Finally, update visibility and render layer info for this tilemap entry based on the current component state and entity transform
+            // Finally, update visibility and render layer info for this tilemap entry based on the current component state and entity transform
             glm::vec2 origin(0.0f, 0.0f);
 
-			// If the entity has a LocalTransform, we need to calculate the world position of the tilemap to set the correct origin for rendering
+            // If the entity has a LocalTransform, we need to calculate the world position of the tilemap to set the correct origin for rendering
             if (world.Has<ECS::Components::LocalTransform>(entity)) {
                 const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
                 Vector3D position, scale;
@@ -2010,7 +2014,7 @@ namespace ECS {
                 origin = glm::vec2(position.X, position.Y);
             }
 
-			// Update the runtime entry with the latest visibility and layer information
+            // Update the runtime entry with the latest visibility and layer information
             entry.Origin = origin;
             entry.Visible = comp.Visible && world.IsActiveInHierarchy(entity);
             entry.RenderLayerId = world.Has<ECS::Components::Layer>(entity) ? world.Get<ECS::Components::Layer>(entity).Id : 0;
@@ -2023,11 +2027,11 @@ namespace ECS {
             }
         });
 
-		// Remove any runtime entries for entities that no longer have a TileMapComponent (i.e. they were destroyed or had the component removed)
+        // Remove any runtime entries for entities that no longer have a TileMapComponent (i.e. they were destroyed or had the component removed)
         for (auto it = m_runtimeTileMaps.begin(); it != m_runtimeTileMaps.end(); ) {
             if (!seen.contains(it->first)) {
                 it = m_runtimeTileMaps.erase(it);
-            } 
+            }
             else {
                 ++it;
             }
@@ -2152,6 +2156,7 @@ namespace ECS {
         }
     }
 
+    // Gather all active scene lights and upload one consolidated light buffer for the frame
     void RendererSystem::CollectLights(World& world) {
         m_lightManager.BeginFrame();
 
@@ -2163,15 +2168,19 @@ namespace ECS {
                 Quaternion rotation;
                 GetRenderTransform(world, e, lt, position, rotation, scale);
 
+                // Convert component color once so both light paths use the same normalized RGB value
                 glm::vec3 color = glm::vec3(ToGlm(l.Color));
 
                 if (l.LightType == Components::Light2D::Type::Directional) {
+                    // Directional lights need only a unit direction vector because position is ignored
                     glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
+                    // Prevent NaNs from normalizing a zero-length direction vector
                     if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
                     dir = glm::normalize(dir);
                     m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
                 }
                 else {
+                    // Point lights are authored in local space so convert them into world space first
                     glm::vec3 worldPos(position.X, position.Y, position.Z);
                     worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
                     m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
@@ -2181,12 +2190,12 @@ namespace ECS {
         m_lightManager.Upload();
     }
 
-    // Bucket entities for ordered rendering.
+    // Bucket entities for ordered rendering
     void RendererSystem::BucketEntities(World& world,
         std::vector<std::vector<Entity>>& buckets,
         int& maxLayerId) {
         maxLayerId = -1;
-        // Render per-layer passes.
+        // Render per-layer passes
         world.Each<Components::Layer>([&](Entity, const Components::Layer& ly) {
             maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
             });
@@ -2201,7 +2210,7 @@ namespace ECS {
             });
     }
 
-    // Render bloom.
+    // Render bloom
     void RendererSystem::RenderBloom(Viewport& vp, float bloomRadius) {
         // Extract
         vp.BloomExtract->BindAndClear(0, 0, 0, 1);
@@ -2230,11 +2239,11 @@ namespace ECS {
         vp.BloomBlur->BindColorTexture(0);
         m_renderer->drawFullscreenQuad();
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Tone map.
+    // Tone map
     void RendererSystem::ToneMap(Viewport& vp) {
         vp.LDR->BindAndClear(0, 0, 0, 1);
         glViewport(0, 0, vp.Size.x, vp.Size.y);
@@ -2250,11 +2259,11 @@ namespace ECS {
         vp.BloomExtract->BindColorTexture(0, 1);
         m_renderer->drawFullscreenQuad();
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Render scene to hdr.
+    // Render scene to hdr
     void RendererSystem::RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets,
         int maxLayerId) {
@@ -2283,7 +2292,7 @@ namespace ECS {
             if (layer >= static_cast<int>(buckets.size())) continue;
 
             auto list = buckets[layer];
-            // Finalize rendering pass state.
+            // Finalize rendering pass state
             std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
                 int za = 0, zb = 0;
                 if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
@@ -2308,7 +2317,7 @@ namespace ECS {
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                 const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
-                // Submit circle geometry.
+                // Submit circle geometry
                 DebugDraw2D::Circle(*m_renderer,
                     ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
                     sc.Radius * ((scale.X + scale.Y) * 0.5f),
@@ -2332,11 +2341,11 @@ namespace ECS {
                 // Wrap the debug tileset into a vector, since Submit expects multiple tilesets
                 const std::vector<const Tileset*> tilesets = { &m_debugTileset->get() };
 
-				// Submit the debug tilemap for rendering
+                // Submit the debug tilemap for rendering
                 tileRenderer.Submit(*m_debugTileMap, tilesets, *m_renderer, m_debugTileMapOffset);
             }
 
-			// Render only legacy debug tilemaps that are not owned by an entity
+            // Render only legacy debug tilemaps that are not owned by an entity
             // Entity-owned debug tilemaps are submitted in Z-sorted order below
             if (!m_debugTileMaps.empty()) {
                 TileMapRenderer tileRenderer;
@@ -2365,7 +2374,7 @@ namespace ECS {
                 SubmitRuntimeTileMapEntity(entity);
                 SubmitDebugTileMapEntity(world, entity);
 
-                // Boid flock entity — flush batch, draw instanced at correct Z
+                // Boid flock entity  flush batch, draw instanced at correct Z
                 if (world.Has<Components::BoidFlock>(entity)) {
                     m_renderer->endFrame();
 
@@ -2414,7 +2423,7 @@ namespace ECS {
                         }
                         if (sb.Filled) DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
                         else for (int i = 0; i < 4; ++i)
-                            // Submit line geometry.
+                            // Submit line geometry
                             DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i + 1) % 4], sb.Thickness, ToGlm(sb.Color), 0);
                     }
                 }
@@ -2425,7 +2434,7 @@ namespace ECS {
                     const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
                     const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
                     const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
-                    // Submit line geometry.
+                    // Submit line geometry
                     DebugDraw2D::Line(*m_renderer, ToGlm(Vector2D{ worldA.X, worldA.Y }), ToGlm(Vector2D{ worldB.X, worldB.Y }), sl.Thickness, ToGlm(sl.Color), 0);
                 }
 
@@ -2466,7 +2475,7 @@ namespace ECS {
             }
               m_renderer->endFrame();
 
-              // --- Particles on this layer ---
+              // Particles on this layer
               if (m_particleSystem && m_particleShader) {
                   m_particleShader->use();
                   m_particleShader->setMat4("uViewProj", viewProj);
@@ -2478,11 +2487,11 @@ namespace ECS {
           }
         RenderWorldGUI(viewProj);
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Render wireframes.
+    // Render wireframes
     void RendererSystem::RenderWireframes(Viewport& vp, const glm::mat4& viewProj) {
         if (m_wireframeQueue.empty()) return;
 
@@ -2497,7 +2506,7 @@ namespace ECS {
                 m_sdfCircleShader->setMat4("uViewProj", viewProj);
                 m_sdfCircleShader->setUniform("uPicking", 0);
                 m_renderer->beginFrame();
-                // Submit circle geometry.
+                // Submit circle geometry
                 DebugDraw2D::Circle(*m_renderer, sub.center, sub.radius, sub.color, sub.filled ? 0.0f : sub.thickness, 0);
                 m_renderer->endFrame();
             }
@@ -2513,7 +2522,7 @@ namespace ECS {
                     else DebugDraw2D::RectStroke(*m_renderer, sub.vertices[0], sub.vertices[2], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Line && sub.vertices.size() == 2) {
-                    // Submit line geometry.
+                    // Submit line geometry
                     DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1], sub.thickness, sub.color, 0);
                 }
                 else if (sub.type == WireframeSubmission::Type::Polygon && sub.vertices.size() >= 2) {
@@ -2521,7 +2530,7 @@ namespace ECS {
                     else for (size_t i = 0; i < sub.vertices.size(); ++i) {
                         size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
                         if (next < sub.vertices.size())
-                            // Submit line geometry.
+                            // Submit line geometry
                             DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next], sub.thickness, sub.color, 0);
                     }
                 }
@@ -2529,11 +2538,11 @@ namespace ECS {
             }
         }
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Render overlay quads.
+    // Render overlay quads
     void RendererSystem::RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj) {
         if (m_overlayQuadQueue.empty()) return;
 
@@ -2571,11 +2580,11 @@ namespace ECS {
 
         if (!blendWasEnabled) glDisable(GL_BLEND);
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Render gui.
+    // Render gui
     void RendererSystem::RenderGUI(Viewport& vp) {
         if (m_guiPanelQueue.empty() && m_guiTextQueue.empty() && m_guiImageQueue.empty()) return;
 
@@ -2594,7 +2603,7 @@ namespace ECS {
         glm::mat4 screenOrtho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
 
         // Layout is produced once before render; remap it into the current viewport size so
-        // screen-space GUI scales with viewport/window resizing in multi-viewport rendering.
+        // screen-space GUI scales with viewport/window resizing in multi-viewport rendering
         GUIViewport layoutViewport = m_guiViewport;
         if (!layoutViewport.Active || layoutViewport.Size.X <= 0.0f || layoutViewport.Size.Y <= 0.0f) {
             layoutViewport.Origin = { 0.0f, 0.0f };
@@ -2649,7 +2658,7 @@ namespace ECS {
                 glm::vec2 center(imagePos.X + imageSize.X * 0.5f, imagePos.Y + imageSize.Y * 0.5f);
                 glm::vec2 size(imageSize.X, imageSize.Y);
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
-                // GUI projection uses Y-down; flip V to keep textures upright.
+                // GUI projection uses Y-down; flip V to keep textures upright
                 glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
                 guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
                     0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
@@ -2667,7 +2676,7 @@ namespace ECS {
                 if (text.text.empty()) continue;
                 std::string fontPath = text.fontPath.empty() ? "assets/fonts/Roboto/static/Roboto-Regular.ttf" : text.fontPath;
                 const Vector2D textPosScaled = scalePos(text.position);
-                // Keep GUI text size in absolute pixels regardless of viewport remapping.
+                // Keep GUI text size in absolute pixels regardless of viewport remapping
                 const float textPixelSize = text.pixelSize;
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(textPixelSize)));
                 if (!font) continue;
@@ -2680,14 +2689,16 @@ namespace ECS {
             guiRenderer->endFrame();
         }
 
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
+    // Render queued world-space GUI primitives so they move with the scene camera
     void RendererSystem::RenderWorldGUI(const glm::mat4& viewProj) {
         if (m_worldGuiPanelQueue.empty() && m_worldGuiTextQueue.empty() && m_worldGuiImageQueue.empty()) return;
         if (!m_renderer) return;
 
+        // Preserve caller blend state because this pass can run from different render paths
         GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -2735,6 +2746,7 @@ namespace ECS {
         // Text
         if (!m_worldGuiTextQueue.empty()) {
             if (m_textShader) {
+                // World-space text shares the same camera projection as world geometry
                 m_textShader->use();
                 m_textShader->setMat4("uProjection", viewProj);
             }
@@ -2744,6 +2756,8 @@ namespace ECS {
                 const std::string fontPath = text.fontPath.empty()
                     ? std::string("assets/fonts/Roboto/static/Roboto-Regular.ttf")
                     : text.fontPath;
+
+                // Convert world-size text request into pixel glyph size for font atlas lookup
                 const float fontPixelSize = UnitsToPixels(text.pixelSize);
                 auto font = RM.GetFont(fontPath, std::max(1, static_cast<int>(std::round(fontPixelSize))));
                 if (!font) continue;
@@ -2759,7 +2773,7 @@ namespace ECS {
         if (!blendWasEnabled) glDisable(GL_BLEND);
     }
 
-    // Render picking.
+    // Render picking
     void RendererSystem::RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
         const std::vector<std::vector<Entity>>& buckets) {
         // Only run if there are pending pick requests
@@ -2823,7 +2837,7 @@ namespace ECS {
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
                 const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
-                // Submit circle geometry.
+                // Submit circle geometry
                 DebugDraw2D::Circle(
                     *m_renderer,
                     ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
@@ -2873,7 +2887,7 @@ namespace ECS {
                     const auto& sb = world.Get<Components::ShapeBox2D>(entity);
                     glm::vec2 he = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
                     glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
-                    // Submit filled rectangle geometry.
+                    // Submit filled rectangle geometry
                     DebugDraw2D::RectFill(*m_renderer, center - he, center + he, idColor, static_cast<GLuint>(-1));
                 }
 
@@ -2882,7 +2896,7 @@ namespace ECS {
                     const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
                     const Vector4D worldA = m * Vector4D{ sl.A.X, sl.A.Y, 0.0f, 1.0f };
                     const Vector4D worldB = m * Vector4D{ sl.B.X, sl.B.Y, 0.0f, 1.0f };
-                    // Submit line geometry.
+                    // Submit line geometry
                     DebugDraw2D::Line(
                         *m_renderer,
                         ToGlm(Vector2D{ worldA.X, worldA.Y }),
@@ -2911,11 +2925,11 @@ namespace ECS {
         m_currentPBO = 1 - m_currentPBO;
 
         glEnable(GL_BLEND);
-        // Unbind the current render target.
+        // Unbind the current render target
         Framebuffer::Unbind();
     }
 
-    // Request pick.
+    // Request pick
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
         // Check if within viewport bounds
         if (screenX < viewportPos.x || screenX >= (viewportPos.x + viewportSize.x) ||
@@ -2938,7 +2952,7 @@ namespace ECS {
         return id;
     }
 
-    // Try to get pick result.
+    // Try to get pick result
     bool RendererSystem::TryGetPickResult(uint32_t requestId, uint32_t& outEntityId) {
         auto it = m_completedPickResults.find(requestId);
         if (it == m_completedPickResults.end()) return false;
@@ -2951,6 +2965,7 @@ namespace ECS {
     // Wireframe/Debug Rendering API Implementations
     // ============================================================
 
+    // Queue a rectangle primitive for the wireframe or fill overlay pass
     void RendererSystem::SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max,
                                               const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -2970,7 +2985,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit a filled quad for debug rendering.
+    // Submit a filled quad for debug rendering
     void RendererSystem::SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
                                           const glm::vec4& color) {
         if (!m_renderer) return;
@@ -2990,7 +3005,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit a wireframe circle for debug rendering.
+    // Submit a wireframe circle for debug rendering
     void RendererSystem::SubmitWireframeCircle(const glm::vec2& center, float radius,
                                                 const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -3006,7 +3021,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit a wireframe polygon for debug rendering.
+    // Submit a wireframe polygon for debug rendering
     void RendererSystem::SubmitWireframePolygon(const glm::vec2* vertices, size_t vertexCount,
                                                  const glm::vec4& color, float thickness, bool closed) {
         if (!m_renderer || !vertices || vertexCount < 2) return;
@@ -3021,7 +3036,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit a wireframe line for debug rendering.
+    // Submit a wireframe line for debug rendering
     void RendererSystem::SubmitWireframeLine(const glm::vec2& p1, const glm::vec2& p2,
                                               const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
@@ -3036,7 +3051,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit a wireframe mesh for debug rendering.
+    // Submit a wireframe mesh for debug rendering
     void RendererSystem::SubmitWireframeMesh(const glm::vec2* vertices, size_t vertexCount,
                                               const uint32_t* indices, size_t indexCount,
                                               const glm::vec4& color, float thickness) {
@@ -3055,7 +3070,7 @@ namespace ECS {
         m_wireframeQueue.push_back(sub);
     }
 
-    // Submit an overlay quad.
+    // Submit an overlay quad
     void RendererSystem::SubmitOverlayQuad(const glm::vec2& center,
                                            const glm::vec2& size,
                                            GLuint textureId,
@@ -3074,13 +3089,13 @@ namespace ECS {
         m_overlayQuadQueue.push_back(sub);
     }
 
-    // Submit a GUI panel draw call.
+    // Submit a GUI panel draw call
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
                                         const Color& color, float cornerRadius) {
         (void)cornerRadius;
         if (!m_renderer) return;
 
-        // Queue GUI panel draw for the GUI pass.
+        // Queue GUI panel draw for the GUI pass
         GUIPanelSubmission submission;
         submission.position = position;
         submission.size = size;
@@ -3089,13 +3104,13 @@ namespace ECS {
         m_guiPanelQueue.push_back(submission);
     }
 
-    // Submit a GUI image draw call.
+    // Submit a GUI image draw call
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
                                          uint32_t textureId, const Vector4D& uvRect, const Color& color,
                                          Graphics::TextureFilter textureFilter) {
         if (!m_renderer) return;
 
-        // Queue GUI image/icon draw for the GUI pass.
+        // Queue GUI image/icon draw for the GUI pass
         GUIImageSubmission submission;
         submission.position = position;
         submission.size = size;
@@ -3106,12 +3121,12 @@ namespace ECS {
         m_guiImageQueue.push_back(submission);
     }
 
-    // Submit a GUI text draw call.
+    // Submit a GUI text draw call
     void RendererSystem::SubmitGUIText(const Vector2D& position, const std::string& text,
         const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
 
-        // Queue GUI text draw for the GUI pass.
+        // Queue GUI text draw for the GUI pass
         GUITextSubmission submission;
         submission.position = position;
         submission.text = text;
@@ -3121,7 +3136,7 @@ namespace ECS {
         m_guiTextQueue.push_back(std::move(submission));
     }
 
-    // Submit a world-space GUI panel draw call.
+    // Submit a world-space GUI panel draw call
     void RendererSystem::SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
         const Color& color, float cornerRadius) {
         (void)cornerRadius;
@@ -3135,7 +3150,7 @@ namespace ECS {
         m_worldGuiPanelQueue.push_back(submission);
     }
 
-    // Submit a world-space GUI image draw call.
+    // Submit a world-space GUI image draw call
     void RendererSystem::SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
         uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter) {
         if (!m_renderer) return;
@@ -3150,7 +3165,7 @@ namespace ECS {
         m_worldGuiImageQueue.push_back(submission);
     }
 
-    // Submit a world-space GUI text draw call.
+    // Submit a world-space GUI text draw call
     void RendererSystem::SubmitWorldGUIText(const Vector2D& position, const std::string& text,
         const std::string& fontPath, float pixelSize, const Color& color) {
         if (!m_renderer) return;
@@ -3164,7 +3179,7 @@ namespace ECS {
         m_worldGuiTextQueue.push_back(std::move(submission));
     }
 
-    // Submit collider debug draw geometry.
+    // Submit collider debug draw geometry
     void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
         const glm::vec4& color) {
         if (entityID == ECS::Entity::NPOS32) {
@@ -3193,7 +3208,7 @@ namespace ECS {
         auto rotate2D = [](const glm::vec2& v, float radians) {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
-            // Convert to a 2D vector.
+            // Convert to a 2D vector
             return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
             };
 
@@ -3253,7 +3268,7 @@ namespace ECS {
         }
     }
 
-    // Set debug tile map.
+    // Set debug tile map
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset)
     {
         m_debugTileMap = map;
@@ -3261,13 +3276,13 @@ namespace ECS {
         m_debugTileMapOffset = worldOffset;
     }
 
-    // Set debug tile maps.
+    // Set debug tile maps
     void RendererSystem::SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps)
     {
         m_debugTileMaps = maps; // Store references to editor-owned tilemaps for this frame.
     }
 
-    // Clear debug tile map.
+    // Clear debug tile map
     void RendererSystem::ClearDebugTileMap()
     {
         m_debugTileMap.reset();
@@ -3275,7 +3290,7 @@ namespace ECS {
         m_debugTileMapOffset = glm::vec2(0.0f, 0.0f);
     }
 
-    // Clear debug tile maps.
+    // Clear debug tile maps
     void RendererSystem::ClearDebugTileMaps()
     {
         m_debugTileMaps.clear(); // Clear multi-tilemap debug rendering state.
