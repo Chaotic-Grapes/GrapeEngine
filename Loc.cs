@@ -348,7 +348,11 @@ class Program
         string pathspec,
         Action<int, int>? progress)
     {
-        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".c", ".cpp", ".h", ".hpp", ".cs" };
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".c", ".cpp", ".h", ".hpp", ".cs", ".frag", ".vert",
+            ".cu", ".cuh"
+        };
         var perFile = new Dictionary<string, (long added, long removed)>(StringComparer.OrdinalIgnoreCase);
         var fileCommits = new Dictionary<string, List<CommitSummary>>(StringComparer.OrdinalIgnoreCase);
 
