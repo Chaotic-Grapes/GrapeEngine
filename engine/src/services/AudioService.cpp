@@ -1,32 +1,22 @@
-/**
- * @Name: Dalton koh, 2403250
- * @email: d.koh@digipen.edu
- * @file    AudioService.cpp
- * @brief   Engine service that owns and drives the FMOD-backed audio device.
- *
- * @details
- * This service wraps an Audio::FmodAudioDevice instance and exposes a standard
- * engine-service lifecycle:
- *   - Initialize(): construct and initialize the FMOD device
- *   - Update():     tick the FMOD mixer each frame (if service is enabled)
- *   - Terminate():  shut down the device and release all audio resources
- *
- * Typical integration:
- *   1) Construct AudioService at app startup.
- *   2) Call Initialize() once. If it succeeds, the FMOD system is ready.
- *   3) Every frame, call Update() so FMOD can mix audio and process I/O.
- *   4) On shutdown, call Terminate() to clean up FMOD resources safely.
- *
- *
- * @dependencies
- *   - audio/FmodAudioDevice.h  : concrete FMOD wrapper (Initialize/Update/Shutdown)
- *   - services/AudioService.h  : matching service interface
- *   - core/Logger.h            : Trace/LOG_* helpers (optional)
- * 
- * Copyright (C) 2025 DigiPen Institute of Technology.
- * Reproduction or disclosure of this file or its contents without the
- */
+/* Start Header *****************************************************************/
+/*!
+\file   AudioService.cpp
+\author Dalton Koh
+\par    d.koh@digipen.edu
+\brief
+Implements the engine audio service that owns device and engine audio runtime state.
 
+Description
+- initializes and terminates the active fmod audio device
+- owns and updates the audio engine facade each frame
+- refreshes cue registry data from project audio assets
+- forwards play stop and cue operations to audio engine and device
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "audio/FmodAudioDevice.h"
 #include "audio/AudioEngine.h"

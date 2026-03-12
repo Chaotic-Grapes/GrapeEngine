@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioEngine.cpp
-\author Dalton Koh
+\author Dalton Koh 2403250
 \par    d.koh@digipen.edu
 \brief
 Implements the audio engine runtime layer that tracks active playback handles
@@ -24,7 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Audio {
     AudioEngine* gAudioEngine = nullptr;
 
-    // load a cue through the active device
+    // load one cue on the active device
     bool AudioEngine::LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params) {
         // return false when no device exists
         if (!m_device) {
@@ -33,7 +33,7 @@ namespace Audio {
         return m_device->LoadCue(cueId, filePath, params);
     }
 
-    // unload a cue through the active device
+    // unload one cue on the active device
     void AudioEngine::UnloadCue(const std::string& cueId) {
         // ignore when no device exists
         if (!m_device) {
@@ -42,7 +42,7 @@ namespace Audio {
         m_device->UnloadCue(cueId);
     }
 
-    // check if a cue exists on the active device
+    // check whether a cue exists
     bool AudioEngine::HasCue(const std::string& cueId) const {
         // return false when no device exists
         if (!m_device) {
@@ -51,20 +51,20 @@ namespace Audio {
         return m_device->HasCue(cueId);
     }
 
-    // play a cue and cache instance state
+    // play a cue and cache runtime state
     PlaybackHandle AudioEngine::Play(const std::string& cueId, const PlaySettings& settings, Bus bus) {
         // return empty handle when no device exists
         if (!m_device) {
             return {};
         }
 
-        // ask device to start playback
+        // start playback on the device
         PlaybackHandle handle = m_device->Play(cueId, settings, bus);
         if (!handle) {
             return {};
         }
 
-        // store runtime state for later updates
+        // cache playback state for runtime updates
         InstanceState state{};
         state.Handle = handle;
         state.BusType = bus;
@@ -77,20 +77,20 @@ namespace Audio {
         return handle;
     }
 
-    // play a cue with play policy and cache instance state
+    // play cue with single instance policy
     PlaybackHandle AudioEngine::PlaySingle(const std::string& cueId, const PlaySettings& settings, PlayPolicy policy, Bus bus) {
         // return empty handle when no device exists
         if (!m_device) {
             return {};
         }
 
-        // ask device to enforce single play policy
+        // start playback with policy on the device
         PlaybackHandle handle = m_device->PlaySingle(cueId, settings, policy, bus);
         if (!handle) {
             return {};
         }
 
-        // create or refresh cached instance state
+        // create or refresh cached state
         auto& state = m_instances[handle.Id];
         state.Handle = handle;
         state.BusType = bus;
@@ -102,7 +102,7 @@ namespace Audio {
         return handle;
     }
 
-    // stop one handle and remove cached state
+    // stop one handle and clear cached state
     void AudioEngine::Stop(PlaybackHandle handle, StopMode mode) {
         // ignore when no device exists
         if (!m_device) {
@@ -113,7 +113,7 @@ namespace Audio {
         m_instances.erase(handle.Id);
     }
 
-    // stop one cue using cue level tracking
+    // stop an active cue mapping
     void AudioEngine::StopCue(const std::string& cueId, StopMode mode) {
         // ignore when no device exists
         if (!m_device) {
@@ -122,7 +122,7 @@ namespace Audio {
         m_device->StopCue(cueId, mode);
     }
 
-    // query cue playback from the device
+    // query cue playback from device
     bool AudioEngine::IsCuePlaying(const std::string& cueId) const {
         // return false when no device exists
         if (!m_device) {
@@ -131,15 +131,15 @@ namespace Audio {
         return m_device->IsCuePlaying(cueId);
     }
 
-    // update cached base volume for an instance
+    // set cached base volume for a handle
     void AudioEngine::SetInstanceVolume(PlaybackHandle handle, float volume) {
-        // write cached value when handle is tracked
+        // update cache only when handle exists
         if (auto it = m_instances.find(handle.Id); it != m_instances.end()) {
             it->second.BaseVolume = volume;
         }
     }
 
-    // update pitch in cache and on device
+    // set pitch in cache and on device
     void AudioEngine::SetInstancePitch(PlaybackHandle handle, float pitch) {
         // ignore when no device exists
         if (!m_device) {
@@ -148,11 +148,11 @@ namespace Audio {
         if (auto it = m_instances.find(handle.Id); it != m_instances.end()) {
             it->second.Pitch = pitch;
         }
-        // push pitch to device
+        // apply pitch to device channel
         m_device->SetInstancePitch(handle, pitch);
     }
 
-    // update pan in cache and on device for non spatial sources
+    // set pan in cache and on device for 2d sources
     void AudioEngine::SetInstancePan(PlaybackHandle handle, float pan) {
         // ignore when no device exists
         if (!m_device) {
@@ -166,7 +166,7 @@ namespace Audio {
         }
     }
 
-    // set per instance low pass gain
+    // set per instance low pass gain on device
     void AudioEngine::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
         // ignore when no device exists
         if (!m_device) {
@@ -175,7 +175,7 @@ namespace Audio {
         m_device->SetInstanceLowPassGain(handle, gain);
     }
 
-    // set 3d attributes for an instance
+    // set 3d position and velocity for one handle
     void AudioEngine::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         // ignore when no device exists
         if (!m_device) {
@@ -184,7 +184,7 @@ namespace Audio {
         m_device->SetInstancePosition(handle, pos, vel);
     }
 
-    // set listener attributes for spatial audio
+    // set current listener data on device
     void AudioEngine::SetListener(const ListenerParams& listener) {
         // ignore when no device exists
         if (!m_device) {
@@ -193,9 +193,9 @@ namespace Audio {
         m_device->SetListener(listener);
     }
 
-    // set bus volume and clear bus fade state
+    // set bus volume and clear bus fade
     void AudioEngine::SetBusVolume(Bus bus, float volume) {
-        // convert enum to array index
+        // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= static_cast<size_t>(Bus::Count)) {
             return;
@@ -205,9 +205,9 @@ namespace Audio {
         m_busStates[index].Fade.Active = false;
     }
 
-    // read current volume for a bus
+    // read current bus volume
     float AudioEngine::GetBusVolume(Bus bus) const {
-        // convert enum to array index
+        // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= static_cast<size_t>(Bus::Count)) {
             return 1.0f;
@@ -215,9 +215,9 @@ namespace Audio {
         return m_busStates[index].Volume;
     }
 
-    // begin a volume fade on one bus
+    // start a volume fade on one bus
     void AudioEngine::FadeBusVolume(Bus bus, float targetVolume, float duration) {
-        // convert enum to array index
+        // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= static_cast<size_t>(Bus::Count)) {
             return;
@@ -233,7 +233,7 @@ namespace Audio {
         state.Fade.StopOnComplete = false;
     }
 
-    // set low pass gain on a bus
+    // set low pass gain on one bus
     void AudioEngine::SetBusLowPassGain(Bus bus, float gain) {
         // ignore when no device exists
         if (!m_device) {
@@ -242,7 +242,7 @@ namespace Audio {
         m_device->SetBusLowPassGain(bus, gain);
     }
 
-    // read low pass gain for a bus
+    // get low pass gain on one bus
     float AudioEngine::GetBusLowPassGain(Bus bus) const {
         // return default when no device exists
         if (!m_device) {
@@ -251,15 +251,15 @@ namespace Audio {
         return m_device->GetBusLowPassGain(bus);
     }
 
-    // begin a fade for one instance
+    // start fade for one instance
     void AudioEngine::FadeInstance(PlaybackHandle handle, float targetVolume, float duration, bool stopOnComplete) {
-        // find tracked state for handle
+        // find cached state for handle
         auto it = m_instances.find(handle.Id);
         if (it == m_instances.end()) {
             return;
         }
         InstanceState& state = it->second;
-        // use current fade value so chained fades stay smooth
+        // Start from the currently interpolated value so chaining fades is smooth.
         state.Fade.Active = true;
         state.Fade.FromVolume = _computePreMixVolume(state);
         state.Fade.ToVolume = targetVolume;
@@ -270,7 +270,7 @@ namespace Audio {
 
     // fade all active instances to zero
     void AudioEngine::FadeOutAll(float duration) {
-        // fade every active instance to zero then stop
+        // Mark all active instances for terminal fade -> stop.
         for (auto& [id, state] : m_instances) {
             state.Fade.Active = true;
             state.Fade.FromVolume = _computePreMixVolume(state);
@@ -281,9 +281,9 @@ namespace Audio {
         }
     }
 
-    // fade only instances on one bus to zero
+    // fade all instances on a bus to zero
     void AudioEngine::FadeOutBus(Bus bus, float duration) {
-        // scan all tracked instances and filter by bus
+        // iterate all instances and filter by bus
         for (auto& [id, state] : m_instances) {
             if (state.BusType != bus) {
                 continue;
@@ -297,9 +297,9 @@ namespace Audio {
         }
     }
 
-    // report if any stop on complete fade is active
+    // check for active terminal fade outs
     bool AudioEngine::HasActiveFadeOuts() const {
-        // look for active terminal fades
+        // find any fade that will stop on complete
         for (const auto& [id, state] : m_instances) {
             if (state.Fade.Active && state.Fade.StopOnComplete && state.Fade.ToVolume <= 0.0f) {
                 return true;
@@ -308,9 +308,9 @@ namespace Audio {
         return false;
     }
 
-    // return max remaining time among terminal fades
+    // return max remaining time across terminal fades
     float AudioEngine::GetMaxFadeOutRemaining() const {
-        // track largest remaining fade time
+        // track highest remaining fade time
         float maxRemaining = 0.0f;
         for (const auto& [id, state] : m_instances) {
             if (state.Fade.Active && state.Fade.StopOnComplete && state.Fade.ToVolume <= 0.0f) {
@@ -323,9 +323,9 @@ namespace Audio {
         return maxRemaining;
     }
 
-    // check if one handle is currently fading
+    // check if a handle is currently fading
     bool AudioEngine::IsHandleFading(PlaybackHandle handle) const {
-        // find tracked state for handle
+        // resolve handle in cache
         auto it = m_instances.find(handle.Id);
         if (it == m_instances.end()) {
             return false;
@@ -333,9 +333,9 @@ namespace Audio {
         return it->second.Fade.Active;
     }
 
-    // check if one handle is tracked as active
+    // check if a handle is tracked as active
     bool AudioEngine::IsHandleActive(PlaybackHandle handle) const {
-        // active means handle exists in map
+        // active means cached handle exists
         return m_instances.find(handle.Id) != m_instances.end();
     }
 
@@ -346,7 +346,7 @@ namespace Audio {
             return;
         }
 
-        // stop all fading instances and remove them
+        // Stop all instances that are currently fading and remove them
         std::vector<uint64_t> toRemove;
         for (auto& [id, state] : m_instances) {
             if (state.Fade.Active) {
@@ -360,13 +360,14 @@ namespace Audio {
         }
     }
 
-    // update fade systems and prune ended handles
+    // run one update tick for audio runtime state
     void AudioEngine::Update(float deltaTime) {
         // ignore when no device exists
         if (!m_device) {
             return;
         }
 
+        // update bus and instance fades then cleanup
         _updateBusFades(deltaTime);
         _updateInstanceFades(deltaTime);
         _pruneStoppedInstances();
@@ -375,7 +376,7 @@ namespace Audio {
     // compute instance volume before bus and master mix
     float AudioEngine::_computePreMixVolume(const InstanceState& instance) const {
         if (instance.Fade.Active) {
-            // compute local fade volume before bus and master mix
+            // Fade interpolation runs in instance-local volume space before bus/master gain.
             float t = instance.Fade.Duration > 0.0f ? (instance.Fade.Elapsed / instance.Fade.Duration) : 1.0f;
             if (t > 1.0f) {
                 t = 1.0f;
@@ -385,9 +386,9 @@ namespace Audio {
         return instance.BaseVolume;
     }
 
-    // compute combined bus multiplier for an instance
+    // compute combined master and bus volume multiplier
     float AudioEngine::_computeBusVolume(const InstanceState& instance) const {
-        // master and bus multiply together
+        // multiply master and bus gains
         float master = GetBusVolume(Bus::Master);
         float bus = GetBusVolume(instance.BusType);
         return master * bus;
@@ -395,13 +396,14 @@ namespace Audio {
 
     // advance all active bus fades
     void AudioEngine::_updateBusFades(float deltaTime) {
+        // walk all buses and update active fades
         for (size_t i = 0; i < static_cast<size_t>(Bus::Count); ++i) {
             auto& state = m_busStates[i];
             if (!state.Fade.Active) {
                 continue;
             }
 
-            // update bus fade value
+            // Bus fades are independent from per-instance fades and multiply later.
             state.Fade.Elapsed += deltaTime;
             float t = state.Fade.Duration > 0.0f ? (state.Fade.Elapsed / state.Fade.Duration) : 1.0f;
             if (t >= 1.0f) {
@@ -413,13 +415,13 @@ namespace Audio {
         }
     }
 
-    // advance all instance fades and apply final volume
+    // advance instance fades and apply final runtime volume
     void AudioEngine::_updateInstanceFades(float deltaTime) {
-        // collect ids to stop after the loop
+        // collect ids that should stop after loop
         std::vector<uint64_t> toStop;
         for (auto& [id, state] : m_instances) {
             if (!state.Fade.Active) {
-                // apply bus and master mix even when no fade is active
+                // Even without an active fade, final gain is still affected by bus/master mix.
                 float finalVolume = _computePreMixVolume(state) * _computeBusVolume(state);
                 m_device->SetInstanceVolume(state.Handle, finalVolume);
                 if (!state.Spatial3D) {
@@ -444,11 +446,11 @@ namespace Audio {
             if (t >= 1.0f) {
                 state.Fade.Active = false;
                 if (state.Fade.StopOnComplete) {
-                    // queue stop and remove after loop
+                    // Defer stop/removal until after iteration to avoid iterator invalidation.
                     toStop.push_back(id);
                 }
                 else {
-                    // keep fade end value as the new base volume
+                    // Non-terminal fades commit their end value as the new steady base volume.
                     state.BaseVolume = state.Fade.ToVolume;
                 }
             }
@@ -456,16 +458,16 @@ namespace Audio {
 
         for (uint64_t id : toStop) {
             if (auto it = m_instances.find(id); it != m_instances.end()) {
-                // stop then erase the finished handle
+                // stop handle then remove cached entry
                 m_device->Stop(it->second.Handle, StopMode::Immediate);
                 m_instances.erase(it);
             }
         }
     }
 
-    // remove cached instances that finished on the device
+    // remove handles that are no longer playing
     void AudioEngine::_pruneStoppedInstances() {
-        // remove handles that are no longer playing
+        // collect dead handles first
         std::vector<uint64_t> toRemove;
         for (auto& [id, state] : m_instances) {
             if (!m_device->IsHandlePlaying(state.Handle)) {
