@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileLayer.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   31st January 2026
 \brief
 Defines a single tile layer represented as a fixed-size 2D grid of TileID values.

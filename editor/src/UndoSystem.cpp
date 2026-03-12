@@ -721,11 +721,12 @@ namespace Editor {
     {
     }
 
-    // Applies batched new values across all valid entities
+    /**
+    * @brief Applies the new property value to all entities in the batch.
+    */
     void BatchComponentPropertyCommand::Execute() {
         if (!m_world || !m_applyFn) return;
-
-        for (const auto& it : m_entries) {
+        for (const auto& it : m_entries) { // Apply the new value for each entity
             ECS::Entity e = m_world->Resolve(it.Entity);
             if (!m_world->IsAlive(e)) continue;
             m_applyFn(m_world, e, m_componentId, m_propertyPath, it.NewValue);
