@@ -1224,6 +1224,8 @@ public static class ScriptHost
     {
         var schemas = new Dictionary<uint, ManagedComponentSchema>();
 
+        // Capture a minimal schema fingerprint per managed component so reload can detect
+        // removed components and binary-layout changes (size/signature drift).
         foreach (var type in ComponentDiscovery.TypeHashToType.Values)
         {
             try
@@ -1293,11 +1295,15 @@ public static class ScriptHost
 
     private static string BuildComponentSignature(Type componentType)
     {
+        // Keep declaration order stable by using metadata tokens, so signature comparison
+        // does not flap when reflection enumeration order changes.
         var props = componentType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.GetIndexParameters().Length == 0)
             .OrderBy(p => p.MetadataToken)
             .Select(p => $"P:{p.Name}:{p.PropertyType.FullName}");
 
+        // Ignore compiler-generated backing fields because property entries already represent
+        // those members in the signature.
         var fields = componentType.GetFields(BindingFlags.Public | BindingFlags.Instance)
             .Where(f => !f.IsStatic && !f.Name.Contains("k__BackingField", StringComparison.Ordinal))
             .OrderBy(f => f.MetadataToken)
