@@ -3,7 +3,7 @@
 \file   EditorComponentRegistry.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   15th November 2025
+\date   12th March 2026
 
 \brief
 Editor UI registry that queries the native ECS ComponentRegistry.
@@ -31,7 +31,7 @@ This registry is only responsible for UI presentation.
 #include <imgui.h> 
 
 namespace {
-    // Return component id from hash or warn.
+    // Resolves a component type hash into a runtime component ID and logs a warning when the mapping is missing
     ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
         const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
         if (id == ECS::NULL_COMPONENT_ID) {
@@ -41,6 +41,9 @@ namespace {
         return id;
     }
 
+    // Precomputed FNV-1a hashes for known component type names used by registry lookups
+    // Hash keys let the editor resolve runtime ComponentTypeId values without repeated string comparisons
+    // These constants are the bridge between human-readable type names and ECS registry metadata
     const uint32_t kHashLocalTransform = Editor::ECSUtils::FNV1aHash("LocalTransform");
     const uint32_t kHashName = Editor::ECSUtils::FNV1aHash("Name");
     const uint32_t kHashActive = Editor::ECSUtils::FNV1aHash("Active");
@@ -78,12 +81,14 @@ namespace {
     const uint32_t kHashGUIButton = Editor::ECSUtils::FNV1aHash("GUIButton");
     const uint32_t kHashGUISlider = Editor::ECSUtils::FNV1aHash("GUISlider");
     
+    // Generates default JSON by serializing a value-initialized component instance through registered serializers
+    // This keeps defaults consistent with runtime serialization rules instead of duplicating field layouts manually
     template<typename T>
-    // Build default JSON payload for components.
+    // Builds default JSON for a native component by serializing a zero-initialized instance through ADL
     nlohmann::json MakeDefaultJson() {
         T value{};
         nlohmann::json j;
-        // Use ADL to_json overloads when available.
+        // Use ADL to_json overloads when available
         Serialization::to_json_adl(j, value);
         return j;
     }
@@ -94,25 +99,16 @@ namespace {
 using DeserializeComponentCallback = void(*)(ECS::ComponentTypeId id, void* componentPtr, int size, const char* jsonStr);
 static DeserializeComponentCallback s_deserializeComponentCallback = nullptr;
 
-// Function to register the deserialize callback from managed code
+// Stores the managed runtime callback used to deserialize JSON into managed component memory
 extern "C" void RegisterComponentDeserializeCallback(DeserializeComponentCallback callback)
 {
     s_deserializeComponentCallback = callback;
     LOG_INFO("[EditorComponentRegistry] Component deserialize callback registered");
 }
 
-/* 
-Helper macro to reduce repetition when registering components
-
-This macro expands into FOUR operations for a component type T:
-1. canCheck: check if an entity HAS this component
-2. apply: add/update the component using JSON data
-3. remove: remove the component from the entity
-4. applyPrefab: same as apply, used for prefab instances
-
-The backslash at the end of each line tells the compiler that the macro continues on the next line
-Without these, the macro would end early and break the expansion
-*/
+// Helper macro that groups standard component operations used by registry metadata entries
+// The macro emits four lambdas in fixed order: has, add or update, remove, apply for prefab override paths
+// Each line ends with a backslash so the preprocessor keeps the full macro as one expansion unit
 #define COMPONENT_OPS_HASH(T, HASH) \
     /* Check if entity already has component T; the lambda returns a bool */ \
     /* BUT the lambda has no name and no fixed type which is why we wrap it into a standard function object */ \
@@ -134,7 +130,8 @@ Without these, the macro would end early and break the expansion
         void* ptr = w->GetRawComponentPtr(e, id); \
         if (ptr) { \
             *static_cast<T*>(ptr) = value; \
-        } else { \
+        } \
+        else { \
             w->AddComponentById(e, id, &value, sizeof(T)); \
         } \
     }), \
@@ -157,7 +154,8 @@ Without these, the macro would end early and break the expansion
         void* ptr = w->GetRawComponentPtr(e, id); \
         if (ptr) { \
             *static_cast<T*>(ptr) = value; \
-        } else { \
+        } \
+        else { \
             w->AddComponentById(e, id, &value, sizeof(T)); \
         } \
     })
@@ -166,8 +164,8 @@ Without these, the macro would end early and break the expansion
 // Hardcoded C++ Component Renderers
 // =============================================================================
 
-// These lambdas provide specialized UI rendering for known C++ components
-// They're stored in a map keyed by component type ID for fast lookup
+// Builds and returns lazy-initialized renderer delegates for built-in C++ component types
+// Each entry maps a runtime component ID to the editor renderer that knows how to draw that component UI
 [[maybe_unused]] static auto& _getCppComponentRenderers() {
     static std::unordered_map<ECS::ComponentTypeId, std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>> renderers;
     
@@ -315,7 +313,7 @@ Without these, the macro would end early and break the expansion
     return renderers;
 }
 
-// Hardcoded default values for known C++ components
+// Builds and returns lazy-initialized default JSON factories for built-in C++ component types
 [[maybe_unused]] static auto& _getCppComponentDefaults() {
     static std::unordered_map<ECS::ComponentTypeId, std::function<nlohmann::json()>> defaults;
     
@@ -378,7 +376,7 @@ Without these, the macro would end early and break the expansion
         }
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"); id != ECS::NULL_COMPONENT_ID) {
-            // Provide sane defaults for new tilemap components.
+            // Provide sane defaults for new tilemap components
             defaults[id] = []() {
                 return nlohmann::json{
                     {"TileMapPath", ""},
@@ -551,7 +549,7 @@ Without these, the macro would end early and break the expansion
         }
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
-            // Register Material2D type metadata.
+            // Register Material2D type metadata
             defaults[ECS::ComponentRegistry::Type<Material2D>()] = []() {
                 return nlohmann::json{
                 {"NormalTextureId", 0},
@@ -715,7 +713,7 @@ Without these, the macro would end early and break the expansion
 static std::vector<ComponentUIMetadata> s_registry;
 static std::mutex s_registryLock;
 
-// Initialize the default component editor registry.
+// Initializes the static editor registry with built-in component metadata and operation delegates
 static void _initializeDefaultRegistry() {
     if (!s_registry.empty()) return;  // Already initialized
     
@@ -728,7 +726,7 @@ static void _initializeDefaultRegistry() {
             "Transform", "LocalTransform", "ECS::Components::LocalTransform",
             GetComponentIdFromHashOrWarn(kHashLocalTransform, "LocalTransform"), kHashLocalTransform, false, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLocalTransform(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
                 {"Rotation", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f}}},
@@ -741,7 +739,7 @@ static void _initializeDefaultRegistry() {
             "Name", "Name", "ECS::Components::Name",
             GetComponentIdFromHashOrWarn(kHashName, "Name"), kHashName, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderName(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", "Entity"}}; }),
             COMPONENT_OPS_HASH(Name, kHashName)
         },
@@ -750,7 +748,7 @@ static void _initializeDefaultRegistry() {
             "Active", "Active", "ECS::Components::Active",
             GetComponentIdFromHashOrWarn(kHashActive, "Active"), kHashActive, false, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Enabled", true}}; }),
             COMPONENT_OPS_HASH(Active, kHashActive)
         },
@@ -759,7 +757,7 @@ static void _initializeDefaultRegistry() {
             "Tag Mask", "TagMask", "ECS::Components::TagMask",
             GetComponentIdFromHashOrWarn(kHashTagMask, "TagMask"), kHashTagMask, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Mask", 0}}; }),
             COMPONENT_OPS_HASH(TagMask, kHashTagMask)
         },
@@ -768,7 +766,7 @@ static void _initializeDefaultRegistry() {
             "Camera 3D", "Camera3D", "ECS::Components::Camera3D",
             GetComponentIdFromHashOrWarn(kHashCamera3D, "Camera3D"), kHashCamera3D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"UsePerspective", false}, {"FOV", 45.0f}, {"NearPlane", 0.1f},
                 {"FarPlane", 100.0f}, {"OrthoSize", 10.0f},
@@ -781,7 +779,7 @@ static void _initializeDefaultRegistry() {
             "Sprite Renderer 2D", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D",
             GetComponentIdFromHashOrWarn(kHashSpriteRenderer2D, "SpriteRenderer2D"), kHashSpriteRenderer2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0},
                 {"NormalTextureId", 0},
@@ -796,13 +794,13 @@ static void _initializeDefaultRegistry() {
             }; }),
             COMPONENT_OPS_HASH(SpriteRenderer2D, kHashSpriteRenderer2D)
         },
-        // Map component types to editor metadata.
+        // Map component types to editor metadata
         // Tile Map (stores asset paths + sizing; editing handled by Tile Palette)
         {
             "Tile Map", "TileMapComponent", "ECS::Components::TileMapComponent",
             GetComponentIdFromHashOrWarn(kHashTileMapComponent, "TileMapComponent"), kHashTileMapComponent, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTileMapComponent(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TileMapPath", ""},
                 {"TilesetTexturePath", ""},
@@ -820,7 +818,7 @@ static void _initializeDefaultRegistry() {
             "Sprite Sheet Animation 2D", "SpriteSheetAnimation2D", "ECS::Components::SpriteSheetAnimation2D",
             GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"), kHashSpriteSheetAnimation2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0}, {"NormalTextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
@@ -836,7 +834,7 @@ static void _initializeDefaultRegistry() {
             "Z-Index 2D", "ZIndex2D", "ECS::Components::ZIndex2D",
             GetComponentIdFromHashOrWarn(kHashZIndex2D, "ZIndex2D"), kHashZIndex2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderZIndex2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"ZOrder", 0}}; }),
             COMPONENT_OPS_HASH(ZIndex2D, kHashZIndex2D)
         },
@@ -845,7 +843,7 @@ static void _initializeDefaultRegistry() {
             "Rigidbody 2D", "Rigidbody2D", "ECS::Components::Rigidbody2D",
             GetComponentIdFromHashOrWarn(kHashRigidbody2D, "Rigidbody2D"), kHashRigidbody2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderRigidbody2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Mass", 1.0f}, {"InverseMass", 1.0f},
                 {"LinearDamping", 0.0f}, {"AngularDamping", 0.0f},
@@ -858,7 +856,7 @@ static void _initializeDefaultRegistry() {
             "Linear Velocity 2D", "LinearVelocity2D", "ECS::Components::LinearVelocity2D",
             GetComponentIdFromHashOrWarn(kHashLinearVelocity2D, "LinearVelocity2D"), kHashLinearVelocity2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLinearVelocity2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; }),
             COMPONENT_OPS_HASH(LinearVelocity2D, kHashLinearVelocity2D)
         },
@@ -867,7 +865,7 @@ static void _initializeDefaultRegistry() {
             "Angular Velocity 2D", "AngularVelocity2D", "ECS::Components::AngularVelocity2D",
             GetComponentIdFromHashOrWarn(kHashAngularVelocity2D, "AngularVelocity2D"), kHashAngularVelocity2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAngularVelocity2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", 0.0f}}; }),
             COMPONENT_OPS_HASH(AngularVelocity2D, kHashAngularVelocity2D)
         },
@@ -876,7 +874,7 @@ static void _initializeDefaultRegistry() {
             "Acceleration 2D", "Acceleration2D", "ECS::Components::Acceleration2D",
             GetComponentIdFromHashOrWarn(kHashAcceleration2D, "Acceleration2D"), kHashAcceleration2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAcceleration2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; }),
             COMPONENT_OPS_HASH(Acceleration2D, kHashAcceleration2D)
         },
@@ -885,7 +883,7 @@ static void _initializeDefaultRegistry() {
             "Physics Material 2D", "PhysicsMaterial2D", "ECS::Components::PhysicsMaterial2D",
             GetComponentIdFromHashOrWarn(kHashPhysicsMaterial2D, "PhysicsMaterial2D"), kHashPhysicsMaterial2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderPhysicsMaterial2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Friction", 0.5f}, {"Restitution", 0.0f}, {"PositionCorrectPercent", 0.2f}
             }; }),
@@ -896,7 +894,7 @@ static void _initializeDefaultRegistry() {
             "Circle Collider 2D", "CircleCollider2D", "ECS::Components::CircleCollider2D",
             GetComponentIdFromHashOrWarn(kHashCircleCollider2D, "CircleCollider2D"), kHashCircleCollider2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCircleCollider2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Radius", 0.5f},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -909,7 +907,7 @@ static void _initializeDefaultRegistry() {
             "Box Collider 2D", "BoxCollider2D", "ECS::Components::BoxCollider2D",
             GetComponentIdFromHashOrWarn(kHashBoxCollider2D, "BoxCollider2D"), kHashBoxCollider2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderBoxCollider2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -923,7 +921,7 @@ static void _initializeDefaultRegistry() {
             "Shape Circle", "ShapeCircle2D", "ECS::Components::ShapeCircle2D",
             GetComponentIdFromHashOrWarn(kHashShapeCircle2D, "ShapeCircle2D"), kHashShapeCircle2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeCircle2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Radius", 0.5f},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -937,7 +935,7 @@ static void _initializeDefaultRegistry() {
             "Shape Box", "ShapeBox2D", "ECS::Components::ShapeBox2D",
             GetComponentIdFromHashOrWarn(kHashShapeBox2D, "ShapeBox2D"), kHashShapeBox2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeBox2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -951,7 +949,7 @@ static void _initializeDefaultRegistry() {
             "Shape Line", "ShapeLine2D", "ECS::Components::ShapeLine2D",
             GetComponentIdFromHashOrWarn(kHashShapeLine2D, "ShapeLine2D"), kHashShapeLine2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeLine2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"A", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"B", {{"X", 1.0f}, {"Y", 0.0f}}},
@@ -965,7 +963,7 @@ static void _initializeDefaultRegistry() {
             "Light 2D", "Light2D", "ECS::Components::Light2D",
             GetComponentIdFromHashOrWarn(kHashLight2D, "Light2D"), kHashLight2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLight2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"LightType", 0},
                 {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
@@ -980,7 +978,7 @@ static void _initializeDefaultRegistry() {
             "Animation State 2D", "AnimationState2D", "ECS::Components::AnimationState2D",
             GetComponentIdFromHashOrWarn(kHashAnimationState2D, "AnimationState2D"), kHashAnimationState2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
             }; }),
@@ -991,7 +989,7 @@ static void _initializeDefaultRegistry() {
             "Audio Source", "AudioSource", "ECS::Components::AudioSource",
             GetComponentIdFromHashOrWarn(kHashAudioSource, "AudioSource"), kHashAudioSource, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "CueId", 0 },
                 { "CuePath", "" },
@@ -1016,7 +1014,7 @@ static void _initializeDefaultRegistry() {
             "Layer 2D", "Layer", "ECS::Components::Layer",
             GetComponentIdFromHashOrWarn(kHashLayer, "Layer"), kHashLayer, false, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Id", 0}}; }),
             COMPONENT_OPS_HASH(Layer, kHashLayer)
         },
@@ -1025,7 +1023,7 @@ static void _initializeDefaultRegistry() {
 			"Material 2D", "Material2D", "ECS::Components::Material2D",
 			GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"), kHashMaterial2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "NormalTextureId", 0 },
                 { "MRA_TextureId", 0 },
@@ -1118,7 +1116,7 @@ static void _initializeDefaultRegistry() {
             "GUI Canvas", "GUICanvas", "ECS::Components::GUICanvas",
             GetComponentIdFromHashOrWarn(kHashGUICanvas, "GUICanvas"), kHashGUICanvas, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUICanvas(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "ReferenceSize", {{"X", 1920.0f}, {"Y", 1080.0f}} },
                 { "Offset", {{"X", 0.0f}, {"Y", 0.0f}} },
@@ -1131,7 +1129,7 @@ static void _initializeDefaultRegistry() {
             "GUI Render Mode", "GUIRenderMode", "ECS::Components::GUIRenderMode",
             GetComponentIdFromHashOrWarn(kHashGUIRenderMode, "GUIRenderMode"), kHashGUIRenderMode, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIRenderMode(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Space", 0 }
             }; }),
@@ -1142,7 +1140,7 @@ static void _initializeDefaultRegistry() {
             "GUI Element", "GUIElement", "ECS::Components::GUIElement",
             GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"), kHashGUIElement, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIElement(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Position", {{"X", 0.0f}, {"Y", 0.0f}} },
                 { "Size", {{"X", 100.0f}, {"Y", 100.0f}} },
@@ -1161,7 +1159,7 @@ static void _initializeDefaultRegistry() {
             "GUI Panel", "GUIPanel", "ECS::Components::GUIPanel",
             GetComponentIdFromHashOrWarn(kHashGUIPanel, "GUIPanel"), kHashGUIPanel, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIPanel(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Color", {{"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f}} },
                 { "CornerRadius", 0.0f }
@@ -1173,7 +1171,7 @@ static void _initializeDefaultRegistry() {
             "GUI Text", "GUIText", "ECS::Components::GUIText",
             GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"), kHashGUIText, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIText(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Text", "Text" },
                 { "FontPath", "" },
@@ -1190,7 +1188,7 @@ static void _initializeDefaultRegistry() {
             "GUI State Style", "GUIStateStyle", "ECS::Components::GUIStateStyle",
             GetComponentIdFromHashOrWarn(kHashGUIStateStyle, "GUIStateStyle"), kHashGUIStateStyle, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIStateStyle(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "NormalColor", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
                 { "HoverColor", {{"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f}} },
@@ -1204,7 +1202,7 @@ static void _initializeDefaultRegistry() {
             "GUI Image", "GUIImage", "ECS::Components::GUIImage",
             GetComponentIdFromHashOrWarn(kHashGUIImage, "GUIImage"), kHashGUIImage, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIImage(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "TexturePath", "" },
                 { "Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}} },
@@ -1221,7 +1219,7 @@ static void _initializeDefaultRegistry() {
             "GUI Input", "GUIInput", "ECS::Components::GUIInput",
             GetComponentIdFromHashOrWarn(kHashGUIInput, "GUIInput"), kHashGUIInput, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIInput(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Hovered", false },
                 { "Pressed", false },
@@ -1238,7 +1236,7 @@ static void _initializeDefaultRegistry() {
             "GUI Button", "GUIButton", "ECS::Components::GUIButton",
             GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"), kHashGUIButton, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUIButton(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Text", "Button" },
                 { "FontPath", "" },
@@ -1261,7 +1259,7 @@ static void _initializeDefaultRegistry() {
             "GUI Slider", "GUISlider", "ECS::Components::GUISlider",
             GetComponentIdFromHashOrWarn(kHashGUISlider, "GUISlider"), kHashGUISlider, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGUISlider(d, e, w); }),
-            // Serialize component JSON.
+            // Serialize component JSON
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "Value", 0.0f },
                 { "Min", 0.0f },
@@ -1282,8 +1280,8 @@ static void _initializeDefaultRegistry() {
     };
 }
 
-// Rebuild the editor registry from the native ECS registry
-// For managed components discovered after startup, add them with generic operations
+// Rebuilds editor metadata from native ECS registry and adds dynamic managed-component entries
+// Keeps built-in C++ entries and refreshes non-built-in entries so managed changes appear without restart
 void ComponentRegistryUI::RebuildFromNativeRegistry() {
     std::lock_guard<std::mutex> lock(s_registryLock);
     
@@ -1310,6 +1308,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
     // Add C++ components that aren't hardcoded
     int newComponentsFound = 0;
     for (ECS::ComponentTypeId id : allIds) {
+        // Pull immutable registry metadata once so all decisions use the same snapshot for this component
         const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
         
         // Skip invalid/uninitialized entries (hash 0x0 is impossible for real components)
@@ -1318,17 +1317,21 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         }
         
         // Check if this component is already in our registry by comparing hash or ComponentTypeId
-        // Also update builtin entries that were initialized before the native registry was ready.
+        // Also update builtin entries that were initialized before the native registry was ready
         bool alreadyExists = false;
         for (auto& meta : s_registry) {
+            // TypeHash match is the strongest identity check across reloads because IDs can be reassigned
             if (meta.TypeHash != 0 && meta.TypeHash == nativeMeta.TypeHash) {
                 if (meta.ComponentId != id) {
+                    // Keep cached component ID in sync so add, remove, and apply callbacks hit the current runtime slot
                     meta.ComponentId = id;
                     LOG_DEBUG("[EditorComponentRegistry] Updated component ID for hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << " to ID " << id);
                 }
                 alreadyExists = true;
                 break;
             }
+
+            // ComponentId match covers entries that may not have a valid hash yet but are still already registered
             if (meta.ComponentId == id) {
                 alreadyExists = true;
                 break;
@@ -1344,7 +1347,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             continue;
         }
 
-        // This is a new managed component - add it with generic operations
+        // This is a new managed component; add it with generic operations
         LOG_DEBUG("[EditorComponentRegistry] Found new managed component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
         newComponentsFound++;
         
@@ -1374,11 +1377,13 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         }
         
         // Create generic operations for managed components
+        // Presence check is fully ID-driven because managed components do not have native C++ type wrappers here
         auto hasComponentFunc = [id](ECS::World* w, ECS::Entity e) {
             if (!w) return false;
             return w->HasById(e, id);
         };
         
+        // Add path allocates zeroed storage sized from native metadata so managed runtime can populate fields later
         auto addComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
             (void)data; // Unused parameter
             
@@ -1388,6 +1393,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             }
             const auto& meta = ECS::ComponentRegistry::Meta(id);
             if (meta.Size == 0) {
+                // Zero-sized metadata means the native registry entry is incomplete or invalid for allocation
                 LOG_WARNING("[EditorComponentRegistry] Component ID " << id << " has zero size");
                 return;
             }
@@ -1403,16 +1409,20 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
                 if (!w->HasById(e, id)) {
                     LOG_ERROR("[EditorComponentRegistry] ERROR: Component was added but HasComponent check failed!");
                 }
-            } else {
+            }
+            else {
                 LOG_ERROR("[EditorComponentRegistry] AddComponentById returned null for component ID " << id);
             }
         };
         
+        // Remove path mirrors add path and only needs ID lookup because runtime owns layout details
         auto removeComponentFunc = [id](ECS::World* w, ECS::Entity e) {
             if (!w) return;
             w->RemoveById(e, id);
         };
         
+        // Applies editor JSON into managed runtime component memory through the managed deserializer callback
+        // This keeps the editor side generic while managed code owns field-level conversion logic
         auto applyComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
             if (!w) return;
             
@@ -1421,6 +1431,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             
             // If component doesn't exist, add it first
             if (!componentPtr) {
+                // Allocate zeroed memory first so managed deserialization can fill only known fields safely
                 std::vector<uint8_t> buffer(meta.Size, 0);
                 w->AddComponentById(e, id, buffer.data(), meta.Size);
                 componentPtr = w->GetRawComponentPtr(e, id);
@@ -1437,6 +1448,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             // Call the managed deserializer to populate component fields from JSON
             // Pass the type hash (not the component ID) so C# can look up the type
             if (s_deserializeComponentCallback) {
+                // Callback writes directly into native-managed shared memory block pointed to by componentPtr
                 s_deserializeComponentCallback(meta.TypeHash, componentPtr, static_cast<int>(meta.Size), jsonStr.c_str());
                 // LOG_INFO("[EditorComponentRegistry] Applied managed component (ID " << id << ", hash 0x" << std::hex << meta.TypeHash << std::dec << ") from JSON data");
             }
@@ -1446,9 +1458,12 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         };
         
         // Add to registry with generic renderer (or specialized overrides)
+        // Default managed renderer falls back to generic JSON widget path until a specialized editor exists
         auto renderFunc = static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>(
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }
         );
+
+        // Default managed payload starts as an empty object and grows as managed side defines fields
         auto defaultFunc = static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); });
 
         s_registry.emplace_back(
@@ -1473,7 +1488,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
     LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry complete: Found " << newComponentsFound << " new managed components. Total in editor registry = " << s_registry.size());
 }
 
-// Returns the full component metadata list (C++ + managed components)
+// Returns complete editor metadata list including built-in and dynamically discovered managed components
 const std::vector<ComponentUIMetadata>& ComponentRegistryUI::GetAll() {
     std::lock_guard<std::mutex> lock(s_registryLock);
     
@@ -1485,7 +1500,7 @@ const std::vector<ComponentUIMetadata>& ComponentRegistryUI::GetAll() {
     return s_registry;
 }
 
-// Finds a single component type using either its short or full type name
+// Finds metadata by matching either short type name or fully qualified type name
 const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName) {
     std::lock_guard<std::mutex> lock(s_registryLock);
     
@@ -1494,6 +1509,5 @@ const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName
             return &meta;
         }
     }
-    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'. Registry has " << s_registry.size() << " components.");
     return nullptr;
 }

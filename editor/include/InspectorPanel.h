@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   InspectorPanel.h
-\author Foo Rui Qin    (80%)
+\author Foo Rui Qin (80%)
         Samantha Leong (20%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
