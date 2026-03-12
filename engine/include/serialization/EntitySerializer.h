@@ -1139,7 +1139,8 @@ namespace Serialization {
                     return a.second.Name < b.second.Name;
                 });
 
-            // Serialize all registered C++ components
+            // Serialize deterministic C++ components first (ordered list above keeps
+            // output stable for diffs and editor workflows).
             for (const auto& [tid, info] : sortedComponents) {
                 json compJson;
                 info.Serialize(world, e, compJson);
@@ -1187,7 +1188,10 @@ namespace Serialization {
                 // Log that we're serializing a discovered managed component
                 // LOG_INFO("[EntitySerializer] Entity " << e.Index << " has managed component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
 
-                // Try to get per-entity serialized JSON from managed serializer
+                // Ask managed host to serialize this component instance using hash-based
+                // dispatch, then stitch the payload into the native entity JSON.
+                // If parsing fails, keep component presence with an empty object so round-trip
+                // does not silently drop the component entry.
                 const char* jsonPtr = WorldInterop_SerializeComponentToJson((void*)&world, ECS::EntityUtils::Pack(e), nativeMeta.TypeHash);
                 if (jsonPtr) {
                     try {
@@ -1245,6 +1249,7 @@ namespace Serialization {
                     // If not found in C++ registry, try to add as managed component
                     if (!found) {
                         // Attempt to look up by name in native registry (managed components)
+                        // because managed types are discovered dynamically at runtime.
                         auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
                         for (ECS::ComponentTypeId id : allIds) {
                             const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
@@ -1252,6 +1257,7 @@ namespace Serialization {
                             std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
                             if (nativeName == typeName || nativeName == normalizedTypeName) {
                                 // Found the managed component by name, add it with zero-initialized data
+                                // first, then let managed side patch fields from JSON.
                                 std::vector<uint8_t> buffer(nativeMeta.Size, 0);
                                 void* ptr = world.AddComponentById(e, id, buffer.data(), nativeMeta.Size);
                                 if (ptr) {
@@ -1272,6 +1278,8 @@ namespace Serialization {
                     }
 
                     if (!found) {
+                        // Keep loading resilient: unknown components are logged and skipped
+                        // so the remainder of the entity can still deserialize.
                         LOG_WARNING("[EntitySerializer] Component '" << typeName << "' not found during deserialization (not in C++ or managed registry)");
                     }
                 }
@@ -1283,6 +1291,7 @@ namespace Serialization {
 
             if (!world.Has<ECS::Components::WorldTransform>(e)) {
                 ECS::Components::WorldTransform wt{};
+                // Force one transform recompute after load so renderer gets valid world matrix.
                 wt.Dirty = true;
                 world.Set<ECS::Components::WorldTransform>(e, wt);
             }

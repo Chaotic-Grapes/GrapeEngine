@@ -168,6 +168,8 @@ void ScriptsCompiler::Update() {
     switch (state) {
         case HotReloadState::ScriptsChanged:
         {
+            // Edge-triggered transition: once scripts change, spin up one orchestrator thread
+            // and move the state machine into "CompilingScripts".
             {
                 std::lock_guard<std::mutex> lock(m_stateMutex);
                 m_hotReloadState = HotReloadState::CompilingScripts;
@@ -232,7 +234,8 @@ void ScriptsCompiler::_doLoadAndRegisterSystems(const std::string& assemblyPath)
 
     ECS::World* targetWorld = _getTargetWorld();
 
-    // Clear C# components from entities before registering new systems
+    // Clear existing managed components before re-registering systems so stale
+    // type layouts from previous assemblies are not reused.
     auto clearComponentsFunc = m_scriptManager->GetClearAllManagedComponentsFunc();
     if (clearComponentsFunc) {
         clearComponentsFunc(targetWorld);
@@ -263,7 +266,8 @@ bool ScriptsCompiler::_doMoveCompiledAssemblyWithRetry(const std::string& tempPa
             return false;
         }
         
-        // Remove old final DLL with retries (may be held by CoreCLR finalizers)
+        // Remove old final DLL/PDB first, then move temp output into place.
+        // Retries handle transient file locks while CoreCLR finalizers release handles.
         int attempt = 0;
         while ((std::filesystem::exists(finalDllPath) || std::filesystem::exists(finalPdbPath)) && attempt < maxRetries) {
             try {
@@ -290,7 +294,7 @@ bool ScriptsCompiler::_doMoveCompiledAssemblyWithRetry(const std::string& tempPa
             }
         }
         
-        // Move temp to final with retries
+        // Move temp to final with the same retry/backoff strategy.
         attempt = 0;
         while (attempt < maxRetries) {
             try {
@@ -366,7 +370,8 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
         m_scriptManager->SetCompileStatus(2, 50, "Compiled successfully, unloading...");
         LOG_INFO("[ScriptsCompiler] Hot reload: compilation successful to temp: " << tempOutput);
         
-        // Step 2: Signal main thread to unload assembly and move temp->final
+        // Step 2: Main thread owns unload/load because CoreCLR host interactions are
+        // not thread-safe for this path in our integration.
         {
             std::lock_guard<std::mutex> lock(m_stateMutex);
             m_pendingScriptsOutput = finalOutput;      // Final path for loading
@@ -375,7 +380,7 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
         }
         m_stateChanged.notify_one();
         
-        // Step 3: Wait for main thread to unload and move file, then transition to LoadingAssembly
+        // Step 3: Wait until main thread confirms we can proceed to LoadingAssembly.
         {
             std::unique_lock<std::mutex> lock(m_stateMutex);
             m_stateChanged.wait(lock, [this]() {
@@ -383,6 +388,7 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
                     || m_hotReloadState == HotReloadState::Failed
                     || m_shutdownRequested.load();
             });
+            // Background thread exits silently on shutdown/failure; main thread owns final state.
             if (m_shutdownRequested.load()) return;
             if (m_hotReloadState == HotReloadState::Failed) return;
         }
@@ -412,11 +418,8 @@ void ScriptsCompiler::_mainThreadUnload() {
         LOG_INFO("[ScriptsCompiler] Set current world for hot reload");
     }
 
-    // Unload assembly:
-    // This must be done on the main thread due to CoreCLR constraints
-    // If unload fails, transition to Failed state
-    // After unload, move the compiled assembly to final location
-    // Then transition to LoadingAssembly state
+    // Main-thread critical section: unload old assembly, force GC to release file locks,
+    // atomically swap temp output into final path, then signal LoadingAssembly.
     if (!m_scriptManager->UnloadScriptAssembly()) {
         std::lock_guard<std::mutex> lock(m_stateMutex);
         m_hotReloadState = HotReloadState::Failed;
@@ -458,11 +461,11 @@ void ScriptsCompiler::_mainThreadLoad() {
 
     ECS::World* targetWorld = _getTargetWorld();
 
-    // 1. Unregister old systems
+    // 1) Unregister old systems so type handles/instances from prior assembly are dropped.
     m_engine->GetSystemManager().UnregisterScriptedSystems(*targetWorld);
     LOG_INFO("[ScriptsCompiler] Unregistered old scripted systems");
 
-    // 2. Load new assembly
+    // 2) Load new assembly from final output path.
     if (!m_scriptManager->LoadAssembly(m_pendingScriptsOutput)) {
         std::lock_guard<std::mutex> lock(m_stateMutex);
         m_hotReloadState = HotReloadState::Failed;
@@ -474,7 +477,7 @@ void ScriptsCompiler::_mainThreadLoad() {
 
     LOG_INFO("[ScriptsCompiler] Loaded new script assembly");
 
-    // 3. Register new systems
+    // 3) Register fresh scripted systems discovered in the new assembly.
     int count = m_scriptManager->RegisterScriptedSystems(
         m_engine->GetSystemManager(), targetWorld);
 
@@ -482,7 +485,7 @@ void ScriptsCompiler::_mainThreadLoad() {
 
     m_registryRebuildPending.store(true);
 
-    // 5. Final transition (main thread only)
+    // 4) Final state transition back to idle.
     {
         std::lock_guard<std::mutex> lock(m_stateMutex);
         m_hotReloadState = HotReloadState::Idle;
@@ -497,6 +500,7 @@ void ScriptsCompiler::Shutdown() {
     m_stateChanged.notify_all();
     
     try {
+        // Join all worker threads to guarantee no callbacks race after shutdown.
         if (m_initialCompileThread.joinable()) m_initialCompileThread.join();
         if (m_hotReloadThread.joinable()) m_hotReloadThread.join();
     } catch (...) {}

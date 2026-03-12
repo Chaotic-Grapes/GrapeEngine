@@ -214,6 +214,8 @@ namespace Platform {
         }
 
         if (!m_windowedValid) {
+            // If no prior placement exists, synthesize a centered windowed fallback
+            // based on the current monitor work area.
             GLFWmonitor* monitor = _getCurrentMonitor();
             if (!monitor) {
                 return;
@@ -271,7 +273,7 @@ namespace Platform {
         }
 
         if (monitorIndex == m_borderlessLockedMonitorIndex) {
-            // Already locked to this monitor; skip redundant snap.
+            // Prevent repeated callbacks from reapplying the same monitor snap.
             return;
         }
 
@@ -292,7 +294,7 @@ namespace Platform {
         }
 
         m_borderlessLockInProgress = true;
-        // Enforce borderless, monitor-sized window without switching to exclusive fullscreen.
+        // Keep borderless in windowed-monitor mode (monitor=nullptr), not exclusive fullscreen.
         glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
         glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY,
                              mode->width, mode->height, 0);
@@ -313,6 +315,7 @@ namespace Platform {
 
         if (borderless) {
             if (!HasFlag(m_mode, WindowMode::Borderless)) {
+                // Preserve windowed placement so exiting borderless can restore prior bounds.
                 _storeWindowedPlacement();
             }
             _lockBorderlessToMonitor();
@@ -466,6 +469,8 @@ namespace Platform {
             return;
         }
 
+        // Mode precedence: exclusive fullscreen first, then borderless windowed,
+        // otherwise standard decorated windowed mode.
         if (HasFlag(mode, WindowMode::Fullscreen)) {
             SetFullscreen(true);
             return;
@@ -536,6 +541,7 @@ namespace Platform {
         }
 
         if (HasFlag(m_mode, WindowMode::Fullscreen) && !HasFlag(m_mode, WindowMode::Borderless)) {
+            // Exclusive fullscreen applies monitor mode directly.
             GLFWmonitor* monitor = glfwGetWindowMonitor(m_windowHandle);
             if (!monitor) {
                 monitor = _getCurrentMonitor();
@@ -546,6 +552,7 @@ namespace Platform {
             m_width = mode.Width;
             m_height = mode.Height;
         } else {
+            // Windowed/borderless just resizes the window and updates cached placement.
             glfwSetWindowSize(m_windowHandle, mode.Width, mode.Height);
             m_width = mode.Width;
             m_height = mode.Height;
@@ -569,6 +576,7 @@ namespace Platform {
         }
 
         if (monitorIndex < 0) {
+            // Negative index is the explicit request to return from fullscreen to windowed.
             if (!HasFlag(m_mode, WindowMode::Fullscreen)) {
                 LOG_INFO("Already in windowed mode");
                 return true;
