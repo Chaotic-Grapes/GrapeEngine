@@ -1363,33 +1363,6 @@ namespace Serialization {
 
             return entity;
         }
-
-        // Save an entity as a prefab payload
-        // Disabled reference implementation retained for future reactivation
-
-        /* 
-        static bool SavePrefab(const std::string& filename, const ECS::World& world, const ECS::Entity e) {
-            json j = SerializeEntity(world, e);
-            return Serializer::SaveJson(filename, "prefab", j);
-        }
-        */
-
-        // Load a prefab payload and instantiate it into the given world
-        // Disabled reference implementation retained for future reactivation
-
-        /*
-        static bool LoadPrefab(const std::string& filename, ECS::World& world, ECS::Entity* outEntity = nullptr) {
-            json j;
-            if (!Serializer::LoadJson(filename, "prefab", j))
-                return false;
-
-            ECS::Entity e = DeserializeEntity(world, j);
-            if (outEntity)
-                *outEntity = e;
-
-            return true;
-        }
-        */
     };
 
     // Register all component serializers
