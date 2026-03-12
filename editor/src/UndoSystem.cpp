@@ -1033,29 +1033,43 @@ namespace Editor {
         m_activePropertyEdits.erase(it);
     }
 
+    /**
+    * @brief Begins a batch property edit for multiple entities.
+    * Captures the current value of a specific component property for each entity
+    * so it can be used as the "before" state when generating undo commands.
+    *
+    * @param entities Set of entity IDs whose component property will be edited.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property inside the component (e.g. "Position.X").
+    */
     void UndoSystem::BeginBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath) {
-        if (!m_world) return;
+        if (!m_world) return; // Ensure the world context exists before continuing
 
         // Resolve component short name from registry so we can locate JSON data in the serialized entity.
         const auto& metaInfo = ECS::ComponentRegistry::Meta(componentId);
         const std::string compShortName = ECS::ComponentRegistry::GetComponentNameFromHash(metaInfo.TypeHash);
-        if (compShortName.empty()) {
+        if (compShortName.empty()) { // If the component name cannot be resolved, abort
             return;
         }
 
         // Fetch current value for each entity to store as the "before" state
         for (EntityId id : entities) {
-            ECS::Entity entity = m_world->Resolve(id);
-            if (!m_world->IsAlive(entity)) continue;
+            ECS::Entity entity = m_world->Resolve(id); // Resolve the runtime entity handle from its ID
+            if (!m_world->IsAlive(entity)) continue; // Skip entities that are no longer alive
 
+            // Serialize the entity into JSON so its components can be inspected
             nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
             nlohmann::json* componentData = nullptr;
 
+            // Locate the desired component within the serialized entity JSON
             if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
                 for (auto& comp : entityJson["Components"]) {
+                    // Ensure the component entry contains a valid type name
                     if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
                     std::string typeName = comp["TypeName"];
+                    // Match either the short name or fully-qualified name
                     if (typeName == compShortName || typeName == "ECS::Components::" + compShortName) {
+                        // Retrieve the component's data block
                         if (comp.contains("Data") && comp["Data"].is_object()) {
                             componentData = &comp["Data"];
                         }
@@ -1068,20 +1082,22 @@ namespace Editor {
             if (componentData) {
                 // Extract the specific property from the component JSON
                 // propertyPath is like "Position.X"
-                propertyVal = *componentData;
+                propertyVal = *componentData; // Start from the component's JSON data
                 size_t start = 0;
                 size_t end = propertyPath.find('.');
                 while (end != std::string::npos) {
                     std::string part = propertyPath.substr(start, end - start);
+                    // Traverse the JSON hierarchy
                     if (propertyVal.is_object() && propertyVal.contains(part)) {
                         propertyVal = propertyVal[part];
                     } else {
-                        propertyVal = nlohmann::json();
+                        propertyVal = nlohmann::json(); // Invalid path segment
                         break;
                     }
                     start = end + 1;
                     end = propertyPath.find('.', start);
                 }
+                // Resolve the final property in the path
                 if (!propertyVal.is_null()) {
                     std::string lastPart = propertyPath.substr(start);
                     if (propertyVal.is_object() && propertyVal.contains(lastPart)) {
@@ -1091,34 +1107,46 @@ namespace Editor {
                     }
                 }
             } else {
-                propertyVal = nlohmann::json();
+                propertyVal = nlohmann::json(); // Component was not found; store an empty value
             }
 
-            BeginPropertyEdit(id, componentId, propertyPath, propertyVal);
+            BeginPropertyEdit(id, componentId, propertyPath, propertyVal); // Store the captured property value as the starting state
         }
     }
 
+    /**
+    * @brief Ends a batch property edit and creates a single undo command.
+    * Compares stored original values with the final value and records
+    * all changes into a batch undo command.
+    *
+    * @param entities Set of entity IDs affected by the edit.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property inside the component.
+    * @param newValue The updated value of the property after editing.
+    * @param applyFn Function used to apply the property during undo/redo operations.
+    */
     void UndoSystem::EndBatchPropertyEdit(const std::unordered_set<EntityId>& entities, ECS::ComponentTypeId componentId, const std::string& propertyPath, const nlohmann::json& newValue,
         ComponentPropertyCommand::ApplyFn applyFn) {
-        if (!m_world || !applyFn) return;
+        if (!m_world || !applyFn) return; // Ensure required systems and callbacks are valid
 
         std::vector<BatchComponentPropertyCommand::Entry> entries;
-        for (EntityId id : entities) {
+        for (EntityId id : entities) { // Iterate through entities to determine which values actually changed
             PropertyKey key{ id, componentId, propertyPath };
             auto it = m_activePropertyEdits.find(key);
             if (it == m_activePropertyEdits.end()) continue;
 
             const nlohmann::json& oldVal = it->second;
+            // Skip recording if the value did not change
             if (JsonApproxEqual(oldVal, newValue)) {
                 m_activePropertyEdits.erase(it);
                 continue;
             }
 
-            entries.push_back({ id, oldVal, newValue });
-            m_activePropertyEdits.erase(it);
+            entries.push_back({ id, oldVal, newValue }); // Store the change entry
+            m_activePropertyEdits.erase(it); // Remove the active edit record
         }
 
-        if (!entries.empty()) {
+        if (!entries.empty()) { // If any entities changed, generate a batch undo command
             auto cmd = std::make_unique<BatchComponentPropertyCommand>(
                 m_world, componentId, propertyPath, std::move(entries), std::move(applyFn)
             );
@@ -1126,19 +1154,36 @@ namespace Editor {
         }
     }
 
+    /**
+    * @brief Records a property change for a single entity.
+    * Generates an undoable command if the old and new values differ.
+    *
+    * @param entityId ID of the entity whose property changed.
+    * @param componentId Identifier of the component containing the property.
+    * @param propertyPath Dot-separated path to the property.
+    * @param oldValue Previous value of the property.
+    * @param newValue Updated value of the property.
+    * @param applyFn Function used to apply the property during undo/redo.
+    */
     void UndoSystem::RecordPropertyChange(EntityId entityId, ECS::ComponentTypeId componentId, const std::string& propertyPath,
         const nlohmann::json& oldValue, const nlohmann::json& newValue, ComponentPropertyCommand::ApplyFn applyFn) {
-        if (!m_world) return;
-        if (JsonApproxEqual(oldValue, newValue)) return;
-        auto cmd = std::make_unique<ComponentPropertyCommand>(
+        if (!m_world) return; // Ensure the world exists
+        if (JsonApproxEqual(oldValue, newValue)) return; // Ignore if the value has not changed
+        auto cmd = std::make_unique<ComponentPropertyCommand>( // Create a command representing this property modification
             m_world, entityId, componentId, propertyPath, oldValue, newValue, std::move(applyFn)
         );
-        ExecuteCommand(std::move(cmd));
+        ExecuteCommand(std::move(cmd)); // Execute and register the command with the undo system
     }
 
+    /**
+    * @brief Consumes the property edit emission flag.
+    * Returns whether a property edit event was emitted and resets the flag.
+    *
+    * @return True if a property edit event occurred since the last call.
+    */
     bool UndoSystem::ConsumePropertyEditEmission() {
         bool was = m_propertyEditEmitted;
-        m_propertyEditEmitted = false;
+        m_propertyEditEmitted = false;     // Reset the emission flag
         return was;
     }
 
