@@ -41,7 +41,7 @@ echo.
 set /p choice=Enter your choice (1-6): 
 
 if "%choice%"=="1" (
-    call script_clean.bat pause
+    call clean.bat pause
     goto MENU
 )
 
@@ -100,13 +100,13 @@ if "%echoice%"=="4" (
     goto EDITOR_MENU
 )
 if "%echoice%"=="5" (
-    call script_clean.bat
+    call clean.bat
     call script_build_editor.bat Debug
     call script_run_editor.bat Debug
     goto EDITOR_MENU
 )
 if "%echoice%"=="6" (
-    call script_clean.bat
+    call clean.bat
     call script_build_editor.bat Release
     call script_run_editor.bat Release
     goto EDITOR_MENU
@@ -153,13 +153,13 @@ if "%gchoice%"=="4" (
     goto GAME_MENU
 )
 if "%gchoice%"=="5" (
-    call script_clean.bat
+    call clean.bat
     call script_build_game.bat Debug
     call script_run_game.bat Debug
     goto GAME_MENU
 )
 if "%gchoice%"=="6" (
-    call script_clean.bat
+    call clean.bat
     call script_build_game.bat Release
     call script_run_game.bat Release
     goto GAME_MENU

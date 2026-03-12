@@ -13,7 +13,8 @@
 #include <fmod_dsp_effects.h>
 
 namespace {
-    constexpr float kMinBusLowPassCutoffHz = 500.0f;
+    // Allow near-maximum LPF effect at gain 0.0f.
+    constexpr float kMinBusLowPassCutoffHz = 20.0f;
     constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
 
     // Log FMOD errors and return success/failure.

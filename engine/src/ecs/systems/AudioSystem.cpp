@@ -4,14 +4,19 @@
 \author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
-Implements the AudioSystem which manages audio playback in the ECS framework.
+Implements the AudioSystem that manages ECS-driven audio playback.
 
 Responsibilities:
-- Process entities with AudioSource component
-- Resolve CueId to audio file paths
-- Manage audio playback lifecycle (start/stop/update)
-- Handle 3D spatial audio positioning
+- Process entities with AudioSource components
+- Resolve CueId/CuePathId to audio cue paths
+- Manage playback lifecycle (start/stop/update/cleanup)
+- Apply per-instance runtime parameters (volume, pitch, pan, low-pass)
+- Handle 3D spatial audio positioning updates
+- support low pass filter effects for damage muffle
+- Support PlayOnStart gating and one-shot tracking
 - Support PlayOnStart functionality
+- Coordinate fade-in/fade-out and scene transition behavior
+- Route playback through audio buses
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
