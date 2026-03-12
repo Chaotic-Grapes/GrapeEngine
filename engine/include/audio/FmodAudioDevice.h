@@ -20,10 +20,12 @@
 * @dependencies
 * - <fmod.hpp>, <unordered_map>, <string>, and Audio::SoundTypes
 * 
-* Copyright (C) 2025 DigiPen Institute of Technology.
-* Reproduction or disclosure of this file or its contents without the
-* 
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
+/* End Header *******************************************************************/
+
 
 #ifndef FMODAUDIODEVICE_H
 #define FMODAUDIODEVICE_H

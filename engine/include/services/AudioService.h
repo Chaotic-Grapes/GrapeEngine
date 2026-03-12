@@ -19,9 +19,11 @@
 * - audio/FmodAudioDevice.h : concrete FMOD-backed audio device
 * - <memory> : unique ownership of the device instance
 * 
-* Copyright (C) 2025 DigiPen Institute of Technology.
-* Reproduction or disclosure of this file or its contents without the
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
+/* End Header *******************************************************************/
 
 #ifndef AUDIOSERVICE_H
 #define AUDIOSERVICE_H
@@ -62,9 +64,8 @@ namespace Services {
 		void Terminate() override;
 
 
-		// -----------------------------------------------------------------
 		// Device accessors
-		// -----------------------------------------------------------------
+
 
 
 		// Raw device pointer for read-only use by advanced clients
@@ -82,9 +83,8 @@ namespace Services {
 		const Audio::AudioCueRegistry& CueRegistry() const { return m_cueRegistry; }
 
 
-		// -----------------------------------------------------------------
 		// Convenience pass-throughs (most callers do not need raw device)
-		// -----------------------------------------------------------------
+	
 
 
 		// Load (or reuse) a cue by id and file path
@@ -114,9 +114,9 @@ namespace Services {
 		float GetBusLowPassGain(Audio::Bus bus) const { return m_engine ? m_engine->GetBusLowPassGain(bus) : 1.0f; }
 
 
-		// -----------------------------------------------------------------
+
 		// Device Management
-		// -----------------------------------------------------------------
+
 
 		/**
 		 * @brief Get list of available output audio devices

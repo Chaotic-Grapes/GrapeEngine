@@ -34,12 +34,6 @@ overall optimise collision checks to a low amount
 making this a systematic autonomous approach to collision
 systems
 
-\dependencies
-- ecs/systems/PhysicsSystem.h, services/Time.h
-- physics/Collision.h, physics/Physics.h, ecs/Components.h
-- helpers/MathUtils.h, helpers/EntityUtils.h
-- <unordered_map>, <unordered_set>, <vector>, <cmath>, <algorithm>, <iostream>
-
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
