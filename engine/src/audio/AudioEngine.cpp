@@ -37,7 +37,7 @@ namespace Audio {
             return {};
         }
 
-        PlaybackHandle handle = m_device->Play(cueId, settings);
+        PlaybackHandle handle = m_device->Play(cueId, settings, bus);
         if (!handle) {
             return {};
         }
@@ -59,7 +59,7 @@ namespace Audio {
             return {};
         }
 
-        PlaybackHandle handle = m_device->PlaySingle(cueId, settings, policy);
+        PlaybackHandle handle = m_device->PlaySingle(cueId, settings, policy, bus);
         if (!handle) {
             return {};
         }
