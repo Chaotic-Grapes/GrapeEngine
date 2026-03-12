@@ -4,7 +4,11 @@
  * @file   AudioEngine.h
  *
  * @brief  High-level audio runtime for mixing, fades, and policy.
- */
+ Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #ifndef AUDIO_ENGINE_H
 #define AUDIO_ENGINE_H
