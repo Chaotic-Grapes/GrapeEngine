@@ -1,9 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file    PrefabManager.cpp
-\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\author  Muhammad Nur Fadzly Bin Zulkifli (98%)
 \par     muhammadnurfadzly.b@digipen.edu
-\author  Samantha Leong Sher Yen
+\author  Samantha Leong Sher Yen (2%)
 \par     s.leong@digipen.edu
 \par     
 \brief

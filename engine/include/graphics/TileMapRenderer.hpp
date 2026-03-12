@@ -1,9 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileMapRenderer.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (50%)
 \date   31st January 2026
-\author Samantha Leong
+\author Samantha Leong (50%)
 \par    s.leong@digipen.edu
 \date   3rd February 2026
 \brief

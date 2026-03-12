@@ -1,7 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileMapRenderer.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (90%)
+\author Samantha Leong (10%)
+\par    s.leong@digipen.edu
 \date   31st October 2025
 \brief
 Implementation of the TileMapRenderer, responsible for submitting tilemap

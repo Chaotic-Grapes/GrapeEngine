@@ -1,7 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileMap.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (92%)
+\author Samantha Leong (8%)
+\par    s.leong@digipen.edu
 \date   31st January 2026
 \brief
 Implementation of the TileMap class, providing tile-layer management,
@@ -10,7 +12,7 @@ coordinate conversion, dynamic resizing, and binary serialization.
 Details:
 This file implements the core logic for managing tile-based world data.
 It handles layer creation and resizing, signed tile-space origins, safe
-tile access and mutation, world–tile coordinate conversions, and dynamic
+tile access and mutation, worldï¿½tile coordinate conversions, and dynamic
 expansion of layers to accommodate out-of-bounds edits.
 
 It also implements binary save/load support for tilemaps, including

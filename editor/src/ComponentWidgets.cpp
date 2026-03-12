@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentWidgets.cpp
-\author Foo Rui Qin (90%)
-        Samantha Leong (10%)
+\author Foo Rui Qin (53%)
+        Samantha Leong (47%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
 \date   12th March 2026

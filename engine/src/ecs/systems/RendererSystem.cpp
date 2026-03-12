@@ -1,7 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (98%)
+\author Samantha Leong (2%)
+\par    s.leong@digipen.edu
 \date   31st January 2026
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline
@@ -788,7 +790,7 @@ namespace ECS {
                         SubmitRuntimeTileMapEntity(entity);
                         SubmitDebugTileMapEntity(world, entity);
 
-                        // Boid flock entity — flush batch, draw instanced at correct Z
+                        // Boid flock entity ï¿½ flush batch, draw instanced at correct Z
                         if (world.Has<Components::BoidFlock>(entity)) {
                             m_renderer->endFrame();
 
@@ -2365,7 +2367,7 @@ namespace ECS {
                 SubmitRuntimeTileMapEntity(entity);
                 SubmitDebugTileMapEntity(world, entity);
 
-                // Boid flock entity — flush batch, draw instanced at correct Z
+                // Boid flock entity ï¿½ flush batch, draw instanced at correct Z
                 if (world.Has<Components::BoidFlock>(entity)) {
                     m_renderer->endFrame();
 

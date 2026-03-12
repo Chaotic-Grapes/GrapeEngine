@@ -1,7 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileSet.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (50%)
+\date   31st January 2026
+\author Samantha Leong (50%)
+\par    s.leong@digipen.edu
 \date   31st January 2026
 \brief
 Implementation of the Tileset class, which stores per-tile atlas UVs and
