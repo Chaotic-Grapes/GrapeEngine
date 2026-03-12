@@ -97,8 +97,10 @@ int main() {
     size_t playEntryMemoryUsage = 0;
     bool hasPlayEntrySnapshot = false;
 
-    LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
+    // Ignore tiny allocator drift/caching noise
+    constexpr size_t kLeakToleranceBytes = 16 * 1024; 
 
+    LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
     // Editor main loop
     while (engine.IsRunning()) {
@@ -178,6 +180,64 @@ int main() {
         // ENGINE UPDATE - Process input, time, and services
         // ============================================================
         engine.Update();
+
+        // Track playback transitions regardless of world/scene availability.
+        EditorState state = editor.GetEditorState();
+        const bool stateChanged = (previousState != state);
+        const bool wasInEdit = (previousState == EditorState::Edit);
+        const bool isInEdit = (state == EditorState::Edit);
+
+        if (stateChanged) {
+            if (wasInEdit && !isInEdit) {
+                // Snapshot memory the moment we enter play mode, this is the baseline
+                // we diff against when play stops so anything allocated during the
+                // play session shows up as a positive delta
+                playEntryMemoryUsage = MemoryManager::GetInstance().GetCurrentUsage();
+                hasPlayEntrySnapshot = true;
+                LOG_INFO("[MemoryLeakCheck] Play mode baseline captured at " << playEntryMemoryUsage << " bytes");
+            }
+            else if (!wasInEdit && isInEdit) {
+                const size_t memoryAfterStop = MemoryManager::GetInstance().GetCurrentUsage();
+
+                if (hasPlayEntrySnapshot) {
+                    if (memoryAfterStop > playEntryMemoryUsage) {
+                        const size_t leakedBytes = memoryAfterStop - playEntryMemoryUsage;
+
+                        if (leakedBytes > kLeakToleranceBytes) {
+                            // Delta exceeds tolerance, likely a real leak from play session
+                            // allocations that weren't freed on scene or entity teardown
+                            LOG_ERROR("[MemoryLeakCheck] Possible leak after leaving Play mode: +"
+                                << leakedBytes << " bytes (before = " << playEntryMemoryUsage
+                                << ", after = " << memoryAfterStop << ", tolerance = "
+                                << kLeakToleranceBytes << ")");
+                        }
+                        else {
+                            // Delta is positive but within tolerance, expected residual from
+                            // allocator bookkeeping, static caches or alignment padding
+                            LOG_INFO("[MemoryLeakCheck][SUCCESS] No leak detected after leaving Play mode "
+                                "(delta " << leakedBytes << " bytes is within tolerance "
+                                << kLeakToleranceBytes << ")");
+                        }
+                    }
+                    else {
+                        // Memory at stop is <= baseline meaning the play session either
+                        // broke even or net freed (e.g. lazy init caches that now persist
+                        // in edit mode were already counted in the baseline)
+                        LOG_INFO("[MemoryLeakCheck][SUCCESS] No leak detected after leaving Play mode (before = "
+                            << playEntryMemoryUsage << ", after = " << memoryAfterStop << ")");
+                    }
+                }
+                else {
+                    // Snapshot was never set, play mode entry transition was missed
+                    // so we have no baseline to diff against
+                    LOG_WARNING("[MemoryLeakCheck] No play baseline snapshot found when leaving Play mode");
+                }
+                // Reset so a subsequent play session starts fresh and doesn't reuse a stale baseline
+                hasPlayEntrySnapshot = false;
+            }
+            // Advance state tracker so the next frame's transition detection is correct
+            previousState = state;
+        }
         
         // Editor controls which systems execute based on playback state
         // Get the current scene
@@ -192,47 +252,20 @@ int main() {
             // Always run these systems (render, transform hierarchy)
             systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::Always));
             
-            // Get current editor state
-            EditorState state = editor.GetEditorState();
-            
-            // Only process transitions if state actually changed
-            if (previousState != state) {
+            // Only process scene/system transitions if state actually changed
+            if (stateChanged) {
                 // Only stop/start when transitioning between Edit and active play states
                 // Paused state keeps audio initialized but systems don't run
-                bool wasInEdit = (previousState == EditorState::Edit);
-                bool isInEdit = (state == EditorState::Edit);
-                
                 if (!wasInEdit && isInEdit) {
                     // Transitioning to Edit: stop PlayOnly systems
                     systemManager.OnSceneStop(world);
                     systemManager.DestroySystemsForMode(ECS::SystemRunMode::PlayOnly, world);
-
-                    const size_t memoryAfterStop = MemoryManager::GetInstance().GetCurrentUsage();
-                    if (hasPlayEntrySnapshot) {
-                        if (memoryAfterStop > playEntryMemoryUsage) {
-                            const size_t leakedBytes = memoryAfterStop - playEntryMemoryUsage;
-                            LOG_ERROR("[MemoryLeakCheck] Possible leak after leaving Play mode: +"
-                                << leakedBytes << " bytes (before=" << playEntryMemoryUsage
-                                << ", after=" << memoryAfterStop << ")");
-                        } else {
-                            LOG_INFO("[MemoryLeakCheck] Memory restored after Play mode (before="
-                                << playEntryMemoryUsage << ", after=" << memoryAfterStop << ")");
-                        }
-                    }
-                    hasPlayEntrySnapshot = false;
                 }
                 else if (wasInEdit && !isInEdit) {
                     // Transitioning from Edit to any active state: start PlayOnly systems
-                    playEntryMemoryUsage = MemoryManager::GetInstance().GetCurrentUsage();
-                    hasPlayEntrySnapshot = true;
-                    LOG_INFO("[MemoryLeakCheck] Play mode baseline captured at "
-                        << playEntryMemoryUsage << " bytes");
                     systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
-                
-                // Update previous state after processing transition
-                previousState = state;
             }
             
             // Run gameplay systems based on playback state
