@@ -29,6 +29,7 @@ Launches the application in editor mode with the level editor interface.
 #include "core/Logger.h"
 #include "scripting/ScriptsCompiler.h"
 #include "ecs/events/EventDispatcher.h"
+#include "services/MemoryManager.h"
 
 extern "C" {
     // Forward declare the component deserialize callback registration function
@@ -93,6 +94,8 @@ int main() {
 
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
+    size_t playEntryMemoryUsage = 0;
+    bool hasPlayEntrySnapshot = false;
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
@@ -203,9 +206,27 @@ int main() {
                     // Transitioning to Edit: stop PlayOnly systems
                     systemManager.OnSceneStop(world);
                     systemManager.DestroySystemsForMode(ECS::SystemRunMode::PlayOnly, world);
+
+                    const size_t memoryAfterStop = MemoryManager::GetInstance().GetCurrentUsage();
+                    if (hasPlayEntrySnapshot) {
+                        if (memoryAfterStop > playEntryMemoryUsage) {
+                            const size_t leakedBytes = memoryAfterStop - playEntryMemoryUsage;
+                            LOG_ERROR("[MemoryLeakCheck] Possible leak after leaving Play mode: +"
+                                << leakedBytes << " bytes (before=" << playEntryMemoryUsage
+                                << ", after=" << memoryAfterStop << ")");
+                        } else {
+                            LOG_INFO("[MemoryLeakCheck] Memory restored after Play mode (before="
+                                << playEntryMemoryUsage << ", after=" << memoryAfterStop << ")");
+                        }
+                    }
+                    hasPlayEntrySnapshot = false;
                 }
                 else if (wasInEdit && !isInEdit) {
                     // Transitioning from Edit to any active state: start PlayOnly systems
+                    playEntryMemoryUsage = MemoryManager::GetInstance().GetCurrentUsage();
+                    hasPlayEntrySnapshot = true;
+                    LOG_INFO("[MemoryLeakCheck] Play mode baseline captured at "
+                        << playEntryMemoryUsage << " bytes");
                     systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
