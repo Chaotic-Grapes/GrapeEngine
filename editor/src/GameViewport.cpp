@@ -155,11 +155,15 @@ void GameViewport::PrepareFrame() {
     // Use a detached runtime camera copy so editor-side camera data remains authoritative.
     Graphics::ViewportManager::SetCamera(kGameViewportName, synced ? &m_gameCamera : nullptr);
 
-    // Keep GUI layout/input in the same coordinate space as the visible Game viewport image.
-    // This aligns editor Game view behavior with standalone runtime.
+    // In immersive mode, treat the full main viewport as the GUI coordinate base
+    // so interaction behaves like runtime fullscreen instead of panel-local space.
     ImVec2 guiOrigin = m_sceneDrawPos;
     ImVec2 guiSize = m_sceneDrawSize;
-    if (guiSize.x <= 1.0f || guiSize.y <= 1.0f) {
+    if (m_immersiveMode) {
+        ImGuiViewport* mainVp = ImGui::GetMainViewport();
+        guiOrigin = mainVp ? mainVp->Pos : ImVec2(0.0f, 0.0f);
+        guiSize = mainVp ? mainVp->Size : ImVec2(static_cast<float>(vp->Size.x), static_cast<float>(vp->Size.y));
+    } else if (guiSize.x <= 1.0f || guiSize.y <= 1.0f) {
         guiOrigin = ImVec2(0.0f, 0.0f);
         guiSize = ImVec2(static_cast<float>(vp->Size.x), static_cast<float>(vp->Size.y));
     }

@@ -5302,9 +5302,16 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
     if (!data.contains("TrackColor")) data["TrackColor"] = { {"R", 0.2f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 1.0f} };
     if (!data.contains("FillColor")) data["FillColor"] = { {"R", 0.4f}, {"G", 0.4f}, {"B", 0.4f}, {"A", 1.0f} };
     if (!data.contains("KnobColor")) data["KnobColor"] = { {"R", 0.9f}, {"G", 0.9f}, {"B", 0.9f}, {"A", 1.0f} };
+    if (!data.contains("TrackTexturePath")) data["TrackTexturePath"] = "";
+    if (!data.contains("TrackTextureFilter")) data["TrackTextureFilter"] = 0;
+    if (!data.contains("FillTexturePath")) data["FillTexturePath"] = "";
+    if (!data.contains("FillTextureFilter")) data["FillTextureFilter"] = 0;
+    if (!data.contains("KnobTexturePath")) data["KnobTexturePath"] = "";
+    if (!data.contains("KnobTextureFilter")) data["KnobTextureFilter"] = 0;
     if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
     if (!data.contains("KnobSize")) data["KnobSize"] = { {"X", 16.0f}, {"Y", 16.0f} };
     if (!data.contains("Padding")) data["Padding"] = { {"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f} };
+    if (!data.contains("RotationDegrees")) data["RotationDegrees"] = 0.0f;
     if (!data.contains("Horizontal")) data["Horizontal"] = true;
     if (!data.contains("Disabled")) data["Disabled"] = false;
     if (!data.contains("ValueChanged")) data["ValueChanged"] = false;
@@ -5312,7 +5319,10 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
     // Begin property section
     EditorUI::BeginPropertySection({
         "Value", "Min", "Max", "Step", "Track Color", "Fill Color", "Knob Color",
-        "Corner Radius", "Knob Size", "Padding", "Horizontal", "Disabled", "Value Changed"
+        "Track Texture", "Track Filter",
+        "Fill Texture", "Fill Filter",
+        "Knob Texture", "Knob Filter",
+        "Corner Radius", "Knob Size", "Padding", "Rotation", "Horizontal", "Disabled", "Value Changed"
     });
 
     // Render float row
@@ -5329,11 +5339,35 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
 
     // Render color row
     EditorUI::RenderColorRow("Knob Color", data["KnobColor"]);
+
+    auto RenderSliderTextureRow = [&](const char* label, const char* pathKey, const char* clearId, const char* clearTooltip) {
+        const std::string texturePath = data.value(pathKey, std::string());
+        const std::string valueText = texturePath.empty()
+            ? "None (drag texture here)"
+            : std::filesystem::path(texturePath).filename().string();
+        RenderAssetDropRow(label, valueText, texturePath.empty(), clearId, clearTooltip, m_symbolsFont, kImageExtensions,
+            [&](const std::string& droppedPath) {
+                data[pathKey] = droppedPath;
+                return true;
+            },
+            [&]() {
+                data[pathKey] = "";
+            });
+    };
+
+    RenderSliderTextureRow("Track Texture", "TrackTexturePath", "GUISliderTrackTextureClear", "Clear track texture");
+    EditorUI::RenderIntProperty("Track Filter", data, "TrackTextureFilter");
+    RenderSliderTextureRow("Fill Texture", "FillTexturePath", "GUISliderFillTextureClear", "Clear fill texture");
+    EditorUI::RenderIntProperty("Fill Filter", data, "FillTextureFilter");
+    RenderSliderTextureRow("Knob Texture", "KnobTexturePath", "GUISliderKnobTextureClear", "Clear knob texture");
+    EditorUI::RenderIntProperty("Knob Filter", data, "KnobTextureFilter");
+
     EditorUI::RenderFloatRow("Corner Radius", "px", data, "CornerRadius", 0.1f);
 
     // Render vector 2 drow
     EditorUI::RenderVector2DRow("Knob Size", data["KnobSize"], "X", "Y", 1.0f);
     EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
+    EditorUI::RenderFloatRow("Rotation", "deg", data, "RotationDegrees", 0.1f);
 
     // Render checkbox property
     EditorUI::RenderCheckboxProperty("Horizontal", data, "Horizontal");

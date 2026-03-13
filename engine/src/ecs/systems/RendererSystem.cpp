@@ -2639,7 +2639,7 @@ namespace ECS {
                 glm::vec2 center(panelPos.X + panelSize.X * 0.5f, panelPos.Y + panelSize.Y * 0.5f);
                 glm::vec2 size(panelSize.X, panelSize.Y);
                 glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
-                guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                guiRenderer->submitQuad(center, size, 0, { 0,0,1,1 }, color, panel.rotation, 1.0f, 0, 0u, 0.0f);
             }
             guiRenderer->endFrame();
         }
@@ -2660,7 +2660,7 @@ namespace ECS {
                 glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
                 // GUI projection uses Y-down; flip V to keep textures upright
                 glm::vec4 uvRect(image.uvRect.X, image.uvRect.W, image.uvRect.Z, image.uvRect.Y);
-                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                guiRenderer->submitQuad(center, size, image.textureId, uvRect, color, image.rotation, 1.0f, 0, 0u, 0.0f,
                     0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
             }
             guiRenderer->endFrame();
@@ -2717,7 +2717,7 @@ namespace ECS {
                                        panel.position.Y + panel.size.Y * 0.5f);
                 const glm::vec2 size(panel.size.X, panel.size.Y);
                 const glm::vec4 color(panel.color.R, panel.color.G, panel.color.B, panel.color.A);
-                m_renderer->submitQuad(center, size, 0, { 0.0f, 0.0f, 1.0f, 1.0f }, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+                m_renderer->submitQuad(center, size, 0, { 0.0f, 0.0f, 1.0f, 1.0f }, color, panel.rotation, 1.0f, 0, 0u, 0.0f);
             }
             m_renderer->endFrame();
         }
@@ -2737,7 +2737,7 @@ namespace ECS {
                 const glm::vec2 size(image.size.X, image.size.Y);
                 const glm::vec4 color(image.color.R, image.color.G, image.color.B, image.color.A);
                 const glm::vec4 uvRect(image.uvRect.X, image.uvRect.Y, image.uvRect.Z, image.uvRect.W);
-                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f,
+                m_renderer->submitQuad(center, size, image.textureId, uvRect, color, image.rotation, 1.0f, 0, 0u, 0.0f,
                     0, 0, 0.0f, 0.5f, 1.0f, 1.0f, 0, image.textureFilter);
             }
             m_renderer->endFrame();
@@ -3091,7 +3091,7 @@ namespace ECS {
 
     // Submit a GUI panel draw call
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                                        const Color& color, float cornerRadius) {
+                                        const Color& color, float cornerRadius, float rotationRadians) {
         (void)cornerRadius;
         if (!m_renderer) return;
 
@@ -3101,13 +3101,14 @@ namespace ECS {
         submission.size = size;
         submission.color = color;
         submission.cornerRadius = cornerRadius;
+        submission.rotation = rotationRadians;
         m_guiPanelQueue.push_back(submission);
     }
 
     // Submit a GUI image draw call
     void RendererSystem::SubmitGUIImage(const Vector2D& position, const Vector2D& size,
                                          uint32_t textureId, const Vector4D& uvRect, const Color& color,
-                                         Graphics::TextureFilter textureFilter) {
+                                         Graphics::TextureFilter textureFilter, float rotationRadians) {
         if (!m_renderer) return;
 
         // Queue GUI image/icon draw for the GUI pass
@@ -3118,6 +3119,7 @@ namespace ECS {
         submission.uvRect = uvRect;
         submission.color = color;
         submission.textureFilter = textureFilter;
+        submission.rotation = rotationRadians;
         m_guiImageQueue.push_back(submission);
     }
 
@@ -3138,7 +3140,7 @@ namespace ECS {
 
     // Submit a world-space GUI panel draw call
     void RendererSystem::SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
-        const Color& color, float cornerRadius) {
+        const Color& color, float cornerRadius, float rotationRadians) {
         (void)cornerRadius;
         if (!m_renderer) return;
 
@@ -3147,12 +3149,13 @@ namespace ECS {
         submission.size = size;
         submission.color = color;
         submission.cornerRadius = cornerRadius;
+        submission.rotation = rotationRadians;
         m_worldGuiPanelQueue.push_back(submission);
     }
 
     // Submit a world-space GUI image draw call
     void RendererSystem::SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
-        uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter) {
+        uint32_t textureId, const Vector4D& uvRect, const Color& color, Graphics::TextureFilter textureFilter, float rotationRadians) {
         if (!m_renderer) return;
 
         WorldGUIImageSubmission submission;
@@ -3162,6 +3165,7 @@ namespace ECS {
         submission.uvRect = uvRect;
         submission.color = color;
         submission.textureFilter = textureFilter;
+        submission.rotation = rotationRadians;
         m_worldGuiImageQueue.push_back(submission);
     }
 
