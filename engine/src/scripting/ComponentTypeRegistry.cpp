@@ -20,7 +20,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cstdint>
 
 namespace {
-    // FNV-1a hash implementation matching C# side
+    /**
+     * @brief Computes a 32-bit FNV-1a hash for a C-string.
+     * @param str Null-terminated string to hash.
+     * @return FNV-1a hash value.
+     */
     constexpr uint32_t FNV1a_Hash(const char* str) {
         uint32_t hash = 2166136261u;
         while (*str) {
@@ -42,6 +46,11 @@ namespace ECS {
 
 #if defined(_DEBUG) || defined(DEBUG)
     namespace {
+        /**
+         * @brief Logs resolved component type id for a name/hash pair in debug builds.
+         * @param name Component display name.
+         * @param hash FNV-1a component hash.
+         */
         void LogComponentTypeIds(const char* name, uint32_t hash) {
             const ComponentTypeId registryId = ComponentRegistry::GetComponentIdFromHash(hash);
 
