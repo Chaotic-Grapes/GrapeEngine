@@ -194,7 +194,8 @@ namespace ECS {
                 Vector2D trackPos{};
                 Vector2D trackSize{};
 
-                // For world-space sliders, we need to scale padding based on the ratio between screen size and resolved size to keep input aligned with rendering.
+                // For world-space sliders, derive hit testing from the projected content rect
+                // so it matches rendering (which also starts from ContentPosition/ContentSize).
                 if (isWorldSpace) {
                     const float screenScaleX = element.ResolvedSize.X > 0.0f
                         ? (element.ScreenSize.X / element.ResolvedSize.X)
@@ -202,19 +203,31 @@ namespace ECS {
                     const float screenScaleY = element.ResolvedSize.Y > 0.0f
                         ? (element.ScreenSize.Y / element.ResolvedSize.Y)
                         : 1.0f;
-                    const Vector4D padding = { // Scale padding from element space to screen space for hit testing.
+                    const Vector2D contentOffset = {
+                        element.ContentPosition.X - element.ResolvedPosition.X,
+                        element.ContentPosition.Y - element.ResolvedPosition.Y
+                    };
+                    const Vector2D contentScreenPos = {
+                        element.ScreenPosition.X + contentOffset.X * screenScaleX,
+                        element.ScreenPosition.Y + contentOffset.Y * screenScaleY
+                    };
+                    const Vector2D contentScreenSize = {
+                        std::max(0.0f, element.ContentSize.X * screenScaleX),
+                        std::max(0.0f, element.ContentSize.Y * screenScaleY)
+                    };
+                    const Vector4D padding = { // Scale slider padding from world units to screen-space hit testing units.
                         PixelsToUnits(slider.Padding.X) * screenScaleX,
                         PixelsToUnits(slider.Padding.Y) * screenScaleY,
                         PixelsToUnits(slider.Padding.Z) * screenScaleX,
                         PixelsToUnits(slider.Padding.W) * screenScaleY
                     };
-                    trackPos = { // Screen-space position of the track rect, accounting for padding.
-                        element.ScreenPosition.X + padding.X,
-                        element.ScreenPosition.Y + padding.Y
+                    trackPos = { // Screen-space track rect, aligned to rendered slider track.
+                        contentScreenPos.X + padding.X,
+                        contentScreenPos.Y + padding.Y
                     };
-                    trackSize = { // Screen-space size of the track rect, accounting for padding.
-                        std::max(0.0f, element.ScreenSize.X - padding.X - padding.Z),
-                        std::max(0.0f, element.ScreenSize.Y - padding.Y - padding.W)
+                    trackSize = {
+                        std::max(0.0f, contentScreenSize.X - padding.X - padding.Z),
+                        std::max(0.0f, contentScreenSize.Y - padding.Y - padding.W)
                     };
                 } else {
                     // Scale padding based on resolved size so layout and input stay in sync.
