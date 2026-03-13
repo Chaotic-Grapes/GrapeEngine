@@ -3,7 +3,7 @@
 \file   EditorService.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   12th March 2026
 \brief
 Implements the EditorService which manages the ImGui-based LevelEditor.
 Handles ImGui frame lifecycle, scene targeting, and world propagation
@@ -70,40 +70,49 @@ using namespace Services;
 
 #ifdef USE_IMGUI
 namespace {
-    // Default font sizes for the editor UI
+
+    // Baseline sizes used to bootstrap UI text and icon fonts before user settings apply
     constexpr float kDefaultTextFontSize = 20.0f;
     constexpr float kDefaultIconFontSize = 22.0f;
 
-    // Helper function to load fonts from the ResourceManager, falling back to file loading if RM fails
+    // Loads font bytes through ResourceManager with a direct-file fallback to keep editor startup resilient
     ImFont* LoadFontFromRM(ImFontAtlas& atlas, const std::string& path, float size,
         ImFontConfig* config = nullptr, const ImWchar* ranges = nullptr) {
-        auto raw = RM.Get<RawData>(path); // Try to load the font as raw data from the ResourceManager
 
-        // If RM fails to load the font, fall back to loading directly from file path
+        // Try packaged/managed asset path first so startup follows project resource pipeline
+        auto raw = RM.Get<RawData>(path);
+
+        // Fallback to direct file loading if resource manager cannot provide valid bytes
         if (!raw || !raw->IsValid) {
             LOG_WARNING("Failed to load font via RM, falling back to file: " << path);
 
-            ImFontConfig cfg = config ? *config : ImFontConfig(); // Use provided config or default if null
-            strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1); // Set the font name in the config for debugging purposes
-            return atlas.AddFontFromFileTTF(path.c_str(), size, &cfg, ranges); // Load font directly from file
+            // Clone optional caller config so local edits do not mutate external config state
+            ImFontConfig cfg = config ? *config : ImFontConfig();
+
+            // Store source path in config name to make font-atlas debugging easier
+            strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
+            return atlas.AddFontFromFileTTF(path.c_str(), size, &cfg, ranges);
         }
 
-        // Successfully loaded font data from RM, add it to the ImGui font atlas
+        // Resource manager returned valid bytes, register memory font in atlas
         ImFontConfig cfg = config ? *config : ImFontConfig();
+
+        // Data ownership stays with RawData container, atlas only borrows the pointer
         cfg.FontDataOwnedByAtlas = false;
         strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
 
-        // Add the font to the atlas from memory data
         return atlas.AddFontFromMemoryTTF(raw->Data.data(), (int)raw->Data.size(), size, &cfg, ranges);
     }
 
-    // Helper function to ensure the default editor fonts are loaded at startup, merging icon fonts into the main atlas
+    // Ensures startup atlas has base text and icon fonts so editor UI is usable before settings override
     void EnsureStartupFontsLoaded(ImGuiIO& io) {
+
+        // Skip if atlas already has fonts to avoid duplicate registration on repeated init calls
         if (!io.Fonts || !io.Fonts->Fonts.empty()) {
             return;
         }
 
-        // Load the main text font for the editor UI, with fallback to default if loading fails
+        // Main UI text face
         ImFont* mainFont = LoadFontFromRM(*io.Fonts,
             "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
             kDefaultTextFontSize);
@@ -111,7 +120,7 @@ namespace {
             mainFont = io.Fonts->AddFontDefault();
         }
 
-        // Load the bold font for the editor UI, with fallback to default if loading fails
+        // Bold variant used by emphasis labels and headers
         ImFont* boldFont = LoadFontFromRM(*io.Fonts,
             "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
             kDefaultTextFontSize);
@@ -119,7 +128,7 @@ namespace {
             boldFont = io.Fonts->AddFontDefault();
         }
 
-        // Set up the icon font configuration for merging into the main atlas, using the Material Symbols Rounded font
+        // Material Symbols private-use codepoint range
         static constexpr ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
         ImFontConfig iconsConfig;
         iconsConfig.MergeMode = false;
@@ -127,14 +136,13 @@ namespace {
         iconsConfig.OversampleH = 3;
         iconsConfig.OversampleV = 3;
 
-        // Merge the icon font into the main atlas to ensure all editor fonts are in a single atlas, which is more efficient for rendering.
-        // We check if we've already merged to avoid doing it multiple times.
+        // Merge icon glyphs into text atlas once so mixed text/icon labels render in one draw pipeline
         static ImFontAtlas* s_mergedAtlas = nullptr;
         if (mainFont && s_mergedAtlas != io.Fonts) {
             ImFontConfig mergeConfig = iconsConfig;
             mergeConfig.MergeMode = true;
 
-            // Load the icon font and merge it into the existing atlas
+            // Merge pass writes icon glyphs into the existing atlas texture
             LoadFontFromRM(*io.Fonts,
                 "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
                 kDefaultTextFontSize,
@@ -143,8 +151,7 @@ namespace {
             s_mergedAtlas = io.Fonts;
         }
 
-        // Load the icon font separately as well, in case we want to use it directly for icon-specific rendering.
-        // This is optional since the icons are merged into the main atlas, but it allows for more direct access if needed.
+        // Keep a standalone icon face too for explicit icon-only drawing code paths
         ImFont* symbolsFont = LoadFontFromRM(*io.Fonts,
             "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
             kDefaultIconFontSize,
@@ -161,46 +168,43 @@ namespace {
     }
 }
 
+// Releases EditorService-owned pointers on destruction
 EditorService::~EditorService() { m_editorInstance = nullptr; }
 
-// Clean up ImGui resources on shutdown
+// Injects startup-stage getter used by startup UI to drive render gating logic
 void EditorService::SetStartupStageGetter(std::function<EditorStartupStage()> getter) {
     m_projectStartupUI.SetStageGetter(std::move(getter));
 }
 
-// Proxy function to set the project startup callbacks in the ProjectStartupUI, allowing the 
-// editor to provide callback implementations for project selection and creation actions initiated from the UI.
+// Forwards startup callbacks so project startup UI can invoke editor actions
 void EditorService::SetProjectStartupCallbacks(const Editor::ProjectStartupCallbacks& callbacks) {
     m_projectStartupUI.SetCallbacks(callbacks);
 }
 
-// Proxy function to set the editor settings in the ProjectStartupUI, allowing the 
-// UI to access configuration settings such as recent projects and UI scale for rendering the startup screens.
+// Updates editor settings references in startup UI and active level editor
 void EditorService::SetEditorSettings(EditorSettings* settings) {
     m_editorSettings = settings;
     m_projectStartupUI.SetEditorSettings(settings);
 
-	// Also propagate the editor settings to the level editor if it exists, so that any changes 
-    // to settings (e.g. UI scale) can be reflected in the editor views immediately
+    // Push settings immediately to active level editor so UI scale and prefs update live
     if (m_levelEditor) {
         m_levelEditor->SetEditorSettings(settings);
     }
 }
 
-// Proxy function to request the project browser UI to be shown, which can be called 
-// from other parts of the editor to trigger the project selection screen.
+// Requests project browser startup screen
 void EditorService::RequestProjectBrowser() {
     m_projectStartupUI.RequestProjectBrowser();
 }
 
-// Proxy function to request a rebuild of the level editor, which can be called from 
-// other parts of the editor to trigger a refresh of the editor views
-// (e.g., after a scene change or significant update that requires the editor to re-query the scene for updated data).
+// Marks level editor for safe rebuild on next update tick
 void EditorService::RequestLevelEditorRebuild() {
     m_pendingLevelEditorRebuild = true;
 }
 
+// Initializes ImGui runtime and editor integration backend state
 void EditorService::Initialize() {    
+
     // Prevent double initialization
     if (m_initialized || m_backendInitialized) {
         LOG_WARNING("[EditorService] Initialize() - Already initialized, skipping");
@@ -232,16 +236,20 @@ void EditorService::Initialize() {
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
+
         // Enable docking, but disable multi-viewport to avoid the ImGui GLFW
         // backend attempting to install Win32 WndProc hooks (engine already
-        // manages GLFW callbacks and that caused assertion failures).
+        // manages GLFW callbacks and that caused assertion failures)
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
         io.FontGlobalScale = EditorStyle::FontScale;
-        EnsureStartupFontsLoaded(io); // Ensure the default editor fonts are loaded at startup, merging icon fonts into the main atlas for efficient rendering.
+
+        // Load baseline fonts before first frame so startup and editor windows use consistent metrics
+        EnsureStartupFontsLoaded(io);
 
         ImGuiStyle& style = ImGui::GetStyle();
-        // Apply the editor's modern theme overrides.
+
+        // Apply shared editor theme once during backend init
         EditorStyle::ApplyModernTheme(style);
 
         GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
@@ -254,8 +262,8 @@ void EditorService::Initialize() {
         // Make sure the window's context is current before initializing GL loader/backends
         glfwMakeContextCurrent(glfwHandle);
 
-        // Ensure GL functions are available (GLAD). Window creation normally initializes GLAD,
-        // but re-check here to be safe in case of ordering differences during refactor.
+        // Ensure GL functions are available (GLAD), window creation normally initializes GLAD
+        // but re-check here to be safe in case of ordering differences during refactor
         if (!gladLoadGL()) {
             LOG_ERROR("[EditorService] gladLoadGL() failed");
             ImGui_ImplOpenGL3_Shutdown();
@@ -264,17 +272,21 @@ void EditorService::Initialize() {
         }
 
         // We avoid using ImGui's GLFW platform backend (it installs Win32 hooks
-        // which conflict with our input system). Instead we initialize only the
-        // OpenGL renderer backend and provide minimal platform data ourselves.
+        // which conflict with our input system), instead initialize only the
+        // OpenGL renderer backend and provide minimal platform data ourselves
         ImGui_ImplOpenGL3_Init("#version 460");
         ImGuiIO& io2 = ImGui::GetIO();
         io2.BackendPlatformName = "GrapeEngine_Custom";
-        io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // we can honor cursors
+
+        // Mark cursor support so ImGui can request cursor shape changes when needed
+        io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
         m_backendInitialized = true;
 
         if (!m_initialized) {
             Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
                 [this](const Messaging::WindowResized& msg) {
+
+                    // Forward resize to level editor so docking and panel layout remain in sync
                     if (m_levelEditor) { m_levelEditor->OnWindowResized(msg.Width, msg.Height); }
                 }
             );
@@ -282,8 +294,10 @@ void EditorService::Initialize() {
 
             LOG_INFO("Running ImGui version " << IMGUI_VERSION);
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         LOG_ERROR("Exception in EditorService::Initialize(): " << e.what());
+
         // Clean up partially initialized state
         if (m_backendInitialized) {
             ImGui_ImplOpenGL3_Shutdown();
@@ -292,8 +306,10 @@ void EditorService::Initialize() {
         if (ImGui::GetCurrentContext() != nullptr) {
             ImGui::DestroyContext();
         }
-    } catch (...) {
+    }
+    catch (...) {
         LOG_ERROR("Unknown exception in EditorService::Initialize()");
+
         // Clean up partially initialized state
         if (m_backendInitialized) {
             ImGui_ImplOpenGL3_Shutdown();
@@ -305,14 +321,21 @@ void EditorService::Initialize() {
     }
 }
 
+// Returns true when level editor playback is in Play state
 bool EditorService::IsGamePlaying() const { return (m_levelEditor) && m_levelEditor->IsPlaying(); }
+
+// Returns whether one-frame step was requested through playback controls
 bool EditorService::IsStepRequested() const { return (m_levelEditor) && m_levelEditor->IsStepRequested(); }
+
+// Clears pending one-frame step request in playback controls
 void EditorService::ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
+// Returns current playback state or Edit when level editor is unavailable
 EditorState EditorService::GetPlaybackState() const { 
     return (m_levelEditor) ? m_levelEditor->GetEditorState() : EditorState::Edit; 
 }
 
+// Updates active world reference and propagates scene target into level editor
 void EditorService::SetWorld(ECS::World* world) {
     if (m_world == world)
         return;
@@ -320,28 +343,27 @@ void EditorService::SetWorld(ECS::World* world) {
     m_world = world;
 
     if (m_levelEditor) {
-        // Also propagate the active Scenes::Scene so EntityActions is updated
+
+        // Update scene binding too so scene-dependent actions follow active context
         Scenes::Scene* activeScene = m_sceneManager.GetActive();
         m_levelEditor->SetScene(activeScene);
     }
 }
 
+// Begins editor frame processing for the active level editor when startup flow allows it
 void EditorService::BeginFrame() {
     if (!m_initialized) return;
 
-    // Check the project startup stage to determine if we should block editor updates/renders.
-    // If the project browser is active or we're in the project selection stage, we skip updating 
-    // and rendering the editor to avoid conflicts and ensure the startup UI is responsive.
+    // Startup UI can take exclusive focus, in that state editor panels should not run begin-frame logic
     const auto& stageGetter = m_projectStartupUI.GetStageGetter();
     const EditorStartupStage stage = stageGetter ? stageGetter() : EditorStartupStage::Ready;
     const bool blockEditor = stageGetter && (m_projectStartupUI.WantsProjectBrowser() || stage == EditorStartupStage::SelectProject);
 
-    // If the editor should be blocked due to the startup stage, we skip the rest of the update/render logic.
     if (blockEditor) {
         return;
     }
 
-    // Determine if we should show the level editor based on the current active scene and the target scene for the level editor.
+    // Show level editor only when enabled and when active scene matches optional scene pin
     auto* activeScene = m_sceneManager.GetActive();
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
 
@@ -350,12 +372,11 @@ void EditorService::BeginFrame() {
     }
 }
 
+// Updates editor runtime state and creates or rebuilds level editor when required
 void EditorService::Update() {
     if (!m_initialized) return;
 
-    // Check the project startup stage to determine if we should block editor updates/renders.
-    // If the project browser is active or we're in the project selection stage, we skip updating
-    // and rendering the editor to avoid conflicts and ensure the startup UI is responsive.
+    // Startup screen ownership means editor update work must pause until startup flow yields control
     const auto& stageGetter = m_projectStartupUI.GetStageGetter();
     const EditorStartupStage stage = stageGetter ? stageGetter() : EditorStartupStage::Ready;
     const bool blockEditor = stageGetter && (m_projectStartupUI.WantsProjectBrowser() || stage == EditorStartupStage::SelectProject);
@@ -363,18 +384,17 @@ void EditorService::Update() {
         return;
     }
 
-    // Handle pending level editor rebuild requests, which can be triggered by other parts of the 
-    // editor when a refresh of the editor views is needed (e.g., after a scene change).
+    // Rebuild path recreates LevelEditor instance to refresh panel graph and scene hookups
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;
         m_levelEditor.reset();
 
-        // When rebuilding the level editor, we need to determine the appropriate target scene to use for the new instance.
+        // Keep previous scene pin when set, otherwise follow current active scene
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : m_sceneManager.GetActive();
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
         m_levelEditor->SetEditorSettings(m_editorSettings);
 
-        // Reinitialize the level editor with the main window's native handle to ensure it has the correct context for rendering and input handling.
+        // Reinitialize with active native window handle so editor can bind viewport/input backend state
         if (Engine::CORE) {
             auto* platformContext = Engine::CORE->GetPlatformContext();
             if (platformContext) {
@@ -391,13 +411,13 @@ void EditorService::Update() {
 
     auto* activeScene = m_sceneManager.GetActive();
 
-    // Propagate active scene's world to editor panels so UI updates immediately
-    // when a new scene is created or activated.
+    // Refresh world pointer whenever active scene changes so all editor panels target current scene data
     ECS::World* activeWorld = activeScene ? &activeScene->GetWorld() : nullptr;
     SetWorld(activeWorld);
 
     if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
-        // Follow the newly activated scene instead of hiding the editor UI.
+
+        // If pinned scene disappears or changes, follow active scene rather than hiding editor UI
         m_levelEditorForScene = activeScene;
         if (!m_levelEditorForScene) {
             m_levelEditorForScene = nullptr;
@@ -406,16 +426,14 @@ void EditorService::Update() {
 
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
 
-    // If we should show the level editor but it doesn't exist yet, create it targeting the current active scene (or null if no active scene).
-    // This allows the editor to be available immediately when toggled on, even if there is no active scene at the time of toggling.
-    // The editor will then update to show the correct scene once one becomes active.
+    // Lazy-create level editor on first use so startup remains lightweight until editor is actually shown
     if (shouldShowLevelEditor && !m_levelEditor) {
         LevelEditorConfig config;
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : activeScene;
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
         m_levelEditor->SetEditorSettings(m_editorSettings);
 
-        // Initialize the level editor with the main window's native handle to ensure it has the correct context for rendering and input handling.
+        // Pass native window handle so renderer/input hooks are initialized against the correct platform window
         if (Engine::CORE) {
             auto* platformContext = Engine::CORE->GetPlatformContext();
 
@@ -431,6 +449,7 @@ void EditorService::Update() {
     }
 }
 
+// Renders ImGui frame and routes startup overlays versus level editor windows
 void EditorService::Render() {
     if (!m_initialized || !m_backendInitialized) {
         return;
@@ -439,7 +458,7 @@ void EditorService::Render() {
     auto* activeScene = m_sceneManager.GetActive();
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
 
-    // Minimal platform glue: update ImGui IO from our Input and Time systems
+    // Feed core timing and viewport size into ImGui before starting a new frame
     ImGuiIO& io = ImGui::GetIO();
     auto* platformContext = Engine::CORE ? Engine::CORE->GetPlatformContext() : nullptr;
     if (platformContext) {
@@ -449,24 +468,27 @@ void EditorService::Render() {
     }
     io.DeltaTime = static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
 
-    double mx, my; Input::GetMousePosition(mx, my);
+    // Forward current mouse position and button state from engine input to ImGui IO
+    double mx, my;
+    Input::GetMousePosition(mx, my);
     io.MousePos = ImVec2(static_cast<float>(mx), static_cast<float>(my));
     io.MouseDown[0] = Input::IsMouseDown(MOUSE_LEFT);
     io.MouseDown[1] = Input::IsMouseDown(MOUSE_RIGHT);
     io.MouseDown[2] = Input::IsMouseDown(MOUSE_MIDDLE);
     io.MouseWheel = static_cast<float>(Input::GetScrollY());
 
-    // Feed keyboard state to ImGui
+    // Update modifier keys explicitly because many widgets depend on Ctrl/Shift/Alt state
     io.KeyCtrl = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
     io.KeyShift = Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
     io.KeyAlt = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
     io.KeySuper = Input::IsKeyDown(KEY_LEFT_SUPER) || Input::IsKeyDown(KEY_RIGHT_SUPER);
 
-    // Feed key presses to ImGui for input handling.
+    // Helper maps engine key state to individual ImGui keys
     auto feedKey = [&](ImGuiKey imguiKey, int engineKey) {
         io.AddKeyEvent(imguiKey, Input::IsKeyDown(engineKey));
     };
 
+    // Navigation and editing cluster keys
     feedKey(ImGuiKey_Tab, KEY_TAB);
     feedKey(ImGuiKey_LeftArrow, KEY_LEFT);
     feedKey(ImGuiKey_RightArrow, KEY_RIGHT);
@@ -503,6 +525,7 @@ void EditorService::Render() {
     feedKey(ImGuiKey_RightAlt, KEY_RIGHT_ALT);
     feedKey(ImGuiKey_RightSuper, KEY_RIGHT_SUPER);
 
+    // Top-row number keys
     feedKey(ImGuiKey_0, KEY_0);
     feedKey(ImGuiKey_1, KEY_1);
     feedKey(ImGuiKey_2, KEY_2);
@@ -514,6 +537,7 @@ void EditorService::Render() {
     feedKey(ImGuiKey_8, KEY_8);
     feedKey(ImGuiKey_9, KEY_9);
 
+    // Alphabet keys
     feedKey(ImGuiKey_A, KEY_A);
     feedKey(ImGuiKey_B, KEY_B);
     feedKey(ImGuiKey_C, KEY_C);
@@ -541,6 +565,7 @@ void EditorService::Render() {
     feedKey(ImGuiKey_Y, KEY_Y);
     feedKey(ImGuiKey_Z, KEY_Z);
 
+    // Function keys
     feedKey(ImGuiKey_F1, KEY_F1);
     feedKey(ImGuiKey_F2, KEY_F2);
     feedKey(ImGuiKey_F3, KEY_F3);
@@ -554,18 +579,18 @@ void EditorService::Render() {
     feedKey(ImGuiKey_F11, KEY_F11);
     feedKey(ImGuiKey_F12, KEY_F12);
 
-    // Feed character input to ImGui
+    // Push UTF character stream for text input widgets then clear per-frame text buffer
     const std::string& charInput = Input::GetCharInput();
     for (unsigned char c : charInput) {
         io.AddInputCharacter(c);
     }
     Input::ClearCharInput();
 
-    // Start the ImGui frame
+    // Begin ImGui frame lifecycle
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
 
-    // Check the project startup stage to determine if we should block editor updates/renders.
+    // Startup stages decide whether editor UI is blocked, overlaid, or fully interactive
     const auto& stageGetter = m_projectStartupUI.GetStageGetter();
     const EditorStartupStage stage = stageGetter ? stageGetter() : EditorStartupStage::Ready;
     const bool showScenePicker = stageGetter && stage == EditorStartupStage::SelectScene;
@@ -575,30 +600,28 @@ void EditorService::Render() {
     
     if (blockEditor) {
         m_projectStartupUI.Render();
-    } 
+    }
     else {
-        // If the editor is not blocked, we proceed with normal update and render logic.
+
+        // Normal editor update/render path while startup screens are not in exclusive mode
         if (m_levelEditor && shouldShowLevelEditor) {
             m_levelEditor->Update();
             m_levelEditor->Render();
         }
-        // If we're in a startup stage that requires an overlay (booting or scene picker), we render the startup UI on top of the editor. 
-        // Otherwise, if there's a stage getter but no overlay is needed, we render the startup UI normally (it will decide what to show based on the stage).
+
+        // When startup controller exists but no overlay mode is active, allow it to render contextual UI panels
         else if (stageGetter && !showStartupOverlay) {
             m_projectStartupUI.Render();
         }
 
-        // If the startup stage indicates we should show an overlay (e.g., booting screen or scene picker), 
-        // we render the startup UI on top of everything else to ensure it is visible and interactive, blocking access 
-        // to the editor until the user has made a selection or the booting process is complete.
+        // Overlay modes must draw last to visually and interactively sit above editor content
         if (showStartupOverlay) {
             m_projectStartupUI.Render();
         }
     }
 
-    // Global Ctrl+A for active text inputs
-    // Run this after all UI is built so the current frame's focused input field
-    // is known (e.g. clicking into "New Entity" then pressing Ctrl+A)
+    // Global Select-All handler for focused ImGui text fields
+    // Run after UI build so final focused input id for this frame is known
     const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
     const bool superDown = Input::IsKeyDown(KEY_LEFT_SUPER) || Input::IsKeyDown(KEY_RIGHT_SUPER);
     const bool selectAllPressed = Input::IsKeyPressed(KEY_A);
@@ -620,10 +643,11 @@ void EditorService::Render() {
     }
 }
 
+// Ends frame for level editor when startup flow does not own the UI
 void EditorService::EndFrame() {
     if (!m_initialized) return;
 
-    // Check the project startup stage to determine if we should block editor updates/renders.
+    // Startup block mode skips level-editor end-frame work
     const auto& stageGetter = m_projectStartupUI.GetStageGetter();
     const EditorStartupStage stage = stageGetter ? stageGetter() : EditorStartupStage::Ready;
     const bool blockEditor = stageGetter && (m_projectStartupUI.WantsProjectBrowser() || stage == EditorStartupStage::SelectProject);
@@ -631,26 +655,28 @@ void EditorService::EndFrame() {
         return;
     }
 
-    // Determine if we should show the level editor based on the current active scene and the target scene for the level editor.
+    // Mirror same show condition used in BeginFrame/Render for lifecycle consistency
     auto* activeScene = m_sceneManager.GetActive();
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
 
-    // If the level editor is active and should be shown, we call EndFrame to allow it to perform any necessary cleanup or state updates after rendering.
+    // Propagate end-frame so editor panels can finalize temporary per-frame state
     if (m_levelEditor && shouldShowLevelEditor) {
         m_levelEditor->EndFrame();
     }
 }
 
+// Shuts down level editor and ImGui backend resources in dependency-safe order
 void EditorService::Terminate() {
+
     // Destroy LevelEditor first while ImGui context is still active
     if (m_levelEditor) {
         m_levelEditor.reset();
     }
 
-    // Clean up ImGui resources carefully
-    // Must happen AFTER LevelEditor is destroyed to avoid accessing ImGui from destructors
+    // Destroy ImGui context only after level editor teardown so panel destructors never touch dead ImGui state
     if (ImGui::GetCurrentContext() != nullptr) {
         if (m_backendInitialized) {
+
             // Ensure GL context is current before shutting down OpenGL backend
             if (Engine::CORE) {
                 auto* platformContext = Engine::CORE->GetPlatformContext();
@@ -666,10 +692,11 @@ void EditorService::Terminate() {
             }
 
             ImGui_ImplOpenGL3_Shutdown();
-            // We only initialize the OpenGL renderer backend (see Initialize()).
+
+            // Only OpenGL renderer backend is initialized in this service
             // Do not call ImGui_ImplGlfw_Shutdown() because we do not use
             // ImGui's GLFW platform backend (it would attempt to shutdown
-            // a backend that was never initialized and trigger assertions).
+            // a backend that was never initialized and trigger assertions)
             m_backendInitialized = false;
         }
         ImGui::DestroyContext();
@@ -678,12 +705,14 @@ void EditorService::Terminate() {
     m_initialized = false;
 }
 
+// Enables level editor and optionally pins it to a specific scene
 void EditorService::EnableLevelEditorForScene(Scenes::Scene* scene) {
     m_showLevelEditor = true;
     m_levelEditorForScene = scene;
     LOG_DEBUG(scene ? "LevelEditor enabled for scene" : "LevelEditor enabled (scene-less)");
 }
 
+// Disables level editor and clears scene pin
 void EditorService::DisableLevelEditor() {
     m_showLevelEditor = false;
     m_levelEditorForScene = nullptr;
@@ -692,6 +721,7 @@ void EditorService::DisableLevelEditor() {
 }
 
 #else
+// Stub no-op when ImGui/editor integration is not compiled
 void EditorService::SetStartupStageGetter(std::function<EditorStartupStage()>) {}
 void EditorService::SetProjectStartupCallbacks(const Editor::ProjectStartupCallbacks&) {}
 void EditorService::SetEditorSettings(EditorSettings*) {}

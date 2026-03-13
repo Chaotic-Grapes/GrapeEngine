@@ -1,15 +1,27 @@
-/**
- * @Name: Dalton koh, 2403250
- * @email: d.koh@digipen.edu
- * @file    AudioDiagnostics.h
- *
- * @brief   Helper diagnostics for audio system setup and runtime checks.
- */
+/* Start Header *****************************************************************/
+/*!
+\file   AudioDiagnostics.h
+\author Dalton Koh , 2403250
+\par    d.koh@digipen.edu
+\brief
+Provides helper checks for audio setup and runtime diagnostics.
+
+Description
+- validates core audio services and device availability
+- scans scene audio source components and cue bindings
+- logs useful pass warning and error results for debugging
+- provides a quick entity level playability check
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #ifndef AUDIODIAGNOSTICS_H
 #define AUDIODIAGNOSTICS_H
 
-// Engine and audio includes used by the diagnostics.
+// includes used by audio diagnostics
 #include "scene/Scene.h"
 #include "core/Application.h"
 #include "core/Logger.h"
@@ -17,16 +29,12 @@
 #include "ecs/systems/AudioSystem.h"
 #include "ecs/StringTable.h"
 
-// Inline helpers for logging/diagnostics.
+// inline helper functions for diagnostics
 namespace AudioDiagnostics {
 
-    /**
-     * @brief Comprehensive diagnostic check for audio system configuration
-     * @param scene The scene to diagnose (usually the active scene)
-     * @return True if all checks pass, false if issues found
-     */
+    // run full scene level audio diagnostics
     inline bool DiagnoseAudioSystem(Scenes::Scene* scene) {
-        // Validate scene.
+        // fail early when scene is missing
         if (!scene) {
             LOG_ERROR("=== AUDIO DIAGNOSIS: FAILED ===");
             LOG_ERROR("No active scene");
@@ -37,9 +45,7 @@ namespace AudioDiagnostics {
 
         LOG_INFO("=== AUDIO SYSTEM DIAGNOSIS START ===");
 
-        // ----------------------------------------------------------------
-        // Check 1: Is Audio system registered in SystemManager?
-        // ----------------------------------------------------------------
+        // check that audio system is registered
         auto& systemManager = Engine::CORE->GetSystemManager();
         auto* audioSystem = systemManager.GetSystem<ECS::AudioSystem>();
         if (!audioSystem) {
@@ -50,7 +56,7 @@ namespace AudioDiagnostics {
         else {
             LOG_INFO("PASS: Audio system is registered in SystemManager");
             
-            // Check if enabled
+            // check enabled state
             if (audioSystem->IsEnabled()) {
                 LOG_INFO("PASS: Audio system is ENABLED");
             }
@@ -60,9 +66,7 @@ namespace AudioDiagnostics {
             }
         }
 
-        // ----------------------------------------------------------------
-        // Check 3: Are there entities with AudioSource components?
-        // ----------------------------------------------------------------
+        // scan all audio source components in the scene
         int audioSourceCount = 0;
         int validCueCount = 0;
         auto& lib = AudioAssetLibrary::Get();
@@ -80,10 +84,12 @@ namespace AudioDiagnostics {
                     }
                 }
 
+                // report missing cue assignment
                 if (src.CueId == 0) {
                     LOG_WARNING("  Entity " << e.Index << " (" << entityName << "): AudioSource has CueId=0 (no sound assigned)");
                 }
                 else {
+                    // resolve cue id in asset library
                     const auto* clip = lib.FindById(src.CueId);
                     if (clip) {
                         LOG_INFO("  Entity " << e.Index << " (" << entityName << "): CueId=" << src.CueId
@@ -99,6 +105,7 @@ namespace AudioDiagnostics {
                 }
             });
 
+        // summarize audio source scan results
         if (audioSourceCount == 0) {
             LOG_WARNING("WARNING: No entities with AudioSource component found in scene");
             LOG_INFO("         -> Add AudioSource components to entities that should play sounds");
@@ -108,9 +115,7 @@ namespace AudioDiagnostics {
                 << validCueCount << " with valid cues)");
         }
 
-        // ----------------------------------------------------------------
-        // Check 4: Is AudioService available and initialized?
-        // ----------------------------------------------------------------
+        // validate audio service and device
         auto* app = Engine::CORE;
         auto* audioSvc = app ? app->GetAudioService() : nullptr;
         if (!audioSvc) {
@@ -130,7 +135,7 @@ namespace AudioDiagnostics {
             else {
                 LOG_INFO("PASS: FmodAudioDevice is available");
 
-                // Check loaded cues
+                // print currently loaded cues
                 std::vector<std::pair<std::string, std::string>> loadedCues;
                 device->GetLoadedCues(loadedCues);
                 if (loadedCues.empty()) {
@@ -145,17 +150,13 @@ namespace AudioDiagnostics {
             }
         }
 
-        // ----------------------------------------------------------------
-        // Check 5: Check AudioAssetLibrary
-        // ----------------------------------------------------------------
+        // kept for future extended diagnostics
         int totalClips = 0;
-        // Note: You'd need to add a method to AudioAssetLibrary to get count
-        // For now just log that we're using it
+        (void)totalClips;
+
         LOG_INFO("AudioAssetLibrary is being used for CueId -> path resolution");
 
-        // ----------------------------------------------------------------
-        // Summary
-        // ----------------------------------------------------------------
+
         LOG_INFO("=== AUDIO SYSTEM DIAGNOSIS " << (allChecksPass ? "COMPLETE" : "FOUND ISSUES") << " ===");
 
         if (!allChecksPass) {
@@ -171,19 +172,17 @@ namespace AudioDiagnostics {
         return allChecksPass;
     }
 
-    /**
-     * @brief Quick check if audio can play for a specific entity
-     * @param scene The scene containing the entity
-     * @param entityId The entity to check
-     * @return True if entity can play audio, false otherwise
-     */
+
+    // check if one entity can play audio correctly
     inline bool CanEntityPlayAudio(Scenes::Scene* scene, uint32_t entityId) {
-        // Validate scene and entity id.
+        // fail early when scene is missing
         if (!scene) return false;
 
+        // resolve entity from id
         auto& world = scene->GetWorld();
         ECS::Entity e = world.Resolve(entityId);
 
+        // validate entity state and components
         if (!world.IsAlive(e)) {
             LOG_ERROR("Entity " << entityId << " is not alive");
             return false;
@@ -200,7 +199,7 @@ namespace AudioDiagnostics {
             return false;
         }
 
-        // Ensure cue exists in the asset library.
+        // check cue id exists in audio asset library
         auto& lib = AudioAssetLibrary::Get();
         const auto* clip = lib.FindById(src.CueId);
         if (!clip) {
@@ -212,6 +211,6 @@ namespace AudioDiagnostics {
         return true;
     }
 
-} // namespace AudioDiagnostics
+}
 
-#endif // AUDIODIAGNOSTICS_H
+#endif 

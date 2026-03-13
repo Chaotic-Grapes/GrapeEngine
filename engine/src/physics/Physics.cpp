@@ -9,7 +9,12 @@
  * impulse and force application, boundary constraint handling, and full collision
  * resolution with restitution and friction responses between entities.
  * Used by PhysicsSystem.cpp for per-frame updates and collision response.
- */
+ * 
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "physics/Physics.h"
 #include <cmath>

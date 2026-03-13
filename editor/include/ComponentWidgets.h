@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentWidgets.h
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
-\date   2nd November 2025
+        s.leong@digipen.edu
+\date   12th March 2026
 
 \brief
 Reusable ImGui helper functions for editing JSON-backed properties.
@@ -57,7 +59,7 @@ namespace EditorUI {
     // -------------------------------------------------------------------------
     // Section Management
     // -------------------------------------------------------------------------
-    
+
     // Begins a property section with aligned labels and consistent spacing
     void BeginPropertySection(const std::vector<std::string>& labels);
 
@@ -67,12 +69,12 @@ namespace EditorUI {
     // -------------------------------------------------------------------------
     // Basic Value Rendering
     // -------------------------------------------------------------------------
-   
+
     // Displays a read-only value row that cannot be edited by user
     void RenderStaticValueRow(const std::string& label, const std::string& value, bool grayed = false);
 
     // Renders a float property editor with drag control and label
-    void RenderFloatRow(const std::string& label, const std::string& fieldLabel, 
+    void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
         nlohmann::json& data, const std::string& key, float dragSpeed, float min = 0.0f, float max = 0.0f);
 
     // Overload with undo context
@@ -83,19 +85,20 @@ namespace EditorUI {
         uint32_t entityId,              // ECS::Entity id
         uint32_t componentTypeId,       // ECS::ComponentTypeId
         const std::string& propertyPath,
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // -------------------------------------------------------------------------
     // Vector Editing
     // -------------------------------------------------------------------------
-    
+
     // Renders a 2D vector editor with X and Y components as separate drag controls
-    void RenderVector2DRow(const std::string& label, nlohmann::json& data, 
+    void RenderVector2DRow(const std::string& label, nlohmann::json& data,
         const std::string& xKey, const std::string& yKey, float dragSpeed);
 
     // Renders a 3D vector editor with X, Y and Z components as separate drag controls
-    void RenderVector3DRow(const std::string& label, nlohmann::json& data, 
-        const std::string& xKey, const std::string& yKey, const std::string& zKey, 
+    void RenderVector3DRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey,
         float dragSpeed);
 
     // Overload with undo context (2D)
@@ -106,7 +109,8 @@ namespace EditorUI {
         uint32_t entityId,              // ECS::Entity id
         uint32_t componentTypeId,       // ECS::ComponentTypeId
         const std::string& basePath,    // e.g. "Offset" -> paths "Offset.X", "Offset.Y"
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Overload with undo context (3D)
     void RenderVector3DRow(const std::string& label, nlohmann::json& data,
@@ -117,23 +121,23 @@ namespace EditorUI {
         uint32_t entityId,              // ECS::Entity id
         uint32_t componentTypeId,       // ECS::ComponentTypeId
         const std::string& basePath,    // e.g. "Position" -> "Position.X", etc.
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Renders a 4D vector editor with X, Y, Z and W components as separate drag controls
     void RenderVector4DRow(const std::string& label, nlohmann::json& data,
         const std::string& xKey, const std::string& yKey, const std::string& zKey,
         const std::string& wKey, float dragSpeed);
 
-    // Renders a quaternion editor with X, Y, Z and W components
-    // Used for rotation values in 3D space
-    void RenderQuaternionRow(const std::string& label, nlohmann::json& data, 
-        const std::string& xKey, const std::string& yKey, const std::string& zKey, 
+    // Renders a quaternion editor with X, Y, Z and W components for 3D rotation values
+    void RenderQuaternionRow(const std::string& label, nlohmann::json& data,
+        const std::string& xKey, const std::string& yKey, const std::string& zKey,
         const std::string& wKey, float dragSpeed);
 
     // -------------------------------------------------------------------------
     // Property Editing
     // -------------------------------------------------------------------------
-    
+
     // Renders a color picker that edits RGBA values in JSON color data
     void RenderColorProperty(const std::string& label, nlohmann::json& colorData);
 
@@ -141,75 +145,71 @@ namespace EditorUI {
     void RenderColorRow(const std::string& label, nlohmann::json& colorData);
 
     // Renders a text input field that edits string values in JSON data
-    void RenderTextProperty(const std::string& label, nlohmann::json& data, 
+    void RenderTextProperty(const std::string& label, nlohmann::json& data,
         const std::string& key);
 
-    // Overload with undo context for Text
-    void RenderTextProperty(const std::string& label, nlohmann::json& data,
-        const std::string& key,
-        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
-        const std::string& propertyPath,
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+    // Overload with undo context
+    void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId, const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Renders an integer input field with drag control for numeric values
-    void RenderIntProperty(const std::string& label, nlohmann::json& data, 
-        const std::string& key);
+    void RenderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key);
 
-    // Overload with undo context for Int
-    void RenderIntProperty(const std::string& label, nlohmann::json& data,
-        const std::string& key,
-        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
-        const std::string& propertyPath,
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+    // Overload with undo context
+    void RenderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId, const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Renders a dropdown to edit a bitmask (up to 32 bits) with labeled entries
-    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
-        const std::string& key, const std::vector<std::string>& bitNames,
-        uint32_t defaultMask = 0xFFFFFFFFu);
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data, const std::string& key, 
+        const std::vector<std::string>& bitNames, uint32_t defaultMask = 0xFFFFFFFFu);
 
-    // Overload with undo context for Bitmask
-    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
-        const std::string& key, const std::vector<std::string>& bitNames,
-        uint32_t defaultMask,
-        void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
-        const std::string& propertyPath,
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+    // Overload with undo context
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data, const std::string& key, 
+        const std::vector<std::string>& bitNames, uint32_t defaultMask, void* undoSystemPtr, 
+        void* worldPtr, uint32_t entityId, uint32_t componentTypeId, const std::string& propertyPath,
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Renders a checkbox that toggles boolean values in JSON data
-    void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, 
-        const std::string& key);
+    void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, const std::string& key);
 
-    // Overload with undo context for Checkbox (instant)
+    // Overload with undo context
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data,
         const std::string& key,
         void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
         const std::string& propertyPath,
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
-    // Overload with undo context for Color (begin/end)
+    // Overload with undo context
     void RenderColorProperty(const std::string& label, nlohmann::json& colorData,
         void* undoSystemPtr, void* worldPtr, uint32_t entityId, uint32_t componentTypeId,
-        const std::string& basePath, // expects keys "R","G","B","A"
-        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, const std::string& /*path*/, const nlohmann::json& /*value*/ )>& applyFn);
+        const std::string& basePath,  // expects keys "R","G","B","A"
+        const std::function<void(void* /*world*/, uint32_t /*entityId*/, uint32_t /*componentId*/, 
+            const std::string& /*path*/, const nlohmann::json& /*value*/)>& applyFn);
 
     // Renders a checkbox and returns whether value changed, letting caller handle JSON update
     bool RenderCheckboxPropertyReturn(const std::string& label, bool& value);
 
     // Renders two checkboxes in a single row for compact boolean editing
-    void RenderCheckboxRow(const std::string& label, nlohmann::json& data, 
-        const std::string& key1, const std::string& label1, const std::string& key2, 
+    void RenderCheckboxRow(const std::string& label, nlohmann::json& data,
+        const std::string& key1, const std::string& label1, const std::string& key2,
         const std::string& label2);
 
     // -------------------------------------------------------------------------
     // Layout Helpers
     // -------------------------------------------------------------------------
-    
+
     // Returns X position where property content starts after labels
     float GetContentStartX();
 
     // Returns content width for the current inspector panel layout
     float GetContentWidth();
 
-} 
+}
 
 #endif

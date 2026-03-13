@@ -2,7 +2,7 @@
 /*!
 \file   EditorEntityActions.h
 \author Samantha Leong (80%)
-        Foo Rui Qin    (20%)
+        Foo Rui Qin (20%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
 \date   16th November 2025

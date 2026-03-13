@@ -3,7 +3,7 @@
 \file   AssetLibrary.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   11th January 2026
+\date   11th March 2026
 
 \brief
 Handles all asset browser operations.
@@ -40,67 +40,67 @@ Provides:
 
 // Helper functions
 namespace {
-	// Normalize a path to a consistent format for comparison
+    // Normalize a path to a consistent format for comparison
     std::filesystem::path NormalizePath(const std::filesystem::path& input) {
-		// weakly_canonical resolves symlinks and normalizes path components
+        // weakly_canonical resolves symlinks and normalizes path components
         std::error_code ec;
         std::filesystem::path normalized = std::filesystem::weakly_canonical(input, ec);
 
         // But can fail if the path doesn't exist
         if (ec) {
             ec.clear();
-			// If weakly_canonical fails, we can still try absolute to resolve relative components
+            // If weakly_canonical fails, we can still try absolute to resolve relative components
             normalized = std::filesystem::absolute(input, ec);
         }
-		// If absolute also fails (e.g. path doesn't exist), we fall back to the original input
+        // If absolute also fails (e.g. path doesn't exist), we fall back to the original input
         if (ec) {
             return input.lexically_normal();
         }
-		// Finally, we apply lexically_normal to clean up any remaining redundant components (like "a/../b" -> "b")
+        // Finally, we apply lexically_normal to clean up any remaining redundant components (like "a/../b" -> "b")
         return normalized.lexically_normal();
     }
 
-	// Compare two path components for equality, ignoring case on Windows
+    // Compare two path components for equality, ignoring case on Windows
     bool PathComponentEquals(const std::filesystem::path& a, const std::filesystem::path& b) {
 #ifdef _WIN32
-		// On Windows, paths are case-insensitive, so we compare them in lowercase
+        // On Windows, paths are case-insensitive, so we compare them in lowercase
         std::string lhs = a.string();
         std::string rhs = b.string();
 
-		// Convert both strings to lowercase for case-insensitive comparison
+        // Convert both strings to lowercase for case-insensitive comparison
         std::transform(lhs.begin(), lhs.end(), lhs.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         std::transform(rhs.begin(), rhs.end(), rhs.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-		// Finally, compare the normalized lowercase strings
+        // Finally, compare the normalized lowercase strings
         return lhs == rhs;
 #else
-		// On Unix-like systems, paths are case-sensitive, so we can compare them directly
+        // On Unix-like systems, paths are case-sensitive, so we can compare them directly
         return a == b;
 #endif
     }
 
-	// Check if a given path is inside the root directory, accounting for normalization and case sensitivity
+    // Check if a given path is inside the root directory, accounting for normalization and case sensitivity
     bool IsPathInsideRoot(const std::filesystem::path& path, const std::filesystem::path& root) {
-		// Normalize both paths to ensure consistent formatting (resolving symlinks, relative components, etc.)
+        // Normalize both paths to ensure consistent formatting (resolving symlinks, relative components, etc.)
         const std::filesystem::path normalizedPath = NormalizePath(path);
         const std::filesystem::path normalizedRoot = NormalizePath(root);
 
-		// Now we can compare the normalized paths component by component
+        // Now we can compare the normalized paths component by component
         auto pathIt = normalizedPath.begin();
         auto rootIt = normalizedRoot.begin();
 
-		// Iterate through each component of the root path and compare with the corresponding component in the input path
+        // Iterate through each component of the root path and compare with the corresponding component in the input path
         for (; rootIt != normalizedRoot.end(); rootIt++, pathIt++) {
-			// If the input path has fewer components than the root, it can't be inside the root
+            // If the input path has fewer components than the root, it can't be inside the root
             if (pathIt == normalizedPath.end()) {
                 return false;
             }
-			// Compare the current components of both paths, using case-insensitive comparison on Windows
+            // Compare the current components of both paths, using case-insensitive comparison on Windows
             if (!PathComponentEquals(*pathIt, *rootIt)) {
                 return false;
             }
         }
-		// If we successfully compared all components of the root path, then the input path is inside the root
+        // If we successfully compared all components of the root path, then the input path is inside the root
         return true;
     }
 }
@@ -192,7 +192,6 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
     // Check if path exists or if path exists but it's a file, not a folder
     if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
         ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
-        // Pop the font we pushed above so ImGui stays balanced (files and folders later use icons)
         ImGui::PopFont();
         return;
     }
@@ -230,7 +229,6 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
             _displayFile(entry.path(), selectedAsset);
         }
     }
-    // If we push, we must pop
     ImGui::PopFont();
 }
 
@@ -261,7 +259,6 @@ void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::stri
         }
     }
 
-    // Enable file dragging
     // Enable drag-and-drop of this file entry
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // Set payload with type tag "ASSET_PATH"; buffer length includes null terminator
@@ -339,7 +336,6 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
             LOG_ERROR("Failed to get file size: " << e.what());
         }
     }
-    // Stop indenting text
     ImGui::Unindent();
 }
 
@@ -376,7 +372,7 @@ void AssetLibrary::_importAsset(const std::string& currentPath, std::string& sel
     if (GetOpenFileNameA(&ofn)) {
         // User selected a file; the path is now in 'filename' buffer
         std::filesystem::path sourcePath(filename);
-		// Call shared import logic to copy file and update status
+        // Call shared import logic to copy file and update status
         _importFromSourcePath(sourcePath, currentPath, selectedAsset, statusMessage, statusTimer);
     }
     // User clicked cancel
@@ -391,11 +387,11 @@ void AssetLibrary::_importAsset(const std::string& currentPath, std::string& sel
 
 // Shared logic for importing a file from a source path (used by both file dialog and drag-drop)
 void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath, const std::string& currentPath,
-    std::string& selectedAsset, std::string& statusMessage, float& statusTimer) 
+    std::string& selectedAsset, std::string& statusMessage, float& statusTimer)
 {
-	// Validate source file exists, destination folder exists and destination is inside project
+    // Validate source file exists, destination folder exists and destination is inside project
     try {
-		// Check if source file exists
+        // Check if source file exists
         if (!std::filesystem::exists(sourcePath)) {
             statusMessage = "Failed to import: source not found";
             statusTimer = 3.0f;
@@ -403,7 +399,7 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
             return;
         }
 
-		// Check if destination folder exists and is a directory
+        // Check if destination folder exists and is a directory
         const std::filesystem::path destinationDir(currentPath);
         if (!std::filesystem::exists(destinationDir) || !std::filesystem::is_directory(destinationDir)) {
             statusMessage = "Failed to import: destination folder not found";
@@ -412,7 +408,7 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
             return;
         }
 
-		// Ensure destination is inside project root to prevent copying files from arbitrary locations on disk
+        // Ensure destination is inside project root to prevent copying files from arbitrary locations on disk
         const std::filesystem::path projectRoot(Engine::ProjectPaths::GetProjectRoot());
         if (projectRoot.empty()) {
             statusMessage = "Failed to import: project root unavailable";
@@ -421,7 +417,7 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
             return;
         }
 
-		// Check if destination is inside project root (with normalization and case-insensitive comparison)
+        // Check if destination is inside project root (with normalization and case-insensitive comparison)
         if (!IsPathInsideRoot(destinationDir, projectRoot)) {
             statusMessage = "Failed to import: destination outside project";
             statusTimer = 3.0f;
@@ -429,27 +425,25 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
             return;
         }
 
-		// Resolve name conflicts: if a file with the same name already exists in the destination, append a numeric suffix to the filename
-        std::filesystem::path destinationPath = destinationDir / sourcePath.filename();
+        // Resolve name conflicts: if a file with the same name already exists in the destination, append a numeric suffix to the filename
+        std::filesystem::path destinationPath = destinationDir / sourcePath.filename(); // Full destination path before conflict resolution
 
-		// If the destination file already exists, we need to find a unique name by appending a suffix (e.g. "file.png" -> "file_1.png")
+        // If the destination file already exists, we need to find a unique name by appending a suffix (e.g. "file.png" -> "file_1.png")
         if (std::filesystem::exists(destinationPath)) {
-			// Determine base name and extension for suffixing
-            const bool sourceIsDirectory = std::filesystem::is_directory(sourcePath);
-            const std::string baseName = sourceIsDirectory ? destinationPath.filename().string() : destinationPath.stem().string();
-            const std::string extension = sourceIsDirectory ? std::string() : destinationPath.extension().string();
+            const bool sourceIsDirectory = std::filesystem::is_directory(sourcePath);                                          // Directories don't use extension suffixing
+            const std::string baseName = sourceIsDirectory ? destinationPath.filename().string() : destinationPath.stem().string(); // Name without extension
+            const std::string extension = sourceIsDirectory ? std::string() : destinationPath.extension().string();            // Extension to re-append after suffix
 
-			// Start with suffix 1 and increment until we find a name that doesn't exist
-            int suffix = 1;
+            int suffix = 1; // Counter appended to base name until a free path is found
 
-			// Loop to find a unique filename by appending "_1", "_2", etc. before the extension until we find a name that doesn't exist
+            // Loop to find a unique filename by appending "_1", "_2", etc. before the extension until we find a name that doesn't exist
             do {
                 destinationPath = destinationDir / (baseName + "_" + std::to_string(suffix) + extension);
                 suffix++;
             } while (std::filesystem::exists(destinationPath));
         }
 
-		// Use RM to copy the file into the project (handles both ../assets and build/assets)
+        // Use RM to copy the file into the project (handles both ../assets and build/assets)
         if (RM.AddAsset(sourcePath.string(), destinationPath.string())) {
             selectedAsset = destinationPath.string();
             statusMessage = "File imported: " + destinationPath.filename().string();
@@ -458,12 +452,12 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
             return;
         }
 
-		// If we reach this point, the import failed for some reason (e.g. copy error)
+        // If we reach this point, the import failed for some reason (e.g. copy error)
         statusMessage = "Failed to import file";
         statusTimer = 3.0f;
         LOG_ERROR("Import failed via ResourceManager: source = " << sourcePath.string() << ", destination = " << destinationPath.string());
     }
-	// Catch any exceptions that might occur during filesystem operations and log them
+    // Catch any exceptions that might occur during filesystem operations and log them
     catch (const std::exception& e) {
         statusMessage = "Failed to import file";
         statusTimer = 3.0f;
@@ -474,14 +468,12 @@ void AssetLibrary::_importFromSourcePath(const std::filesystem::path& sourcePath
 // Replace the currently selected file with a new one of the same type
 // Performs hot-reload by refreshing the ResourceManager cache
 void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string& statusMessage, float& statusTimer) {
-    // Checks
     if (selectedAsset.empty()) {
         LOG_WARNING("No file selected to replace");
         return;
     }
 
 #ifdef _WIN32
-    // Same as above (import textures)
     char filename[512] = "";
 
     OPENFILENAMEA ofn = {};
@@ -494,29 +486,17 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
     // This ensures the Replace dialog only shows compatible files (e.g. only .png)
     std::filesystem::path destPathBuild(selectedAsset);
 
-    // Becomes .PNG instead of .png basically
-    std::string ext = destPathBuild.extension().string();
-    std::string upperExt = ext;
+    std::string ext = destPathBuild.extension().string(); // Lowercase extension of the selected asset (e.g. ".png")
+    std::string upperExt = ext;                           // Uppercased copy used for display in filter description
     for (auto& c : upperExt) c = (char)std::toupper((unsigned char)c);
 
-    // Build the filter description shown in the file dialog
-    // If no extension exists, fall back to "All Files"
-    // E.g. ext = ".png" -> "PNG files"
-    std::string filterDesc = upperExt.empty() ? std::string("All Files") : (upperExt.substr(1) + " Files");
+    std::string filterDesc = upperExt.empty() ? std::string("All Files") : (upperExt.substr(1) + " Files"); // Human-readable filter label shown in dialog dropdown
+    std::string filterPattern = ext.empty() ? std::string("*.*") : ("*" + ext);                             // Wildcard pattern the dialog uses to filter visible files
+    std::string filter = filterDesc + "\0" + filterPattern + "\0All Files\0*.*\0";                          // Full filter string in Win32 double-null-terminated format
 
-    // Build the actual wildcard pattern the dialog will filter by
-    // E.g. ext = ".png" -> "*.png" and ext = "" -> "*.*"
-    std::string filterPattern = ext.empty() ? std::string("*.*") : ("*" + ext);
-
-    // Combine description + pattern into the Windows dialog filter format
-    // "\0" separators are required by Win32 API formatting
-    // E.g. "PNG Files\0*.png\0All Files\0*.*\0" matching import textures basically
-    std::string filter = filterDesc + "\0" + filterPattern + "\0All Files\0*.*\0";
-
-    // Everything from this point onwards is just the same stuff
     ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
-    std::string title = ext.empty() ? std::string("Select file to replace with") : ("Select " + upperExt + " to replace with");
+    std::string title = ext.empty() ? std::string("Select file to replace with") : ("Select " + upperExt + " to replace with"); // Dialog title reflecting the expected file type
     ofn.lpstrTitle = title.c_str();
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
@@ -532,9 +512,9 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
         }
 
         // Only operate when inside the project's Assets folder
-        std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
-        auto absSel = std::filesystem::absolute(selectedAsset).string();
-        auto absAssets = std::filesystem::absolute(assetsRoot).string();
+        std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();   // Project assets root used to validate replacement target is inside the project
+        auto absSel = std::filesystem::absolute(selectedAsset).string();  // Absolute path of selected asset
+        auto absAssets = std::filesystem::absolute(assetsRoot).string();  // Absolute path of assets root for prefix check
         if (absSel.find(absAssets) != std::string::npos) {
             // Use ResourceManager to replace the asset (handles unload + reload automatically)
             if (RM.ReplaceAsset(selectedAsset, sourcePath.string())) {
@@ -555,22 +535,22 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
 #else
     LOG_WARNING("File dialog not implemented for this platform");
 #endif
-    }
+}
 
 // Handle a file dropped from the OS into the asset browser
 // Mirrors the import flow and selects the newly copied file
-void AssetLibrary::_handleFileDrop(const std::string & sourcePathStr, const std::string & currentPath,
-    std::string & selectedAsset, std::string & statusMessage, float& statusTimer)
+void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::string& currentPath,
+    std::string& selectedAsset, std::string& statusMessage, float& statusTimer)
 {
     std::filesystem::path sourcePath(sourcePathStr);
-	// The logic for handling a file dropped from the OS is basically the same as the import flow triggered by the file dialog, 
+    // The logic for handling a file dropped from the OS is basically the same as the import flow triggered by the file dialog, 
     // except we already have the source path and don't need to show a dialog
     _importFromSourcePath(sourcePath, currentPath, selectedAsset, statusMessage, statusTimer);
 }
 
 // Delete the currently selected file or folder safely in both locations
 // Removes from build/assets and mirrors the deletion in ../assets
-void AssetLibrary::_deleteSelectedAsset(std::string & selectedAsset, std::string & statusMessage,
+void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage,
     float& statusTimer)
 {
     if (selectedAsset.empty()) {
@@ -588,12 +568,11 @@ void AssetLibrary::_deleteSelectedAsset(std::string & selectedAsset, std::string
         selectedAsset.clear();
         return;
     }
-    // bool isFolder = std::filesystem::is_directory(selectedPath);
 
     // Only operate when inside the project's Assets folder
-    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
-    auto absSel = std::filesystem::absolute(selectedAsset).string();
-    auto absAssets = std::filesystem::absolute(assetsRoot).string();
+    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();   // Project assets root used to validate deletion target is inside the project
+    auto absSel = std::filesystem::absolute(selectedAsset).string();  // Absolute path of the selected asset
+    auto absAssets = std::filesystem::absolute(assetsRoot).string();  // Absolute path of assets root for prefix check
     if (absSel.find(absAssets) != std::string::npos) {
         // Use ResourceManager to delete the asset (handles cache cleanup automatically)
         if (RM.DeleteAsset(selectedAsset)) {

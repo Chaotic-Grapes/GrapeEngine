@@ -1,13 +1,13 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.h
-\author Foo Rui Qin    (60%)
-        Muhammad Nur Fadzly Bin Zulkifli (20%)
+\author Foo Rui Qin (50%)
+        Muhammad Nur Fadzly Bin Zulkifli (30%)
         Samantha Leong Sher Yen (20%)
 \par    ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
         s.leong@digipen.edu
-\date   16th November 2025
+\date   11th March 2026
 
 \brief
 Declares the EditorFileMenu class which manages all File-menu actions in the
@@ -49,14 +49,14 @@ public:
 
     // Connects the File menu to the SceneManager so it can create, load and save scenes
     void Initialize(Scenes::SceneManager* sceneManager);
-    
+
     // Set fonts for rendering bold asterisk
     void SetFonts(ImFont* mainFont, ImFont* boldFont) {
         m_mainFont = mainFont;
         m_boldFont = boldFont;
     }
-    
-    // Set symbols font for icon-only buttons.
+
+    // Set symbols font for icon-only buttons
     void SetSymbolsFont(ImFont* symbolsFont) {
         m_symbolsFont = symbolsFont;
     }
@@ -66,7 +66,7 @@ public:
         m_hierarchyPanel = hierarchyPanel;
     }
 
-    // Set undo system for edit menu actions.
+    // Set undo system for edit menu actions
     void SetUndoSystem(Editor::UndoSystem* undoSystem) {
         m_undoSystem = undoSystem;
     }
@@ -76,17 +76,17 @@ public:
         m_getEditorState = std::move(getter);
     }
 
-    // Called when the active scene is reloaded during play to clear playback snapshot.
+    // Called when the active scene is reloaded during play to clear playback snapshot
     void SetPlaybackSnapshotClearCallback(std::function<void()> callback) {
         m_clearPlaybackSnapshot = std::move(callback);
     }
 
-    // Called before scene save to persist external assets (e.g., tilemaps).
+    // Called before scene save to persist external assets (e.g. tilemaps)
     void SetPreSaveCallback(std::function<void(const std::string&)> callback) {
         m_preSaveCallback = std::move(callback);
     }
 
-    // Request opening the project browser (project selection UI).
+    // Request opening the project browser (project selection UI)
     void SetProjectBrowserRequestCallback(std::function<void()> callback) {
         m_requestProjectBrowser = std::move(callback);
     }
@@ -113,7 +113,8 @@ public:
 
     // Shows a file dialog allowing the user to pick a .scene file to load
     void OpenSceneDialog();
-    // Opens a scene directly from a provided path (e.g., asset browser double-click).
+
+    // Opens a scene directly from a provided path (e.g., asset browser double-click)
     void OpenSceneFromPath(const std::string& path);
 
     // Shows a Save As dialog and writes the current scene to disk
@@ -122,7 +123,7 @@ public:
     // Saves to current scene path if known; otherwise falls back to Save As
     void SaveScene();
 
-    // Expose the current scene path for editor systems.
+    // Expose the current scene path for editor systems
     const std::string& GetCurrentScenePath() const { return m_currentScenePath; }
 
     // Sync the current scene path when scenes are activated outside the file menu
@@ -141,7 +142,8 @@ public:
             m_hasUnsavedChanges = true;
         }
     }
-    // Expose dirty state for play-mode guards.
+
+    // Expose dirty state for play-mode guards
     bool HasUnsavedChanges() const { return m_hasUnsavedChanges; }
 
     // -------------------------------------------------------------------------
@@ -152,11 +154,12 @@ public:
     void HandleShortcuts(float& uiScale);
 
 private:
+    // Result of a single export step, including name, success flag and output message
     struct ExportStepResult {
-        std::string Name;
-        bool Success = false;
-        std::string Message;
-        std::string Output;
+        std::string Name;       // Display name of the export step
+        bool Success = false;   // Whether the step completed successfully
+        std::string Message;    // Human-readable result or error message
+        std::string Output;     // Raw output captured from the step
     };
 
     // -------------------------------------------------------------------------
@@ -168,11 +171,22 @@ private:
 
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
+
+    // Trigger a full project export, launching the export thread
     void _exportProject();
+
+    // Render the export summary popup showing per-step results
     void _renderExportSummaryPopup();
+
+    // Render the project settings modal for editing project-wide config
+    void _renderProjectSettingsModal();
+
 #ifdef _WIN32
+    // Show a folder picker dialog and return the selected export destination path
     std::string _pickExportFolder();
 #endif
+
+    // Check if the export thread has finished and finalize export state
     void _finalizeExportIfDone();
 
     // -------------------------------------------------------------------------
@@ -191,45 +205,47 @@ private:
     // Getter used to query current EditorState; optional (defaults to Edit)
     std::function<EditorState()> m_getEditorState = nullptr;
 
-    // Optional callback to clear playback snapshot on in-place reload.
+    // Optional callback to clear playback snapshot on in-place reload
     std::function<void()> m_clearPlaybackSnapshot;
 
-    // Optional callback to sync external assets before scene serialization.
+    // Optional callback to sync external assets before scene serialization
     std::function<void(const std::string&)> m_preSaveCallback;
 
-    // Optional callback to open the project browser.
+    // Optional callback to open the project browser
     std::function<void()> m_requestProjectBrowser;
 
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
 
-    // Track whether current scene has unsaved changes
+    // Whether the current scene has unsaved changes
     bool m_hasUnsavedChanges = false;
-    
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_boldFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
 
-    // Project settings editor state
+    ImFont* m_mainFont = nullptr;       // Main body font
+    ImFont* m_boldFont = nullptr;       // Bold font for unsaved-changes asterisk
+    ImFont* m_symbolsFont = nullptr;    // Symbols/icon font for icon-only buttons
+
+    // Whether the project settings modal is currently open
     bool m_showProjectSettings = false;
+
+    // Whether project settings have been modified but not yet saved
     bool m_projectSettingsDirty = false;
-    // Helper to render project settings modal
-    void _renderProjectSettingsModal();
 
 public:
 
-    // Export state
-    bool m_exportRequested = false;
-    bool m_openExportSummary = false;
-    std::string m_exportDestination;
-    std::vector<ExportStepResult> m_exportResults;
-    std::thread m_exportThread;
-    std::mutex m_exportMutex;
-    std::atomic<bool> m_exportInProgress{ false };
-    std::atomic<bool> m_exportDone{ false };
-    std::atomic<int> m_exportCurrentStep{ -1 };
-    std::vector<std::string> m_exportStepNames;
-    
+    // -------------------------------------------------------------------------
+    // Export State
+    // -------------------------------------------------------------------------
+
+    bool m_exportRequested = false;                     // True if an export has been requested this frame
+    bool m_openExportSummary = false;                   // True if the export summary popup should open
+    std::string m_exportDestination;                    // Target folder path for the export output
+    std::vector<ExportStepResult> m_exportResults;      // Per-step results from the last export run
+    std::thread m_exportThread;                         // Background thread running the export pipeline
+    std::mutex m_exportMutex;                           // Guards shared export state across threads
+    std::atomic<bool> m_exportInProgress{ false };      // True while the export thread is running
+    std::atomic<bool> m_exportDone{ false };            // True once the export thread has completed
+    std::atomic<int> m_exportCurrentStep{ -1 };         // Index of the currently executing export step
+    std::vector<std::string> m_exportStepNames;         // Ordered display names for each export step
 };
 
 #endif

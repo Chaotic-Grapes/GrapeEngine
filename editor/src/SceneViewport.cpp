@@ -1,13 +1,13 @@
 /* Start Header *****************************************************************/
 /*!
 \file   SceneViewport.cpp
-\author Samantha Leong (45%)
-        Foo Rui Qin    (45%)
+\author Samantha Leong (40%)
+        Foo Rui Qin (50%)
         Muhammad Nur Fadzly Bin Zulkifli (10%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
-\date   3rd November 2025
+\date   12th March 2026
 \brief
 Implementation of SceneViewport class for the editor scene view with editor camera,
 entity selection, gizmo manipulation via ViewportInteractionManager.
@@ -54,16 +54,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace {
     constexpr const char* kSceneViewportName = "Scene";
 
-	// Collision mask bits for 2x2 subcell editing in the tile palette collision brush
-	constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;   // Bit 0
-	constexpr uint8_t kCollisionMaskBottomRight = 1 << 1;  // Bit 1
-	constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;      // Bit 2
-	constexpr uint8_t kCollisionMaskTopRight = 1 << 3;     // Bit 3
+    // Collision mask bits for 2x2 subcell editing in the tile palette collision brush
+    constexpr uint8_t kCollisionMaskBottomLeft = 1 << 0;   // Bit 0
+    constexpr uint8_t kCollisionMaskBottomRight = 1 << 1;  // Bit 1
+    constexpr uint8_t kCollisionMaskTopLeft = 1 << 2;      // Bit 2
+    constexpr uint8_t kCollisionMaskTopRight = 1 << 3;     // Bit 3
 }
 
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
+
+// Initializes scene viewport dependencies and creates the render viewport entry
 void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
                                 ECS::World* world, Scenes::SceneManager* sceneManager) {
     BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
@@ -74,18 +76,23 @@ void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbo
     Graphics::ViewportManager::Create(kSceneViewportName, m_editorCamera ? m_editorCamera->GetCamera() : nullptr, 1, 1);
 }
 
+// Destroys the scene viewport render target registration
 SceneViewport::~SceneViewport() {
+
     // Cleanup handled by base class and RAII members
     Graphics::ViewportManager::Destroy(kSceneViewportName);
 }
 
+// Starts per-frame editor camera input handling for this viewport
 void SceneViewport::BeginFrame() {
+
     // Only the scene viewport uses the editor camera input handling
     if (m_editorCamera) {
         m_editorCamera->BeginFrame();
     }
 }
 
+// Finalizes frame-level viewport state through the base implementation
 void SceneViewport::EndFrame() {
     BaseViewport::EndFrame();
 }
@@ -93,18 +100,22 @@ void SceneViewport::EndFrame() {
 // -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
+
+// Applies viewport hotkeys and synchronizes selection from viewport picking
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    // Focus selected entity when the scene viewport is active.
+    // Focus the selected entity when F is pressed so camera framing is one-keystroke
     if (Input::IsKeyPressed(KEY_F) && !m_selectedEntity.IsNull()) {
         FocusOnEntity(m_selectedEntity.Index);
     }
-    // Toggle viewport maximize/restore via hotkey.
+
+    // Toggle maximize state with F11 while preserving enough data to restore docking
     if (Input::IsKeyPressed(KEY_F11)) {
         if (!m_maximizeViewport) {
             m_requestRestore = false;
-        } else {
+        }
+        else {
             m_requestRestore = true;
         }
         m_maximizeViewport = !m_maximizeViewport;
@@ -122,6 +133,8 @@ void SceneViewport::HandleInWorldInteraction() {
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
+
+// Renders all scene viewport editor UI surfaces
 void SceneViewport::ShowEditorWindows() {
     _renderViewport();
 }
@@ -129,20 +142,24 @@ void SceneViewport::ShowEditorWindows() {
 // -------------------------------------------------------------------------
 // Private Rendering Implementation
 // -------------------------------------------------------------------------
+
+// Draws scene viewport UI, image output, overlays, gizmos and tile-palette interaction
 void SceneViewport::_renderViewport() {
-    // Handle maximize/restore state before rendering the window.
+
+    // Resolve maximize and restore intent before opening the ImGui window
     ImGuiWindowFlags windowFlags = 0;
+
     if (!m_maximizeViewport && m_requestRestore && m_restoreDockValid) {
         ImGuiID restoreDockId = 0;
 
-        // Prefer docking back into the same panel/tab stack as Game.
+        // Prefer restoring into the same dock node as Game so both viewports stay grouped
         if (ImGuiWindow* gameWindow = ImGui::FindWindowByName("Game")) {
             if (gameWindow->DockId != 0 && ImGui::DockBuilderGetNode(gameWindow->DockId) != nullptr) {
                 restoreDockId = gameWindow->DockId;
             }
         }
 
-        // Fall back to the previously cached dock node if Game isn't docked/available.
+        // Fall back to cached dock id when Game is not present or has no valid dock node
         if (restoreDockId == 0) {
             restoreDockId = m_restoreDockId;
             if (restoreDockId != 0 && ImGui::DockBuilderGetNode(restoreDockId) == nullptr) {
@@ -152,9 +169,11 @@ void SceneViewport::_renderViewport() {
 
         if (restoreDockId != 0) {
             ImGui::SetNextWindowDockID(restoreDockId, ImGuiCond_Always);
-        } else if (m_defaultDockspaceId != 0) {
+        }
+        else if (m_defaultDockspaceId != 0) {
             ImGui::SetNextWindowDockID(m_defaultDockspaceId, ImGuiCond_Always);
-        } else {
+        }
+        else {
             ImGui::SetNextWindowPos(m_restorePos, ImGuiCond_Always);
             ImGui::SetNextWindowSize(m_restoreSize, ImGuiCond_Always);
         }
@@ -166,23 +185,26 @@ void SceneViewport::_renderViewport() {
         ImGui::SetNextWindowSize(vp->Size, ImGuiCond_Always);
         ImGui::SetNextWindowViewport(vp->ID);
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+
         windowFlags |= ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
-                       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
     }
 
     // Begin scene viewport window
     ImGui::Begin("Scene", nullptr, windowFlags);
     {
-		// Handle gizmo operation hotkeys when the scene viewport is focused or hovered
+
+        // Handle gizmo operation hotkeys when the scene viewport is focused or hovered
         // and no text input or item interaction is active
         ImGuiIO& io = ImGui::GetIO();
         const bool sceneFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         const bool sceneHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
         const bool sceneInputContext = sceneFocused || sceneHovered;
 
-		// Only process gizmo hotkeys if we're in the scene viewport and not typing or interacting with UI items
+        // Only process gizmo hotkeys if we're in the scene viewport and not typing or interacting with UI items
         if (sceneInputContext && !io.WantTextInput && !ImGui::IsAnyItemActive()) {
-			// Translate (T), Rotate (E), Scale (R) hotkeys
+
+            // Translate (T), Rotate (E), Scale (R) hotkeys
             if (ImGui::IsKeyPressed(ImGuiKey_T)) {
                 m_interactionMgr.SetGizmoOperation(Editor::GizmoRenderer::Operation::Translate);
             }
@@ -194,8 +216,9 @@ void SceneViewport::_renderViewport() {
             }
         }
     }
+
     if (!m_maximizeViewport) {
-        // Cache docking state for restoring the viewport later.
+        // Cache docking state so we can return this window to the same place after leaving maximize mode
         m_restoreDockId = ImGui::GetWindowDockID();
         m_restoreDockValid = true;
         m_restorePos = ImGui::GetWindowPos();
@@ -204,18 +227,22 @@ void SceneViewport::_renderViewport() {
 
     auto* rendererSystem = _getRendererSystem();
     
-    // --- Viewport Header -----------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Viewport Header
+    // -------------------------------------------------------------------------
+
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
     const float iconButtonSize = 28.0f;
     const float headerHeight = iconButtonSize + 10.0f;
     ImGui::BeginChild("##SceneViewportHeader", ImVec2(0.0f, headerHeight), false,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    // Vertically center controls within the header strip.
+
+    // Vertically center controls so every icon cluster aligns cleanly in the strip
     const float centerOffset = std::max(0.0f, (headerHeight - iconButtonSize) * 0.5f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + centerOffset);
 
-    // Clamp helper for per-group tinting.
+    // Clamp helper for tint scaling so multiplied colors do not overflow above 1.0
     auto tintScale = [](const ImVec4& c, float s) {
         return ImVec4(
             std::min(c.x * s, 1.0f),
@@ -225,7 +252,7 @@ void SceneViewport::_renderViewport() {
         );
     };
 
-    // Small helper to scope button palette overrides.
+    // Small helper that pushes a full button palette and returns how many colors to pop
     auto pushButtonColors = [](const ImVec4& normal, const ImVec4& hover, const ImVec4& active, const ImVec4& text) {
         ImGui::PushStyleColor(ImGuiCol_Button, normal);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hover);
@@ -234,7 +261,7 @@ void SceneViewport::_renderViewport() {
         return 4;
     };
 
-    // Icon-only button with optional active tint and tooltip.
+    // Icon button helper with active tint, hover tooltip, and optional symbol font
     auto iconButtonTinted = [&](const char* id, const char* icon, const char* tooltip, bool active, const ImVec4& tint, bool useSymbols) {
         const ImVec4 normal = active ? tintScale(tint, 1.25f) : tint;
         const ImVec4 hover = active ? tintScale(tint, 1.35f) : tintScale(tint, 1.12f);
@@ -243,6 +270,7 @@ void SceneViewport::_renderViewport() {
         const int popCount = pushButtonColors(normal, hover, pressed, text);
         ImGui::PushID(id);
         if (useSymbols && m_symbolsFont) ImGui::PushFont(m_symbolsFont);
+
         // Remove padding inside viewport icon buttons
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
@@ -275,7 +303,7 @@ void SceneViewport::_renderViewport() {
     static const char* ICON_MAX         = EditorIcons::Maximize;
     static const char* ICON_RESTORE     = EditorIcons::Restore;
 
-    // Per-group tints to visually separate control clusters.
+    // Per-group tints make related controls visually scannable at a glance
     const ImVec4 cameraTint = ImVec4(0.20f, 0.38f, 0.66f, 1.0f);
     const ImVec4 gizmoTint = ImVec4(0.20f, 0.62f, 0.44f, 1.0f);
     const ImVec4 spaceTint = ImVec4(0.18f, 0.58f, 0.64f, 1.0f);
@@ -338,7 +366,7 @@ void SceneViewport::_renderViewport() {
     ImGui::Separator();
     ImGui::SameLine();
 
-    // Snap toggle with right-click settings popup.
+    // Snap toggle plus right-click popup for translate, rotate, and scale snap values
     ImGui::PushID("Snap");
     if (iconButtonTinted("Toggle", "S", "Snap (Right-click for settings)", m_snapEnabled, snapTint, false)) {
         m_snapEnabled = !m_snapEnabled;
@@ -362,7 +390,7 @@ void SceneViewport::_renderViewport() {
     ImGui::Separator();
     ImGui::SameLine();
 
-    // Overlays menu for editor helpers and diagnostics.
+    // Overlay menu toggles helper visuals and viewport diagnostics
     ImGui::PushID("Overlays");
     const bool overlaysActive = m_showGrid || m_showAxes || m_showBounds || m_showColliders ||
         m_showLights || m_showCameraFrustum || m_showSceneFpsOverlay;
@@ -383,7 +411,8 @@ void SceneViewport::_renderViewport() {
     ImGui::PopID();
 
     ImGui::SameLine();
-    // Debug render target selector.
+
+    // Debug render-target selector swaps the displayed scene texture source
     ImGui::PushID("DebugView");
     ImGui::SetNextItemWidth(110.0f);
     static const char* kDebugViews[] = { "Final", "HDR", "Bloom" };
@@ -394,7 +423,7 @@ void SceneViewport::_renderViewport() {
     ImGui::Separator();
     ImGui::SameLine();
 
-    // Layout preset buttons for dock rebuilding.
+    // Layout preset buttons request dockspace arrangement changes
     ImGui::PushID("ViewportLayout");
     if (iconButtonTinted("Layout1", ICON_LAYOUT_1, "Layout: Single View", m_layoutPreset == 1, layoutTint, true)) {
         if (m_layoutPreset != 1) {
@@ -422,24 +451,26 @@ void SceneViewport::_renderViewport() {
     ImGui::Separator();
     ImGui::SameLine();
 
-    // Toggle maximize/restoration of the scene viewport.
+    // Toggle maximize and restore behavior for this viewport
     if (iconButtonTinted("Maximize", m_maximizeViewport ? ICON_RESTORE : ICON_MAX,
         m_maximizeViewport ? "Restore Viewport (F11)" : "Maximize Viewport (F11)",
         m_maximizeViewport, maximizeTint, true)) {
         if (!m_maximizeViewport) {
-            // Cache docking state for restoring later.
+
+            // Cache current docking and rectangle so restore returns this viewport to its prior location
             m_restoreDockId = ImGui::GetWindowDockID();
             m_restoreDockValid = true;
             m_restorePos = ImGui::GetWindowPos();
             m_restoreSize = ImGui::GetWindowSize();
             m_requestRestore = false;
-        } else {
+        }
+        else {
             m_requestRestore = true;
         }
         m_maximizeViewport = !m_maximizeViewport;
     }
 
-    // Push snap settings into the gizmo system each frame.
+    // Push latest snap settings every frame so gizmo behavior reflects current header controls
     m_interactionMgr.SetGizmoSnap(m_snapEnabled, m_snapTranslate, m_snapRotate, m_snapScale);
 
     ImGui::EndChild();
@@ -466,6 +497,7 @@ void SceneViewport::_renderViewport() {
     Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
     if (rendererSystem) {
+
         // Configure renderer to use EDITOR camera for Scene viewport
         rendererSystem->SetCamera(m_editorCamera->GetCamera());
 
@@ -484,14 +516,18 @@ void SceneViewport::_renderViewport() {
         if (auto* vp = rendererSystem->GetViewport(kSceneViewportName)) {
             if (m_debugViewIndex == 1 && vp->HDR) {
                 textureId = vp->HDR->GetColorTexture(0);
-            } else if (m_debugViewIndex == 2 && vp->BloomExtract) {
+            }
+            else if (m_debugViewIndex == 2 && vp->BloomExtract) {
                 textureId = vp->BloomExtract->GetColorTexture(0);
-            } else if (vp->LDR) {
+            }
+            else if (vp->LDR) {
                 textureId = vp->LDR->GetColorTexture(0);
             }
-        } else if (auto* rg = rendererSystem->GetRenderGraph()) {
+        }
+        else if (auto* rg = rendererSystem->GetRenderGraph()) {
             ResourceAccessor acc(rg);
-            // Select debug texture based on the header dropdown.
+
+            // Select debug texture by dropdown choice with LDR fallback for safety
             const char* debugTextureName = "LDR";
             if (m_debugViewIndex == 1) debugTextureName = "HDR";
             if (m_debugViewIndex == 2) debugTextureName = "BloomExtract";
@@ -508,12 +544,14 @@ void SceneViewport::_renderViewport() {
             // Check if image is hovered AFTER drawing it
             bool isSceneImageHovered = ImGui::IsItemHovered();
 
-            // Accept asset drops on the scene viewport to set the active tileset.
+            // Accept asset drag-drop so dropping a tileset on the viewport updates the tile palette target
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
                     const char* data = static_cast<const char*>(payload->Data);
                     if (data && payload->DataSize > 0) {
-                        const std::string assetPath(data); // Payload is null-terminated list, first entry is enough.
+
+                        // Payload may contain multiple null-separated entries, first path is enough for active target swap
+                        const std::string assetPath(data);
                         if (m_tilePalettePanel) {
                             m_tilePalettePanel->HandleAssetDrop(assetPath);
                         }
@@ -554,7 +592,7 @@ void SceneViewport::_renderViewport() {
 
                     // Handle mouse click picking on the viewport image
                     // Don't pick if gizmo is being used or hovered
-                    // Let tile palette consume clicks when active.
+                    // Let tile palette consume relevant clicks first so paint input does not fight entity picking
                     bool tilePaletteHandledClick = false;
                     if (m_tilePalettePanel && isSceneImageHovered) {
                         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -584,27 +622,30 @@ void SceneViewport::_renderViewport() {
                         glm::vec4 world4 = invViewProj * ndc;
                         glm::vec2 worldPos = { world4.x, world4.y };
 
-						// Check if tile palette is in collision edit mode to determine hover vs paint behavior
+                        // Check if tile palette is in collision edit mode to determine hover vs paint behavior
                         const bool collisionEditActive = m_tilePalettePanel->IsCollisionEditActive();
 
-						// When collision edit mode is active, show the collision brush preview instead of tile preview
+                        // When collision edit mode is active, show the collision brush preview instead of tile preview
                         if (collisionEditActive) {
                             m_tilePalettePanel->OnViewportCollisionHover(worldPos);
                         } 
-						// When not in collision edit mode, show regular tile preview on hover
+
+                        // When not in collision edit mode, show regular tile preview on hover
                         else {
                             m_tilePalettePanel->OnViewportHover(worldPos);
                         }
 
-                        // Draw tilemap bounds/grid when tile palette is active.
+                        // Draw tilemap overlays while palette tools are active so paint context is visible
                         if (rendererSystem) {
                             const auto& map = m_tilePalettePanel->GetTileMap();
-                            const glm::vec2 mapOrigin = m_tilePalettePanel->GetTileMapOrigin(); // Tilemap origin in world space.
+
+                            // Tilemap origin offsets world-space conversion and must be applied before grid/tile calculations
+                            const glm::vec2 mapOrigin = m_tilePalettePanel->GetTileMapOrigin();
                             if (map && map->LayerCount() > 0) {
                                 const auto& layer = map->GetLayer(0);
                                 const float tileSize = map->TileSize();
 
-                                // Compute camera-aligned extents for an "infinite" grid overlay.
+                                // Compute camera-aligned extents so grid drawing only covers current visible region
                                 float halfHeight = 10.0f;
                                 float halfWidth = 10.0f;
                                 if (camera->UsePerspective) {
@@ -612,7 +653,8 @@ void SceneViewport::_renderViewport() {
                                     const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
                                     halfHeight = std::max(1.0f, halfHeightView);
                                     halfWidth = halfHeight * camera->AspectRatio;
-                                } else {
+                                }
+                                else {
                                     halfHeight = std::max(1.0f, camera->OrthoSize);
                                     halfWidth = halfHeight * camera->AspectRatio;
                                 }
@@ -622,14 +664,14 @@ void SceneViewport::_renderViewport() {
                                 // Align grid to the tilemap origin
                                 const glm::vec2 camLocal = camPos - mapOrigin; 
 
-								// When in collision edit mode, show a finer grid at half tile size to help visualize sub-tile collision editing
+                                // When in collision edit mode, show a finer grid at half tile size to help visualize sub-tile collision editing
                                 const float gridStep = collisionEditActive ? (tileSize * 0.5f) : tileSize;
                                 const float startX = std::floor((camLocal.x - halfWidth) / gridStep) * gridStep + mapOrigin.x;
                                 const float endX = camPos.x + halfWidth;
                                 const float startY = std::floor((camLocal.y - halfHeight) / gridStep) * gridStep + mapOrigin.y;
                                 const float endY = camPos.y + halfHeight;
 
-                                // Draw infinite-ish grid within the camera view.
+                                // Draw bounded "infinite" grid slice across the current camera extents
                                 const glm::vec4 gridColor(0.6f, 0.8f, 0.9f, 0.12f);
                                 const uint32_t maxLines = 512;
                                 uint32_t lineCount = 0;
@@ -641,62 +683,65 @@ void SceneViewport::_renderViewport() {
                                     rendererSystem->SubmitWireframeLine(glm::vec2(startX, y), glm::vec2(endX, y), gridColor, 0.02f);
                                 }
 
-                                // Draw current tilemap bounds as a separate outline.
+                                // Draw tilemap bounds separately so users can distinguish map extents from helper grid lines
                                 const glm::vec2 min(mapOrigin.x + map->TileToWorldSigned(map->OriginX()),
-                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY())); // Bounds min in world space.
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY()));
                                 const glm::vec2 max(mapOrigin.x + map->TileToWorldSigned(map->OriginX() + static_cast<int32_t>(layer.Width())),
-                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY() + static_cast<int32_t>(layer.Height()))); // Bounds max in world space.
+                                                    mapOrigin.y + map->TileToWorldSigned(map->OriginY() + static_cast<int32_t>(layer.Height())));
                                 const glm::vec4 outlineColor(0.2f, 0.9f, 0.9f, 0.45f);
                                 rendererSystem->SubmitWireframeQuad(min, max, outlineColor, 0.05f);
 
-								// When in collision edit mode, overlay collision masks on top of tiles using 
+                                // When in collision edit mode, overlay collision masks on top of tiles using 
                                 // the tile palette's current collision brush settings for visualization
                                 if (collisionEditActive && tileSize > 0.0f) {
-									// Compute visible tile range based on camera view to limit collision mask rendering 
+
+                                    // Compute visible tile range based on camera view to limit collision mask rendering 
                                     // to only tiles within the viewport for performance
                                     const glm::vec2 viewMin = camPos - glm::vec2(halfWidth, halfHeight);
                                     const glm::vec2 viewMax = camPos + glm::vec2(halfWidth, halfHeight);
                                     const glm::vec2 localMin = viewMin - mapOrigin;
                                     const glm::vec2 localMax = viewMax - mapOrigin;
 
-									// Calculate tile indices for the visible range, clamping to the tilemap bounds
+                                    // Calculate tile indices for the visible range, clamping to the tilemap bounds
                                     int32_t startTileX = static_cast<int32_t>(std::floor(localMin.x / tileSize));
                                     int32_t endTileX = static_cast<int32_t>(std::floor(localMax.x / tileSize));
                                     int32_t startTileY = static_cast<int32_t>(std::floor(localMin.y / tileSize));
                                     int32_t endTileY = static_cast<int32_t>(std::floor(localMax.y / tileSize));
 
-									// Tilemap may have an origin offset, so factor that in when clamping tile indices to the map bounds
+                                    // Tilemap may have an origin offset, so factor that in when clamping tile indices to the map bounds
                                     const int32_t mapMinX = map->OriginX();
                                     const int32_t mapMinY = map->OriginY();
                                     const int32_t mapMaxX = mapMinX + static_cast<int32_t>(layer.Width()) - 1;
                                     const int32_t mapMaxY = mapMinY + static_cast<int32_t>(layer.Height()) - 1;
 
-									// Clamp tile indices to map bounds to avoid out-of-range access when checking collision masks
+                                    // Clamp tile indices to map bounds to avoid out-of-range access when checking collision masks
                                     startTileX = std::max(startTileX, mapMinX);
                                     endTileX = std::min(endTileX, mapMaxX);
                                     startTileY = std::max(startTileY, mapMinY);
                                     endTileY = std::min(endTileY, mapMaxY);
 
-									// Use a semi-transparent red fill to indicate collision areas, subdivided into quadrants based 
+                                    // Use a semi-transparent red fill to indicate collision areas, subdivided into quadrants based 
                                     // on the tile's collision mask for better visualization of sub-tile collision editing
                                     const glm::vec4 collisionFill(0.9f, 0.2f, 0.2f, 0.35f);
                                     const float subSize = tileSize * 0.5f;
 
-									// Iterate over visible tiles and draw collision mask overlays
+                                    // Iterate over visible tiles and draw collision mask overlays
                                     for (int32_t ty = startTileY; ty <= endTileY; ty++) {
                                         for (int32_t tx = startTileX; tx <= endTileX; tx++) {
-											// Skip empty tiles since they don't have collision masks and it reduces visual clutter
+
+                                            // Skip empty tiles since they don't have collision masks and it reduces visual clutter
                                             if (map->GetTileSigned(0, tx, ty) == EMPTY_TILE) {
                                                 continue;
                                             }
-											// Calculate the world position of the tile's bottom-left corner for rendering the collision mask overlay
+
+                                            // Calculate the world position of the tile's bottom-left corner for rendering the collision mask overlay
                                             const glm::vec2 tileWorld(mapOrigin.x + map->TileToWorldSigned(tx), mapOrigin.y + map->TileToWorldSigned(ty));
-											
+                                            
                                             // Get the collision mask for the tile and draw filled quads for each quadrant based on the mask bits and 
                                             // the tile palette's collision brush settings
                                             const uint8_t mask = map->GetCollisionMaskSigned(tx, ty);
 
-											// The collision mask uses 4 bits to represent collision in each quadrant of the tile:
+                                            // The collision mask uses 4 bits to represent collision in each quadrant of the tile:
                                             if (mask & kCollisionMaskBottomLeft) {
                                                 rendererSystem->SubmitFilledQuad(tileWorld, tileWorld + glm::vec2(subSize, subSize), collisionFill);
                                             }
@@ -716,40 +761,46 @@ void SceneViewport::_renderViewport() {
                             }
                         }
                         
-						// When tile palette is active, prioritize it handling clicks for painting over regular picking/selection 
+                        // When tile palette is active, prioritize it handling clicks for painting over regular picking/selection 
                         // to avoid interference
                         bool left = Input::IsMouseDown(MOUSE_LEFT);
                         if (collisionEditActive) {
                             const bool canPaintCollision = m_tilePalettePanel->CanHandleViewportCollisionPaint();
-							// Begin collision paint mode on mouse down
+
+                            // Begin collision paint mode on mouse down
                             if (left) {
                                 if (canPaintCollision) {
-									// Always treat clicks as handled when tile palette is active to avoid deselecting entities
+
+                                    // Always treat clicks as handled when tile palette is active to avoid deselecting entities
                                     m_tilePalettePanel->OnViewportCollisionClick(worldPos);
                                     tilePaletteHandledClick = true;
                                 }
                             } 
-							// End collision paint mode on mouse release 
+
+                            // End collision paint mode on mouse release 
                             else {
                                 m_tilePalettePanel->EndViewportCollisionPaint();
                             }
-                        } 
-						// When not in collision edit mode, use clicks for regular tile painting if the palette can handle it
+                        }
+
+                        // When not in collision edit mode, use clicks for regular tile painting if the palette can handle it
                         else {
                             const bool canPaint = m_tilePalettePanel->CanHandleViewportPaint();
                             if (left) {
                                 if (canPaint) {
+
                                     // Always treat clicks as handled when tile palette is active to avoid deselecting entities
                                     m_tilePalettePanel->OnViewportClick(worldPos, false);
                                     tilePaletteHandledClick = true;
                                 }
-                            } 
+                            }
                             else {
                                 m_tilePalettePanel->EndViewportPaint();
                             }
                         }
                     }
                     if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {
+
                         // Check if gizmo should block input
                         bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
 
@@ -761,6 +812,7 @@ void SceneViewport::_renderViewport() {
                             // We need access to renderer system to make the request
                             auto* rs = _getRendererSystem();
                             if (rs && m_world) {
+
                                 // Default to NPOS32 (no fallback) unless we find a valid tilemap tile under the cursor
                                 uint32_t fallbackTileMapEntity = ECS::Entity::NPOS32;
 
@@ -775,6 +827,7 @@ void SceneViewport::_renderViewport() {
                                     if (map && activeTileMapId != ECS::Entity::NPOS32 && map->LayerCount() > 0) {
                                         glm::vec2 worldPos(0.0f, 0.0f);
                                         {
+
                                             // ImGui reports positions in logical pixels; scale up to physical
                                             // framebuffer pixels so the viewport math matches the actual render target
                                             const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
@@ -819,7 +872,7 @@ void SceneViewport::_renderViewport() {
                         }
                     }
 
-                    // Draw grid/axes overlays anchored to camera view.
+                    // Draw grid and axes overlays in world space using camera-derived visible extents
                     if (m_showGrid || m_showAxes) {
                         const glm::vec2 camPos(camera->Position.x, camera->Position.y);
                         float halfWidth = 10.0f;
@@ -830,7 +883,8 @@ void SceneViewport::_renderViewport() {
                             const float halfHeightView = std::tan(glm::radians(camera->FOV * 0.5f)) * dist;
                             halfHeight = std::max(1.0f, halfHeightView);
                             halfWidth = halfHeight * camera->AspectRatio;
-                        } else {
+                        }
+                        else {
                             halfHeight = std::max(1.0f, camera->OrthoSize);
                             halfWidth = halfHeight * camera->AspectRatio;
                         }
@@ -881,7 +935,7 @@ void SceneViewport::_renderViewport() {
                     }
 
                     // Draw selection outline around selected entity
-                    // Optional selection bounds overlay.
+                    // Optional selection-bounds overlay
                     if (m_showBounds && !m_selectedEntity.IsNull()) {
                         Editor::SelectionOutlineRenderer::RenderOutline(
                             *m_world,
@@ -894,7 +948,7 @@ void SceneViewport::_renderViewport() {
                     }
 
                     // Submit collider debug visualization for selected entity
-                    // Optional collider debug overlay for selection.
+                    // Optional collider debug overlay for selection
                     if (m_showColliders && !m_selectedEntity.IsNull() && m_world) {
                         const glm::vec4 colliderColor{ 1.0f, 0.64f, 0.0f, 0.45f }; // Orange with some transparency
                         rendererSystem->SubmitColliderDebugDraw(*m_world, m_selectedEntity.Index, colliderColor);
@@ -902,17 +956,21 @@ void SceneViewport::_renderViewport() {
 
                     // Optional light debug overlays
                     if (m_showLights && m_world) {
+
                         // Determine arrow length based on camera distance/ortho size
                         // Engine::Camera* camera = m_editorCamera ? m_editorCamera->GetCamera() : nullptr;
                         float arrowLength = 1.0f;
                         if (camera) {
+
                             // Scale arrow length based on camera parameters
                             if (camera->UsePerspective) {
                                 arrowLength = std::max(1.0f, std::abs(camera->Position.z) * 0.05f);
-                            } else {
+                            }
+                            else {
                                 arrowLength = std::max(1.0f, camera->OrthoSize * 0.05f);
                             }
                         }
+
                         // Precompute constants for arrow and circle rendering
                         const float arrowHead = arrowLength * 0.25f;
                         const float arrowWing = arrowHead * 0.6f;
@@ -923,6 +981,7 @@ void SceneViewport::_renderViewport() {
                         auto* world = m_world;
                         world->Each<ECS::Components::LocalTransform, ECS::Components::Light2D>(
                             [&](ECS::Entity e, const ECS::Components::LocalTransform& lt, const ECS::Components::Light2D& light) {
+
                                 // Skip inactive lights
                                 if (!world->IsActiveInHierarchy(e)) {
                                     return;
@@ -940,7 +999,8 @@ void SceneViewport::_renderViewport() {
                                     const float len2 = dir.x * dir.x + dir.y * dir.y;
                                     if (len2 < 1e-6f) {
                                         dir = glm::vec2(0.0f, -1.0f);
-                                    } else {
+                                    }
+                                    else {
                                         dir *= 1.0f / std::sqrt(len2);
                                     }
 
@@ -955,7 +1015,9 @@ void SceneViewport::_renderViewport() {
                                     const glm::vec2 headBase = end - dir * arrowHead;
                                     rendererSystem->SubmitWireframeLine(headBase + perp * arrowWing, end, tint, lineThickness);
                                     rendererSystem->SubmitWireframeLine(headBase - perp * arrowWing, end, tint, lineThickness);
-                                } else {
+                                }
+                                else {
+
                                     // Draw circle representing point light range
                                     glm::vec2 center(worldPos.X + light.Position.X, worldPos.Y + light.Position.Y);
                                     const float range = std::max(0.01f, light.Range);
@@ -972,11 +1034,12 @@ void SceneViewport::_renderViewport() {
                 }
             }
 
-            // Optional FPS overlay.
+            // Optional FPS overlay
             if (m_showSceneFpsOverlay) {
                 _drawFpsOverlay(viewportScreenPos, size);
             }
-        } else {
+        }
+        else {
             ImGui::TextDisabled("Viewport texture unavailable");
             m_isViewportHovered = false;
             if (m_editorCamera) {

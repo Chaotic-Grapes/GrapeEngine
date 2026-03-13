@@ -3,7 +3,7 @@
 \file   ResourceManager.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   11th January 2026
+\date   12th March 2026
 \brief
 Implements the ResourceManager class for centralized asset management.
 
@@ -84,7 +84,7 @@ template<>
 std::unordered_map<std::string, std::unordered_set<std::string>>&
 ResourceManager::GetOwnerMap<RawData>() { return m_rawDataOwners; }
 
-// Generic Get function: handles caching logic for all asset types
+// Fetch an asset from cache or load it on demand, then attach the current owner tag for lifetime tracking
 template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     // Get reference to appropriate cache (m_textures or m_audioFiles)
     auto& cache = GetCacheMap<T>();
@@ -93,7 +93,7 @@ template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& n
     // typeid(T).name() returns the type name as a string (e.g. "Texture", "AudioData")
     auto it = cache.find(name);
     if (it != cache.end()) {
-		// Only log the first time we hit this asset in cache to avoid spamming logs for frequently used assets
+        // Only log the first cache hit per key to keep hot-path logs readable
         static std::unordered_set<std::string> loggedHits;
         if (loggedHits.insert(name).second) {
             LOG_DEBUG("[CACHE HIT] " << typeid(T).name() << ": " << name);
@@ -281,17 +281,19 @@ template<>std::shared_ptr<RawData> ResourceManager::Load<RawData>(const std::str
     }
 }
 
-// Loading function for shaders
+// Load a shader from either explicit "vert|frag" key format or implicit "<base>.vert/.frag" format
 template<>std::shared_ptr<Shader> ResourceManager::Load<Shader>(const std::string& key) {
     std::string vertPath;
     std::string fragPath;
 
     size_t separator = key.find('|');
     if (separator != std::string::npos) {
+        // Explicit key format allows arbitrary file names and extensions
         vertPath = key.substr(0, separator);
         fragPath = key.substr(separator + 1);
     }
     else {
+        // Implicit key format keeps call sites short when using standard extension naming
         vertPath = key + ".vert";
         fragPath = key + ".frag";
     }
@@ -407,6 +409,7 @@ std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixe
     }
 }
 
+// Build a deterministic shader cache key from vertex and fragment paths
 std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& vertexPath, const std::string& fragmentPath) {
     std::string key = vertexPath + "|" + fragmentPath;
     return Get<Shader>(key);
@@ -430,7 +433,7 @@ void ResourceManager::ClearCache() {
     LOG_INFO("Cleared all cached assets");
 }
 
-// Remove a specific asset from cache by name
+// Remove one asset key across every cache and owner map, including font size variants
 void ResourceManager::UnloadAsset(const std::string& name) {
     bool removed = false;
 
@@ -501,7 +504,7 @@ void ResourceManager::PrintCacheInfo() const {
         // <Label> Owners:
         //   OwnerTag1 -> N assets
         //   asset1
-        //   asset2...
+        //   asset2 and more
         LOG_INFO(std::string(label) + " Owners:");
         if (ownerMap.empty()) {
             LOG_INFO("  (none)");
@@ -520,7 +523,7 @@ void ResourceManager::PrintCacheInfo() const {
         // Format:
         // OwnerTag -> N assets
         //   asset1
-        //   asset2...
+        //   asset2 and more
         for (const auto& [owner, assets] : ownersToAssets) {
             LOG_INFO("  " << owner << " -> " << assets.size() << " assets");
             for (const auto& asset : assets) {
@@ -713,7 +716,8 @@ void ResourceManager::UnloadAssetsByOwner(const std::string& ownerTag) {
             if (owners.empty()) {
                 cacheMap.erase(it->first);
                 it = ownerMap.erase(it);
-            } else {
+            }
+            else {
                 ++it;
             }
         }
@@ -727,7 +731,7 @@ void ResourceManager::UnloadAssetsByOwner(const std::string& ownerTag) {
     removeOwner(m_prefabOwners, m_prefabs);
     removeOwner(m_rawDataOwners, m_rawData);
 
-	// Clean up logged font cache hits to remove any fonts that were unloaded
+    // Remove stale font hit markers for keys that were evicted by owner cleanup
     for (auto it = m_loggedFontCacheHits.begin(); it != m_loggedFontCacheHits.end(); ) {
         if (m_fonts.find(*it) == m_fonts.end()) {
             it = m_loggedFontCacheHits.erase(it);

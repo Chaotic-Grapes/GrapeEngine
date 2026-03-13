@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   PerformancePanel.cpp
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\author Muhammad Nur Fadzly Bin Zulkifli (90%)
+        Foo Rui Qin (10%)
 \par    muhammadnurfadzly.b@digipen.edu
-\date   25th November 2025
+        ruiqin.foo@digipen.edu
+\date   12th March 2026
 
 \brief
 Implements the in-editor performance monitoring panel used by the Level Editor.
@@ -29,30 +31,45 @@ polling system counters while the game is not running.
 #include <algorithm>
 #include <deque>
 
+// Initializes panel font handles and marks panel state ready for rendering
 void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
+    // Cache font handles once so all sub-sections render with consistent typography
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
+
+    // Mark panel ready so Render can start collecting and drawing metrics
     m_initialized = true;
 }
 
+// Resets runtime flags so panel stops collecting and rendering cached performance data
 void PerformancePanel::Shutdown() {
+    // Prevent further rendering and data refresh calls until reinitialized
     m_initialized = false;
+
+    // Drop collected-data marker so next startup begins from clean state
     m_hasCollectedData = false;
 }
 
+// Clears per-scene collected state when world content changes
 void PerformancePanel::ResetForNewScene() {
+    // Keep caches but force state to be treated as not yet refreshed for new scene context
     m_hasCollectedData = false;
 }
 
+// Stores system manager pointer used for scripted and enabled system status lookups
 void PerformancePanel::SetSystemManager(ECS::SystemManager* systemManager) {
+    // Store non-owning pointer managed by editor lifecycle
     m_systemManager = systemManager;
 }
 
+// Stores world pointer used to compute entity, component, and chunk-related metrics
 void PerformancePanel::SetWorld(ECS::World* world) {
+    // Store non-owning pointer managed by scene or editor service
     m_world = world;
 }
 
+// Renders the full performance panel and updates cached metrics each frame
 void PerformancePanel::Render(bool /*isPlaying*/) {
     if (!m_initialized) return;
 
@@ -92,13 +109,17 @@ void PerformancePanel::Render(bool /*isPlaying*/) {
 // Private Rendering Methods
 // -------------------------------------------------------------------------
 
+// Draws the panel title row
 void PerformancePanel::_renderHeader() {
+    // Use bold face to visually anchor the panel title
     ImGui::PushFont(m_boldFont);
     ImGui::Text("Performance");
     ImGui::PopFont();
 }
 
+// Draws compact overview metrics including frame timings and world counts
 void PerformancePanel::_renderOverviewStats() {
+    // Section title in bold to separate overview from detailed tables
     ImGui::PushFont(m_boldFont);
     ImGui::Text("Overview");
     ImGui::PopFont();
@@ -141,15 +162,16 @@ void PerformancePanel::_renderOverviewStats() {
     ImGui::Columns(1);
 }
 
+// Draws per-system timing usage table with percentage bars and fallback engine bucket
 void PerformancePanel::_renderSystemsTable() {
     ImGui::PushFont(m_boldFont);
     ImGui::Text("System Usage");
     ImGui::PopFont();
 
-    // Use cached total time. Ensure it's not smaller than the frame time
-    // (some profilers report scope totals that are smaller due to sampling
-    // or nested/overlapping scopes). Using at least the frame time prevents
-    // usage percentages from exceeding 100% unexpectedly.
+    // Use cached total time
+    // Ensure it's not smaller than the frame time (some profilers report scope totals 
+    // that are smaller due to sampling or nested/overlapping scopes)
+    // Using at least the frame time prevents usage percentages from exceeding 100% unexpectedly
     double totalTime = m_cachedTotalTime;
     if (totalTime < 0.001)
         totalTime = m_cachedFrameMs; // Fallback to frame time if no scopes
@@ -164,7 +186,7 @@ void PerformancePanel::_renderSystemsTable() {
 
     double unaccountedMs = totalTime - sumScopeAvgMs;
     if (unaccountedMs < 0.0)
-        unaccountedMs = 0.0; // avoid negative due to rounding
+        unaccountedMs = 0.0; // Avoid negative due to rounding
 
     // Render table with columns: System Name, %, Avg (ms), Max (ms)
     if (ImGui::BeginTable("PerformanceTable", 4,
@@ -189,7 +211,7 @@ void PerformancePanel::_renderSystemsTable() {
                 }
             }
 
-            // Calculate usage percentage and clamp to [0, 100].
+            // Calculate usage percentage and clamp to [0, 100]
             float usagePercent = 0.0f;
             if (totalTime > 0.001) {
                 double percent = (static_cast<double>(data.AverageTimeMs) / totalTime) * 100.0;
@@ -301,6 +323,7 @@ void PerformancePanel::_renderSystemsTable() {
     }
 }
 
+// Draws live memory-pool and ECS chunk metrics with quick health indicators
 void PerformancePanel::_renderMemoryStats() {
     ImGui::Separator();
 
@@ -323,15 +346,19 @@ void PerformancePanel::_renderMemoryStats() {
 
 	// Sum up all archetype chunk bytes
     if (m_world) {
+
 		// Get all archetypes in the world
         const auto archetypes = m_world->GetAllArchetypes();
 
 		// Sum up chunk counts and bytes
         for (const auto* archetype : archetypes) {
+
 			// Sanity check
             if (!archetype) continue;
+
 			// Get chunk count and byte size
             const uint32_t chunks = archetype->GetChunkCount();
+
 			// Accumulate
             ecsChunkCount += chunks;
             ecsChunkBytes += static_cast<size_t>(chunks) * archetype->GetChunkByteSize();
@@ -361,6 +388,7 @@ void PerformancePanel::_renderMemoryStats() {
 
 	// Usage label: "X KB / Y KB"
     char barLabel[64];
+
 	// Divide by 1024.0f to convert to KB
     snprintf(barLabel, sizeof(barLabel), "%.1f KB / %.1f KB", currentUsage / 1024.0f,
         totalPoolSize / 1024.0f);
@@ -435,6 +463,7 @@ void PerformancePanel::_renderMemoryStats() {
     }
 }
 
+// Runs allocation and free probes to verify memory manager counters remain internally consistent
 bool PerformancePanel::_validateMemoryStats() {
     MemoryManager& mm = MemoryManager::GetInstance();
 
@@ -452,6 +481,7 @@ bool PerformancePanel::_validateMemoryStats() {
 
 	// Calculate expected allocation delta
     for (int i{}; i < NUM_TESTS; i++) {
+
 		// Align size to nearest multiple of ALIGNMENT
 		// Adding (ALIGNMENT - 1) ensures that any size that is not already a multiple of ALIGNMENT will round up 
         // to the next multiple when the bitwise AND with the negated ALIGNMENT - 1 is applied
@@ -487,6 +517,7 @@ bool PerformancePanel::_validateMemoryStats() {
 
 	// Perform allocations
     for (int i{}; i < NUM_TESTS; i++)
+
 		// Allocate and store pointer
         ptrs[i] = mm.Allocate(TEST_SIZES[i]);
 
@@ -558,17 +589,23 @@ bool PerformancePanel::_validateMemoryStats() {
 
 	// Check only if we had a valid page size before
     if (pageSizeBeforeOk) {
+
 		// After alloc
         if (pagesAfterAlloc > 0) {
+
 			// Compute page size after alloc
             size_t pageSizeAfterAlloc = poolAfterAlloc / static_cast<size_t>(pagesAfterAlloc);
+
 			// Compare with before
             if (pageSizeAfterAlloc != pageSizeBefore) pageSizeConsistentOk = false;
         }
+
 		// After free
         if (pagesAfterFree > 0) {
+
 			// Compute page size after free
             size_t pageSizeAfterFree = poolAfterFree / static_cast<size_t>(pagesAfterFree);
+
 			// Compare with before
             if (pageSizeAfterFree != pageSizeBefore) pageSizeConsistentOk = false;
         }
@@ -585,6 +622,7 @@ bool PerformancePanel::_validateMemoryStats() {
 	// Pointer validity checks
     bool allPtrsOk = true;
     for (int i{}; i < NUM_TESTS; i++)
+
 		// Check each pointer is not nullptr
         if (!ptrs[i]) { allPtrsOk = false; break; }
 
@@ -629,6 +667,7 @@ bool PerformancePanel::_validateMemoryStats() {
     return passed;
 }
 
+// Draws allocator benchmark controls and last-run timing feedback
 void PerformancePanel::_renderMemoryBenchmark() {
     ImGui::PushFont(m_boldFont);
     ImGui::Text("Memory Benchmark");
@@ -684,6 +723,7 @@ void PerformancePanel::_renderMemoryBenchmark() {
 
     // Display time if valid
     if (m_lastTestTime >= 0.0) {
+
         // Color coding based on performance
         ImVec4 color;
         if (m_lastTestTime < 10.0) color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);      // Green for fast (< 10ms)
@@ -703,6 +743,7 @@ void PerformancePanel::_renderMemoryBenchmark() {
 // Private Data Management
 // -------------------------------------------------------------------------
 
+// Pulls latest profiler and world data into cached fields used by render methods
 void PerformancePanel::_updateCachedData() {
     m_hasCollectedData = true;
 
@@ -744,6 +785,7 @@ void PerformancePanel::_updateCachedData() {
 
         // Get entity and component count from World if available
         if (m_world) {
+
             // Count entities by iterating through archetypes
             uint32_t totalEntities = 0;
             uint32_t totalComponents = 0;
@@ -751,6 +793,7 @@ void PerformancePanel::_updateCachedData() {
             const auto archetypes = m_world->GetAllArchetypes();
             for (const auto* archetype : archetypes) {
                 if (archetype) {
+
                     // Each archetype contains entities with a specific set of components
                     const uint32_t chunkCount = archetype->GetChunkCount();
 

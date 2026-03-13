@@ -1,13 +1,13 @@
 /* Start Header *****************************************************************/
 /*!
 \file   HierarchyPanel.cpp
-\author Foo Rui Qin    (45%)
-        Samantha Leong (45%)
+\author Foo Rui Qin (60%)
+        Samantha Leong (30%)
         Muhammad Nur Fadzly Bin Zulkifli (10%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
         muhammadnurfadzly.b@digipen.edu
-\date   5th November 2025
+\date   12th March 2026
 \brief
 Implements the Hierarchy panel that shows all scene entities as a tree.
 
@@ -53,6 +53,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "UndoSystem.h"
 
 namespace {
+
+    // Detects whether an entity should be treated as the protected editor camera helper
+    // Uses both component presence and optional name hints to avoid accidental false matches
     bool IsEditorCameraEntity(ECS::World* world, ECS::Entity entity) {
         if (!world || entity.IsNull() || !world->IsAlive(entity)) {
             return false;
@@ -62,7 +65,7 @@ namespace {
             return false;
         }
 
-        // Extra name check prevents false positives if component-name lookup regresses.
+        // Extra name check prevents false positives if component-name lookup regresses
         const auto* nameComp = Editor::ECSUtils::GetNamePtr(world, entity);
         if (!nameComp) {
             return true;
@@ -83,6 +86,7 @@ namespace {
     bool AddComponentIfMatch(ECS::World* world, ECS::Entity instance, const std::string& typeName,
         const std::string& expectedName, nlohmann::json& compData)
     {
+
         // If the json component name does not match what this function handles we skip it
         // This avoids adding the wrong component type to the entity
         if (typeName != expectedName) return false;
@@ -90,19 +94,23 @@ namespace {
         // Only add the component if the entity does not already have it
         // world Has<T> checks if this entity already contains a component of type T
         if (!world->Has<T>(instance)) {
+
             // Add<T> attaches the component to the entity and returns a reference to it
             auto& c = world->Add<T>(instance);
+
             // from_json fills the new component using values from the json 
             // This allows prefabs and saved scenes to restore component state exactly
             from_json(compData, c);
         }
+
         // true means this template handled the component successfully
         return true;
     }
 
-    // Helper function to check if entity should be hidden from hierarchy
-    // Returns true if entity should be filtered out (hidden)
+    // Returns whether an entity should be filtered out from hierarchy rendering
+    // Centralizes hide rules so root and child queries stay consistent
     bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
+
         // Also hide entities that are not alive or null, or the camera editor entity
         if (!world || entity.IsNull() || !world->IsAlive(entity) || IsEditorCameraEntity(world, entity))
             return true;
@@ -110,8 +118,8 @@ namespace {
         return false;
     }
 
-    // Helper function to check if an entity is protected from modification
-    // Returns true if entity should NOT be modified (deleted, cloned, reparented, etc.)
+    // Returns whether entity operations should be blocked for safety-critical editor-only entities
+    // Protected entities cannot be deleted, cloned, or reparented from panel actions
     bool IsProtectedEntity(ECS::World* world, EntityId entityId) {
         if (!world)
             return false;
@@ -129,9 +137,7 @@ namespace {
 
         return false;
     }
-
 }
-
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -145,6 +151,7 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
+
     // Cache pointers to world and entity actions so we operate on correct scene
     m_world = world;
     m_entityActions = entityActions;
@@ -172,7 +179,8 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
                     ECS::Entity parentEntity = m_world->ParentOf(entity);
                     if (!parentEntity.IsNull()) {
                         entity = parentEntity;
-                    } else {
+                    }
+                    else {
                         break;
                     }
                 }
@@ -185,6 +193,7 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
 // Clears selection and expanded nodes when switching to a new world
 void HierarchyPanel::SetWorld(ECS::World* world) {
     m_world = world;
+
     // Reset selection when scene changes
     m_selectedEntityIds.clear();
     m_anchorEntityId = ECS::Entity::NPOS32;
@@ -192,13 +201,15 @@ void HierarchyPanel::SetWorld(ECS::World* world) {
     m_renamingEntityId = ECS::Entity::NPOS32;
     m_focusRenameInput = false;
     m_contextMenuTarget = ECS::Entity::NPOS32;
+
     // Clear expanded nodes so tree redraws cleanly
     m_expandedNodes.clear();
+
     // Reset persistent root order for the new world
     m_rootOrder.clear();
-    m_childOrder.clear(); // Clear per-parent order cache on scene switch.
-    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state.
-    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state.
+    m_childOrder.clear(); // Clear per-parent order cache on scene switch
+    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state
+    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state
 }
 
 // Register a callback for selection change events
@@ -217,15 +228,17 @@ void HierarchyPanel::SetSelectedEntity(EntityId id) {
     else {
         m_anchorEntityId = ECS::Entity::NPOS32;
     }
+
     // Don't trigger the callback here to avoid circular updates
 }
 
-// Set selected entities.
+// Set selected entities
 void HierarchyPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids) {
     m_selectedEntityIds = ids;
     if (m_selectedEntityIds.empty()) {
         m_anchorEntityId = ECS::Entity::NPOS32;
-    } else {
+    }
+    else {
         m_anchorEntityId = *m_selectedEntityIds.begin();
     }
     if (m_selectionCallback) {
@@ -234,13 +247,13 @@ void HierarchyPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids
     }
 }
 
-// Set entity order.
+// Set entity order
 void HierarchyPanel::SetEntityOrder(const std::vector<EntityId>& order) {
     m_entityOrder = order;
     m_rootOrder.clear();
-    m_childOrder.clear(); // Rebuild per-parent order from serialized order.
-    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state.
-    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state.
+    m_childOrder.clear(); // Rebuild per-parent order from serialized order
+    m_lastReorderParentId = ECS::Entity::NPOS32; // Reset reorder coalesce state
+    m_lastReorderTime = -1000.0f; // Reset reorder coalesce state
     _seedRootOrderFromEntityOrder();
 }
 
@@ -251,6 +264,7 @@ void HierarchyPanel::SetEntityOrder(const std::vector<EntityId>& order) {
 // Render the hierarchy window with entity tree and controls
 // Handles entity selection, drag-drop and keyboard shortcuts
 void HierarchyPanel::Render() {
+
     // Push main font for consistent text styling
     if (m_mainFont) ImGui::PushFont(m_mainFont);
 
@@ -260,14 +274,17 @@ void HierarchyPanel::Render() {
     // Early return if no world is attached to prevent crashes
     if (!m_world) {
         ImGui::TextDisabled("No scene attached");
-        // Render disabled text.
+
+        // Render disabled text
         ImGui::TextDisabled("Create a new scene or open one via File");
         if (m_mainFont) ImGui::PopFont();
-        // End.
+
+        // End
         ImGui::End();
         return;
     }
-    // If the renamed entity no longer exists, clear rename mode so interactions remain usable.
+
+    // If the renamed entity no longer exists, clear rename mode so interactions remain usable
     if (m_renamingEntityId != ECS::Entity::NPOS32) {
         ECS::Entity renamed = m_world->Resolve(m_renamingEntityId);
         if (renamed.IsNull() || !m_world->IsAlive(renamed)) {
@@ -277,10 +294,10 @@ void HierarchyPanel::Render() {
     }
 
     // Render the main UI sections
-    _renderHeader();           // Header with entity creation controls
-    _renderEntityTree();       // Main entity tree with drag-drop
+    _renderHeader();      // Header with entity creation controls
+    _renderEntityTree();  // Main entity tree with drag-drop
 
-    // Apply deferred single-click selection only when no drag operation is active.
+    // Apply deferred single-click selection only when no drag operation is active
     if (m_pendingClickSelectionId != ECS::Entity::NPOS32 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         if (ImGui::GetDragDropPayload() == nullptr) {
             m_selectedEntityIds.clear();
@@ -296,6 +313,7 @@ void HierarchyPanel::Render() {
     if (!m_deferredDeletions.empty()) {
         for (EntityId id : m_deferredDeletions) {
             if (!IsProtectedEntity(m_world, id)) {
+
                 // Collect all entities that will be deleted (parent + all children recursively)
                 std::vector<EntityId> allDeletedIds;
                 std::function<void(EntityId)> collectRecursive = [&](EntityId deleteId) {
@@ -322,6 +340,7 @@ void HierarchyPanel::Render() {
 				// Resolve all entity handles
                 for (EntityId deletedId : allDeletedIds) {
                     ECS::Entity handle = m_world->Resolve(deletedId);
+
 					// Only track alive entities for deletion
                     if (m_world->IsAlive(handle)) {
                         deleteHandles.push_back(handle);
@@ -345,6 +364,7 @@ void HierarchyPanel::Render() {
 
 				// If any entities are still alive, destroy them now
                 if (anyAlive) {
+
 					// Record undo for root entity deletion if applicable
                     if (!removed && m_undoSystem) {
                         if (rootWasAlive && m_world->IsAlive(rootHandle)) {
@@ -368,7 +388,7 @@ void HierarchyPanel::Render() {
                 // Remove ALL deleted entities from selection
                 for (EntityId deletedId : allDeletedIds) {
                     m_selectedEntityIds.erase(deletedId);
-                    _removeEntityFromOrders(deletedId); // Drop deleted entities from order lists.
+                    _removeEntityFromOrders(deletedId); // Drop deleted entities from order lists
                 }
 
                 // Update anchor if it was one of the deleted entities
@@ -392,11 +412,8 @@ void HierarchyPanel::Render() {
     const bool hierarchyInputContext = hierarchyFocused || hierarchyHovered;
     const bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
 
-    const bool hierarchyCopyShortcut =
-        hierarchyInputContext &&
-        ctrlDown &&
-        Input::IsKeyPressed(KEY_C) &&
-        !io.WantTextInput;
+    const bool hierarchyCopyShortcut = hierarchyInputContext && ctrlDown && Input::IsKeyPressed(KEY_C) 
+        && !io.WantTextInput;
 
 	// Only trigger copy if we have a valid selection and we're not focused on a text input 
     // (to avoid conflicts with renaming)
@@ -466,12 +483,14 @@ void HierarchyPanel::Render() {
 
 // Render the header with entity count, context menu & add entity controls
 void HierarchyPanel::_renderHeader() {
+
     // Search bar for filtering entities
     ImGui::SetNextItemWidth(-1); // Full width
     if (ImGui::InputTextWithHint("##SearchFilter", "Search...", m_searchBuffer, sizeof(m_searchBuffer))) {
         m_searchFilter = m_searchBuffer;
     }
-    // Insert spacing via a dummy widget.
+
+    // Insert spacing via a dummy widget
     ImGui::Dummy(ImVec2(0, 2));
 
     // Entity creation section
@@ -485,12 +504,14 @@ void HierarchyPanel::_renderHeader() {
     // Add entity button: opens a dropdown menu with creation options
     ImGui::SameLine();
     if (ImGui::Button("Add")) {
-        // Open a context popup.
+
+        // Open a context popup
         ImGui::OpenPopup("AddEntityMenu");
     }
 
     // Popup menu for Add button
     if (ImGui::BeginPopup("AddEntityMenu")) {
+
         // helper to select newly created entity and mark scene dirty
         auto selectAndMark = [&](const ECS::Entity& e) {
             if (e.IsNull())
@@ -501,10 +522,10 @@ void HierarchyPanel::_renderHeader() {
             if (m_world) {
                 ECS::Entity parent = m_world->ParentOf(e);
                 if (parent.IsNull()) {
-                    _appendToOrderList(m_rootOrder, e.Index); // New root goes to bottom.
+                    _appendToOrderList(m_rootOrder, e.Index); // New root goes to bottom
                 }
                 else {
-                    _appendToOrderList(m_childOrder[parent.Index], e.Index); // New child goes to bottom.
+                    _appendToOrderList(m_childOrder[parent.Index], e.Index); // New child goes to bottom
                 }
             }
 
@@ -512,7 +533,8 @@ void HierarchyPanel::_renderHeader() {
                 m_selectionCallback(e.Index);
             if (m_fileMenu)
                 m_fileMenu->MarkSceneDirty();
-            // Close the current popup.
+
+            // Close the current popup
             ImGui::CloseCurrentPopup();
         };
 
@@ -523,16 +545,18 @@ void HierarchyPanel::_renderHeader() {
             if (m_entityActions) {
                 EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
                 if (newId != ECS::Entity::NPOS32) {
-                    _appendToOrderList(m_rootOrder, newId); // Add new root at end.
+                    _appendToOrderList(m_rootOrder, newId); // Add new root at end
                 }
             }
-            // Close the current popup.
+
+            // Close the current popup
             ImGui::CloseCurrentPopup();
         }
 
         if (ImGui::BeginMenu("Create GUI")) {
             if (ImGui::MenuItem("Panel")) {
                 if (m_entityActions && m_world) {
+
                     // Create new entity and add GUI panel components
                     EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
 
@@ -552,10 +576,12 @@ void HierarchyPanel::_renderHeader() {
 
             if (ImGui::MenuItem("Text")) {
                 if (m_entityActions && m_world) {
+
                     // Create new entity and add GUI text components
                     EntityId newId = m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
 
                     if (newId != ECS::Entity::NPOS32) {
+
                         // Add default GUIElement and GUIText components
                         ECS::Entity e = m_world->Resolve(newId);
 
@@ -618,18 +644,19 @@ void HierarchyPanel::_renderHeader() {
                 }
             }
 
-            // End menu.
+            // End menu
             ImGui::EndMenu();
         }
 
-        // End popup.
+        // End popup
         ImGui::EndPopup();
     }
 
     // Visual spacing
     ImGui::Dummy(ImVec2(0, 2));
     ImGui::Separator();
-    // Insert spacing via a dummy widget.
+
+    // Insert spacing via a dummy widget
     ImGui::Dummy(ImVec2(0, 2));
 
     // Count visible entities (excluding hidden ones like EditorCamera)
@@ -648,6 +675,7 @@ void HierarchyPanel::_renderHeader() {
 // Render the main entity tree with drag-drop support
 // This is the core of the hierarchy panel showing all entities
 void HierarchyPanel::_renderEntityTree() {
+
     // Adjust frame padding for better tree node appearance
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 3));
 
@@ -676,7 +704,7 @@ void HierarchyPanel::_renderEntityTree() {
     }
     _renderBackgroundContextMenu();
 
-    // End child.
+    // End child
     ImGui::EndChild();
     ImGui::PopStyleVar();
 
@@ -693,6 +721,7 @@ void HierarchyPanel::_renderEntityTree() {
 // Handles selection, drag source and drop target logic
 // Depth parameter tracks recursion level for indentation
 void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
+
     // Resolve entity ID to entity object and check if valid
     ECS::Entity entity = m_world->Resolve(entityId);
 
@@ -707,6 +736,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     bool isPrefabInstance = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
     if (!isPrefabInstance) {
+
         // Check if any parent has prefab component
         ECS::Entity parent = m_world->ParentOf(entity);
         while (!parent.IsNull()) {
@@ -793,13 +823,14 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Render rename input if this entity is being renamed
     bool nodeOpen = false;
     if (m_renamingEntityId == entityId) {
+
         // Show input field for renaming
         if (m_focusRenameInput) {
             ImGui::SetKeyboardFocusHere();
             m_focusRenameInput = false;
         }
 
-        // Set next item width.
+        // Set next item width
         ImGui::SetNextItemWidth(-1);
 
         // Submit not only by enter but also by clicking out of the input text field
@@ -823,16 +854,19 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         }
     }
     else {
-        // Calculate icon sizes to reserve space on the right BEFORE creating the tree node.
+
+        // Calculate icon sizes to reserve space on the right BEFORE creating the tree node
         const float iconPadding = 6.0f; // space between icons and edge
         float prefabIconWidth = 0.0f;
         const char* prefabIcon = EditorIcons::Prefab;
 
         if (m_symbolsFont && isPrefabInstance) {
-            // Push the font for this section.
+
+            // Push the font for this section
             ImGui::PushFont(m_symbolsFont);
             prefabIconWidth = ImGui::CalcTextSize(prefabIcon).x;
-            // Restore the previous font.
+
+            // Restore the previous font
             ImGui::PopFont();
         }
 
@@ -842,8 +876,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Compute available width for label using content region (safer than querying item rect)
         ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
         float cursorX = ImGui::GetCursorPosX();
+
         // Add a safety reserve to account for frame padding and item spacing so the
-        // ellipsis or text never overlaps the icons even with font rounding.
+        // ellipsis or text never overlaps the icons even with font rounding
         const ImGuiStyle& style = ImGui::GetStyle();
         float reservedWidth = style.ItemSpacing.x * 2.0f + style.FramePadding.x * 2.0f + 8.0f;
         float maxLabelWidth = contentMax.x - cursorX - iconsTotalWidth - reservedWidth;
@@ -886,14 +921,17 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         float itemCenterY = itemRectMin.y + (itemRectMax.y - itemRectMin.y) * 0.5f;
 
         if (isPrefabInstance && m_symbolsFont) {
-            // Push the font for this section.
+
+            // Push the font for this section
             ImGui::PushFont(m_symbolsFont);
             ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
             ImVec2 iconPos = ImVec2(drawX - iconSize.x, itemCenterY - iconSize.y * 0.5f);
-            // Return window draw list.
+
+            // Return window draw list
             ImGui::GetWindowDrawList()->AddText(m_symbolsFont, 26.0f, iconPos,
                 ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), prefabIcon);
-            // Restore the previous font.
+
+            // Restore the previous font
             ImGui::PopFont();
             drawX -= (iconSize.x + iconPadding);
         }
@@ -914,6 +952,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
     // If node is open, render children recursively
     if (nodeOpen) {
+
         // Track that this node is expanded
         m_expandedNodes.insert(entityId);
 
@@ -921,20 +960,23 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         for (auto childId : children) {
             _renderEntityNode(childId, depth + 1);
         }
-        // Close the current tree node.
+
+        // Close the current tree node
         ImGui::TreePop();
     }
     else if (hasChildren) {
+
         // Remove from expanded set when collapsed
         m_expandedNodes.erase(entityId);
     }
 
-    // Restore the previous ImGui ID.
+    // Restore the previous ImGui ID
     ImGui::PopID();
 }
 
-// Process node interaction (click, right-click, double-click).
+// Process node interaction (click, right-click, double-click)
 void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
+
     // Block interaction with protected entities (shouldn't happen due to filtering, but just in case)
     if (IsProtectedEntity(m_world, entityId)) return;
 
@@ -951,23 +993,28 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (m_viewport) { 
+
             // Focus on entity
             m_viewport->FocusOnEntity(entityId);  
         }
+
 		// Also set focus to the hierarchy window so user can continue interacting with it after double-clicking
         if (m_world) {
             const ECS::Entity entity = m_world->Resolve(entityId);
+
 			// If this is a tilemap entity, also focus the tile palette so user can edit tiles immediately after double-clicking
             if (m_world->IsAlive(entity) && Editor::ECSUtils::HasComponent(m_world, entity, "TileMapComponent")) {
                 ImGui::SetWindowFocus("Tile Palette");
             }
         }
+
         // Update click tracking
         m_lastClickedEntity = entityId;
         m_lastClickTime = currentTime;
         m_pendingClickSelectionId = ECS::Entity::NPOS32;
     }
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
         // Only trigger rename if second click is within a reasonable time window (0.3s - 1.0s)
         bool isAlreadySelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
@@ -978,11 +1025,13 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             (currentTime - m_lastClickTime) < RENAME_DELAY_MAX);
 
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
+
             // Start rename mode (only for single selection, no modifiers)
             _startRename(entityId);
         }
         else if (shiftPressed && m_anchorEntityId != ECS::Entity::NPOS32) {
             m_pendingClickSelectionId = ECS::Entity::NPOS32;
+
             // Shift+Click: Range selection from anchor to clicked entity
             m_selectedEntityIds.clear();
 
@@ -1003,6 +1052,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             auto clickedIt = std::find(allEntities.begin(), allEntities.end(), entityId);
 
             if (anchorIt != allEntities.end() && clickedIt != allEntities.end()) {
+
                 // Select range between anchor and clicked (inclusive)
                 auto startIt = (anchorIt < clickedIt) ? anchorIt : clickedIt;
                 auto endIt = (anchorIt < clickedIt) ? clickedIt : anchorIt;
@@ -1017,9 +1067,11 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         }
         else if (ctrlPressed) {
             m_pendingClickSelectionId = ECS::Entity::NPOS32;
+
             // Ctrl+Click: Toggle selection
             if (isAlreadySelected) {
                 m_selectedEntityIds.erase(entityId);
+
                 // If we removed the anchor, set new anchor to first remaining selection
                 if (m_anchorEntityId == entityId) {
                     m_anchorEntityId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
@@ -1037,6 +1089,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             if (m_selectionCallback) m_selectionCallback(selectedId);
         }
         else {
+
             // Normal click (no modifiers): collapse to the clicked entity
             // Deferred until release so a drag start can still cancel this change
             m_pendingClickSelectionId = entityId;
@@ -1048,14 +1101,16 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     }
 }
 
-// Process drag-drop for entity reparenting and prefab instantiation.
+// Process drag-drop for entity reparenting and prefab instantiation
 void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
+
     // Block dragging protected entities
     if (IsProtectedEntity(m_world, entityId)) return;
 
     // Drag source: make this entity draggable
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-        // Drag started; do not apply deferred click selection.
+
+        // Drag started; do not apply deferred click selection
         m_pendingClickSelectionId = ECS::Entity::NPOS32;
 
         // If dragging a selected entity, drag all selected entities (multi-select support)
@@ -1063,6 +1118,7 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
             m_selectedEntityIds.size() > 1;
 
         if (isDraggingSelection) {
+
             // Drag all selected entities as a vector
             std::vector<EntityId> selectedVec(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
             ImGui::SetDragDropPayload("ENTITY_IDS", selectedVec.data(), selectedVec.size() * sizeof(EntityId));
@@ -1071,6 +1127,7 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
             ImGui::Text("(%zu entities)", selectedVec.size());
         }
         else {
+
             // Single entity drag
             ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId));
 
@@ -1082,11 +1139,13 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                 if (resolved.empty()) {
                     resolved = "Entity";
                 }
-                // Render label text.
+
+                // Render label text
                 ImGui::Text("%s", resolved.c_str());
             }
         }
-        // End drag drop source.
+
+        // End drag drop source
         ImGui::EndDragDropSource();
     }
 
@@ -1104,7 +1163,7 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                 m_fileMenu->MarkSceneDirty();
             }
         };
-        const bool reorderOnly = ImGui::GetIO().KeyAlt; // Alt+drop reorders without changing parents.
+        const bool reorderOnly = ImGui::GetIO().KeyAlt; // Alt+drop reorders without changing parents
 
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
@@ -1120,7 +1179,7 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                     auto& order = (draggedParentId == ECS::Entity::NPOS32)
                         ? m_rootOrder
                         : m_childOrder[draggedParentId];
-                    std::vector<EntityId> before = order; // Snapshot order for undo.
+                    std::vector<EntityId> before = order; // Snapshot order for undo
 
                     // Reorder dragged entity within the same parent
                     if (draggedParentId == entityId) {
@@ -1134,8 +1193,10 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                     }
                     _recordOrderChange(draggedParentId, before, order);
                 }
+
                 // Normal reparenting
                 else if (m_entityActions) {
+
                     // Prevent reparenting onto itself
                     m_entityActions->ReparentEntity(draggedId, entityId);
                     EntityId newParentId = getParentId(draggedId);
@@ -1189,7 +1250,8 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 
             if (reorderOnly && sameParent && hasCommonParent &&
                 (commonParentId == targetParentId || commonParentId == entityId) &&
-                // Close drag-drop target handling.
+
+                // Close drag-drop target handling
                 draggedSet.find(entityId) == draggedSet.end()) {
                 auto& order = (commonParentId == ECS::Entity::NPOS32)
                     ? m_rootOrder
@@ -1215,15 +1277,17 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                     }
                 }
 
-                std::vector<EntityId> before = order; // Snapshot order for undo.
+                std::vector<EntityId> before = order; // Snapshot order for undo
                 order.insert(order.begin() + insertPos, orderedDragged.begin(), orderedDragged.end());
                 markDirty();
                 _recordOrderChange(commonParentId, before, order);
             }
             else {
+
                 // Reparent all dragged entities
                 for (size_t i = 0; i < count; ++i) {
                     EntityId draggedId = draggedIds[i];
+
                     // Block reparenting if either entity is protected
                     if (!IsProtectedEntity(m_world, draggedId) && !IsProtectedEntity(m_world, entityId)) {
                         EntityId oldParentId = getParentId(draggedId);
@@ -1280,12 +1344,13 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                 }
             }
         }
-        // End drag drop target.
+
+        // End drag drop target
         ImGui::EndDragDropTarget();
     }
 }
 
-// Process drag-drop for the tree background (reparent to root).
+// Process drag-drop for the tree background (reparent to root)
 void HierarchyPanel::_handleTreeDragDrop() {
     if (ImGui::BeginDragDropTarget()) {
         auto markDirty = [&]() {
@@ -1293,6 +1358,7 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 m_fileMenu->MarkSceneDirty();
             }
         };
+
         // Reparent single entity to root (make it have no parent)
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
@@ -1309,7 +1375,7 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 }
 
                 if (oldParentId == ECS::Entity::NPOS32) {
-                    std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo.
+                    std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo
                     _removeFromOrderList(m_rootOrder, draggedId);
                     _appendToOrderList(m_rootOrder, draggedId);
                     markDirty();
@@ -1358,7 +1424,7 @@ void HierarchyPanel::_handleTreeDragDrop() {
             }
 
             if (allRoots) {
-                std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo.
+                std::vector<EntityId> before = m_rootOrder; // Snapshot order for undo
                 std::vector<EntityId> orderedDragged;
                 orderedDragged.reserve(draggedSet.size());
                 for (EntityId id : m_rootOrder) {
@@ -1375,6 +1441,7 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 _recordOrderChange(ECS::Entity::NPOS32, before, m_rootOrder);
             }
             else {
+
                 // Reparent all dragged entities to root
                 for (size_t i = 0; i < count; ++i) {
                     EntityId draggedId = draggedIds[i];
@@ -1441,7 +1508,8 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 }
             }
         }
-        // End drag drop target.
+
+        // End drag drop target
         ImGui::EndDragDropTarget();
     }
 }
@@ -1450,7 +1518,10 @@ void HierarchyPanel::_handleTreeDragDrop() {
 // Context Menu
 // -------------------------------------------------------------------------
 
+// Renders the background context menu for empty-space actions and bulk operations on current selection
 void HierarchyPanel::_renderBackgroundContextMenu() {
+
+    // Open this popup only when right-clicking empty hierarchy background
     if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
         !ImGui::IsAnyItemHovered() &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Right))
@@ -1458,7 +1529,7 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
         ImGui::OpenPopup("HierarchyBackgroundMenu");
     }
 
-    // Only show "Create Empty" when right-clicking on empty space (not on an entity)
+    // Popup contains root-level actions because no specific entity node owns this menu
     if (ImGui::BeginPopup("HierarchyBackgroundMenu")) {
         if (ImGui::Selectable("Create Empty")) {
             _addRootEntity();
@@ -1467,10 +1538,10 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
             }
         }
 
-		// Paste option should be available even without any selection, as long as there are copied entities
+        // Paste is valid with no active selection because paste path can spawn items at root level
         if (m_copiedEntityIds.empty()) ImGui::BeginDisabled();
 
-		// Show Paste option if there are copied entities, even if nothing is currently selected
+        // Keep paste action available whenever clipboard has entities
         if (ImGui::Selectable("Paste")) {
             _pasteCopiedEntities();
         }
@@ -1478,11 +1549,12 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
 
         // Show Copy/Clone/Delete options if there is at least one entity selected (same as entity context menu)
         if (!m_selectedEntityIds.empty()) {
-            // Show count in label if multiple selected, but still operate on all selected entities
+
+            // Label includes selection count so users can confirm multi-entity operations before clicking
             const size_t selectionCount = m_selectedEntityIds.size();
             const std::string copyLabel = (selectionCount > 1) ? "Copy (" + std::to_string(selectionCount) + ")" : "Copy";
-            
-			// Copy should operate on all selected entities, even when triggered from background menu
+             
+            // Copy always targets current selection set even though menu was opened on empty background
             if (ImGui::Selectable(copyLabel.c_str())) {
                 _copySelectedEntities();
             }
@@ -1506,7 +1578,7 @@ void HierarchyPanel::_renderBackgroundContextMenu() {
     }
 }
 
-// Render the entity context menu with entity operations
+// Renders node context menu with entity-specific operations and component add controls
 void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
     if (ImGui::BeginPopupContextItem("EntityContextMenu")) {
         m_pendingClickSelectionId = ECS::Entity::NPOS32;
@@ -1521,8 +1593,9 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
         ECS::Entity entity = m_world->Resolve(entityId);
         size_t selectionCount = m_selectedEntityIds.size();
 
-        // Only show menu options if entity is valid AND not protected
+        // Operations are available only when the target still exists and is not protected
         if (!entity.IsNull() && m_world->IsAlive(entity) && !IsProtectedEntity(m_world, entityId)) {
+
             // Add Child only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Add Child")) {
@@ -1533,6 +1606,7 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
             // Clone works with multiple selections
             std::string cloneLabel = (selectionCount > 1) ? "Clone (" + std::to_string(selectionCount) + ")" : "Clone";
             if (ImGui::Selectable(cloneLabel.c_str())) {
+
                 // Clone all selected entities
                 for (EntityId id : m_selectedEntityIds) {
                     if (!IsProtectedEntity(m_world, id)) {
@@ -1541,14 +1615,15 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
                 }
             }
 
-			// Copy should operate on all selected entities, even when triggered from entity context menu
+            // Copy still applies to the full selection to match common DCC editor behavior
             const std::string copyLabel = (selectionCount > 1) ? "Copy (" + std::to_string(selectionCount) + ")" : "Copy";
             if (ImGui::Selectable(copyLabel.c_str())) {
                 _copySelectedEntities();
             }
             if (m_copiedEntityIds.empty()) ImGui::BeginDisabled();
 
-			// Paste should operate on all copied entities, even when triggered from entity context menu and 
+            // Paste applies current clipboard regardless of what is selected when menu is opened
+            // This keeps paste semantics consistent with keyboard shortcuts and background menu paste
             // regardless of current selection
             if (ImGui::Selectable("Paste")) {
                 _pasteCopiedEntities();
@@ -1564,7 +1639,9 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
 
             // Detach Prefab: removes prefab metadata from entity
             if (selectionCount == 1) {
-            bool hasMeta = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+
+                // Show detach only when prefab metadata is present on this entity
+                bool hasMeta = m_world && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
 
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
@@ -1582,9 +1659,11 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
             if (ImGui::Selectable(deleteLabel.c_str())) {
                 _deleteSelectedEntities();
             }
-            // Insert a visual separator.
+
+            // Insert a visual separator
             ImGui::Separator();
             if (ImGui::BeginMenu("Add Component")) {
+
                 // You can add other component types (Renderer, Rigidbody, etc.) here later
                 ECS::Entity targetEntity = m_world->Resolve(entityId);
                 const auto& registry = ComponentRegistryUI::GetAll();
@@ -1596,11 +1675,13 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
                     }
                     if (hasComponent) ImGui::EndDisabled();
                 }
-                // End menu.
-                ImGui::EndMenu(); // End Add Component menu
+
+                // Close Add Component submenu after all items are rendered
+                ImGui::EndMenu();
             }
         }
-        // End popup.
+
+        // Close entity context popup
         ImGui::EndPopup();
     }
 }
@@ -1612,12 +1693,14 @@ void HierarchyPanel::_renderEntityContextMenu(EntityId entityId) {
 // Delete an entity - defers actual deletion until after tree rendering
 // This prevents crashes from modifying hierarchy while iterating it
 void HierarchyPanel::_deleteEntity(EntityId entityId) {
+
     // Add to deferred deletion queue
     m_deferredDeletions.push_back(entityId);
 }
 
 // Clone an entity: creates a duplicate with same components and hierarchy
 void HierarchyPanel::_cloneEntity(EntityId entityId) {
+
     // Block cloning protected entities
     if (IsProtectedEntity(m_world, entityId)) return;
 
@@ -1628,10 +1711,10 @@ void HierarchyPanel::_cloneEntity(EntityId entityId) {
             if (m_world->IsAlive(cloned)) {
                 ECS::Entity parent = m_world->ParentOf(cloned);
                 if (parent.IsNull()) {
-                    _appendToOrderList(m_rootOrder, clonedId); // Append clone at end.
+                    _appendToOrderList(m_rootOrder, clonedId); // Append clone at end
                 }
                 else {
-                    _appendToOrderList(m_childOrder[parent.Index], clonedId); // Append clone at end.
+                    _appendToOrderList(m_childOrder[parent.Index], clonedId); // Append clone at end
                 }
             }
         }
@@ -1640,11 +1723,13 @@ void HierarchyPanel::_cloneEntity(EntityId entityId) {
 
 // Copy selected entities: stores their IDs for later pasting
 void HierarchyPanel::_copySelectedEntities() {
+
 	// Block copying if any selected entity is protected
     m_copiedEntityIds.clear();
 
     // Copy only top-level selected entities to avoid duplicate nested clones on paste
     for (EntityId id : m_selectedEntityIds) {
+
 		// Skip if entity is protected
         ECS::Entity entity = m_world->Resolve(id);
 
@@ -1660,12 +1745,14 @@ void HierarchyPanel::_copySelectedEntities() {
 
 		// Traverse up the hierarchy to check for selected ancestors
         while (!parent.IsNull()) {
+
 			// If we find an ancestor that is also selected, we skip copying this entity because it 
             // will be included in the clone of the ancestor
             if (m_selectedEntityIds.find(parent.Index) != m_selectedEntityIds.end()) {
                 hasSelectedAncestor = true;
                 break;
             }
+
 			// Move up to the next ancestor
             parent = m_world->ParentOf(parent);
         }
@@ -1679,6 +1766,7 @@ void HierarchyPanel::_copySelectedEntities() {
 
 // Paste copied entities: clones the stored entity IDs and adds them to the hierarchy
 void HierarchyPanel::_pasteCopiedEntities() {
+
 	// Block pasting if there are no copied entities or if world/entityActions are 
     // not available
     if (!m_world || !m_entityActions || m_copiedEntityIds.empty()) {
@@ -1706,6 +1794,7 @@ void HierarchyPanel::_pasteCopiedEntities() {
 		// If cloning was successful, we need to add the cloned entity to the correct order 
         // list based on its new parent
         if (clonedId != ECS::Entity::NPOS32) {
+
 			// After cloning, we check the parent of the cloned entity to determine where to insert 
             // it in the order list
             ECS::Entity cloned = m_world->Resolve(clonedId);
@@ -1719,6 +1808,7 @@ void HierarchyPanel::_pasteCopiedEntities() {
                 if (parent.IsNull()) {
                     _appendToOrderList(m_rootOrder, clonedId);
                 }
+
 				// If the parent is not null, we add it to the child order list of its parent
                 else {
                     _appendToOrderList(m_childOrder[parent.Index], clonedId);
@@ -1748,6 +1838,7 @@ void HierarchyPanel::_pasteCopiedEntities() {
 
 // Delete all selected entities, with safety checks to prevent deleting protected entities
 void HierarchyPanel::_deleteSelectedEntities() {
+
 	// We first gather all entities to delete in a separate list to avoid modifying the selection set while 
     // iterating it
     std::vector<EntityId> toDelete;
@@ -1755,11 +1846,13 @@ void HierarchyPanel::_deleteSelectedEntities() {
 
 	// We check each selected entity to see if it is protected
     for (EntityId id : m_selectedEntityIds) {
+
         // If it is not protected, we add it to the list of entities to delete
         if (!IsProtectedEntity(m_world, id)) {
             toDelete.push_back(id);
         }
     }
+
 	// Now we delete all entities in the toDelete list
     // This will also handle deleting any child entities
     for (EntityId id : toDelete) {
@@ -1775,13 +1868,14 @@ void HierarchyPanel::_cutSelectedEntities() {
 // Add a child entity to the selected entity
 // Creates a new entity as child of the specified parent
 void HierarchyPanel::_addChildEntity(EntityId parentId) {
+
     // Block adding children to protected entities
     if (IsProtectedEntity(m_world, parentId)) return;
 
     if (m_entityActions) {
         EntityId newId = m_entityActions->AddEntity("Entity", parentId);
         if (newId != ECS::Entity::NPOS32) {
-            _appendToOrderList(m_childOrder[parentId], newId); // Add child at end.
+            _appendToOrderList(m_childOrder[parentId], newId); // Add child at end
         }
     }
 }
@@ -1791,13 +1885,14 @@ void HierarchyPanel::_addRootEntity() {
     if (m_entityActions) {
         EntityId newId = m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
         if (newId != ECS::Entity::NPOS32) {
-            _appendToOrderList(m_rootOrder, newId); // Add root at end.
+            _appendToOrderList(m_rootOrder, newId); // Add root at end
         }
     }
 }
 
 // Start renaming an entity (prepare rename state and buffers)
 void HierarchyPanel::_startRename(EntityId entityId) {
+
     // Block renaming protected entities
     if (IsProtectedEntity(m_world, entityId)) return;
 
@@ -1837,6 +1932,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
     }
 
     try {
+
         // Open and read prefab file
         std::ifstream file(prefabPath);
         if (!file.is_open()) {
@@ -1853,10 +1949,12 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
 
         // Check if this is new hierarchical format or old single-entity format
         if (prefabJson.contains("Entity")) {
+
             // New format with hierarchy: use DeserializeEntityHierarchy
             rootEntity = Serialization::EntitySerializer::DeserializeEntityHierarchy(*m_world, prefabJson["Entity"], parentId);
         }
         else if (prefabJson.contains("Components")) {
+
             // Old format: single entity
             // Create new entity
             rootEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
@@ -1864,10 +1962,13 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
             // Set parent relationship if not creating as root
             // NPOS32 is a special value meaning "no parent" (root entity)
             if (parentId != ECS::Entity::NPOS32) {
+
                 // Convert EntityId to ECS::Entity object for world operations
                 ECS::Entity parent = m_world->Resolve(parentId);
+
                 // Only set parent if the parent entity exists and is valid
                 if (!parent.IsNull() && m_world->IsAlive(parent)) {
+
                     // Use Attach to properly update hierarchy indices
                     m_world->Attach(rootEntity, parent);
                 }
@@ -1893,9 +1994,11 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         if (m_prefabManager) {
             hash = m_prefabManager->RegisterPrefab(normalizedPath);
             m_prefabManager->TrackInstance(rootEntity, hash);
-        } else {
+        }
+        else {
             hash = ECS::PrefabManager::ComputeHash(
-                // Normalize the asset path for comparisons.
+
+                // Normalize the asset path for comparisons
                 ECS::PrefabManager::NormalizePath(normalizedPath)
             );
         }
@@ -1907,6 +2010,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
 
         if (m_undoSystem) {
+
             // Treat prefab instantiation like entity creation for undo/redo
             m_undoSystem->RecordEntityCreation(rootEntity.Index);
         }
@@ -1922,10 +2026,10 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
 
         // Return the entity ID so caller can select it
         if (parentId == ECS::Entity::NPOS32) {
-            _appendToOrderList(m_rootOrder, rootEntity.Index); // Track prefab root order.
+            _appendToOrderList(m_rootOrder, rootEntity.Index); // Track prefab root order
         }
         else {
-            _appendToOrderList(m_childOrder[parentId], rootEntity.Index); // Track prefab child order.
+            _appendToOrderList(m_childOrder[parentId], rootEntity.Index); // Track prefab child order
         }
         return rootEntity.Index;
     }
@@ -1939,7 +2043,6 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
 // Helper Methods
 // -------------------------------------------------------------------------
 
-// Get all root entities (entities without parents)
 // Get all root entities (entities without parents)
 // Uses World's ParentOf API to check hierarchy maintained by Attach/Detach
 std::vector<EntityId> HierarchyPanel::_getRootEntities() {
@@ -1990,7 +2093,8 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) {
         return children;
 
     std::vector<EntityId> currentChildren;
-    // Iterate over child entities.
+
+    // Iterate over child entities
     m_world->ForChildren(parent, [&](ECS::Entity child) {
         if (!ShouldHideFromHierarchy(m_world, child)) {
             currentChildren.push_back(child.Index);
@@ -2021,10 +2125,9 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) {
     return children;
 }
 
-
-
 // Check if entity matches current search filter
 bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
+
     // Empty filter matches everything
     if (m_searchFilter.empty()) return true;
 
@@ -2032,30 +2135,31 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return false;
 
+    auto normalize = [](std::string value) {
+        value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char c) {
+            return !std::isspace(c);
+        }));
+        value.erase(std::find_if(value.rbegin(), value.rend(), [](unsigned char c) {
+            return !std::isspace(c);
+        }).base(), value.end());
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return value;
+    };
+
     if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
         std::string entityName = ECS::StringTable::Resolve(nameComp->Value);
         if (entityName.empty()) {
             entityName = "Entity";
         }
 
-        // Convert both to lowercase for case-insensitive search
-        std::string lowerName = entityName;
-        std::string lowerFilter = m_searchFilter;
-        // Apply transform values.
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
-        std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-
-        // Check if entity name contains the filter string
-        return lowerName.find(lowerFilter) != std::string::npos;
+        // Exact name match (case-insensitive, trimmed)
+        return normalize(entityName) == normalize(m_searchFilter);
     }
 
-    // No name component, check if searching for "Entity"
-    std::string defaultName = "Entity";
-    std::string lowerFilter = m_searchFilter;
-    // Apply transform values.
-    std::transform(defaultName.begin(), defaultName.end(), defaultName.begin(), ::tolower);
-    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-    return defaultName.find(lowerFilter) != std::string::npos;
+    // No name component fallback
+    return normalize("Entity") == normalize(m_searchFilter);
 }
 
 // -------------------------------------------------------------------------
@@ -2077,6 +2181,7 @@ void HierarchyPanel::RebuildEntityOrder() {
 
 // Recursive helper to traverse hierarchy depth-first
 void HierarchyPanel::_rebuildEntityOrderRecursive(EntityId entityId) {
+
     // Add current entity to order
     m_entityOrder.push_back(entityId);
 
@@ -2096,7 +2201,7 @@ void HierarchyPanel::ClearUIState() {
     m_contextMenuTarget = ECS::Entity::NPOS32;
     m_searchFilter.clear();
     m_rootOrder.clear();
-    m_childOrder.clear(); // Clear order caches when UI state resets.
+    m_childOrder.clear(); // Clear order caches when UI state resets
 
     // Notify selection callback that nothing is selected
     if (m_selectionCallback) {
@@ -2104,18 +2209,23 @@ void HierarchyPanel::ClearUIState() {
     }
 }
 
-// Seed root ordering from entity order state.
+// Seeds cached root and child order lists from serialized flat entity order state
 void HierarchyPanel::_seedRootOrderFromEntityOrder() {
     if (!m_world) return;
 
+    // Track duplicates so bad serialized data does not create repeated tree entries
     std::unordered_set<EntityId> seen;
     m_rootOrder.clear();
     m_childOrder.clear();
 
     for (EntityId id : m_entityOrder) {
+
+        // Skip duplicate IDs while preserving first occurrence order
         if (seen.insert(id).second == false) continue;
 
         ECS::Entity entity = m_world->Resolve(id);
+
+        // Hidden entities should not consume ordering slots in visible hierarchy
         if (ShouldHideFromHierarchy(m_world, entity)) continue;
 
         ECS::Entity parent = m_world->ParentOf(entity);
@@ -2128,14 +2238,14 @@ void HierarchyPanel::_seedRootOrderFromEntityOrder() {
     }
 }
 
-// Append entity to the order list.
+// Appends an entity to an order list only when it is not already present
 void HierarchyPanel::_appendToOrderList(std::vector<EntityId>& order, EntityId entityId) {
     if (std::find(order.begin(), order.end(), entityId) == order.end()) {
         order.push_back(entityId);
     }
 }
 
-// Remove entity from the order list.
+// Removes all occurrences of an entity from an order list
 void HierarchyPanel::_removeFromOrderList(std::vector<EntityId>& order, EntityId entityId) {
     auto it = std::remove(order.begin(), order.end(), entityId);
     if (it != order.end()) {
@@ -2143,7 +2253,7 @@ void HierarchyPanel::_removeFromOrderList(std::vector<EntityId>& order, EntityId
     }
 }
 
-// Remove entity from all order lists.
+// Removes an entity from root and child order caches and prunes now-empty child buckets
 void HierarchyPanel::_removeEntityFromOrders(EntityId entityId) {
     _removeFromOrderList(m_rootOrder, entityId);
     for (auto it = m_childOrder.begin(); it != m_childOrder.end(); ) {
@@ -2157,7 +2267,7 @@ void HierarchyPanel::_removeEntityFromOrders(EntityId entityId) {
     }
 }
 
-// Move entity within the order list.
+// Moves one entity to immediately after target entity inside the provided order list
 void HierarchyPanel::_moveEntityInOrder(std::vector<EntityId>& order, EntityId entityId, EntityId targetId) {
     if (entityId == targetId) return;
 
@@ -2182,29 +2292,29 @@ void HierarchyPanel::_moveEntityInOrder(std::vector<EntityId>& order, EntityId e
     order.insert(targetIt + 1, entityId);
 }
 
-// Apply the updated order list.
+// Applies an updated order list to either root ordering or a specific parent child ordering
 void HierarchyPanel::_applyOrder(EntityId parentId, const std::vector<EntityId>& order) {
     if (parentId == ECS::Entity::NPOS32) {
-        m_rootOrder = order; // Apply new root order.
+        m_rootOrder = order; // Apply new root order
     }
     else {
-        m_childOrder[parentId] = order; // Apply new child order.
+        m_childOrder[parentId] = order; // Apply new child order
     }
 
     if (m_fileMenu) {
-        m_fileMenu->MarkSceneDirty(); // Order changes should persist to scene files.
+        m_fileMenu->MarkSceneDirty(); // Order changes should persist to scene files
     }
 }
 
-// Record order changes for undo/redo.
+// Records reorder operations and coalesces rapid drag updates into one undo step
 void HierarchyPanel::_recordOrderChange(EntityId parentId, const std::vector<EntityId>& before, const std::vector<EntityId>& after) {
     if (!m_undoSystem) return;
     if (before == after) return;
 
-    float now = static_cast<float>(ImGui::GetTime()); // Timestamp for coalescing.
+    float now = static_cast<float>(ImGui::GetTime()); // Timestamp for coalescing
     if (parentId == m_lastReorderParentId && (now - m_lastReorderTime) <= REORDER_COALESCE_WINDOW) {
         if (m_undoSystem->CoalesceReorder(parentId, after)) {
-            m_lastReorderTime = now; // Extend coalesce window.
+            m_lastReorderTime = now; // Extend coalesce window
             return;
         }
     }
@@ -2213,7 +2323,7 @@ void HierarchyPanel::_recordOrderChange(EntityId parentId, const std::vector<Ent
         _applyOrder(parentId, order);
     };
 
-    m_undoSystem->ExecuteCommand(std::make_unique<Editor::ReorderEntitiesCommand>(parentId, apply, before, after)); // Push reorder undo.
-    m_lastReorderParentId = parentId; // Track last reorder parent for coalescing.
-    m_lastReorderTime = now; // Track last reorder time for coalescing.
+    m_undoSystem->ExecuteCommand(std::make_unique<Editor::ReorderEntitiesCommand>(parentId, apply, before, after)); // Push reorder undo
+    m_lastReorderParentId = parentId; // Track last reorder parent for coalescing
+    m_lastReorderTime = now;          // Track last reorder time for coalescing
 }

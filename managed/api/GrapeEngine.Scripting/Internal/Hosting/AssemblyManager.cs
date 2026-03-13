@@ -72,6 +72,8 @@ internal static class AssemblyManager
         var ext = Path.GetExtension(originalAssemblyPath);
         var pattern = $"{filename}_hotreload_*{ext}";
 
+        // Parse numeric suffixes from "<name>_hotreload_<n>.dll" and select the highest n.
+        // Non-matching files are ignored so corrupted or manual files do not break reload.
         int bestVersion = -1;
         string? bestPath = null;
 

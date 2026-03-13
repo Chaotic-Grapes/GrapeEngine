@@ -1,8 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.h
-\author Choi Meng Yew (100%)
+\author Choi Meng Yew (95%)
+        Foo Rui Qin (5%)
+\date   12th March 2026
 \par    choi.m@digipen.edu
+        ruiqin.foo@digipen.edu
 \brief
 Declares the RendererSystem which manages 2D rendering in the ECS framework.
 
@@ -64,7 +67,10 @@ namespace ECS {
      */
     class GRAPEENGINE_API RendererSystem : public ISystem {
     public:
+        // Build an uninitialized renderer system with default state
         RendererSystem() = default;
+
+        // Clean up renderer-owned resources
         ~RendererSystem() override = default;
 
         // ====================================================================
@@ -72,12 +78,23 @@ namespace ECS {
         // ====================================================================
 
         // ISystem interface
+
+        // Create renderer resources and bind to the active world
         void OnCreate(World& world) override;
+
+        // Render one frame for the current world state
         void OnUpdate(World& world) override;
+
+        // Release renderer resources before system shutdown
         void OnDestroy(World& world) override;
         
+        // Describe scheduling metadata used by ECS system orchestration
         SystemMetadata GetMetadata() const override;
+
+        // Report this system's execution group
         SystemGroup GetSystemGroup() const override { return SystemGroup::Render; }
+
+        // Keep renderer updates enabled in both edit and play contexts
         SystemRunMode GetRunMode() const override { return SystemRunMode::Always; }
 
         /**
@@ -89,7 +106,11 @@ namespace ECS {
         }
 
         // Compatibility accessors for editor integration
+
+        // Expose the active orthographic size for editor tools
         float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
+
+        // Expose the render graph so editor systems can inspect pass outputs
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
 
         struct GUIViewport {
@@ -102,12 +123,23 @@ namespace ECS {
         // Static accessor for global access
         static RendererSystem* GetInstance();
 
+        // Return the current render target size in pixels
         Vector2D GetRenderTargetSize() const { return m_renderTargetSize; }
+
+        // Return the active GUI viewport definition
         GUIViewport GetGUIViewport() const { return m_guiViewport; }
+
+        // Configure GUI viewport origin, size, and DPI scale for UI rendering
         void SetGUIViewport(const Vector2D& origin, const Vector2D& size, const Vector2D& displayScale);
+
+        // Clear GUI viewport override and fall back to full render target
         void ResetGUIViewport();
+
+        // Project a world position into screen coordinates for the provided viewport
         bool WorldToScreen(World& world, const Vector3D& worldPos, const Vector2D& viewportOrigin,
             const Vector2D& viewportSize, Vector2D& outScreen);
+
+        // Compute camera basis vectors used by editor gizmo alignment
         bool GetCameraBasis(World& world, glm::vec3& outRight, glm::vec3& outUp);
 
         // ====================================================================
@@ -128,11 +160,22 @@ namespace ECS {
             std::unique_ptr<Framebuffer> PickingFBO;
         };
 
+        // Register a named viewport and allocate its render targets
         void AddViewport(const std::string& name, Engine::Camera* camera, int w, int h);
+
+        // Remove a named viewport and free its associated resources
         void RemoveViewport(const std::string& name);
+
+        // Resize all render targets for a named viewport
         void ResizeViewport(const std::string& name, int w, int h);
+
+        // Swap the camera source used by a named viewport
         void SetViewportCamera(const std::string& name, Engine::Camera* camera);
+
+        // Look up a viewport by name for mutation
         Viewport* GetViewport(const std::string& name);
+
+        // Fetch the final LDR texture id for viewport presentation
         GLuint GetViewportTexture(const std::string& name) const;
 
         // ====================================================================
@@ -150,6 +193,8 @@ namespace ECS {
         Engine::Camera* GetCamera() { return m_activeCamera; }
 
         // Rebind the renderer to a new world
+
+        // Rebuild world-dependent renderer state after world replacement
         void BindWorld(World& world);
 
         // -----------------------
@@ -264,18 +309,31 @@ namespace ECS {
         void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
                                      const glm::vec4& color);
 
+        // Queue a screen-space rounded panel quad for GUI rendering
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                            const Color& color, float cornerRadius = 0.0f);
+                            const Color& color, float cornerRadius = 0.0f, float rotationRadians = 0.0f);
+
+        // Queue a screen-space textured GUI image quad
         void SubmitGUIImage(const Vector2D& position, const Vector2D& size,
                             uint32_t textureId, const Vector4D& uvRect, const Color& color,
-                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest,
+                            float rotationRadians = 0.0f);
+
+        // Queue a screen-space text draw request
         void SubmitGUIText(const Vector2D& position, const std::string& text,
                            const std::string& fontPath, float pixelSize, const Color& color);
+
+        // Queue a world-space panel that is rendered with scene camera transforms
         void SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
-                                 const Color& color, float cornerRadius = 0.0f);
+                                 const Color& color, float cornerRadius = 0.0f, float rotationRadians = 0.0f);
+
+        // Queue a world-space textured GUI image
         void SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
                                  uint32_t textureId, const Vector4D& uvRect, const Color& color,
-                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest,
+                                 float rotationRadians = 0.0f);
+
+        // Queue world-space text to be composited in the scene pass
         void SubmitWorldGUIText(const Vector2D& position, const std::string& text,
                                 const std::string& fontPath, float pixelSize, const Color& color);
 
@@ -293,9 +351,16 @@ namespace ECS {
             Entity SourceEntity = NULL_ENTITY; // Editor entity that owns this debug tilemap
         };
 
+        // Install one debug tilemap entry from direct map and tileset references
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset, const glm::vec2& worldOffset);
+
+        // Replace all debug tilemap entries for the next render
         void SetDebugTileMaps(const std::vector<DebugTileMapEntry>& maps);
+
+        // Clear single-debug-tilemap state
         void ClearDebugTileMap();
+
+        // Clear multi-debug-tilemap state
         void ClearDebugTileMaps();
 
     private:
@@ -421,6 +486,7 @@ namespace ECS {
             Vector2D size;
             Color color;
             float cornerRadius = 0.0f;
+            float rotation = 0.0f;
         };
         std::vector<GUIPanelSubmission> m_guiPanelQueue;
 
@@ -440,6 +506,7 @@ namespace ECS {
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+            float rotation = 0.0f;
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
 
@@ -448,6 +515,7 @@ namespace ECS {
             Vector2D size;
             Color color;
             float cornerRadius = 0.0f;
+            float rotation = 0.0f;
         };
         std::vector<WorldGUIPanelSubmission> m_worldGuiPanelQueue;
 
@@ -467,6 +535,7 @@ namespace ECS {
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+            float rotation = 0.0f;
         };
         std::vector<WorldGUIImageSubmission> m_worldGuiImageQueue;
 
@@ -552,11 +621,21 @@ namespace ECS {
         // ====================================================================
         // Extracted Render Helpers (for multi-viewport)
         // ====================================================================
+
+        // Gather active lights into the renderer light manager
         void CollectLights(World& world);
+
+        // Group renderable entities into layer buckets for stable draw ordering
         void BucketEntities(World& world, std::vector<std::vector<Entity>>& buckets, int& maxLayerId);
+
+        // Render scene content into the viewport HDR target
         void RenderSceneToHDR(World& world, Viewport& vp, const glm::mat4& viewProj,
             const std::vector<std::vector<Entity>>& buckets, int maxLayerId);
+
+        // Apply bloom extraction and blur passes for the viewport
         void RenderBloom(Viewport& vp, float bloomRadius);
+
+        // Run tone mapping from HDR to final LDR output
         void ToneMap(Viewport& vp);
 
         // Sync runtime tilemap cache with current world state
@@ -571,10 +650,19 @@ namespace ECS {
         // Draw editor/debug tilemap per entity
         void SubmitDebugTileMapEntity(World& world, Entity entity); 
 
+        // Draw queued overlay quads after main scene geometry
         void RenderOverlayQuads(Viewport& vp, const glm::mat4& viewProj);
+
+        // Draw queued wireframe primitives for editor visualization
         void RenderWireframes(Viewport& vp, const glm::mat4& viewProj);
+
+        // Render queued screen-space GUI primitives
         void RenderGUI(Viewport& vp);
+
+        // Render queued world-space GUI primitives
         void RenderWorldGUI(const glm::mat4& viewProj);
+
+        // Render picking ids into the picking target and process async readback
         void RenderPicking(World& world, Viewport& vp, const glm::mat4& viewProj,
             const std::vector<std::vector<Entity>>& buckets);
 

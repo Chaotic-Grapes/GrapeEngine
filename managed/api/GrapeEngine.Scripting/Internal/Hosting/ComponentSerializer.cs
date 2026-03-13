@@ -116,8 +116,8 @@ internal static class ComponentSerializer
             if (obj == null)
                 return IntPtr.Zero;
 
-            // Serialize through JSON-compatible primitives/objects so System.Text.Json
-            // does not cache reflection-emit accessors for collectible script types.
+            // Serialize through neutral primitives/maps so System.Text.Json avoids
+            // retaining type-specific dynamic accessors tied to collectible ALCs.
             object? jsonValue = ToJsonCompatibleValue(obj, t);
             var json = JsonSerializer.Serialize(jsonValue, _jsonOptions);
 
@@ -160,6 +160,8 @@ internal static class ComponentSerializer
         if (size <= 0)
             return null;
 
+        // Create an uninitialized boxed value-type and copy native bytes directly into it.
+        // This preserves exact unmanaged layout for blittable script components.
         object boxed = RuntimeHelpers.GetUninitializedObject(t);
         GCHandle handle = default;
         try
@@ -188,10 +190,12 @@ internal static class ComponentSerializer
         object? obj;
         try
         {
+            // Start from current native bytes so partial JSON updates keep existing values.
             obj = CreateManagedObjectFromNative(t, data, size);
         }
         catch
         {
+            // Fallback: still allow full-object JSON writes when byte bootstrap fails.
             obj = RuntimeHelpers.GetUninitializedObject(t);
         }
 
@@ -199,6 +203,7 @@ internal static class ComponentSerializer
             return false;
 
         using JsonDocument document = JsonDocument.Parse(jsonString);
+        // Apply JSON as a patch over the pre-seeded object, then copy final bytes to native.
         if (!ApplyJsonToObject(t, document.RootElement, obj))
         {
             Logging.LogInternal($"[ComponentSerializer] Failed to deserialize type {t.Name}", LogLevel.Warning);
@@ -208,6 +213,7 @@ internal static class ComponentSerializer
         GCHandle handle = default;
         try
         {
+            // Copy updated managed bytes back to native storage used by ECS.
             handle = GCHandle.Alloc(obj, GCHandleType.Pinned);
             IntPtr boxedPtr = handle.AddrOfPinnedObject();
             int managedSize = Marshal.SizeOf(t);
@@ -309,6 +315,8 @@ internal static class ComponentSerializer
         if (element.ValueKind != JsonValueKind.Object)
             return false;
 
+        // Build case-insensitive lookup maps once so each JSON property can be resolved
+        // to either a writable property or a backing field.
         var properties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.GetIndexParameters().Length == 0)
             .ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
@@ -324,7 +332,8 @@ internal static class ComponentSerializer
                 if (!TryConvertJsonToType(jsonProp.Value, prop.PropertyType, out object? converted))
                     continue;
 
-                // For record-struct init-only properties, write backing field directly.
+                // init-only record structs cannot be set via setter after construction.
+                // If a compiler backing field exists, write that field directly.
                 string backingName = $"<{prop.Name}>k__BackingField";
                 if (fields.TryGetValue(backingName, out var backingField))
                 {
@@ -406,6 +415,7 @@ internal static class ComponentSerializer
             {
                 if (element.ValueKind == JsonValueKind.String)
                 {
+                    // Support editor-friendly enum names in addition to numeric payloads.
                     string? s = element.GetString();
                     if (s != null && Enum.TryParse(targetType, s, ignoreCase: true, out object? enumObj))
                     {
@@ -425,6 +435,7 @@ internal static class ComponentSerializer
 
             if (targetType.IsValueType && element.ValueKind == JsonValueKind.Object)
             {
+                // Nested unmanaged structs are recursively patched field-by-field.
                 object boxed = RuntimeHelpers.GetUninitializedObject(targetType);
                 if (!ApplyJsonToObject(targetType, element, boxed))
                     return false;

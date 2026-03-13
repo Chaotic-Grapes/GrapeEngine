@@ -1,6 +1,23 @@
-#pragma once
+/* Start Header *****************************************************************/
+/*!
+\file   pch.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   12th March 2026
+\brief
+Precompiled header for GrapeEngine. Includes all frequently used standard library
+headers and third-party core headers so they are compiled once and reused across
+all translation units, reducing overall build time.
+*/
+/* End Header *******************************************************************/
 
+#ifndef PCH_H
+#define PCH_H
+
+// ============================================================================
 // Standard library
+// ============================================================================
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -31,7 +48,10 @@
 #include <utility>
 #include <vector>
 
+// ============================================================================
 // Third-party core headers
+// ============================================================================
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -43,3 +63,5 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <nlohmann/json.hpp>
+
+#endif // PCH_H

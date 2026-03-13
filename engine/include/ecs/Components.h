@@ -804,9 +804,22 @@ namespace ECS {
             Color TrackColor{ 0.2f, 0.2f, 0.2f, 1.0f }; // background bar
             Color FillColor{ 0.4f, 0.4f, 0.4f, 1.0f };  // filled bar
             Color KnobColor{ 0.9f, 0.9f, 0.9f, 1.0f };  // knob color
+            uint32_t TrackTextureId = 0;      // runtime texture handle (optional)
+            uint32_t TrackTexturePathId = 0;  // StringTable id for texture path
+            Vector4D TrackUVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
+            Graphics::TextureFilter TrackTextureFilter = Graphics::TextureFilter::Nearest;
+            uint32_t FillTextureId = 0;      // runtime texture handle (optional)
+            uint32_t FillTexturePathId = 0;  // StringTable id for texture path
+            Vector4D FillUVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
+            Graphics::TextureFilter FillTextureFilter = Graphics::TextureFilter::Nearest;
+            uint32_t KnobTextureId = 0;      // runtime texture handle (optional)
+            uint32_t KnobTexturePathId = 0;  // StringTable id for texture path
+            Vector4D KnobUVRect{ 0.0f, 0.0f, 1.0f, 1.0f }; // normalized UVs
+            Graphics::TextureFilter KnobTextureFilter = Graphics::TextureFilter::Nearest;
             float CornerRadius = 0.0f;  // rounded rect radius
             Vector2D KnobSize{ 16.0f, 16.0f }; // knob size
             Vector4D Padding{ 6.0f, 6.0f, 6.0f, 6.0f }; // track padding
+            float RotationDegrees = 0.0f; // optional slider rotation around track center
             bool Horizontal = true; // horizontal vs vertical slider
             bool Disabled = false;  // ignores input
             bool ValueChanged = false; // set when value updated this frame
@@ -816,3 +829,4 @@ namespace ECS {
     }
 }
 #endif
+
