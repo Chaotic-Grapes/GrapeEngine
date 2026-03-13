@@ -1,3 +1,46 @@
+/* Start Header *****************************************************************/
+/*!
+\file   boid.frag
+\author Choi Meng Yew (100%)
+\date   13th March 2026
+\brief
+Physically Based Rendering (PBR) fragment shader used for instanced
+boid rendering in GrapeEngine.
+
+This shader performs lighting using a Cook–Torrance BRDF with GGX
+distribution and supports both directional and point lights supplied
+via a GPU SSBO. Material properties can be sourced from textures or
+uniform parameters, enabling flexible rendering for boid instances.
+
+Features:
+    - Cook–Torrance PBR lighting model (GGX + Schlick Fresnel)
+    - Directional and point light support
+    - GPU point lights stored in SSBO
+    - Albedo texture support
+    - Normal mapping
+    - Metallic / Roughness / AO (MRA) map support
+    - Emissive map support
+    - Alpha testing and transparency
+    - Editor picking mode
+
+Responsibilities:
+    - Decode material flags and determine shading path
+    - Sample material textures (Albedo, Normal, MRA, Emissive)
+    - Compute PBR lighting contributions per light
+    - Apply emissive contribution
+    - Output final shaded fragment color
+
+Used by:
+    - BoidSystem instanced renderer
+    - GrapeEngine material pipeline
+    - GPU point-light lighting system
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #version 460 core
 
 in vec2 vTexCoord;

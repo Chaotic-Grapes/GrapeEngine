@@ -1,4 +1,37 @@
-#version 450 core
+/* Start Header *****************************************************************/
+/*!
+\file   boid.vert
+\author Choi Meng Yew (100%)
+\date   13th March 2026
+\brief
+Vertex shader for instanced boid rendering.
+
+This shader renders each boid as a rotated quad using instanced data
+provided by a CUDA–OpenGL interoperable VBO. Each instance contains the
+boid's position and velocity direction, allowing the quad to orient
+itself along the direction of movement.
+
+Inputs:
+    - Per-vertex unit quad geometry (aPos, aTexCoord)
+    - Per-instance boid data (position + velocity direction)
+
+Responsibilities:
+    - Compute boid rotation from velocity vector
+    - Rotate and scale the quad to face movement direction
+    - Translate the quad to the boid's world position
+    - Output world position and texture coordinates for fragment shader
+
+Used by:
+    - BoidSystem instanced renderer
+    - CUDA–OpenGL boid simulation pipeline
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#version 460 core
 
 // Per-vertex (unit quad)
 layout(location = 0) in vec2 aPos;
