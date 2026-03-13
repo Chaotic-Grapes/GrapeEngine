@@ -75,6 +75,7 @@ namespace ECS {
         }
 
         bool IsHigherPriorityHit(Entity candidateEntity, int16_t candidateZ, Entity currentEntity, int16_t currentZ) {
+            // Deterministic winner: higher Z first, then stable entity-id tie-break.
             if (candidateZ != currentZ) {
                 return candidateZ > currentZ;
             }
@@ -113,6 +114,7 @@ namespace ECS {
             const Vector2D relStart = Sub2(cursor, primaryStart);
             const Vector2D relCenter = Sub2(cursor, basis.Center);
 
+            // Measure cursor in slider-local coordinates so rotated/world sliders use one math path.
             outPrimaryCoord = Dot2(relStart, primaryDir);
             outSecondaryCoord = Dot2(relCenter, secondaryDir);
             outT = std::clamp(outPrimaryCoord / basis.PrimaryLength, 0.0f, 1.0f);
@@ -216,6 +218,7 @@ namespace ECS {
                 : Vector2D{ trackSize.X, 0.0f };
 
             if (!isWorldSpace) {
+                // Screen-space basis directly uses resolved GUI layout dimensions.
                 outBasis.Center = {
                     trackPos.X + trackSize.X * 0.5f,
                     trackPos.Y + trackSize.Y * 0.5f
@@ -253,6 +256,7 @@ namespace ECS {
                 return;
             }
 
+            // World-space basis is projected to screen so hit-testing matches what is rendered.
             outBasis.Center = screenCenter;
             outBasis.PrimaryAxis = {
                 (screenPrimaryEnd.X - screenCenter.X) * 2.0f,
@@ -426,6 +430,7 @@ namespace ECS {
 
                 const bool startInteraction = mousePressed && captured;
                 if (startInteraction && basisProjected) {
+                    // Click-to-set uses absolute projection along the slider axis.
                     const float value = QuantizeAndClampSliderValue(
                         slider.Min + tFromCursor * (slider.Max - slider.Min), slider);
                     if (std::abs(value - slider.Value) > 0.0001f) {
@@ -440,6 +445,7 @@ namespace ECS {
 
                 const bool dragInteraction = captured && mouseDown && !mousePressed && (m_activeSlider == entity);
                 if (dragInteraction && basisProjected && m_sliderAxisValid && basis.PrimaryLength > 0.0001f) {
+                    // Drag uses axis delta to preserve smooth movement across rotated sliders.
                     const float delta = cursorPrimaryCoord - m_sliderLastAxisCoord;
                     m_sliderLastAxisCoord = cursorPrimaryCoord;
 

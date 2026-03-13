@@ -638,6 +638,7 @@ namespace ECS {
                 };
 
                 auto resolveSliderTextureId = [&](uint32_t runtimeId, uint32_t pathId) {
+                    // Prefer path-backed texture when available so serialized slider assets reload correctly.
                     uint32_t textureId = runtimeId;
                     const std::string texturePath = ECS::StringTable::Resolve(pathId);
                     const std::string loadPath = ResolveProjectPathForLoad(texturePath);
@@ -653,10 +654,12 @@ namespace ECS {
                 const uint32_t trackTextureId = resolveSliderTextureId(slider.TrackTextureId, slider.TrackTexturePathId);
                 const uint32_t fillTextureId = resolveSliderTextureId(slider.FillTextureId, slider.FillTexturePathId);
                 const uint32_t knobTextureId = resolveSliderTextureId(slider.KnobTextureId, slider.KnobTexturePathId);
+                // Slider textures intentionally use full UVs; per-part UV editing is not supported.
                 const Vector4D fullUVRect{ 0.0f, 0.0f, 1.0f, 1.0f };
 
                 const Color trackColor = ResolveStyleColor(style, slider.TrackColor, state);
                 if (trackTextureId != 0u) {
+                    // Texture path: draw image part. Fallback path below keeps previous color-panel behavior.
                     if (isWorldSpace) {
                         renderer->SubmitWorldGUIImage(trackPos, trackSize, trackTextureId, fullUVRect, trackColor,
                             slider.TrackTextureFilter, rotationRadians);
