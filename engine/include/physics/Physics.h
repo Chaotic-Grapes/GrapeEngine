@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Physics.h
-\author Dalton Koh Shi Hao (100%)
+\author Dalton Koh Shi Hao , 2403250
 \par    d.koh@digipen.edu
 
 \brief
@@ -9,8 +9,13 @@ Declaration of the Physics class for 2D physics simulation. Provides methods for
 gravity management, force application, collision resolution, and world boundary
 constraints. Includes utilities for computing world-space shapes from entity
 components.
+*
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
+
 
 #ifndef PHYSICS_H
 #define PHYSICS_H
@@ -92,9 +97,8 @@ namespace Engine {
             const ECS::Components::PhysicsMaterial2D& physics
         );
 
-        // =========================================================================
-        // World-space shape helpers (Step 1 of refactor)
-        // =========================================================================
+
+        // World-space shape helpers
         // These compute world-space shapes by applying transform position, collider
         // offset, and scale - ensuring consistent shapes between broad and narrow phase.
 

@@ -1,8 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorConfiguration.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\author Muhammad Nur Fadzly Bin Zulkifli (95%)
+        Foo Rui Qin (5%)
 \par    muhammadnurfadzly.b@digipen.edu
+        ruiqin.foo@digipen.edu
+\date   11th March 2026
 \brief
 Editor-specific configuration structure and serialization.
 Separated from engine to maintain clean Engine/Editor architecture.
@@ -26,45 +29,31 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using json = nlohmann::json;
 
-/**
- * @brief Editor-only configuration structure
- * 
- * This structure holds editor-specific settings loaded from config.json
- * Kept separate from engine ProjectSettings to maintain architecture boundaries.
- */
+// Editor-only configuration structure holding settings loaded from config.json
+// Kept separate from engine ProjectSettings to maintain architecture boundaries
 struct EditorSettings {
-    /**
-     * @brief Window-specific configuration settings for editor
-     */
+    // Window-specific configuration settings for the editor
     struct Window {
-        int Width = 1600;           // Window width in pixels
-        int Height = 900;           // Window height in pixels
-        bool Maximized = true;      // Whether to start maximized
-        bool VSync = true;          // Whether to enable vertical sync
-        std::string Mode = "Windowed"; // Windowed, Fullscreen, Borderless
+        int Width = 1600;              // Window width in pixels
+        int Height = 900;              // Window height in pixels
+        bool Maximized = true;         // Whether to start maximized
+        bool VSync = true;             // Whether to enable vertical sync
+        std::string Mode = "Windowed"; // Display mode: Windowed, Fullscreen, Borderless
     } WindowSettings;
 
-    float UiScale = 1.0f;
-    int AssetBrowserViewMode = 1; // 0 = List, 1 = Grid
-    std::vector<std::string> RecentProjects;
-    std::string LastProject;
+    float UiScale = 1.0f;                       // Global UI scale factor
+    int AssetBrowserViewMode = 1;               // Asset browser view mode: 0 = List, 1 = Grid
+    std::vector<std::string> RecentProjects;    // Ordered list of recently opened project paths
+    std::string LastProject;                    // Path of the most recently opened project
 };
 
 namespace Editor {
-    /**
-     * @brief Handles loading, saving, and validating editor configuration
-     * 
-     * Provides functionality to load and save editor settings from JSON
-     * configuration files, with fallback to default values.
-     */
+    // Handles loading, saving, and validating editor configuration from JSON files
+    // Falls back to default values when a config file is missing or malformed
     class EditorConfiguration {
     public:
-        /**
-         * @brief Loads editor configuration from a JSON file
-         * @param configPath Path to the configuration JSON file
-         * @param config Reference to EditorSettings structure to populate
-         * @return true if config was loaded successfully, false if using defaults
-         */
+        // Load editor configuration from a JSON file into config
+        // Returns true if loaded successfully, false if falling back to defaults
         static bool LoadConfig(const std::string& configPath, EditorSettings& config) {
             json configJson;
             if (!Serialization::Serializer::LoadJson(configPath, "json", configJson)) {
@@ -103,12 +92,8 @@ namespace Editor {
             return true;
         }
 
-        /**
-         * @brief Saves editor configuration to a JSON file
-         * @param configPath Path to the configuration JSON file
-         * @param config Reference to EditorSettings structure to save
-         * @return true if config was saved successfully, false otherwise
-         */
+        // Save editor configuration to a JSON file
+        // Returns true if saved successfully, false otherwise
         static bool SaveConfig(const std::string& configPath, const EditorSettings& config) {
             json configJson;
 
@@ -125,11 +110,8 @@ namespace Editor {
             return Serialization::Serializer::SaveJson(configPath, "json", configJson);
         }
 
-        /**
-         * @brief Validates the configuration structure
-         * @param config Reference to EditorSettings structure to validate
-         * @return true if valid, false otherwise
-         */
+        // Validate the configuration structure
+        // Returns true if valid, false if width/height are non-positive or mode is unrecognized
         static bool ValidateConfig(const EditorSettings& config) {
             // Basic validation: width/height positive
             if (config.WindowSettings.Width <= 0 || config.WindowSettings.Height <= 0)
@@ -139,15 +121,14 @@ namespace Editor {
             return true;
         }
 
-        /**
-         * @brief Returns a default editor configuration
-         * @return EditorSettings with default values
-         */
+        // Returns a default-constructed EditorSettings with all default values
         static EditorSettings GetDefaultConfig() {
             return EditorSettings{};
         }
-        
+
     private:
+        // Normalize a window mode string to one of: Windowed, Fullscreen, Borderless
+        // Returns Windowed for any unrecognized input
         static std::string _normalizeWindowMode(const std::string& mode) {
             if (mode.empty()) {
                 return "Windowed";
@@ -171,6 +152,7 @@ namespace Editor {
             return "Windowed";
         }
 
+        // Parse window configuration fields from JSON into the Window struct
         static void _parseWindowConfig(const json& configJson, EditorSettings::Window& window) {
             if (configJson.contains("Width")) {
                 window.Width = configJson["Width"].get<int>();

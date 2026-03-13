@@ -3,7 +3,7 @@
 \file   AssetBrowserPanel.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   11th January 2026
+\date   11th March 2026
 
 \brief
 Implements the AssetBrowserPanel which renders the asset browser UI.
@@ -91,7 +91,7 @@ namespace {
     // Build tile input state + draw tile chrome
     GridTileInputState DrawGridTileButtonAndBackground(const bool isSelected, const size_t index,
         const int columns, const float tileSpacing, const float tileWidth, const float tileHeight,
-        const float tileRounding) 
+        const float tileRounding)
     {
         // For all items after first column, continue current row
         // modulo check tells us if this index starts a new row
@@ -157,7 +157,7 @@ namespace {
     // Trim long names so labels stay inside tile bounds
     // Input is by value on purpose so we can mutate and return it
     std::string TruncateGridLabel(std::string text, ImFont* nameFont, const float nameFontSize,
-        const float maxWidth) 
+        const float maxWidth)
     {
         // Empty input means nothing to do
         if (text.empty()) {
@@ -194,8 +194,8 @@ namespace {
 
     // Measure icon footprint used by layout
     // Image assets reserve fixed preview box instead of glyph-width box
-    ImVec2 MeasureGridIconSize(ImFont* symbolsFont, const AssetBadgeInfo& badgeInfo, 
-        const float iconFontSize, const bool isImageAsset) 
+    ImVec2 MeasureGridIconSize(ImFont* symbolsFont, const AssetBadgeInfo& badgeInfo,
+        const float iconFontSize, const bool isImageAsset)
     {
         // Default measurement is the glyph itself in symbols font
         ImVec2 iconSize = symbolsFont
@@ -212,10 +212,10 @@ namespace {
 
     // Draw icon/preview + type badge for one tile
     // Handles both texture preview path and glyph fallback path
-    void DrawGridEntryIconAndBadge(const std::string& entryPath, const AssetBadgeInfo& badgeInfo, 
+    void DrawGridEntryIconAndBadge(const std::string& entryPath, const AssetBadgeInfo& badgeInfo,
         const bool isImageAsset, ImFont* symbolsFont, const float iconFontSize, const float textPaddingX,
         const ImVec2& tileMin, const ImVec2& tileMax, const float tileWidth, const ImVec2& iconSize,
-        const float contentTop) 
+        const float contentTop)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();                             // Draw on current window list
         const ImVec2 iconPos(tileMin.x + (tileWidth - iconSize.x) * 0.5f, contentTop); // Center icon/preview horizontally
@@ -400,7 +400,7 @@ void AssetBrowserPanel::Render() {
     // This is module-safe even when message-bus subscriptions are split across engine/editor binaries
     const std::vector<std::string> droppedFiles = Input::ConsumeDroppedFiles();
 
-	// Handle each dropped file
+    // Handle each dropped file
     for (const auto& droppedPath : droppedFiles) {
         // Reuse AssetLibrary importer path handling + status wiring
         m_assetLibrary._handleFileDrop(droppedPath, m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
@@ -411,7 +411,6 @@ void AssetBrowserPanel::Render() {
     // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling
     ImGui::Begin("Asset Browser", nullptr, ImGuiWindowFlags_NoScrollbar);
 
-    // Render all the UI stuff
     _renderNavigationBar();
     _renderActionButtons();
     _renderContentArea();
@@ -509,7 +508,8 @@ void AssetBrowserPanel::_renderNavigationBar() {
         // Rebuild absolute path represented by each breadcrumb segment
         if (i == 0) {
             accumulatedPath = projectRoot;
-        } else {
+        }
+        else {
             accumulatedPath /= pathParts[i].string();
         }
 
@@ -610,7 +610,6 @@ void AssetBrowserPanel::_renderActionButtons() {
     ImGui::PopFont();
     if (!enableReplace) ImGui::EndDisabled();
 
-    // Show tooltip even when disabled
     // Allow tooltips even when the button is disabled to explain why
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         if (enableReplace) {
@@ -625,7 +624,7 @@ void AssetBrowserPanel::_renderActionButtons() {
     }
 
     ImGui::SameLine();
-    // UI things
+    // Render create/prefab management button and popup
     _renderPrefabButton();
 
     ImGui::SameLine();
@@ -657,12 +656,11 @@ void AssetBrowserPanel::_renderPrefabButton() {
 
     ImGui::PopFont();
 
-    // Tooltip for button
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Create new assets and manage prefabs");
     }
 
-    // UI things
+    // Render the combined create/prefab popup menu
     _renderPrefabPopup();
 }
 
@@ -713,7 +711,6 @@ void AssetBrowserPanel::_renderContentArea() {
     // Slightly shorten the status bar to give the content area a bit more height
     const float statusBarHeight = 24.0f;
 
-    // Content region above status bar (fills remaining height; docking preserves split ratios)
     // Child fills remaining height; negative height reserves space for the fixed status bar
     ImGui::BeginChild("ContentRegion", ImVec2(0, -statusBarHeight), false);
 
@@ -728,7 +725,7 @@ void AssetBrowserPanel::_renderContentArea() {
 // Render the left file/folder list panel
 void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
     // Left side: File/folder list (65% width)
-    // Left list child; third arg 'true' draws a frame (border) around the child
+    // Third arg 'true' draws a frame (border) around the child
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
 
     // Custom folder display with multi-selection support
@@ -792,7 +789,8 @@ std::vector<std::filesystem::directory_entry> AssetBrowserPanel::_getSortedEntri
 
     // Keep folder-first then alphabetical ordering for predictable list/grid layout
     std::sort(entries.begin(), entries.end(), [](const std::filesystem::directory_entry& a,
-        const std::filesystem::directory_entry& b) {
+        const std::filesystem::directory_entry& b) 
+    {
         const bool aDir = a.is_directory();
         const bool bDir = b.is_directory();
 
@@ -920,7 +918,7 @@ void AssetBrowserPanel::_renderFileListEntries(const std::vector<std::filesystem
 // Compute a single tile size for this folder so the grid stays uniform
 ImVec2 AssetBrowserPanel::_calculateGridTileSize(const std::vector<std::filesystem::directory_entry>& entries,
     ImFont* nameFont, const float nameFontSize, const float iconFontSize, const float textPaddingX,
-    const float tilePaddingY, const float contentGap) const 
+    const float tilePaddingY, const float contentGap) const
 {
     float maxIconWidth = 0.0f;
     float maxIconHeight = 0.0f;
@@ -967,9 +965,9 @@ ImVec2 AssetBrowserPanel::_calculateGridTileSize(const std::vector<std::filesyst
 void AssetBrowserPanel::_renderFileGridEntry(const std::vector<std::filesystem::directory_entry>& entries,
     const size_t index, const int columns, const float tileWidth, const float tileHeight, const float tileSpacing,
     const float tileRounding, const float iconFontSize, const float nameFontSize, const float textPaddingX,
-    const float contentGap, ImFont* nameFont) 
+    const float contentGap, ImFont* nameFont)
 {
-    // Set up variables
+    // Resolve entry metadata for this tile
     const auto& entry = entries[index];
     const std::string entryPath = entry.path().string();
     const std::string entryName = entry.path().filename().string();
@@ -1023,7 +1021,7 @@ void AssetBrowserPanel::_renderFileGridEntry(const std::vector<std::filesystem::
 void AssetBrowserPanel::_renderGridEntryLabel(const std::filesystem::directory_entry& entry,
     const std::string& entryPath, const bool isRenaming, const float contentTop, const ImVec2& iconSize,
     const float contentGap, const float textPaddingX, const float tileWidth, ImFont* nameFont,
-    const float nameFontSize, const ImVec2& nameSize, const std::string& displayName) 
+    const float nameFontSize, const ImVec2& nameSize, const std::string& displayName)
 {
     if (isRenaming) {
         // Place rename box where normal filename sits
@@ -1063,7 +1061,7 @@ void AssetBrowserPanel::_renderGridEntryLabel(const std::filesystem::directory_e
 // Handle all per-tile interactions
 void AssetBrowserPanel::_handleGridEntryInteractions(const std::vector<std::filesystem::directory_entry>& entries,
     const std::string& entryPath, const bool isSelected, const bool isDirectory, const std::string& extLower,
-    const bool tileLeftClick, const bool tileDoubleClick, const bool tileRightClick, const bool tileHovered) 
+    const bool tileLeftClick, const bool tileDoubleClick, const bool tileRightClick, const bool tileHovered)
 {
     if (tileLeftClick) {
         // Shared logic handles single/multi/range/double-click
@@ -1224,17 +1222,11 @@ void AssetBrowserPanel::_renderStatusBar() {
     ImGui::SetCursorPosX(3);
     ImGui::TextColored(color, "%s", m_statusMessage.c_str());
 
-    // Read DeltaTime for timer countdown
+    // ImGui provides delta time; clamp large spikes caused by file dialogs,
+    // breakpoints or window focus loss to avoid instantly wiping the timer
     float dt = ImGui::GetIO().DeltaTime;
-
-    // If dt is huge, it means the frame was frozen by:
-    // - File dialog
-    // - Breakpoint
-    // - Window move
-    // - Alt-tab
-    // - System stall
     if (dt > 0.2f) {
-        dt = 0.0f;  // Don't let a jump instantly wipe the timer
+        dt = 0.0f;
     }
 
     // Decrement the status timer safely
@@ -1363,8 +1355,8 @@ void AssetBrowserPanel::_loadPrefab() {
             }
             else {
                 nlohmann::json entityJson;
-                file >> entityJson; // Read JSON content
-                file.close();       // Close file after reading
+                file >> entityJson;
+                file.close();
 
                 // Deserialize JSON into an entity in the current world
                 ECS::Entity entity;
@@ -1387,7 +1379,8 @@ void AssetBrowserPanel::_loadPrefab() {
                     // Register/track prefab instance for override workflows
                     hash = prefabManager->RegisterPrefab(normalizedPath);
                     prefabManager->TrackInstance(entity, hash);
-                } else {
+                }
+                else {
                     // Fallback path when prefab manager unavailable
                     hash = ECS::PrefabManager::ComputeHash(
                         ECS::PrefabManager::NormalizePath(normalizedPath)
@@ -1399,7 +1392,6 @@ void AssetBrowserPanel::_loadPrefab() {
                 meta.Flags = 0;
                 m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
-                // Log info and update status message on successful load
                 LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
                 m_statusMessage = "Prefab loaded successfully";
                 m_statusTimer = 3.0f;
@@ -1438,8 +1430,8 @@ void AssetBrowserPanel::_editPrefab() {
             }
             else {
                 nlohmann::json prefabJson;
-                file >> prefabJson; // Parse JSON content
-                file.close();       // Close file after reading
+                file >> prefabJson;
+                file.close();
 
                 // If parsing succeeded, open in prefab editor and report success
                 m_inspector->InspectPrefab(m_selectedAsset);
@@ -1486,7 +1478,7 @@ void AssetBrowserPanel::_notifySelectionChanged() const {
 
 // Handle double-click open behavior
 bool AssetBrowserPanel::_handleEntryDoubleClick(const std::string& entryPath, const std::string& extLower,
-    const bool isDirectory) 
+    const bool isDirectory)
 {
     if (isDirectory) {
         // Double-click folder enters folder
@@ -1515,7 +1507,7 @@ bool AssetBrowserPanel::_handleEntryDoubleClick(const std::string& entryPath, co
 // Apply plain / Ctrl / Shift selection behavior
 void AssetBrowserPanel::_applyEntrySelection(const std::vector<std::filesystem::directory_entry>& entries,
     const std::string& entryPath, const bool isSelected, const bool isDoubleClick, const bool isDirectory,
-    const std::string& extLower) 
+    const std::string& extLower)
 {
     if (isDoubleClick && _handleEntryDoubleClick(entryPath, extLower, isDirectory)) {
         // Double-click handled so skip normal selection changes
@@ -1624,7 +1616,7 @@ bool AssetBrowserPanel::_commitRename(const std::filesystem::directory_entry& en
 void AssetBrowserPanel::_selectEmptySpace() {
     // Click on empty background in this window/child to clear selection
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
-        && !ImGui::IsAnyItemHovered()) 
+        && !ImGui::IsAnyItemHovered())
     {
         _clearSelection();
         _notifySelectionChanged();
@@ -1880,7 +1872,7 @@ void AssetBrowserPanel::_createScene() {
         }
 
         file << sceneContent;
-        // Persist scene template to disk now
+        // Persist scene template to disk
         file.close();
 
         m_statusMessage = "Created scene: " + fileName;
@@ -2176,7 +2168,7 @@ void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
     std::string scriptsRootStr = projectRoot.string();
     std::string projectName = std::filesystem::path(projectRoot).filename().string();
     std::string csprojPath = csprojDir + "/" + projectName + ".csproj";
-    
+
     // Check if the csproj file exists
     if (!std::filesystem::exists(csprojPath)) {
         m_statusMessage = "Project file not found: " + std::filesystem::path(csprojPath).filename().string();
@@ -2205,7 +2197,7 @@ void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
             "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Professional\\Common7\\IDE\\devenv.exe",
             "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\Common7\\IDE\\devenv.exe",
         };
-        
+
         std::string devenvPath;
         for (const auto& path : vsSearchPaths) {
             if (std::filesystem::exists(path)) {
@@ -2214,7 +2206,7 @@ void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
                 break;
             }
         }
-        
+
         if (devenvPath.empty()) {
             // Try to find devenv in PATH
             int result = system("where devenv.exe > nul 2>&1");
@@ -2222,10 +2214,9 @@ void AssetBrowserPanel::_openProjectFile(const std::string& fileToOpen) {
                 devenvPath = "devenv.exe";
             }
         }
-        
+
         if (!devenvPath.empty()) {
             // Found Visual Studio, open the project
-            // Use ShellExecuteA via system() - properly formatted for Windows
             std::string command = "start \"\" \"" + devenvPath + "\" \"" + csprojPath + "\"";
             if (!fileToOpen.empty()) {
                 // /Edit jumps straight to script when provided

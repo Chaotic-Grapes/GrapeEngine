@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file     ParticleSystem.cpp
-\author   Choi Meng Yew
+\author   Choi Meng Yew (100%)
 \date     28th February 2026
 \brief
 GPU-accelerated particle system using CUDA-OpenGL interop.

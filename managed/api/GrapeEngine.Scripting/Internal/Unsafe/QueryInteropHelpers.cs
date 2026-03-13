@@ -10,11 +10,14 @@ internal static unsafe class QueryInteropHelpers
     {
         iterator = default;
 
+        // required is always present; keep it pinned for the entire call path.
         fixed (uint* reqPtr = required)
         {
             uint* optionalPtr = null;
             uint* excludePtr = null;
 
+            // Pin optional and exclude arrays together when both exist so the native call
+            // can consume stable pointers in a single invocation.
             if (optional != null && optional.Length > 0)
             {
                 fixed (uint* op = optional)
@@ -34,6 +37,7 @@ internal static unsafe class QueryInteropHelpers
                     }
                     else
                     {
+                        // Optional-only query.
                         fixed (QueryIterator* iterPtr = &iterator)
                         {
                             QueryInteropAPI.CreateQuery(worldPtr, reqPtr, required.Length, optionalPtr, optional.Length, null, 0, iterPtr);
@@ -45,6 +49,7 @@ internal static unsafe class QueryInteropHelpers
 
             if (exclude != null && exclude.Length > 0)
             {
+                // Exclude-only query.
                 fixed (uint* ep = exclude)
                 {
                     excludePtr = ep;

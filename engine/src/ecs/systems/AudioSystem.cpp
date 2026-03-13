@@ -4,14 +4,19 @@
 \author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
-Implements the AudioSystem which manages audio playback in the ECS framework.
+Implements the AudioSystem that manages ECS-driven audio playback.
 
 Responsibilities:
-- Process entities with AudioSource component
-- Resolve CueId to audio file paths
-- Manage audio playback lifecycle (start/stop/update)
-- Handle 3D spatial audio positioning
+- Process entities with AudioSource components
+- Resolve CueId/CuePathId to audio cue paths
+- Manage playback lifecycle (start/stop/update/cleanup)
+- Apply per-instance runtime parameters (volume, pitch, pan, low-pass)
+- Handle 3D spatial audio positioning updates
+- support low pass filter effects for damage muffle
+- Support PlayOnStart gating and one-shot tracking
 - Support PlayOnStart functionality
+- Coordinate fade-in/fade-out and scene transition behavior
+- Route playback through audio buses
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -35,6 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fmod_dsp_effects.h>
 
 namespace {
+    // convert raw bus value to a valid enum
     Audio::Bus ToBus(uint8_t raw) {
         const auto count = static_cast<uint8_t>(Audio::Bus::Count);
         if (raw >= count) {
@@ -46,11 +52,13 @@ namespace {
 
 namespace ECS {
 
+    // build audio system with required audio service
     AudioSystem::AudioSystem(Services::AudioService& audioService)
         : m_audioService{audioService}
         , m_hasStarted{true} 
     { }
 
+    // initialize state and register scene event hooks
     void AudioSystem::OnCreate(World& world) {
         (void)world;
         m_world = &world;
@@ -88,7 +96,7 @@ namespace ECS {
                      << msg.OldScene << "' to '" << msg.NewScene << "')");
         });
 
-        // Subscribe to scene changing events to prepare for audio transitions
+        // subscribe to scene changing events to prepare for audio transitions
         Messaging::MessageSystem::Subscribe<Messaging::SceneChanging>([this](const Messaging::SceneChanging&) {
             if (!Engine::CORE) {
                 return;
@@ -104,6 +112,7 @@ namespace ECS {
 
     }
 
+    // process all audio source entities for this frame
     void AudioSystem::OnUpdate(World& world)
     {
         m_world = &world;
@@ -121,6 +130,7 @@ namespace ECS {
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
 
+        // update pending crossfade in timer
         if (m_crossfadeFadeInActive) {
             const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
             if (dt > 0.0f) {
@@ -139,20 +149,17 @@ namespace ECS {
         world.Each<Components::AudioSource>(
             [&](Entity e, Components::AudioSource& src)
             {
+                // mark this entity as processed this frame
                 processedEntities.insert(e);
 
-                // ----------------------------------------------------------------
-                // Handle CueId = 0 (no audio assigned)
-                // ----------------------------------------------------------------
+                // stop if no cue is assigned
                 if (src.CueId == 0) {
                     m_playOnStartPlayedCue.erase(e);
                     _stopSound(e, world);
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Resolve cueId -> clip info
-                // ----------------------------------------------------------------
+                // resolve cue id and optional cue path
                 const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
                 if (!cueInfo && src.CuePathId) {
                     const std::string cuePathRaw = ECS::StringTable::Resolve(src.CuePathId);
@@ -197,9 +204,7 @@ namespace ECS {
 
                 const std::string& cueKey = cueInfo->Path;
 
-                // ----------------------------------------------------------------
-                // Load the sound if not already loaded
-                // ----------------------------------------------------------------
+                // build loading params from audio source settings
                 Audio::SoundParams params{};
                 params.Stream = false;
                 params.Is3D = src.Spatial3D;
@@ -215,9 +220,7 @@ namespace ECS {
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Check if we have an active instance
-                // ----------------------------------------------------------------
+                // check for an existing active playback handle
                 auto it = m_activeSounds.find(e);
                 bool hasInstance = (it != m_activeSounds.end());
                 if (hasInstance && !engine->IsHandleActive(it->second)) {
@@ -231,9 +234,7 @@ namespace ECS {
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Determine if this sound should be playing
-                // ----------------------------------------------------------------
+                // compute if this source should be playing now
                 bool shouldPlay = false;
 
                 if (!src.PlayOnStart || src.Loop) {
@@ -241,9 +242,7 @@ namespace ECS {
                 }
 
                 if (src.PlayOnStart) {
-                    // PlayOnStart gating:
-                    // 1) Game must be in play mode.
-                    // 2) System must have received OnSceneStart() in this session.
+                    // allow one shot play on start once per cue
                     bool playOnStartEligible = true;
                     auto playedIt = m_playOnStartPlayedCue.find(e);
                     if (playedIt != m_playOnStartPlayedCue.end() && playedIt->second == src.CueId) {
@@ -254,13 +253,11 @@ namespace ECS {
                 else {
                     // Non-PlayOnStart sounds can be controlled manually
                     // For now, we don't auto-play these at all
-                    // (You can add manual Play() API later if needed)
+                    // (can add manual Play() API later if needed)
                     shouldPlay = false;
                 }
 
-                // ----------------------------------------------------------------
-                // Handle starting/stopping based on game state
-                // ----------------------------------------------------------------
+                // stop active sounds when game is not running
                 if (!isPlaying) {
                     // Game is paused/stopped - stop all sounds
                     if (hasInstance) {
@@ -270,9 +267,7 @@ namespace ECS {
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Start playback if needed
-                // ----------------------------------------------------------------
+                // start playback when needed and no instance exists
                 if (shouldPlay && !hasInstance) {
                     Audio::PlaySettings settings{};
                     const bool crossfadeFadeIn = m_crossfadeFadeInActive && m_crossfadeInRemaining > 0.0f;
@@ -311,17 +306,13 @@ namespace ECS {
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Stop playback if it shouldn't be playing
-                // ----------------------------------------------------------------
+                // stop playback when it should no longer play
                 if (!shouldPlay && hasInstance) {
                     _stopSound(e, world);
                     return;
                 }
 
-                // ----------------------------------------------------------------
-                // Update existing playback parameters
-                // ----------------------------------------------------------------
+                // update runtime parameters for active playback
                 if (hasInstance) {
                     Audio::PlaybackHandle handle = it->second;
 
@@ -352,9 +343,7 @@ namespace ECS {
                 }
             });
 
-        // ----------------------------------------------------------------
-        // Clean up sounds for entities that no longer have AudioSource
-        // ----------------------------------------------------------------
+        // collect stale handles for entities without audio source
         std::vector<Entity> toRemove;
         for (auto& [entity, handle] : m_activeSounds) {
             if (processedEntities.find(entity) == processedEntities.end()) {
@@ -368,6 +357,7 @@ namespace ECS {
         }
     }
 
+    // shutdown audio state owned by this system
     void AudioSystem::OnDestroy(World& world) {
         (void)world;
         m_world = nullptr;
@@ -379,9 +369,10 @@ namespace ECS {
         LOG_INFO("AudioSystem: Destroyed");
     }
 
+    // describe system metadata for scheduler
     SystemMetadata AudioSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Audio");
-        // Note: AudioSystem reads AudioSource and WorldTransform components
+        // AudioSystem reads AudioSource and WorldTransform components
         // but uses them through custom service lookups, not direct ECS iteration.
         // Declaring minimal access for dependency tracking.
         // Execution parameters
@@ -391,8 +382,10 @@ namespace ECS {
         return builder.Build();
     }
 
+    // reset start state when scene starts
     void AudioSystem::OnSceneStart()
     {
+        // reset scene transition flags
         m_hasStarted = true;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
@@ -403,8 +396,10 @@ namespace ECS {
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
+    // stop all active scene audio immediately
     void AudioSystem::OnSceneStop()
     {
+        // clear scene transition flags
         m_hasStarted = false;
         m_sceneUnloadInProgress = false;
         m_allowCrossfadeOnUnload = false;
@@ -422,8 +417,10 @@ namespace ECS {
         LOG_DEBUG("AudioSystem: Scene stopped - all sounds stopped");
     }
 
+    // stop one entity sound with optional fade out
     void AudioSystem::_stopSound(Entity entity, World& world, bool allowFade)
     {
+        // find active sound handle for this entity
         auto it = m_activeSounds.find(entity);
         if (it == m_activeSounds.end()) return;
 
@@ -445,6 +442,7 @@ namespace ECS {
         LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
     }
 
+    // report whether gameplay audio should run
     bool AudioSystem::_isGamePlaying() const
     {
         // Engine always considers game as "playing"
@@ -452,6 +450,7 @@ namespace ECS {
         return true;
     }
 
+    // initialize legacy master dsp state
     bool AudioSystem::_initializeMasterDsp() {
         // Device-owned bus DSP routing now owns the master low-pass node.
         m_masterLowPassDsp = nullptr;
@@ -459,32 +458,41 @@ namespace ECS {
         return m_audioService.Device() != nullptr;
     }
 
+    // release legacy master dsp state
     void AudioSystem::_shutdownMasterDsp() {
         // Device-owned bus DSP routing handles lifetime now.
         m_masterLowPassDsp = nullptr;
         m_masterLowPassAttached = false;
     }
 
+    // fade in one handle from zero to target volume
     void AudioSystem::_fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume) {
+        // validate handle and duration
         if (!handle || duration <= 0.0f) {
             return;
         }
+        // start fade on audio engine
         if (auto* engine = m_audioService.Engine()) {
             engine->SetInstanceVolume(handle, 0.0f);
             engine->FadeInstance(handle, targetVolume, duration, false);
         }
     }
 
+    // fade out one handle to silence
     void AudioSystem::_fadeOutHandle(Audio::PlaybackHandle handle, float duration) {
+        // validate handle and duration
         if (!handle || duration <= 0.0f) {
             return;
         }
+        // start terminal fade on audio engine
         if (auto* engine = m_audioService.Engine()) {
             engine->FadeInstance(handle, 0.0f, duration, true);
         }
     }
 
+    // prepare active sounds for scene unload transitions
     void AudioSystem::OnSceneWillUnload(float fadeDuration, bool allowCrossfade) {
+        // mark unload in progress and store crossfade settings
         m_sceneUnloadInProgress = true;
         m_allowCrossfadeOnUnload = allowCrossfade;
         m_crossfadeInDuration = allowCrossfade ? fadeDuration : 0.0f;
@@ -498,12 +506,14 @@ namespace ECS {
             return;
         }
 
+        // fallback to full stop if engine is unavailable
         auto* engine = m_audioService.Engine();
         if (!engine) {
             OnSceneStop();
             return;
         }
 
+        // fade or stop each active handle
         bool anyFadeStarted = false;
         for (auto& [entity, handle] : m_activeSounds) {
             float duration = fadeDuration;
@@ -526,6 +536,7 @@ namespace ECS {
             }
         }
 
+        // clear handle map so next scene can start clean
         if (allowCrossfade) {
             m_activeSounds.clear();
         }
@@ -538,7 +549,9 @@ namespace ECS {
         }
     }
 
+    // fade out every active sound in this system
     void AudioSystem::FadeOutAllAudio(float duration) {
+        // use immediate stop when duration is invalid
         if (duration <= 0.0f) {
             LOG_WARNING("AudioSystem::FadeOutAllAudio called with duration <= 0, using immediate stop");
             for (auto& [entity, handle] : m_activeSounds) {
@@ -548,6 +561,7 @@ namespace ECS {
             return;
         }
 
+        // request global fade out on audio engine
         if (auto* engine = m_audioService.Engine()) {
             engine->FadeOutAll(duration);
         }
@@ -557,15 +571,19 @@ namespace ECS {
                  << " sounds (duration=" << duration << "s)");
     }
 
+    // report if there are active terminal fade outs
     bool AudioSystem::HasActiveFadeOuts() const {
         return m_audioService.Engine() ? m_audioService.Engine()->HasActiveFadeOuts() : false;
     }
 
+    // return the longest remaining fade out time
     float AudioSystem::GetMaxFadeOutRemaining() const {
         return m_audioService.Engine() ? m_audioService.Engine()->GetMaxFadeOutRemaining() : 0.0f;
     }
 
+    // report if a tracked entity handle is fading
     bool AudioSystem::IsEntityFading(Entity entity) const {
+        // look up the current handle for this entity
         auto it = m_activeSounds.find(entity);
         if (it == m_activeSounds.end()) {
             return false;

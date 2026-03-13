@@ -1,8 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorECSUtils.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\author Muhammad Nur Fadzly Bin Zulkifli (95%)
+        Samantha Leong (5%)
 \par    muhammadnurfadzly.b@digipen.edu
+        s.leong@digipen.edu
 \brief
 Shared ECS helper utilities for editor-side code.
 */

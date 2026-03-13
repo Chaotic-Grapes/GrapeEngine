@@ -5,7 +5,7 @@
         Muhammad Nur Fadzly Bin Zulkifli (30%)
 \par    ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
-\date   26th October 2025
+\date   12th March 2026
 \brief
 Declares the Input class for handling keyboard and mouse input events through
 GLFW. Provides static functions for checking input states, managing window
@@ -55,30 +55,13 @@ public:
     // Check if a mouse button is currently pressed
     static bool IsMousePressed(int button);
 
-    /*!
-    \brief Check if a mouse button is currently held down.
-    \param button The mouse button to check (use MOUSE_* constants).
-    \return True if the button is currently held down, false otherwise.
-
-    This is equivalent to IsMousePressed(), but is intended for continuous
-    checks such as dragging or camera movement.
-    */
+    // Check if a mouse button is held across frames for continuous actions like drag and camera orbit
     static bool IsMouseDown(int button);
 
-    /*!
-    \brief Check if a mouse button was just released this frame.
-    \param button The mouse button to check (use MOUSE_* constants).
-    \return True if the button was just released, false otherwise.
-    */
+    // Check if a mouse button transitioned from down to up in the current frame
     static bool IsMouseUp(int button);
 
-    /*!
-    \brief Get the current mouse cursor position.
-    \param xPos Reference to store the X coordinate.
-    \param yPos Reference to store the Y coordinate.
-    
-    Retrieves the current mouse position in window coordinates.
-    */
+    // Get the mouse cursor position in window-space coordinates
     static void GetMousePosition(double& xPos, double& yPos);
 
     // Get the current mouse X coordinate
@@ -136,11 +119,23 @@ private:
     static std::vector<std::string> m_droppedFiles;
 
     // GLFW callback functions
+
+    // Receive keyboard events from GLFW and update key state buffers
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod);
+
+    // Receive mouse button events from GLFW and update mouse state buffers
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);
+
+    // Receive mouse position updates from GLFW
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);
+
+    // Receive mouse wheel updates from GLFW
     static void _mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset);
+
+    // Receive OS file drop events and queue paths for editor consumption
     static void _fileDropCallback(GLFWwindow* pWin, int count, const char** paths);
+
+    // Receive UTF-32 codepoints from GLFW text input
     static void _charCallback(GLFWwindow* pWin, unsigned int codepoint);
 
     // Process input events and update internal state (called once per frame)

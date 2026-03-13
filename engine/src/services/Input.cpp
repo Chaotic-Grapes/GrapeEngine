@@ -5,7 +5,7 @@
         Muhammad Nur Fadzly Bin Zulkifli (30%)
 \par    ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
-\date   26th October 2025
+\date   12th March 2026
 \brief
 Implements the Input class for handling keyboard and mouse input events through
 GLFW. Integrates with the engine's message system for event broadcasting and
@@ -30,11 +30,11 @@ Features:
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
 
-// ************** Keyboard state ************** //
+// Keyboard state
 bool Input::s_keyCurrent[MAX_KEYS] = { false };
 bool Input::s_keyPrevious[MAX_KEYS] = { false };
 
-// ************** Mouse state ************** //
+// Mouse state
 bool Input::s_mouseCurrent[MAX_MOUSE] = { false };
 bool Input::s_mousePrevious[MAX_MOUSE] = { false };
 
@@ -43,60 +43,61 @@ double Input::m_scrollY{ 0 };
 std::string Input::m_charInput{ "" };
 std::vector<std::string> Input::m_droppedFiles{};
 
+// Bind the GLFW window used by all static input queries and callback registration
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
 }
 
-// Check if a specific key is currently pressed
+// Return true only on the frame the key transitions from up to down
 bool Input::IsKeyPressed(const int key) {
     return s_keyCurrent[key] && !s_keyPrevious[key];
 }
 
-// Check if a specific key was just pressed this frame
+// Return true while the key is held down across frames
 bool Input::IsKeyDown(const int key) {
     return s_keyCurrent[key];
 }
 
-// Check if a specific key was just released this frame
+// Return true only on the frame the key transitions from down to up
 bool Input::IsKeyUp(const int key) {
     return !s_keyCurrent[key] && s_keyPrevious[key];
 }
 
-// Check if a specific mouse button is currently pressed
+// Return true only on the frame the mouse button transitions from up to down
 bool Input::IsMousePressed(const int button) {
     return s_mouseCurrent[button] && !s_mousePrevious[button];
 }
 
-// Check if a mouse button was just pressed this frame
+// Return true while the mouse button is held down
 bool Input::IsMouseDown(const int button) {
     return s_mouseCurrent[button];
 }
 
-// Check if a mouse button was just released this frame
+// Return true only on the frame the mouse button transitions from down to up
 bool Input::IsMouseUp(const int button) {
     return !s_mouseCurrent[button] && s_mousePrevious[button];
 }
 
-// Get current mouse position
+// Query current cursor coordinates directly from GLFW
 void Input::GetMousePosition(double& xPos, double& yPos) {
     glfwGetCursorPos(m_window, &xPos, &yPos);
 }
 
-// Get mouse X position
+// Query only the X coordinate by reading both values and returning X
 double Input::GetMouseX() {
     double xPos, yPos;
     glfwGetCursorPos(m_window, &xPos, &yPos);
     return xPos;
 }
 
-// Get mouse Y position
+// Query only the Y coordinate by reading both values and returning Y
 double Input::GetMouseY() {
     double xPos, yPos;
     glfwGetCursorPos(m_window, &xPos, &yPos);
     return yPos;
 }
 
-// Sets up all GLFW event callbacks (keyboard, mouse)
+// Register all GLFW callbacks so input state and message broadcasts stay synchronized
 void Input::SetupEventCallbacks() {
     glfwSetKeyCallback(m_window, _keyCallback);
     glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
@@ -106,37 +107,40 @@ void Input::SetupEventCallbacks() {
     glfwSetCharCallback(m_window, _charCallback);
 }
 
-// Retrieves and clears any file paths dropped from the OS since the last consume
+// Move out dropped files and clear the internal queue in one operation
 std::vector<std::string> Input::ConsumeDroppedFiles() {
     std::vector<std::string> dropped;
-	// Swap the dropped files with an empty vector to efficiently clear the internal state
+    // Swap avoids copying strings and leaves the member vector empty for future callbacks
     dropped.swap(m_droppedFiles);
     return dropped;
 }
 
-// Called when GLFW encounters an error
+// Forward GLFW error information into the engine logger
 void Input::ErrorCallback(const int error, char const* description) {
     (void)error;
     LOG_ERROR("GLFW error: " << description);
 }
 
-// Clear frame-specific input state and poll GLFW events (called once per frame)
+// Advance per-frame input history, clear one-frame deltas, then pump GLFW events
 void Input::_processInput() {
-    // Update previous state arrays
+    // Snapshot current button states so edge detection still works next frame
     std::memcpy(s_keyPrevious,   s_keyCurrent,   sizeof(s_keyCurrent));
     std::memcpy(s_mousePrevious, s_mouseCurrent, sizeof(s_mouseCurrent));
 
-    // Reset scroll deltas so scroll input only lasts one frame
+    // Scroll is treated as a per-frame delta, so clear before processing new events
     m_scrollX = 0.0;
     m_scrollY = 0.0;
 
+    // Text input is also frame-scoped and rebuilt by _charCallback events
     m_charInput.clear();
 
+    // Dispatch pending OS events, which will invoke our registered callbacks
     glfwPollEvents();
 }
 
-// Called on keyboard key press/release
+// Update keyboard state and broadcast key transition events
 void Input::_keyCallback(GLFWwindow*, int key, int, int action, int mod) {
+    // Ignore unknown keys and out-of-range values returned by platform backends
     if (key < 0 || key >= MAX_KEYS)
         return;
 
@@ -150,14 +154,16 @@ void Input::_keyCallback(GLFWwindow*, int key, int, int action, int mod) {
     }
 }
 
-// Called on mouse button press/release
+// Update mouse button state and broadcast click/release with cursor position payload
 void Input::_mouseButtonCallback(GLFWwindow*, int button, int action, int) {
+    // Ignore out-of-range button indices so arrays remain safe
     if (button < 0 || button >= MAX_MOUSE)
         return;
 
     if (action == GLFW_PRESS) {
         double xPos = 0.0, yPos = 0.0;
         if (Input::m_window) {
+            // Read cursor position at click time so listeners get precise interaction coordinates
             glfwGetCursorPos(Input::m_window, &xPos, &yPos);
         }
         s_mouseCurrent[button] = true;
@@ -167,6 +173,7 @@ void Input::_mouseButtonCallback(GLFWwindow*, int button, int action, int) {
     else if (action == GLFW_RELEASE) {
         double xPos = 0.0, yPos = 0.0;
         if (Input::m_window) {
+            // Read release position to support drag-end and drop style interactions
             glfwGetCursorPos(Input::m_window, &xPos, &yPos);
         }
         s_mouseCurrent[button] = false;
@@ -178,43 +185,44 @@ void Input::_mouseButtonCallback(GLFWwindow*, int button, int action, int) {
 // Enhanced mouse position callback with delta tracking
 static double lastMouseX = 0.0, lastMouseY = 0.0;
 
-// Called when mouse cursor moves
+// Broadcast absolute cursor position plus per-event delta for camera and gizmo controls
 void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     
-    // Calculate delta from last position
+    // Delta is measured against the previously observed cursor sample
     double deltaX = xPos - lastMouseX;
     double deltaY = yPos - lastMouseY;
 
-    // Broadcast mouse movement event
+    // Broadcast both absolute and delta coordinates so subscribers choose what they need
     Messaging::MessageSystem::Broadcast(Messaging::MouseMoved{ static_cast<float>(xPos),
         static_cast<float>(yPos), static_cast<float>(deltaX), static_cast<float>(deltaY) });
 
-    // Update last position
+    // Persist the sample for next callback delta computation
     lastMouseX = xPos;
     lastMouseY = yPos;
 }
 
-// Called when mouse wheel is scrolled
+// Store frame scroll deltas and broadcast a scroll event
 void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset) {
     (void)pWin;
 
-    // Store the scroll offsets
+    // Store latest deltas so polling APIs can consume scroll this frame
     m_scrollX = xOffset;
     m_scrollY = yOffset;
 
-    // Broadcast scroll event
+    // Publish one-shot wheel movement for systems that are event-driven
     Messaging::MessageSystem::Broadcast(Messaging::MouseScrolled{ static_cast<float>(xOffset),
         static_cast<float>(yOffset) }); // One-shot deltas; cleared at start of each frame
 }
 
+// Queue dropped file paths and broadcast each one so tools can react immediately
 void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {
     (void)pWin;
 
     if (count > 0) {
-        // Broadcast event for each dropped file
+        // Iterate all dropped items because OS drag-drop can deliver multiple files at once
         for (int i = 0; i < count; i++) {
-			// Convert the dropped file path to a std::string and store it in the internal queue
+            // Copy the C string path into owned storage before callback stack memory is released
             std::string droppedPath(paths[i]);
             m_droppedFiles.push_back(droppedPath);
             Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ droppedPath });
@@ -222,19 +230,27 @@ void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {
     }
 }
 
+// Convert incoming UTF-32 codepoints into UTF-8 bytes appended to this frame's text buffer
 void Input::_charCallback(GLFWwindow* pWin, unsigned int codepoint) {
     (void)pWin;
-    // Convert Unicode codepoint to UTF-8 and append to character input buffer
+
+    // Encode single-byte ASCII codepoints as-is
     if (codepoint < 0x80) {
         m_charInput += static_cast<char>(codepoint);
-    } else if (codepoint < 0x800) {
+    }
+    else if (codepoint < 0x800) {
+        // Encode two-byte UTF-8 sequences: 110xxxxx 10xxxxxx
         m_charInput += static_cast<char>(0xC0 | (codepoint >> 6));
         m_charInput += static_cast<char>(0x80 | (codepoint & 0x3F));
-    } else if (codepoint < 0x10000) {
+    }
+    else if (codepoint < 0x10000) {
+        // Encode three-byte UTF-8 sequences for BMP codepoints
         m_charInput += static_cast<char>(0xE0 | (codepoint >> 12));
         m_charInput += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
         m_charInput += static_cast<char>(0x80 | (codepoint & 0x3F));
-    } else if (codepoint < 0x110000) {
+    }
+    else if (codepoint < 0x110000) {
+        // Encode four-byte UTF-8 sequences for supplementary planes
         m_charInput += static_cast<char>(0xF0 | (codepoint >> 18));
         m_charInput += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
         m_charInput += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
@@ -242,34 +258,34 @@ void Input::_charCallback(GLFWwindow* pWin, unsigned int codepoint) {
     }
 }
 
-// Prints OpenGL system info (GPU, version, limits, etc.)
+// Query OpenGL driver capabilities and print a consolidated hardware report
 void Input::PrintSpecs() {
-    // glGetString() for OpenGL string information
-    const GLubyte* vendorStr = glGetString(GL_VENDOR);       // Vendor name
-    const GLubyte* rendererStr = glGetString(GL_RENDERER);   // Renderer name
-    const GLubyte* versionStr = glGetString(GL_VERSION);     // Graphics driver version
-    const GLubyte* shaderVersionStr = glGetString(GL_SHADING_LANGUAGE_VERSION);  // Shader language version
+    // String queries provide driver identity and language support details
+    const GLubyte* vendorStr = glGetString(GL_VENDOR);       // GPU vendor
+    const GLubyte* rendererStr = glGetString(GL_RENDERER);   // Renderer/device string
+    const GLubyte* versionStr = glGetString(GL_VERSION);     // OpenGL runtime version
+    const GLubyte* shaderVersionStr = glGetString(GL_SHADING_LANGUAGE_VERSION);  // GLSL version
 
-    // glGetIntegerv() for OpenGL numeric parameters
+    // Numeric queries provide hard limits used for rendering budget decisions
     GLint majorVersion, minorVersion;
-    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);          // Major version
-    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);          // Minor version
+    glGetIntegerv(GL_MAJOR_VERSION, &majorVersion);          // API major version
+    glGetIntegerv(GL_MINOR_VERSION, &minorVersion);          // API minor version
 
-    // Buffer and context information
+    // Double buffering state indicates whether front/back swap presentation is enabled
     GLint doubleBuffer;
-    glGetIntegerv(GL_DOUBLEBUFFER, &doubleBuffer);           // Double buffering status
+    glGetIntegerv(GL_DOUBLEBUFFER, &doubleBuffer);
 
-    // System limits
+    // Capability limits determine practical mesh, viewport, and attribute constraints
     GLint maxVertices, maxIndices, maxTextureSize, maxVertexAttribs, maxBufferBindings;
     GLint maxViewportDims[2];
-    glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, &maxVertices);   // Max vertex count
-    glGetIntegerv(GL_MAX_ELEMENTS_INDICES, &maxIndices);     // Max index count
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);     // Max texture size
-    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewportDims);    // Max viewport dimensions
-    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxVertexAttribs); // Max vertex attributes
-    glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBufferBindings); // Max buffer bindings
+    glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, &maxVertices);   // Recommended indexed draw vertex bound
+    glGetIntegerv(GL_MAX_ELEMENTS_INDICES, &maxIndices);     // Recommended indexed draw index bound
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);     // Largest square texture dimension
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewportDims);    // Maximum viewport width and height
+    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxVertexAttribs); // Maximum vertex input attributes
+    glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBufferBindings); // Maximum vertex buffer binding slots
 
-    // Print to output
+    // Emit a single structured log block for easier copy and diagnostics
     LOG_INFO("=== GPU Specifications ===" << "\n"
         << "GPU Vendor: " << vendorStr << "\n"
         << "GL Renderer: " << rendererStr << "\n"

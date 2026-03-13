@@ -23,11 +23,12 @@
  * Logics and formulaes derived from GIT trimester 2, with submissions Asteroids
  * and balls/segment in mind.
  * 
- * @dependencies
- *   - Math/Vector2D, Collision.h, <cmath>, <limits>, <algorithm>.
  *
- */
-
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "physics/Collision.h"
 #include <cmath>      // std::sqrt, std::fabs

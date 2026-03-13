@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Export.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Defines export macros for the Grape Engine, allowing for proper symbol visibility
+when building and using the engine as a shared library (DLL). This header also 
+includes macros for C API exports to facilitate interop with C# scripting. 
+The GRAPEENGINE_API macro is used to annotate classes and functions that should 
+be exported from the DLL, while the INTEROP_API macro is used for C-style 
+functions that need to be accessible from other languages, such as C#.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 // Suppress warnings about STL types in DLL interface

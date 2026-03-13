@@ -1,4 +1,19 @@
-// Viewport.hpp
+/* Start Header *****************************************************************/
+/*!
+\file   Viewport.hpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Defines the ViewportManager class for managing multiple viewports in the engine.
+The ViewportManager allows for creating, resizing, and destroying viewports, as 
+well as setting cameras and performing picking operations.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include "Export.h"
 #include <string>

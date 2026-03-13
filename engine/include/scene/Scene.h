@@ -1,8 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Scene.h
-\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\author  Muhammad Nur Fadzly Bin Zulkifli (95%)
+         Foo Rui Qin (5%)
+\date    12th March 2026
 \par     muhammadnurfadzly.b@digipen.edu
+         ruiqin.foo@digipen.edu
 \brief
 This file contains the declaration and definition of the Scene class.
 
@@ -34,92 +37,56 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Scenes { class SceneManager; }
 namespace Scenes {
-    /**
-     * @brief Pure data container for a game scene.
-     * 
-     * Scene stores all data for a scene without any logic or virtual functions.
-     * This design allows scenes to be:
-     * - Created and edited in a level editor
-     * - Serialized to/from files (JSON, binary, etc.)
-     * - Loaded without code compilation
-     * 
-     * The SceneManager is responsible for executing systems on the scene based
-     * on its SystemProfile.
-     */
+    // Pure data container for a game scene
+    // Stores scene data only and leaves execution logic to SceneManager
     class GRAPEENGINE_API Scene {
     public:
+        // Construct a scene and bind its layer manager to the ECS world
         Scene() {
             // Set LayerManager pointer on World so systems can access it
             m_world.SetLayerManager(&m_layers);
         }
+
+        // Use default destruction because all members are value-owned
         ~Scene() = default;
 
         // ********************** Scene Metadata ********************** //
 
-        /**
-         * @brief Gets the scene name.
-         * @return The scene name.
-         */
+        // Return the scene display name used by editor and serialization
         const std::string& GetName() const { return m_name; }
 
-        /**
-         * @brief Sets the scene name.
-         * @param name The new scene name.
-         */
+        // Set the scene display name
         void SetName(const std::string& name) { m_name = name; }
 
-        /**
-         * @brief Gets the scene file path.
-         * @return The scene file path.
-         */
+        // Return the file path associated with this scene
         const std::string& GetPath() const { return m_path; }
 
-        /**
-         * @brief Sets the scene file path.
-         * @param path The new scene file path.
-         */
+        // Set the file path associated with this scene
         void SetPath(const std::string& path) { m_path = path; }
 
         // ********************** Core API ********************** //
-        
-        /**
-         * @brief Access the ECS world for this scene.
-         * @return Reference to the ECS::World instance.
-         */
+
+        // Return mutable ECS world access for scene editing and system updates
         ECS::World& GetWorld()                { return m_world; }
 
-        /**
-         * @brief Access the ECS world for this scene (const version).
-         * @return Const reference to the ECS::World instance.
-         */
+        // Return read-only ECS world access
         const ECS::World& GetWorld() const    { return m_world; }
 
-        /**
-         * @brief Access the LayerManager for this scene.
-         * @return Reference to the LayerManager instance.
-         */
+        // Return mutable layer manager access
         LayerManager& GetLayers()             { return m_layers; }
 
-        /**
-         * @brief Access the LayerManager for this scene (const version).
-         * @return Const reference to the LayerManager instance.
-         */
+        // Return read-only layer manager access
         const LayerManager& GetLayers() const { return m_layers; }
 
         // ********************** Entity Management ********************** //
 
-        /**
-         * @brief Creates an empty entity in the scene with an optional parent.
-         * @param parent Optional parent entity to establish hierarchy.
-         * @return The created ECS::Entity.
-         * @note Use m_world.Create(arguments...) to create entities with components.
-         */
+        // Create an empty entity, mark it active by default, and optionally attach it to a parent
         ECS::Entity CreateEntity(const std::optional<ECS::Entity> parent = std::nullopt) {
             // Will this suppress copy elision?
             // Consideration: Let user attach after creation to avoid this?
             const ECS::Entity e = m_world.Create();
 
-			// Set Active by default so new entities are enabled
+            // Set Active by default so new entities are enabled
             m_world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
             if (parent.has_value())
                 m_world.Attach(e, parent.value());
@@ -127,31 +94,18 @@ namespace Scenes {
             return e;
         }
 
-        /**
-         * @brief Creates an empty entity on the specified layer.
-         * @param layerId The layer ID to assign the entity to.
-         * @param parent Optional parent entity to establish hierarchy.
-         * @return The created ECS::Entity.
-         */
+        // Create an empty entity on a specific layer and optionally attach a parent
         ECS::Entity CreateEntityOnLayer(const uint16_t layerId, const std::optional<ECS::Entity> parent = std::nullopt);
 
-        /**
-         * @brief Destroys an entity in the scene.
-         * @param entity The entity to destroy.
-         */
+        // Destroy an entity and all ECS state tied to it
         void DestroyEntity(const ECS::Entity entity) { m_world.Destroy(entity); }
 
-        /**
-         * @brief Creates a new entity on the specified layer with optional components.
-         * @param layerId The ID of the layer to assign the entity to.
-         * @param cs Variadic list of components to add to the entity.
-         * @return The created ECS::Entity.
-         */
+        // Create an entity with provided components, ensure Active exists, then assign layer membership
         template<typename... TCs>
         ECS::Entity CreateOnLayer(const uint16_t layerId, TCs&&... cs) {
             const ECS::Entity e = m_world.Create(std::forward<TCs>(cs)...);
 
-			// Set Active by default so new entities are enabled
+            // Set Active by default so new entities are enabled
             if (!m_world.Has<ECS::Components::Active>(e)) {
                 m_world.Set<ECS::Components::Active>(e, ECS::Components::Active{ true });
             }
@@ -161,11 +115,7 @@ namespace Scenes {
             return e;
         }
 
-        /**
-         * @brief Sets the layer of an entity.
-         * @param e The entity to modify.
-         * @param id The ID of the layer to assign to the entity.
-         */
+        // Move an entity to a new layer and synchronize collider layer masks
         void SetLayer(const ECS::Entity e, const uint16_t id) {
             if (m_world.Has<ECS::Components::Layer>(e)) {
                 const auto prev = m_world.Get<ECS::Components::Layer>(e).Id;
@@ -178,23 +128,15 @@ namespace Scenes {
             m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{id});
             m_layers.OnLayerSet(e, id);
 
-            // Synchronize the collider's LayerMask with the layer manager's collision mask.
-            // This ensures that physics collision checks will use the correct layer-based collision rules.
+            // Synchronize the collider's LayerMask with the layer manager's collision mask
+            // This ensures physics collision checks use the correct layer-based collision rules
             _syncCollidersToLayer(e, id);
         }
 
-        /**
-         * @brief Set the layer of an entity using the registry hash mapping.
-         * Used by editor code to avoid cross-module TypeId mismatches.
-         * @param e The entity to modify.
-         * @param id The ID of the layer to assign to the entity.
-         */
+        // Set an entity layer using registry hash mapping to avoid cross-module TypeId mismatch issues
         void SetLayerById(const ECS::Entity e, const uint16_t id);
 
-        /**
-         * @brief Internal helper: sync an entity's colliders to a layer's collision mask.
-         * Called by SetLayer and should be called whenever colliders are added to an entity with a layer.
-         */
+        // Update collider masks to match the layer collision mask configured in LayerManager
         void _syncCollidersToLayer(const ECS::Entity e, const uint16_t layerId) {
             uint32_t layerMask = m_layers.GetLayerMask(layerId);
             if (m_world.Has<ECS::Components::CircleCollider2D>(e)) {
@@ -207,10 +149,7 @@ namespace Scenes {
             }
         }
 
-        /**
-         * @brief Removes the layer component from an entity.
-         * @param entity The entity to modify.
-         */
+        // Remove layer membership from an entity and notify the layer manager
         void RemoveFromLayer(const ECS::Entity entity) {
             if (!m_world.Has<ECS::Components::Layer>(entity))
                 return;
@@ -223,10 +162,10 @@ namespace Scenes {
     private:
         friend class SceneManager;
 
-        std::string m_name = "Untitled Scene";      ///< Scene name
-        std::string m_path;                         ///< Scene file path
-        ECS::World m_world;                         ///< ECS world containing all entities
-        LayerManager m_layers;                      ///< Layer management
+        std::string m_name = "Untitled Scene";      // Scene name
+        std::string m_path;                         // Scene file path
+        ECS::World m_world;                         // ECS world containing all entities
+        LayerManager m_layers;                      // Layer management
     };
 }
 

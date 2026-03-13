@@ -11,11 +11,6 @@
  *   - Update():     tick the FMOD mixer each frame (if service is enabled)
  *   - Terminate():  shut down the device and release all audio resources
  *
- * Typical integration:
- *   1) Construct AudioService at app startup.
- *   2) Call Initialize() once. If it succeeds, the FMOD system is ready.
- *   3) Every frame, call Update() so FMOD can mix audio and process I/O.
- *   4) On shutdown, call Terminate() to clean up FMOD resources safely.
  *
  *
  * @dependencies
@@ -23,10 +18,11 @@
  *   - services/AudioService.h  : matching service interface
  *   - core/Logger.h            : Trace/LOG_* helpers (optional)
  * 
- * Copyright (C) 2025 DigiPen Institute of Technology.
- * Reproduction or disclosure of this file or its contents without the
- */
-
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "audio/FmodAudioDevice.h"
 #include "audio/AudioEngine.h"

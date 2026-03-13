@@ -3,7 +3,7 @@
 \file   AssetBrowserPanel.h
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   11th March 2026
 
 \brief
 Declares the AssetBrowserPanel which renders the asset browser UI.
@@ -38,7 +38,7 @@ class InspectorPanel;
 // Asset browser panel for file navigation and asset management
 class AssetBrowserPanel {
 public:
-	// View modes for asset display (list vs grid)
+    // View modes for asset display; defaults to Grid
     enum class ViewMode : uint8_t {
         List = 0,
         Grid = 1
@@ -46,6 +46,7 @@ public:
 
     // Callback for asset selection changes (used by other editor systems).
     using AssetSelectionCallback = std::function<void(const std::string&)>;
+
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
@@ -59,7 +60,7 @@ public:
     // Connect inspector so double-click can open prefabs
     void SetInspector(InspectorPanel* inspector);
 
-	// Update editor settings reference for view mode and other config
+    // Update editor settings reference for view mode and other config
     void SetEditorSettings(EditorSettings* settings);
 
     // Register a callback for asset selection changes
@@ -96,7 +97,7 @@ private:
     // Render the main two panel layout
     void _renderContentArea();
 
-    // Render the main file list panel, switching between list and grid view based on view mode
+    // Render the main file list panel
     void _renderFileListPanel(float windowWidth);
 
     // Return directory entries for the current path sorted by type then name
@@ -108,22 +109,22 @@ private:
     // Calculate the tile dimensions that fit the longest filename in the current entry set
     ImVec2 _calculateGridTileSize(const std::vector<std::filesystem::directory_entry>& entries, ImFont* nameFont,
         float nameFontSize, float iconFontSize, float textPaddingX, float tilePaddingY, float contentGap) const;
-    
-    // Render a single grid tile entry at the given index with icon and label
+
+    // Render a single grid tile entry at the given index using the provided tile layout dimensions
     void _renderFileGridEntry(const std::vector<std::filesystem::directory_entry>& entries, size_t index, int columns,
         float tileWidth, float tileHeight, float tileSpacing, float tileRounding, float iconFontSize, float nameFontSize,
         float textPaddingX, float contentGap, ImFont* nameFont);
 
     // Render all entries in the current directory as a grid of tiles
     void _renderFileGridEntries(const std::vector<std::filesystem::directory_entry>& entries);
-    
+
     // Render the truncated or wrapped name label below a grid tile's icon
-    void _renderGridEntryLabel(const std::filesystem::directory_entry& entry, const std::string& entryPath, 
-        bool isRenaming, float contentTop, const ImVec2& iconSize, float contentGap, float textPaddingX, float tileWidth, 
+    void _renderGridEntryLabel(const std::filesystem::directory_entry& entry, const std::string& entryPath,
+        bool isRenaming, float contentTop, const ImVec2& iconSize, float contentGap, float textPaddingX, float tileWidth,
         ImFont* nameFont, float nameFontSize, const ImVec2& nameSize, const std::string& displayName);
 
     // Handle click, double-click, right-click and hover interactions for a grid tile
-    void _handleGridEntryInteractions(const std::vector<std::filesystem::directory_entry>& entries, 
+    void _handleGridEntryInteractions(const std::vector<std::filesystem::directory_entry>& entries,
         const std::string& entryPath, bool isSelected, bool isDirectory, const std::string& extLower, bool tileLeftClick,
         bool tileDoubleClick, bool tileRightClick, bool tileHovered);
 
@@ -258,7 +259,7 @@ private:
 
     // Clipboard state
     std::vector<std::string> m_clipboardAssets;
-    bool m_clipboardIsCut = false;
+    bool m_clipboardIsCut = false; // True if assets were cut (vs copied)
 
     // Status bar state
     std::string m_statusMessage;
@@ -279,7 +280,7 @@ private:
     char m_renameBuffer[256] = "";
     bool m_focusRenameInput = false;
 
-	// View mode state (list vs grid)
+    // Current view mode; defaults to Grid
     ViewMode m_viewMode = ViewMode::Grid;
     EditorSettings* m_editorSettings = nullptr;
 };

@@ -1,10 +1,23 @@
-/**
- * @Name: Dalton koh, 2403250
- * @email: d.koh@digipen.edu
- * @file    FmodAudioDevice.cpp
- *
- * @brief   FMOD-backed audio device implementation.
- */
+/* Start Header *****************************************************************/
+/*!
+\file   FmodAudioDevice.cpp
+\author Dalton Koh,2403250
+\par    d.koh@digipen.edu
+\brief
+Implements the FMOD audio device backend used by the engine runtime.
+
+Description
+- owns fmod system startup and shutdown
+- loads cues from memory or file paths
+- plays and stops instances and single instance cues
+- updates listener and per instance runtime parameters
+- manages bus routing and bus low pass dsp nodes
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #include "audio/FmodAudioDevice.h"
 #include "core/Logger.h"
@@ -13,19 +26,23 @@
 #include <fmod_dsp_effects.h>
 
 namespace {
-    constexpr float kMinBusLowPassCutoffHz = 500.0f;
+    // keep low pass cutoff range for bus filters
+    constexpr float kMinBusLowPassCutoffHz = 20.0f;
     constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
 
-    // Log FMOD errors and return success/failure.
+    // check fmod results and log failures
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
+        // return true on success
         if (r == FMOD_OK) return true;
         LOG_ERROR(std::string("FMOD error") + (ctx 
             ? (std::string(" (") + ctx + ")")
             : "") + ": " + std::to_string(r));
         return false;
     }
-    // Helper to check channel playback state.
+
+    // read channel playing state
     inline bool _is_playing(FMOD::Channel* ch) {
+        // null channels are not playing
         if (!ch) return false;
         bool playing = false;
         if (ch->isPlaying(&playing) != FMOD_OK) return false;
@@ -35,7 +52,9 @@ namespace {
 
 namespace Audio {
 
+    // initialize fmod and bus routing
     bool FmodAudioDevice::Initialize() {
+        // reset bus objects before startup
         m_busGroups.fill(nullptr);
         m_busLowPassDsps.fill(nullptr);
 
@@ -61,7 +80,9 @@ namespace Audio {
         return true;
     }
 
+    // initialize fmod on a requested output device
     bool FmodAudioDevice::InitializeWithDevice(const std::string& deviceID) {
+        // reset bus objects before startup
         m_busGroups.fill(nullptr);
         m_busLowPassDsps.fill(nullptr);
 
@@ -69,14 +90,16 @@ namespace Audio {
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
 
-        // Convert device ID string to integer index
-        // Device IDs from DeviceManager are typically formatted as numeric strings or device names
+        // Device IDs can arrive either as numeric index or display name depending
+        // on where selection originated (settings UI, bootstrap config, etc).
         int driverIndex = 0;
         try {
+            // parse numeric device id
             // Try to parse as integer first (0, 1, 2, etc.)
             driverIndex = std::stoi(deviceID);
         }
         catch (...) {
+            // scan driver names when id is not numeric
             // If not a direct integer, search for device by name
             int numDrivers = 0;
             if (m_system->getNumDrivers(&numDrivers) == FMOD_OK) {
@@ -120,11 +143,13 @@ namespace Audio {
         return true;
     }
 
+    // update fmod and cleanup dead single instances
     void FmodAudioDevice::Update() {
         // Pump FMOD update.
         if (m_system) m_system->update();
 
-        // Prune finished singletons.
+        // Keep single-instance map clean so subsequent PlaySingle() policy decisions
+        // are based on currently alive channels only.
         for (auto it = m_activeByCue.begin(); it != m_activeByCue.end(); ) {
             FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second });
             if (!ch || !_is_playing(ch)) it = m_activeByCue.erase(it);
@@ -132,6 +157,7 @@ namespace Audio {
         }
     }
 
+    // release all runtime audio resources
     void FmodAudioDevice::Shutdown() {
         // Free channel user data.
         for (const auto& [id, ch] : m_channels) {
@@ -160,14 +186,16 @@ namespace Audio {
         m_master = nullptr;
     }
 
+    // load one cue either from memory or file path
     bool FmodAudioDevice::LoadCue(const std::string& cueId,
         const std::string& filePath,
         const SoundParams& params)
     {
+        // require an initialized fmod system
         if (!m_system) return false;
         if (m_cues.count(cueId)) return true; // already loaded
 
-        // Try ResourceManager memory path.
+        // Prefer in-memory load via ResourceManager so packed/virtualized assets work.
         if (auto audioBytes = RM.Get<AudioData>(filePath)) {
             if (audioBytes->IsValid && !audioBytes->Data.empty()) {
                 if (FMOD::Sound* s = _createSoundFromMemory(cueId, filePath, params)) {
@@ -180,7 +208,7 @@ namespace Audio {
             }
         }
 
-        // Fallback: create from file path.
+        // Fallback to direct file path when memory-backed load is unavailable.
         FMOD::Sound* s = nullptr;
         auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
         mode |= params.Is3D ? FMOD_3D : FMOD_2D;
@@ -191,7 +219,9 @@ namespace Audio {
         return true;
     }
 
+    // unload one cue and clear active single map entry
     void FmodAudioDevice::UnloadCue(const std::string& cueId) {
+        // release cue sound if it exists
         if (const auto it = m_cues.find(cueId); it != m_cues.end()) {
             if (it->second.Sound) it->second.Sound->release();
             m_cues.erase(it);
@@ -199,14 +229,18 @@ namespace Audio {
         m_activeByCue.erase(cueId);
     }
 
+    // check whether a cue is loaded
     bool FmodAudioDevice::HasCue(const std::string& cueId) const {
+        // lookup cue map
         return m_cues.count(cueId) > 0;
     }
 
+    // start playback for one cue
     PlaybackHandle FmodAudioDevice::Play(const std::string& cueId,
         const PlaySettings& s,
         Bus bus)
     {
+        // find loaded cue data
         const auto it = m_cues.find(cueId);
         if (it == m_cues.end()) return {};
 
@@ -215,6 +249,7 @@ namespace Audio {
 
         FMOD::ChannelGroup* targetGroup = _channelGroupForBus(bus);
         if (!targetGroup) {
+            // fallback to master group
             targetGroup = m_master;
         }
 
@@ -239,7 +274,7 @@ namespace Audio {
         }
         ch->setPaused(s.StartPaused);
 
-        // Track playback handle.
+        // store channel by generated handle id
         PlaybackHandle h{ m_nextId++ };
         m_channels.emplace(h.Id, ch);
         auto* storedId = new uint64_t(h.Id);
@@ -247,26 +282,32 @@ namespace Audio {
         return h;
     }
 
+    // stop playback for one handle
     void FmodAudioDevice::Stop(PlaybackHandle handle, StopMode mode) {
+        // resolve channel from handle
         if (auto* ch = _channelFromHandle(handle)) {
             if (mode == StopMode::Immediate) ch->stop();
             else { ch->setVolume(0.0f); ch->stop(); }
         }
     }
 
+    // start playback with single instance policy
     PlaybackHandle FmodAudioDevice::PlaySingle(const std::string& cueId,
         const PlaySettings& s,
         PlayPolicy policy,
         Bus bus)
     {
+        // resolve routing group for requested bus
         FMOD::ChannelGroup* targetGroup = _channelGroupForBus(bus);
         if (!targetGroup) {
             targetGroup = m_master;
         }
 
+        // reuse or replace active cue instance based on policy
         if (auto it = m_activeByCue.find(cueId); it != m_activeByCue.end()) {
             if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
                 const bool playing = _is_playing(ch);
+                // Policy decides whether to restart, resume, ignore, or spawn a new instance.
                 switch (policy) {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
@@ -284,6 +325,8 @@ namespace Audio {
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceResume:
+                    // Resume only affects paused/stopped state; we still reapply routing
+                    // and current play settings so behavior stays consistent with fresh Play().
                     if (!playing && !s.StartPaused) ch->setPaused(false);
                     if (s.StartPaused) ch->setPaused(true);
                     ch->setChannelGroup(targetGroup);
@@ -299,22 +342,28 @@ namespace Audio {
                     ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceIgnore:
+                    // Keep current playback untouched while active.
                     if (playing) return PlaybackHandle{ it->second };
                     break;
                 case PlayPolicy::NewInstance:
+                    // Fall through to normal Play() below.
                     break;
                 }
             }
             else {
+                // remove stale cue handle mapping
                 m_activeByCue.erase(it);
             }
         }
+        // create a new instance when policy allows
         auto h = Play(cueId, s, bus);
         if (h) m_activeByCue[cueId] = h.Id;
         return h;
     }
 
+    // stop active instance tracked for one cue
     void FmodAudioDevice::StopCue(const std::string& cueId, StopMode mode) {
+        // find active cue handle entry
         auto it = m_activeByCue.find(cueId);
         if (it == m_activeByCue.end()) return;
         if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
@@ -324,7 +373,9 @@ namespace Audio {
         m_activeByCue.erase(it);
     }
 
+    // query active playback for one cue
     bool FmodAudioDevice::IsCuePlaying(const std::string& cueId) const {
+        // find tracked cue handle
         auto it = m_activeByCue.find(cueId);
         if (it == m_activeByCue.end()) return false;
         auto* self = const_cast<FmodAudioDevice*>(this);
@@ -333,26 +384,36 @@ namespace Audio {
         return false;
     }
 
+    // set runtime volume for one handle
     void FmodAudioDevice::SetInstanceVolume(PlaybackHandle handle, float volume) {
+        // write channel volume if handle resolves
         if (auto* ch = _channelFromHandle(handle)) ch->setVolume(volume);
     }
 
+    // set runtime pitch for one handle
     void FmodAudioDevice::SetInstancePitch(PlaybackHandle handle, float pitch) {
+        // write channel pitch if handle resolves
         if (auto* ch = _channelFromHandle(handle)) ch->setPitch(pitch);
     }
 
+    // set runtime pan for one handle
     void FmodAudioDevice::SetInstancePan(PlaybackHandle handle, float pan) {
+        // write channel pan if handle resolves
         if (auto* ch = _channelFromHandle(handle)) ch->setPan(pan);
     }
 
+    // set low pass gain for one handle
     void FmodAudioDevice::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
+        // clamp and apply to channel low pass
         if (auto* ch = _channelFromHandle(handle)) {
             const float clamped = _clampLowPassGain(gain);
             FMOD_OK_OR_LOG(ch->setLowPassGain(clamped), "Channel::setLowPassGain");
         }
     }
 
+    // set 3d attributes for one handle
     void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
+        // write position and velocity vectors
         if (auto* ch = _channelFromHandle(handle)) {
             const FMOD_VECTOR p{ pos.x, pos.y, pos.z };
             const FMOD_VECTOR v{ vel.x, vel.y, vel.z };
@@ -360,7 +421,9 @@ namespace Audio {
         }
     }
 
+    // check if one handle is currently playing
     bool FmodAudioDevice::IsHandlePlaying(PlaybackHandle handle) const {
+        // resolve mutable access for helper call
         auto* self = const_cast<FmodAudioDevice*>(this);
         if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
             return _is_playing(ch);
@@ -368,7 +431,9 @@ namespace Audio {
         return false;
     }
 
+    // set bus low pass gain and apply dsp state
     void FmodAudioDevice::SetBusLowPassGain(Bus bus, float gain) {
+        // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
             return;
@@ -378,7 +443,9 @@ namespace Audio {
         _applyBusLowPassGain(bus);
     }
 
+    // read current bus low pass gain
     float FmodAudioDevice::GetBusLowPassGain(Bus bus) const {
+        // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
             return 1.0f;
@@ -386,7 +453,9 @@ namespace Audio {
         return m_busLowPassGain[index];
     }
 
+    // set listener transform for spatial audio
     void FmodAudioDevice::SetListener(const ListenerParams& l) {
+        // require initialized fmod system
         if (!m_system) return;
         // Update listener attributes.
         const FMOD_VECTOR pos{ l.Position.x, l.Position.y, l.Position.z };
@@ -396,25 +465,35 @@ namespace Audio {
         m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
     }
 
+    // set master output volume
     void FmodAudioDevice::SetMasterVolume(float volume) {
+        // clamp volume to valid range
         // Clamp and apply.
         m_masterVolume = (volume < 0.f) ? 0.f : (volume > 1.f ? 1.f : volume);
         if (m_master) m_master->setVolume(m_masterVolume);
     }
 
+    // read master output volume
     float FmodAudioDevice::GetMasterVolume() const {
+        // return cached master value
         return m_masterVolume;
     }
 
+    // pause all output through master group
     void FmodAudioDevice::PauseAll() {
+        // pause master channel group
         if (m_master) m_master->setPaused(true);
     }
 
+    // resume all output through master group
     void FmodAudioDevice::ResumeAll() {
+        // resume master channel group
         if (m_master) m_master->setPaused(false);
     }
 
+    // return list of loaded cue ids and source paths
     void FmodAudioDevice::GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const {
+        // reset output container then fill
         // Return cue id -> path list.
         out.clear();
         out.reserve(m_cues.size());
@@ -422,10 +501,12 @@ namespace Audio {
             out.emplace_back(id, entry.SourcePath);
     }
 
+    // find existing sound or create a new one from file path
     FMOD::Sound* FmodAudioDevice::_getOrCreateSound(const std::string& cueId,
         const std::string& path,
         const SoundParams& params)
     {
+        // require initialized fmod system
         if (!m_system) return nullptr;
         if (const auto it = m_cues.find(cueId); it != m_cues.end())
             return it->second.Sound;
@@ -441,7 +522,9 @@ namespace Audio {
         return s;
     }
 
+    // resolve channel pointer from playback handle
     FMOD::Channel* FmodAudioDevice::_channelFromHandle(PlaybackHandle h) {
+        // reject invalid handles
         // Resolve channel by handle id.
         if (!h) return nullptr;
         const auto it = m_channels.find(h.Id);
@@ -449,10 +532,12 @@ namespace Audio {
         return it->second;
     }
 
+    // create sound from resource manager memory bytes
     FMOD::Sound* FmodAudioDevice::_createSoundFromMemory(const std::string& cueId,
         const std::string& path,
         const SoundParams& params)
     {
+        // cue id is unused in memory path loading
         // Ignore cue id; use the audio data by path.
         (void)cueId;
 
@@ -475,7 +560,9 @@ namespace Audio {
         return s;
     }
 
+    // create channel groups and low pass dsp per bus
     bool FmodAudioDevice::_initializeBusRouting() {
+        // require system and master group
         if (!m_system || !m_master) {
             return false;
         }
@@ -486,6 +573,7 @@ namespace Audio {
 
         const char* names[kBusCount] = { "Master", "Music", "SFX", "UI", "Ambient" };
 
+        // Build a simple bus tree under master and attach one low-pass DSP per bus.
         for (size_t index = 0; index < kBusCount; ++index) {
             FMOD::ChannelGroup* group = nullptr;
             if (index == static_cast<size_t>(Bus::Master)) {
@@ -529,7 +617,10 @@ namespace Audio {
         return true;
     }
 
+    // release low pass dsp and bus groups
     void FmodAudioDevice::_shutdownBusRouting() {
+        // release dsp objects first
+        // Release DSPs first, then release non-master channel groups.
         for (size_t index = 0; index < kBusCount; ++index) {
             if (FMOD::DSP* dsp = m_busLowPassDsps[index]) {
                 if (FMOD::ChannelGroup* group = m_busGroups[index]) {
@@ -540,6 +631,7 @@ namespace Audio {
             }
         }
 
+        // release non master groups next
         for (size_t index = 0; index < kBusCount; ++index) {
             if (index == static_cast<size_t>(Bus::Master)) {
                 m_busGroups[index] = m_master;
@@ -553,7 +645,9 @@ namespace Audio {
         }
     }
 
+    // resolve the channel group for one bus
     FMOD::ChannelGroup* FmodAudioDevice::_channelGroupForBus(Bus bus) const {
+        // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
             return m_busGroups[static_cast<size_t>(Bus::SFX)];
@@ -562,7 +656,9 @@ namespace Audio {
         return group ? group : m_master;
     }
 
+    // apply stored low pass gain to one bus dsp
     void FmodAudioDevice::_applyBusLowPassGain(Bus bus) {
+        // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
             return;
@@ -575,15 +671,20 @@ namespace Audio {
 
         const float gain = m_busLowPassGain[index];
         const float cutoffHz = _lowPassGainToCutoffHz(gain);
+        // Bypass DSP near unity gain to avoid unnecessary filter work on the bus.
         dsp->setBypass(gain >= 0.999f);
         FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_CUTOFF, cutoffHz), "DSP::setParameterFloat LOWPASS_CUTOFF");
     }
 
+    // clamp low pass gain to range zero to one
     float FmodAudioDevice::_clampLowPassGain(float gain) {
+        // return clamped value
         return (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
     }
 
+    // map low pass gain to cutoff frequency
     float FmodAudioDevice::_lowPassGainToCutoffHz(float gain) {
+        // clamp gain before mapping
         const float clamped = _clampLowPassGain(gain);
         if (clamped <= 0.0f) {
             return kMinBusLowPassCutoffHz;

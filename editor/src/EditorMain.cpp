@@ -96,7 +96,6 @@ int main() {
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
-
     // Editor main loop
     while (engine.IsRunning()) {
         if (editor.IsProjectInitialized()) {
@@ -175,6 +174,17 @@ int main() {
         // ENGINE UPDATE - Process input, time, and services
         // ============================================================
         engine.Update();
+
+        // Track playback transitions regardless of world/scene availability.
+        EditorState state = editor.GetEditorState();
+        const bool stateChanged = (previousState != state);
+        const bool wasInEdit = (previousState == EditorState::Edit);
+        const bool isInEdit = (state == EditorState::Edit);
+
+        if (stateChanged) {
+            // Advance state tracker so the next frame's transition detection is correct
+            previousState = state;
+        }
         
         // Editor controls which systems execute based on playback state
         // Get the current scene
@@ -189,16 +199,10 @@ int main() {
             // Always run these systems (render, transform hierarchy)
             systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::Always));
             
-            // Get current editor state
-            EditorState state = editor.GetEditorState();
-            
-            // Only process transitions if state actually changed
-            if (previousState != state) {
+            // Only process scene/system transitions if state actually changed
+            if (stateChanged) {
                 // Only stop/start when transitioning between Edit and active play states
                 // Paused state keeps audio initialized but systems don't run
-                bool wasInEdit = (previousState == EditorState::Edit);
-                bool isInEdit = (state == EditorState::Edit);
-                
                 if (!wasInEdit && isInEdit) {
                     // Transitioning to Edit: stop PlayOnly systems
                     systemManager.OnSceneStop(world);
@@ -209,9 +213,6 @@ int main() {
                     systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
-                
-                // Update previous state after processing transition
-                previousState = state;
             }
             
             // Run gameplay systems based on playback state

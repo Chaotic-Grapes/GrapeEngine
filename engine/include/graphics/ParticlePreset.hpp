@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file     ParticlePreset.h
-\author   Choi Meng Yew
+\author   Choi Meng Yew (100%)
 \date     28th February 2026
 \brief
 Shared read-only configuration for particle emitters. Multiple emitter

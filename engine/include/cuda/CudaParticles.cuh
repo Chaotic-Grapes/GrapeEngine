@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file     CudaParticles.cuh
-\author   Choi Meng Yew
-\date     28th February 2026
+\author   Choi Meng Yew (100%)
+\date     10th March 2026
 \brief
 CUDA particle system header. Defines ParticleParams for kernel configuration
 and declares host-side launch wrappers. Uses the same CUDA-GL interop pattern

@@ -1,7 +1,7 @@
 ﻿/* Start Header *****************************************************************/
 /*!
 \file   BoidSystem.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   26th February 2026
 \brief
 GPU-accelerated boid flocking simulation using CUDA–OpenGL interop.
@@ -19,10 +19,6 @@ The system maintains a double-buffered position/velocity layout
 (previous + current) to ensure deterministic updates. Results live
 directly in an OpenGL VBO, enabling zero CPU copies and fully
 GPU-resident simulation-to-rendering flow.
-
-ISSUES TO DO:
-1) Remove the Device-to-Device cudaMemcpy
-2) Use CUDA Streams
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

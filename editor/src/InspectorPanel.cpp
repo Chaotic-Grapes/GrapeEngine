@@ -1,11 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   InspectorPanel.cpp
-\author Foo Rui Qin    (80%)
+\author Foo Rui Qin (80%)
         Samantha Leong (20%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
-\date   15th November 2025
+\date   12th March 2026
 
 \brief
 Implementation of the editor panel for viewing and editing game entities and
@@ -49,48 +49,93 @@ through a unified system shared by both entities and prefab templates.
 namespace {
     constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
 
+    // Builds contiguous absolute-frame spans for segment-based animation playback
+    // Each segment is clamped to valid sheet bounds so bad data cannot produce out-of-range frame indices
     int BuildSegmentSpans(const ECS::Components::SpriteSheetAnimation2D& anim,
         int totalCols, int totalRows,
         int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
+
+        // If the sheet grid is invalid there is no safe way to compute segment frame ranges
+        // Returning zero tells callers there are no playable frames in segment mode
         if (totalCols <= 0 || totalRows <= 0) {
             return 0;
         }
 
+        // SegmentCount can come from edited JSON so clamp to fixed storage size
+        // This protects starts and counts arrays from overflow writes
         const int segCount = std::clamp(static_cast<int>(anim.SegmentCount), 0, kMaxAnimSegments);
+
+        // Accumulate total playable frame count across all valid segments
+        // Caller uses this to clamp animation state frame index later
         int totalCount = 0;
+
         for (int i = 0; i < segCount; ++i) {
+
+            // Clamp row and start column to the sprite-sheet grid so bad data stays in bounds
             const int row = std::clamp(anim.SegmentRows[i], 0, totalRows - 1);
             const int startCol = std::clamp(anim.SegmentOffsets[i], 0, totalCols - 1);
+
+            // Frames available in this segment from startCol to end of row
+            // Segment playback in this mode never wraps to next row automatically
             const int available = totalCols - startCol;
 
+            // SegmentLengths <= 0 means use full remaining row from startCol
+            // SegmentLengths > available is clamped so segment does not spill past row boundary
             int count = anim.SegmentLengths[i];
             if (count <= 0 || count > available) {
                 count = available;
             }
+
+            // A non-positive count after clamping means this segment contributes no frames
+            // Store zeros explicitly so downstream consumers can skip it deterministically
             if (count <= 0) {
                 starts[i] = 0;
                 counts[i] = 0;
                 continue;
             }
 
+            // Convert row and column into absolute linear frame index in sheet order
+            // Example: row 2 col 3 in a 10-column sheet starts at 2*10+3 = 23
             starts[i] = row * totalCols + startCol;
+
+            // Keep per-segment frame count for local-frame to absolute-frame resolution
             counts[i] = count;
+
+            // Sum total playable frames across all valid segments
             totalCount += count;
         }
+
+        // Return total segment window size used by animation preview and frame clamping logic
         return totalCount;
     }
 
+    // Resolves local playback frame index into an absolute frame index across all active segments
+    // Returns -1 when local frame falls outside all valid segment ranges
     int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
         int segmentCount, int localFrame) {
+
+        // cursor tracks the running local-frame range start for each segment
+        // If segment A has 4 frames then segment B starts at cursor 4, and so on
         int cursor = 0;
+
         for (int i = 0; i < segmentCount; ++i) {
+
+            // Skip segments that were disabled or clamped to zero in BuildSegmentSpans
             const int count = counts[i];
             if (count <= 0) continue;
+
+            // localFrame in [cursor, cursor+count) belongs to current segment i
+            // Convert from segment-local offset back to absolute sheet frame index
             if (localFrame < cursor + count) {
                 return starts[i] + (localFrame - cursor);
             }
+
+            // Advance cursor by this segment length before checking next segment
             cursor += count;
         }
+
+        // localFrame did not map to any valid segment range
+        // Caller treats this as invalid and avoids updating preview UVs
         return -1;
     }
 
@@ -100,6 +145,7 @@ namespace {
     bool AddComponentIfMatch(ECS::World* world, ECS::Entity instance, const std::string& typeName,
         const std::string& expectedName, nlohmann::json& compData)
     {
+
         // If the json component name does not match what this function handles we skip it
         // This avoids adding the wrong component type to the entity
         if (typeName != expectedName) return false;
@@ -108,11 +154,13 @@ namespace {
         // world Has<T> checks if this entity already contains a component of type T
         if (!Editor::ECSUtils::HasComponent(world, instance, expectedName.c_str())) {
             T value{};
+
             // from_json fills the new component using values from the json 
             // This allows prefabs and saved scenes to restore component state exactly
             from_json(compData, value);
             Editor::ECSUtils::AddComponent(world, instance, expectedName.c_str(), value);
         }
+
         // true means this template handled the component successfully
         return true;
     }
@@ -137,61 +185,97 @@ namespace {
         return false;
     }
 
+    // Marks scene dirty only when file-menu hook exists
+    // Centralizes this guard so call sites stay compact
     void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
         if (fileMenu) {
             fileMenu->MarkSceneDirty();
         }
     }
 
+    // Syncs SpriteRenderer2D UVs and frame size from current SpriteSheetAnimation2D playback frame
+    // This keeps preview sprite visuals aligned with inspector animation settings
     void UpdateSpriteAnimationPreview(ECS::World* world, ECS::Entity entity) {
+
+        // Preview update only makes sense when entity exists in a live world
         if (!world || entity.IsNull() || !world->IsAlive(entity))
             return;
+
+        // Animation source data is required to compute current frame and UV region
         if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteSheetAnimation2D"))
             return;
+
+        // Renderer target is required to apply computed preview texture region
         if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteRenderer2D"))
             return;
 
+        // Pull component pointers once so all later reads and writes use the same snapshot
         const auto* anim = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteSheetAnimation2D>(world, entity, "SpriteSheetAnimation2D");
         auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
         if (!anim || !sprite) {
             return;
         }
 
+        // Frame and sheet dimensions must be positive to avoid divide-by-zero and invalid grid math
         if (anim->FrameWidth <= 0 || anim->FrameHeight <= 0 ||
             anim->SheetWidth <= 0 || anim->SheetHeight <= 0)
             return;
 
+        // Derive sheet grid size from pixel dimensions
+        // Integer division is intentional because partial frames at sheet edges are ignored
         const int totalCols = anim->SheetWidth / anim->FrameWidth;
         const int totalRows = anim->SheetHeight / anim->FrameHeight;
         if (totalCols <= 0 || totalRows <= 0)
             return;
 
+        // Segment mode has highest priority because it defines explicit non-contiguous playback ranges
         const bool useSegments = anim->UseSegments && anim->SegmentCount > 0;
+
+        // Row mode is only active when segment mode is off
+        // Row mode defines one contiguous window on one row
         const bool useRow = anim->UseRow && !useSegments;
 
+        // windowStart and windowCount describe the playable frame window in absolute-frame space
+        // For segment mode, absolute frame is resolved later from segmentStarts and segmentCounts
         int windowStart = 0;
         int windowCount = 0;
         int absoluteFrame = -1;
         int segmentStarts[kMaxAnimSegments] = { 0 };
         int segmentCounts[kMaxAnimSegments] = { 0 };
         int segmentCount = 0;
+
+        // Segment mode uses explicit row and offset windows that can span multiple rows
         if (useSegments) {
             windowCount = BuildSegmentSpans(*anim, totalCols, totalRows, segmentStarts, segmentCounts);
             segmentCount = std::clamp(static_cast<int>(anim->SegmentCount), 0, kMaxAnimSegments);
         }
         else if (useRow) {
+
+            // Row mode treats selected row as one contiguous strip starting at FrameOffset
             const int row = std::clamp(anim->Row, 0, totalRows - 1);
             const int startCol = std::clamp(anim->FrameOffset, 0, totalCols - 1);
+
+            // Convert row-local start into absolute linear frame index
             const int start = row * totalCols + startCol;
+
+            // totalFrames bounds any clamp done later for frame count
             const int totalFrames = totalCols * totalRows;
+
+            // rowAvailable is maximum legal length before crossing row boundary
             const int rowAvailable = totalCols - startCol;
+
+            // maxFromStart bounds total frame window to sheet end in case of malformed values
             const int maxFromStart = totalFrames - start;
 
             int count = anim->FrameLength;
             if (count <= 0) {
+
+                // Non-positive length means consume full remainder of selected row
                 count = rowAvailable;
             }
             else {
+
+                // Clamp explicit length so selected window stays inside legal frame range
                 count = std::clamp(count, 1, maxFromStart);
             }
 
@@ -199,20 +283,29 @@ namespace {
             windowCount = count;
         }
         else {
+
+            // Default mode uses StartFrame plus FrameCount over whole sheet addressing space
             const int totalFrames = totalCols * totalRows;
             windowStart = std::clamp(anim->StartFrame, 0, totalFrames - 1);
             windowCount = anim->FrameCount;
             if (windowCount <= 0) {
+
+                // Non-positive count means play from StartFrame to end of sheet
                 windowCount = std::max(1, totalFrames - windowStart);
             }
             else {
+
+                // Clamp explicit count to remaining frames so window never exceeds sheet bounds
                 windowCount = std::min(windowCount, totalFrames - windowStart);
             }
         }
 
+        // Nothing to preview when computed window contains zero valid frames
         if (windowCount <= 0)
             return;
 
+        // Read current playback frame from AnimationState2D when present
+        // Missing state falls back to first frame in computed window
         int localFrame = 0;
         if (Editor::ECSUtils::HasComponent(world, entity, "AnimationState2D")) {
             const auto* animState = Editor::ECSUtils::GetComponentPtr<ECS::Components::AnimationState2D>(world, entity, "AnimationState2D");
@@ -220,35 +313,54 @@ namespace {
                 localFrame = animState->CurrentFrame;
             }
         }
+
+        // Clamp local frame to computed window to survive stale runtime state values
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
         if (useSegments) {
+
+            // Segment mode maps local frame through sparse segment windows
             absoluteFrame = ResolveSegmentAbsoluteFrame(segmentStarts, segmentCounts, segmentCount, localFrame);
             if (absoluteFrame < 0) {
                 return;
             }
         }
         else {
+
+            // Row and default mode use simple contiguous offset from windowStart
             absoluteFrame = windowStart + localFrame;
         }
+
+        // Convert linear frame index into column and row based on texture sheet dimensions
         const int col = absoluteFrame % totalCols;
         const int rowTop = absoluteFrame / totalCols;
+
+        // rowBottom flips top-origin row index to bottom-origin UV coordinate system
         const int rowBottom = (totalRows - 1) - rowTop;
 
+        // Normalize pixel-space frame bounds to UV space [0,1] for renderer sampling
+        // rowBottom flips row indexing because texture coordinates are bottom-origin in this pipeline
         const float u0 = (col * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
         const float v0 = (rowBottom * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
         const float u1 = ((col + 1) * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
         const float v1 = ((rowBottom + 1) * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
 
+        // Preserve renderer texture when animation does not specify overrides
         if (anim->TextureId != 0)
             sprite->TextureId = anim->TextureId;
         if (anim->NormalTextureId != 0)
             sprite->NormalTextureId = anim->NormalTextureId;
+
+        // Frame dimensions define rendered quad size for preview consistency
         sprite->Width = anim->FrameWidth;
         sprite->Height = anim->FrameHeight;
+
+        // Tiling is UV span size and offset is UV origin for selected frame rectangle
         sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
         sprite->Offset = Vector2D{ u0, v0 };
     }
 
+    // Compares component snapshots ignoring ordering differences by sorting both sets by component ID first
+    // This avoids false undo triggers when serialization order changes but component values are identical
     bool SnapshotsEqual(const std::vector<ECS::SerializedComponent>& a,
         const std::vector<ECS::SerializedComponent>& b) {
         if (a.size() != b.size()) {
@@ -276,11 +388,12 @@ namespace {
 
 // Helper functions for prefab synchronization and component matching
 namespace {
+
     // Some serializers include the namespace in the component type name while others do not, 
     // so we need to be flexible when matching
     constexpr const char* kComponentPrefix = "ECS::Components::";
 
-    // Strips known namespace prefixes from component type names for more flexible matching.
+    // Strips known namespace prefixes from component type names for more flexible matching
     // e.g. "ECS::Components::LocalTransform" -> "LocalTransform"
     std::string StripComponentPrefix(const std::string& typeName) {
         const std::string prefix = kComponentPrefix;
@@ -305,14 +418,17 @@ namespace {
     // - Wrapped: { "Entity": { "Components": [...], "Children": [...] } }
     // - Flat: { "Components": [...], "Children": [...] }
     const nlohmann::json* GetPrefabRootNode(const nlohmann::json& prefabData) {
+
         // Wrapped format: root is the "Entity" object
         if (prefabData.contains("Entity") && prefabData["Entity"].is_object()) {
             return &prefabData["Entity"];
         }
+
         // Flat format: root itself contains "Components" directly
         if (prefabData.contains("Components") && prefabData["Components"].is_array()) {
             return &prefabData;
         }
+
         // Neither format matched: invalid prefab structure
         return nullptr;
     }
@@ -331,6 +447,7 @@ namespace {
     // - PrefabInstanceMetadata: stores the hash directly as "PrefabHash"
     // - PrefabLink: stores the prefab file path; the hash is computed from it
     bool SceneEntityMatchesPrefabHash(const nlohmann::json& entity, const std::vector<uint32_t>& targetHashes) {
+
 		// If the entity doesn't have a Components array, it cannot be a prefab instance
         if (!entity.contains("Components") || !entity["Components"].is_array()) {
             return false;
@@ -338,6 +455,7 @@ namespace {
 
 		// Check each component for prefab association metadata
         for (const auto& comp : entity["Components"]) {
+
 			// Basic validation to ensure component has expected structure before accessing fields
             if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
             if (!comp["TypeName"].is_string() || !comp["Data"].is_object()) continue;
@@ -347,6 +465,7 @@ namespace {
 
 			// Check for PrefabInstanceMetadata which directly contains the prefab hash
             if (ComponentTypeMatches(typeName, "PrefabInstanceMetadata")) {
+
                 // Hash is stored directly on the component
                 if (!comp["Data"].contains("PrefabHash")) continue;
                 uint32_t hashValue = 0;
@@ -363,6 +482,7 @@ namespace {
 
 			// Check for PrefabLink which contains the prefab file path; we compute the hash from it
             else if (ComponentTypeMatches(typeName, "PrefabLink")) {
+
                 // Hash is derived from the prefab file path
 				// Validate that the prefabPath field exists and is a string before accessing
                 if (!comp["Data"].contains("prefabPath") || !comp["Data"]["prefabPath"].is_string()) continue;
@@ -386,6 +506,7 @@ namespace {
 
 	// Applies components from a prefab node to a scene entity JSON object, matching by component type name
     bool ApplyPrefabComponentsToSceneEntity(nlohmann::json& sceneEntity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+
 		// Validate that the prefab node has a Components array before proceeding
         const nlohmann::json* prefabComponents = GetPrefabNodeComponents(prefabNode);
         if (!prefabComponents) {
@@ -403,6 +524,7 @@ namespace {
 
 		// For each component defined in the prefab node, we will try to find a matching component in the scene entity by type name
         for (const auto& prefabComp : *prefabComponents) {
+
 			// Basic validation to ensure the prefab component has expected structure before accessing fields
             if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
             if (!prefabComp["TypeName"].is_string() || !prefabComp["Data"].is_object()) continue;
@@ -417,6 +539,7 @@ namespace {
 
 			// Search for a matching component in the scene entity's components by type name
             for (auto& sceneComp : sceneComponents) {
+
 				// Basic validation to ensure the scene component has expected structure before accessing fields
                 if (!sceneComp.contains("TypeName") || !sceneComp["TypeName"].is_string()) continue;
 
@@ -467,6 +590,7 @@ namespace {
 
 	// Builds a mapping of parent entity indices to their child entity indices based on the "Hierarchy" array in the scene JSON
     std::unordered_map<size_t, std::vector<size_t>> BuildSceneChildrenMap(const nlohmann::json& sceneJson) {
+
 		// The scene JSON may contain a "Hierarchy" array that defines parent-child relationships between entities by their indices 
         // in the "Entities" array
         std::unordered_map<size_t, std::vector<size_t>> childrenByParent;
@@ -478,6 +602,7 @@ namespace {
         // We will iterate through this array and build a mapping of parent indices to their child indices for easy lookup when 
         // applying prefab hierarchies
         for (const auto& relation : sceneJson["Hierarchy"]) {
+
 			// Basic validation to ensure the hierarchy relation has expected structure before accessing fields
             if (!relation.contains("child") || !relation.contains("parent")) continue;
             if (!relation["child"].is_number_unsigned() || !relation["parent"].is_number_unsigned()) continue;
@@ -496,6 +621,7 @@ namespace {
     bool ApplyPrefabHierarchyToSceneEntity(nlohmann::json& entities, const std::unordered_map<size_t, std::vector<size_t>>& sceneChildrenByParent,
         size_t sceneEntityIndex, const nlohmann::json& prefabNode, bool preserveRootTransform)
     {
+
 		// Validate that the scene entity index is within bounds and that the target scene entity is an object before proceeding
         if (sceneEntityIndex >= entities.size()) {
             return false;
@@ -528,6 +654,7 @@ namespace {
 
 		// Recursively apply each child prefab node to the corresponding child scene entity
         for (size_t i = 0; i < applyCount; i++) {
+
 			// Look up the index of the child scene entity from the mapping; if the mapping is missing or malformed we will skip to 
             // avoid errors
             const size_t childSceneIndex = sceneIt->second[i];
@@ -546,6 +673,7 @@ namespace {
 	// Main function to update all instances of a prefab in a scene file by applying the prefab's components to matching entities based on 
     // prefab hash association
     void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath, const nlohmann::json& prefabData, const std::vector<uint32_t>& targetHashes) {
+
 		// Open the scene JSON file from disk
         std::ifstream inFile(scenePath);
         if (!inFile.is_open()) {
@@ -637,6 +765,7 @@ void InspectorPanel::SetWorld(ECS::World* world) {
 
 // Switch inspector into entity mode and validate the entity we want to inspect
 void InspectorPanel::InspectEntity(EntityId id) {
+
     // Block inspection of protected system entities
     if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
@@ -670,6 +799,7 @@ void InspectorPanel::InspectEntity(EntityId id) {
     // Wrap the ID into an ECS::Entity handle (use Resolve() instead of hardcoding generation 0)
     ECS::Entity e = m_world->Resolve(id);
     if (!m_world->IsAlive(e)) {
+
         // Entity might have been deleted so we reset the mode
         m_mode = InspectionMode::None;
         return;
@@ -693,6 +823,7 @@ void InspectorPanel::InspectEntity(EntityId id) {
     m_mode = InspectionMode::Entity;
 }
 
+// Replaces current multi-selection set consumed by batch component editing paths
 void InspectorPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids) {
     m_selectedEntities = ids;
 }
@@ -722,6 +853,7 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
     }
 
     try {
+
         // Read entire file into a string so we can detect empty files
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         file.close();
@@ -767,19 +899,14 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
         m_prefabData = nlohmann::json::parse(content);
         m_prefabPath = path;
 
-        /*
-        Take the entire prefab JSON, convert it to a string
-        Hash the string (turn it into a number), then store that number
-
-        This hash acts like a fingerprint of the prefab at the moment we saved it
-        Next time we try to save, we compute a new hash and compare it with this one
-        If the hashes match, it means nothing changed, so we skip rewriting the file
-        If they differ, it means the prefab was modified, so we save again
-        */
+        // Convert prefab JSON to string and hash it to create a compact content fingerprint
+        // Later saves recompute this value so unchanged prefabs can skip disk writes
+        // Matching hashes mean data is unchanged, differing hashes mean prefab content was edited
         m_lastSavedPrefabHash = std::hash<std::string>{}(m_prefabData.dump());
         m_mode = InspectionMode::Prefab;
     }
     catch (const std::exception& e) {
+
         // Any parse or other exception means the JSON is invalid
         m_statusMessage = "Failed: Invalid JSON in prefab";
         m_statusTimer = 3.0f;
@@ -814,6 +941,7 @@ void InspectorPanel::RequestFocus() {
 
 // Draw the inspector window based on current mode (none, entity, prefab)
 void InspectorPanel::Render() {
+
     // Use main editor font for the whole inspector window
     ImGui::PushFont(m_mainFont);
 
@@ -843,10 +971,10 @@ void InspectorPanel::Render() {
     if (m_mode == InspectionMode::None) {
         ImGui::TextDisabled("No selection");
     }
-    else if (m_mode == InspectionMode::Entity) {
+        else if (m_mode == InspectionMode::Entity) {
         _renderEntityInspector();
     }
-    else if (m_mode == InspectionMode::Prefab) {
+        else if (m_mode == InspectionMode::Prefab) {
         _renderPrefabInspector();
     }
 
@@ -882,6 +1010,7 @@ void InspectorPanel::_renderEntityInspector() {
 
 // Draw entity name, ID and prefab link information at the top of the inspector
 void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
+
     // Try to read the Name component for display
     std::string entityName = "Unnamed";
     if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
@@ -911,7 +1040,8 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         ImGui::SameLine();
         if (!prefabPath.empty()) {
             ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
-        } else {
+        }
+        else {
             ImGui::TextDisabled("0x%08X", meta.PrefabHash);
         }
 
@@ -925,6 +1055,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         if (!prefabPath.empty()) {
             ImGui::SameLine();
             if (ImGui::Button("Open Prefab")) {
+
                 // Switch inspector into prefab mode using the linked path
                 InspectPrefab(prefabPath);
             }
@@ -936,6 +1067,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
         ImGui::Separator();
     }
+
     // If NOT a prefab instance, show an empty prefab slot with drag - drop
     else {
         ImGui::Separator();
@@ -946,17 +1078,20 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         // Allow drag and drop of assets onto this row
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+
                 // payload->Data is a char* containing the file path
                 std::string droppedPath = static_cast<const char*>(payload->Data);
 
                 // Only allow .prefab files to be dropped here
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
+
                     // Add PrefabInstanceMetadata with registered hash
                     uint32_t hash = 0;
                     if (m_prefabManager) {
                         hash = m_prefabManager->RegisterPrefab(droppedPath);
                         m_prefabManager->TrackInstance(entity, hash);
-                    } else {
+                    }
+        else {
                         hash = ECS::PrefabManager::ComputeHash(
                             ECS::PrefabManager::NormalizePath(droppedPath)
                         );
@@ -970,7 +1105,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
                 }
-                else {
+        else {
                     m_statusMessage = "Not a prefab: drop a .prefab file";
                     m_statusTimer = 2.0f;
                 }
@@ -989,7 +1124,8 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     if (m_prefabManager) {
                         hash = m_prefabManager->RegisterPrefab(path);
                         m_prefabManager->TrackInstance(entity, hash);
-                    } else {
+                    }
+        else {
                         hash = ECS::PrefabManager::ComputeHash(
                             ECS::PrefabManager::NormalizePath(path)
                         );
@@ -1014,6 +1150,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
 // Render all components on an entity using JSON as a temporary editable buffer
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
+
     // Reserve extra footer space so bottom status text remains visible
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
 
@@ -1035,8 +1172,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     // UI edits this JSON, then we sync the edits back into the ECS
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
 
-    // LOG_DEBUG("[InspectorPanel] Serialized entity " << entity.Index << ": " << entityJson.dump(2));
-
     // Make sure the JSON has a component list we can iterate
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
@@ -1052,7 +1187,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         // Apply property filter so per-field rows can be narrowed
         if (m_componentFilter.empty()) {
             EditorUI::ClearPropertyFilter();
-        } else {
+        }
+        else {
             EditorUI::SetPropertyFilter(m_componentFilter);
         }
 
@@ -1065,6 +1201,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
+
             // Basic validation
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
             if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
@@ -1074,9 +1211,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             const auto* meta = ComponentRegistryUI::Find(typeName);
 
             // To log missing metadata for debugging
-            // if (!meta) {
-            //     LOG_WARNING("[InspectorPanel] No UI metadata for component '" << typeName << "' while rendering entity " << entity.Index);
-            // }
             if (meta) {
                 auto& data = componentEntry["Data"];
 
@@ -1121,6 +1255,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         // Process deferred deletions after UI loop so we don't mutate while iterating
         // Also remove deleted components from the JSON buffer so they are not re-applied below
         for (const auto& type : m_componentsToDelete) {
+
             // Pull out Components array (early-continue instead of nesting)
             if (!entityJson.contains("Components")) continue;
             if (!entityJson["Components"].is_array()) continue;
@@ -1129,6 +1264,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
             // Manual iterator loop because we may erase while iterating
             for (auto it = comps.begin(); it != comps.end(); ) {
+
                 // Bail early if no valid TypeName
                 bool hasTypeName = it->contains("TypeName") && (*it)["TypeName"].is_string();
                 if (!hasTypeName) {
@@ -1159,20 +1295,21 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             m_editState.isEditing = true;
             m_editState.entityId = entity.Index;
 
-            // Snapshot current component state before edits begin.
+            // Snapshot current component state before edits begin
             if (m_undoSystem) {
                 m_editState.startComponents = m_world->CaptureEntityComponents(entity);
                 m_editState.hasSnapshot = true;
             }
         }
 
-        // Keep sprite preview in sync even when the animation UI is collapsed.
+        // Keep sprite preview in sync even when the animation UI is collapsed
         UpdateSpriteAnimationPreview(m_world, entity);
 
         // Second pass: push any edited JSON values back into ECS components
         // IMPORTANT: Only apply components that were actually modified to prevent
         // unnecessarily overwriting entity data every frame (which can cause teleporting)
         for (const auto& componentEntry : entityJson["Components"]) {
+
             // Validate again; same same
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
             if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
@@ -1185,6 +1322,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             }
 
             const auto* meta = ComponentRegistryUI::Find(typeName);
+
             // Apply edited JSON to the actual ECS component
             if (meta) {
                 LOG_DEBUG("[Inspector] Applying modified component: " << typeName << " to entity " << entity.Index);
@@ -1209,9 +1347,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                     if (isMultiSelect) {
                         auto macro = std::make_unique<Editor::MacroCommand>();
                         
-                        // We don't have start snapshots for all entities, only the primary one.
-                        // This is a limitation of the current snapshot system for generic edits.
-                        // However, most property edits now use BatchComponentPropertyCommand.
+                        // We don't have start snapshots for all entities, only the primary one
+                        // This is a limitation of the current snapshot system for generic edits
+                        // However, most property edits now use BatchComponentPropertyCommand
                         
                         auto endSnapshot = m_world->CaptureEntityComponents(entity);
                         if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
@@ -1222,7 +1360,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         if (!macro->IsEmpty()) {
                             m_undoSystem->ExecuteCommand(std::move(macro));
                         }
-                    } else {
+                    }
+                    else {
                         auto endSnapshot = m_world->CaptureEntityComponents(entity);
                         if (!SnapshotsEqual(m_editState.startComponents, endSnapshot)) {
                             auto command = std::make_unique<Editor::EntityComponentsSnapshotCommand>(
@@ -1244,11 +1383,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
-    // else {
-    //     // Debug: show why components aren't rendering
-    //     ImGui::TextDisabled("No Components array in serialized entity");
-    //     LOG_ERROR("[InspectorPanel] Entity " << entity.Index << " has no Components array. JSON: " << entityJson.dump(2));
-    // }
 
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -1259,6 +1393,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
 // Renders the Add Component button row at the bottom of the inspector
 void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
+
     // Button to open the Add Component popup menu
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
@@ -1404,19 +1539,23 @@ bool InspectorPanel::_isHierarchicalPrefab() const {
 
 // Get a pointer to the currently selected prefab node in the JSON structure based on m_selectedPrefabNodePath
 nlohmann::json* InspectorPanel::_getSelectedPrefabNode() {
+
 	// If this is a hierarchical prefab, we need to traverse the JSON tree based on the selected path
     if (_isHierarchicalPrefab()) {
+
 		// Start at the root "Entity" node
         nlohmann::json* node = &m_prefabData["Entity"];
 
 		// Traverse down the "Children" arrays according to the indices in m_selectedPrefabNodePath
         for (size_t idx : m_selectedPrefabNodePath) {
+
 			// If at any point the expected "Children" array is missing or the index is out of bounds, we 
             // reset the selection to root
             if (!node->contains("Children") || !(*node)["Children"].is_array() || idx >= (*node)["Children"].size()) {
                 m_selectedPrefabNodePath.clear();
                 return &m_prefabData["Entity"];
             }
+
 			// Move the pointer down to the selected child node
             node = &(*node)["Children"][idx];
         }
@@ -1434,6 +1573,7 @@ nlohmann::json* InspectorPanel::_getSelectedPrefabNode() {
 
 // Const version of _getSelectedPrefabNode for read-only access
 const nlohmann::json* InspectorPanel::_getSelectedPrefabNode() const {
+
 	// Same traversal logic as non-const version, but returns a const pointer for read-only access
     if (_isHierarchicalPrefab()) {
         const nlohmann::json* node = &m_prefabData["Entity"];
@@ -1455,6 +1595,7 @@ const nlohmann::json* InspectorPanel::_getSelectedPrefabNode() const {
 // Get a pointer to the "Components" array of the currently selected prefab node, optionally creating it 
 // if it doesn't exist
 nlohmann::json* InspectorPanel::_getSelectedPrefabComponents(bool createIfMissing) {
+
 	// First get the currently selected node in the prefab JSON structure
     nlohmann::json* node = _getSelectedPrefabNode();
     if (!node || !node->is_object()) {
@@ -1466,11 +1607,13 @@ nlohmann::json* InspectorPanel::_getSelectedPrefabComponents(bool createIfMissin
         if (!createIfMissing) return nullptr;
         (*node)["Components"] = nlohmann::json::array();
     }
+
 	// If "Components" exists but is not an array, this is a malformed prefab structure; we log an error and reset it
     if (!(*node)["Components"].is_array()) {
         if (!createIfMissing) return nullptr;
         (*node)["Components"] = nlohmann::json::array();
     }
+
 	// Finally return a pointer to the "Components" array of the selected node, which the caller can read from 
     // or write to
     return &(*node)["Components"];
@@ -1478,6 +1621,7 @@ nlohmann::json* InspectorPanel::_getSelectedPrefabComponents(bool createIfMissin
 
 // Const version of _getSelectedPrefabComponents for read-only access
 const nlohmann::json* InspectorPanel::_getSelectedPrefabComponents() const {
+
     // SAME THING
     const nlohmann::json* node = _getSelectedPrefabNode();
     if (!node || !node->is_object()) {
@@ -1491,11 +1635,14 @@ const nlohmann::json* InspectorPanel::_getSelectedPrefabComponents() const {
 
 // Helper to extract a display name for a prefab node by looking for a Name component in its Components list
 std::string InspectorPanel::_getPrefabNodeDisplayName(const nlohmann::json& node) const {
+
 	// Look for a Name or ECS::Components::Name component in this node's Components array to use as display name
     if (node.contains("Components") && node["Components"].is_array()) {
+
 		// We loop through all components of this prefab node to find a Name component, which we use as the display 
         // name in the UI
         for (const auto& comp : node["Components"]) {
+
 			// Basic validation to make sure this component has the expected structure before we try to read it
             if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
             if (!comp.contains("Data") || !comp["Data"].is_object()) continue;
@@ -1506,6 +1653,7 @@ std::string InspectorPanel::_getPrefabNodeDisplayName(const nlohmann::json& node
 			// If this is a Name component, we look for a "Value" field inside its "Data" object, which should be the 
             // actual name string
             if (typeName == "Name" || typeName == "ECS::Components::Name") {
+
 				// If the Value field exists and is a string, we return it as the display name for this prefab node
                 // If it's empty, we fall back to a default name below
                 if (comp["Data"].contains("Value") && comp["Data"]["Value"].is_string()) {
@@ -1514,12 +1662,14 @@ std::string InspectorPanel::_getPrefabNodeDisplayName(const nlohmann::json& node
                         return value;
                     }
                 }
+
 				// If we found a Name component but it doesn't have a valid Value, we stop looking further and return a 
                 // default name
                 break;
             }
         }
     }
+
 	// If no Name component found, we return a default name based on whether this is the root node or a child node
     return "Entity";
 }
@@ -1547,6 +1697,7 @@ std::vector<InspectorPanel::PrefabNodeSelectionItem> InspectorPanel::_buildPrefa
 
 		// Loop through each child of this node
         for (size_t i = 0; i < node["Children"].size(); i++) {
+
 			// Basic validation to ensure this child is an object before we try to read it
             const auto& child = node["Children"][i];
             if (!child.is_object()) continue;
@@ -1575,10 +1726,13 @@ std::vector<InspectorPanel::PrefabNodeSelectionItem> InspectorPanel::_buildPrefa
 
 // Render all component definitions stored inside the prefab JSON
 void InspectorPanel::_renderPrefabComponents() {
+
 	// First we get a pointer to the currently selected prefab node's "Components" array in the JSON structure
     if (_isHierarchicalPrefab()) {
+
 		// For hierarchical prefabs, we render a child selector dropdown to allow selecting which node's components to edit
         const std::vector<PrefabNodeSelectionItem> nodeItems = _buildPrefabNodeSelectionItems();
+
 		// We look through the list of nodes to find the currently selected one so we can show its name in the UI
         std::string currentLabel = "Root";
         for (const auto& item : nodeItems) {
@@ -1596,6 +1750,7 @@ void InspectorPanel::_renderPrefabComponents() {
 		// Popup menu to select which child node's components to edit; shows a hierarchical list of all nodes in the prefab with 
         // indentation
         if (ImGui::BeginPopup("PrefabChildSelector")) {
+
 			// Iterate through all prefab nodes and show them in the popup with indentation based on their depth in the hierarchy
             for (size_t itemIndex = 0; itemIndex < nodeItems.size(); itemIndex++) {
                 const auto& item = nodeItems[itemIndex];
@@ -1671,7 +1826,8 @@ void InspectorPanel::_renderPrefabComponents() {
     // Apply property filter so per-field rows can be narrowed
     if (m_componentFilter.empty()) {
         EditorUI::ClearPropertyFilter();
-    } else {
+    }
+        else {
         EditorUI::SetPropertyFilter(m_componentFilter);
     }
 
@@ -1683,6 +1839,7 @@ void InspectorPanel::_renderPrefabComponents() {
     }
 
     std::sort(sortedIndices.begin(), sortedIndices.end(), [&](size_t a, size_t b) {
+
         // Get type names for comparison
         std::string typeA = components[a].value("TypeName", "");
         std::string typeB = components[b].value("TypeName", "");
@@ -1758,6 +1915,7 @@ void InspectorPanel::_renderPrefabComponents() {
         auto& data = componentEntry["Data"];
         const nlohmann::json defaults = meta->GetDefaults(); // Defaults used for reset + per-field reset
         _renderComponentSection(meta->DisplayName, meta->TypeName, data,
+
             // UI renderer callback: InspectorPanel forwards JSON to ComponentWidgets
             // Prefabs do not have live ECS so we save as soon as data changes
             [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, ECS::Entity{}, nullptr); _savePrefabData(); },
@@ -1899,11 +2057,14 @@ void InspectorPanel::_renderComponentMenuItem(const char* displayName, const cha
     if (ImGui::MenuItem(displayName)) {
 
         bool added = false;
+
         // If we are editing a live entity
         if (m_mode == InspectionMode::Entity) {
+
             // _addComponentToEntity now handles multi-selection and undo internally
             added = _addComponentToEntity(componentType, true);
         }
+
         // If we are editing a prefab template
         else if (m_mode == InspectionMode::Prefab) {
             added = _addComponentToPrefab(componentType);
@@ -1934,7 +2095,8 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType, boo
             ECS::Entity e = m_world->Resolve(id);
             if (m_world->IsAlive(e)) targetEntities.push_back(e);
         }
-    } else {
+    }
+        else {
         targetEntities.push_back(entity);
     }
 
@@ -1949,13 +2111,14 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType, boo
 
         // Shape components are mutually exclusive
         if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
+
             // Internal call to remove mutually exclusive components - we don't want separate undo for these
-            // as they should be part of the same snapshot command.
-            // However, _removeComponentFromEntity handles its own snapshots if recordUndo=true.
-            // We'll pass false here to avoid double-snapshotting.
+            // as they should be part of the same snapshot command
+            // However, _removeComponentFromEntity handles its own snapshots if recordUndo=true
+            // We'll pass false here to avoid double-snapshotting
             
             // Temporary mode change to avoid recursive multi-select issues if we were to call _removeComponentFromEntity
-            // Instead we just use metadata to remove.
+            // Instead we just use metadata to remove
             const char* shapes[] = { "ShapeCircle2D", "ShapeBox2D", "ShapeLine2D" };
             for (const char* s : shapes) {
                 const auto* smeta = ComponentRegistryUI::Find(s);
@@ -1966,6 +2129,7 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType, boo
         // Look up this component's metadata so we know how to create it
         const auto* meta = ComponentRegistryUI::Find(componentType);
         if (meta) {
+
             // No duplicates
             if (meta->HasComponent(m_world, target)) continue;
 
@@ -2014,7 +2178,8 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
             ECS::Entity e = m_world->Resolve(id);
             if (m_world->IsAlive(e)) targetEntities.push_back(e);
         }
-    } else {
+    }
+        else {
         targetEntities.push_back(entity);
     }
 
@@ -2075,6 +2240,7 @@ bool InspectorPanel::_entityHasComponent(EntityId id, const std::string& compone
 // Add a component entry to the prefab JSON
 // Prefabs are stored and edited entirely through JSON so we modify the data directly
 bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
+
 	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure, 
     // creating it if it doesn't exist
     nlohmann::json* componentsPtr = _getSelectedPrefabComponents(true);
@@ -2108,6 +2274,7 @@ bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 // Prefabs store components as JSON objects so we search the Components array by TypeName
 // Some entries store the short name while others store the fully qualified ECS type so we check for both
 void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType) {
+
 	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure; 
     // if it doesn't exist, there is nothing to remove
     nlohmann::json* componentsPtr = _getSelectedPrefabComponents(false);
@@ -2116,16 +2283,19 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
 
     // Iterate over each component entry to find a matching TypeName
     for (auto it = components.begin(); it != components.end(); it++) {
+
         // Validate entry
         if (!(*it).contains("TypeName") || !(*it)["TypeName"].is_string()) continue;
 
         // Match short name or fully qualified name
         std::string typeName = (*it)["TypeName"];
         if (typeName == componentType || typeName == "ECS::Components::" + componentType) {
+
             // Remove the component from the prefab JSON
             components.erase(it);
             m_statusMessage = std::string("Removed ") + componentType;
             m_statusTimer = 2.0f;
+
             // Prefab changed so we save immediately
             _savePrefabData();
             return;
@@ -2133,6 +2303,7 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
     }
 }
 
+// Resets a component to defaults on primary and additional selected entities and records one grouped undo step
 void InspectorPanel::_resetComponentOnSelectedEntities(const std::string& componentType, nlohmann::json& data, const nlohmann::json& defaults) {
     if (!m_world) return;
 
@@ -2189,6 +2360,7 @@ void InspectorPanel::_resetComponentOnSelectedEntities(const std::string& compon
 
 // Checks whether the prefab JSON already contains a component of this type
 bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
+
 	// First we get a pointer to the currently selected prefab node's Components array in the JSON structure; 
     // if it doesn't exist, there are no components
     const nlohmann::json* componentsPtr = _getSelectedPrefabComponents();
@@ -2196,9 +2368,11 @@ bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
 
     // Search each component entry
     for (const auto& comp : *componentsPtr) {
+
         // Validate type name
         if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
         std::string typeName = comp["TypeName"];
+
         // Match short name or fully qualified name
         if (typeName == componentType || typeName == "ECS::Components::" + componentType) return true;
     }
@@ -2212,6 +2386,7 @@ bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
 // Saves the current prefab JSON to disk
 // We hash the JSON before saving so we avoid rewriting the file when nothing changed
 void InspectorPanel::_savePrefabData() {
+
     // Must have a valid prefab path to write to
     if (m_prefabPath.empty()) return;
 
@@ -2277,18 +2452,22 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     // Force root transform to identity (Position = 0, Rotation = 0) but keep Scale
     // This ensures that the prefab definition itself doesn't carry the instance's world position
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+
 		// Find the LocalTransform component
         for (auto& comp : entityJson["Components"]) {
+
 			// Validate component entry
             if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
             std::string typeName = comp["TypeName"];
 
 			// Match LocalTransform by short or full name
             if (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform") {
+
                 // Reset Position to (0,0,0)
                 if (comp["Data"].contains("Position")) {
                     comp["Data"]["Position"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f} };
                 }
+
                 // Reset Rotation to Identity (0,0,0,1)
                 if (comp["Data"].contains("Rotation")) {
                     comp["Data"]["Rotation"] = { {"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f} };
@@ -2299,10 +2478,12 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     }
 
     nlohmann::json prefabData;
+
     // If entity has children, save the full hierarchy in new format
     if (entityJson.contains("Children")) {
         prefabData["Entity"] = entityJson;
     }
+
     // No children, use old format
     else {
         prefabData["Components"] = entityJson["Components"];
@@ -2356,6 +2537,7 @@ void InspectorPanel::_applyPrefabToInstances() {
         uint32_t relHash = ECS::PrefabManager::ComputeHash(
             ECS::PrefabManager::NormalizePath(relativePath)
         );
+
         // Only add if different to avoid duplicates
         if (relHash != absHash) {
             targetHashes.push_back(relHash);
@@ -2365,8 +2547,10 @@ void InspectorPanel::_applyPrefabToInstances() {
     // Iterate over every entity that has a PrefabInstanceMetadata component
     int count = 0;
     m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
+
         // Check if the entity's hash matches any of our target hashes
         if (std::find(targetHashes.begin(), targetHashes.end(), meta.PrefabHash) != targetHashes.end()) {
+
 			// This entity is an instance of our prefab, so we apply the prefab data to it
             _applyPrefabHierarchyToEntity(entity, *prefabRootNode, true);
             count++;
@@ -2407,6 +2591,7 @@ void InspectorPanel::_applyPrefabToInstances() {
 
 // Applies all component data from one prefab node to one entity instance
 void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+
 	// Get the Components array for this prefab node; if it doesn't exist, there is nothing to apply
     const nlohmann::json* componentsPtr = GetPrefabNodeComponents(prefabNode);
 
@@ -2415,6 +2600,7 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann
 
     // For each component in the prefab assign its JSON back into the ECS entity
     for (const auto& componentEntry : *componentsPtr) {
+
         // Basic validation
         if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
         if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
@@ -2424,15 +2610,19 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann
 
         // Use metadata to load the JSON into the live ECS component
         if (meta) {
+
             // For LocalTransform on the root entity, only apply Scale from prefab
             if (preserveRootTransform && (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform")) {
+
                 // 1. Capture current instance values
                 ECS::Components::LocalTransform backupPosRot;
                 bool hasTransform = false;
                 {
+
 					// Get current transform from entity
                     auto* t = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
                     if (t) {
+
 						// Backup Position and Rotation
                         backupPosRot = *t;
                         hasTransform = true;
@@ -2445,6 +2635,7 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann
                 // 3. Restore Position and Rotation from the instance, keeping the new Scale
                 if (hasTransform) {
                     auto* t = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+
 					// Restore Position and Rotation
                     if (t) {
                         t->Position = backupPosRot.Position;
@@ -2452,6 +2643,7 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann
                     }
                 }
             }
+
 			// For all other components, apply normally
             else {
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
@@ -2462,6 +2654,7 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity, const nlohmann
 
 // Recursively applies prefab data down the entity hierarchy
 void InspectorPanel::_applyPrefabHierarchyToEntity(ECS::Entity entity, const nlohmann::json& prefabNode, bool preserveRootTransform) {
+
 	// Validate entity before applying data
     if (!m_world || entity.IsNull() || !m_world->IsAlive(entity)) {
         return;
@@ -2494,6 +2687,7 @@ void InspectorPanel::_applyPrefabHierarchyToEntity(ECS::Entity entity, const nlo
 
 	// Recursively apply prefab data to each child entity using the corresponding child prefab node
     for (size_t i = 0; i < applyCount; i++) {
+
 		// Validate prefab child node before recursing
         const auto& childPrefabNode = prefabChildren[i];
         if (!childPrefabNode.is_object()) continue;
@@ -2516,6 +2710,7 @@ void InspectorPanel::_renderStatusBar() {
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     if (m_statusTimer > 0.0f) {
+
         // Pick color based on whether the message contains "Failed"
         const ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
             ? EditorStyle::DangerText
