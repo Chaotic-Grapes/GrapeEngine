@@ -978,9 +978,16 @@ namespace ECS {
             {"TrackColor", slider.TrackColor},
             {"FillColor", slider.FillColor},
             {"KnobColor", slider.KnobColor},
+            {"TrackTexturePath", ResolvePathId(slider.TrackTexturePathId)},
+            {"TrackTextureFilter", static_cast<uint8_t>(slider.TrackTextureFilter)},
+            {"FillTexturePath", ResolvePathId(slider.FillTexturePathId)},
+            {"FillTextureFilter", static_cast<uint8_t>(slider.FillTextureFilter)},
+            {"KnobTexturePath", ResolvePathId(slider.KnobTexturePathId)},
+            {"KnobTextureFilter", static_cast<uint8_t>(slider.KnobTextureFilter)},
             {"CornerRadius", slider.CornerRadius},
             {"KnobSize", slider.KnobSize},
             {"Padding", slider.Padding},
+            {"RotationDegrees", slider.RotationDegrees},
             {"Horizontal", slider.Horizontal},
             {"Disabled", slider.Disabled}
         };
@@ -994,9 +1001,25 @@ namespace ECS {
         if (j.contains("TrackColor")) slider.TrackColor = j.at("TrackColor").get<::Color>();
         if (j.contains("FillColor")) slider.FillColor = j.at("FillColor").get<::Color>();
         if (j.contains("KnobColor")) slider.KnobColor = j.at("KnobColor").get<::Color>();
+        slider.TrackTexturePathId = ReadPathId(j, "TrackTexturePath", 0);
+        slider.TrackTextureId = 0;
+        slider.TrackUVRect = Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f };
+        slider.TrackTextureFilter = static_cast<Graphics::TextureFilter>(
+            j.value("TrackTextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
+        slider.FillTexturePathId = ReadPathId(j, "FillTexturePath", 0);
+        slider.FillTextureId = 0;
+        slider.FillUVRect = Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f };
+        slider.FillTextureFilter = static_cast<Graphics::TextureFilter>(
+            j.value("FillTextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
+        slider.KnobTexturePathId = ReadPathId(j, "KnobTexturePath", 0);
+        slider.KnobTextureId = 0;
+        slider.KnobUVRect = Vector4D{ 0.0f, 0.0f, 1.0f, 1.0f };
+        slider.KnobTextureFilter = static_cast<Graphics::TextureFilter>(
+            j.value("KnobTextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
         slider.CornerRadius = j.value("CornerRadius", 0.0f);
         if (j.contains("KnobSize")) slider.KnobSize = j.at("KnobSize").get<Vector2D>();
         if (j.contains("Padding")) slider.Padding = j.at("Padding").get<Vector4D>();
+        slider.RotationDegrees = j.value("RotationDegrees", 0.0f);
         slider.Horizontal = j.value("Horizontal", true);
         slider.Disabled = j.value("Disabled", false);
         slider.ValueChanged = false;

@@ -620,11 +620,54 @@ namespace ECS {
                     std::max(0.0f, element.ContentSize.Y - padding.Y - paddingOpposite.Y)
                 };
 
+                const float rotationRadians = slider.RotationDegrees * (3.14159265358979323846f / 180.0f);
+                const float cosRot = std::cos(rotationRadians);
+                const float sinRot = std::sin(rotationRadians);
+                const Vector2D trackCenter = {
+                    trackPos.X + trackSize.X * 0.5f,
+                    trackPos.Y + trackSize.Y * 0.5f
+                };
+
+                auto rotatePointAroundTrackCenter = [&](const Vector2D& point) {
+                    const float dx = point.X - trackCenter.X;
+                    const float dy = point.Y - trackCenter.Y;
+                    return Vector2D{
+                        trackCenter.X + dx * cosRot - dy * sinRot,
+                        trackCenter.Y + dx * sinRot + dy * cosRot
+                    };
+                };
+
+                auto resolveSliderTextureId = [&](uint32_t runtimeId, uint32_t pathId) {
+                    uint32_t textureId = runtimeId;
+                    const std::string texturePath = ECS::StringTable::Resolve(pathId);
+                    const std::string loadPath = ResolveProjectPathForLoad(texturePath);
+                    if (!loadPath.empty()) {
+                        auto texture = RM.Get<Texture>(loadPath);
+                        if (texture) {
+                            textureId = texture->ID();
+                        }
+                    }
+                    return textureId;
+                };
+
+                const uint32_t trackTextureId = resolveSliderTextureId(slider.TrackTextureId, slider.TrackTexturePathId);
+                const uint32_t fillTextureId = resolveSliderTextureId(slider.FillTextureId, slider.FillTexturePathId);
+                const uint32_t knobTextureId = resolveSliderTextureId(slider.KnobTextureId, slider.KnobTexturePathId);
+                const Vector4D fullUVRect{ 0.0f, 0.0f, 1.0f, 1.0f };
+
                 const Color trackColor = ResolveStyleColor(style, slider.TrackColor, state);
-                if (isWorldSpace) {
-                    renderer->SubmitWorldGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                if (trackTextureId != 0u) {
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIImage(trackPos, trackSize, trackTextureId, fullUVRect, trackColor,
+                            slider.TrackTextureFilter, rotationRadians);
+                    } else {
+                        renderer->SubmitGUIImage(trackPos, trackSize, trackTextureId, fullUVRect, trackColor,
+                            slider.TrackTextureFilter, rotationRadians);
+                    }
+                } else if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius, rotationRadians);
                 } else {
-                    renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius);
+                    renderer->SubmitGUIPanel(trackPos, trackSize, trackColor, slider.CornerRadius, rotationRadians);
                 }
 
                 // Fill length is derived from the normalized slider value.
@@ -637,10 +680,28 @@ namespace ECS {
                 } else {
                     fillSize.Y = trackSize.Y * t;
                 }
-                if (isWorldSpace) {
-                    renderer->SubmitWorldGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+
+                const Vector2D fillCenter = {
+                    fillPos.X + fillSize.X * 0.5f,
+                    fillPos.Y + fillSize.Y * 0.5f
+                };
+                const Vector2D rotatedFillCenter = rotatePointAroundTrackCenter(fillCenter);
+                fillPos = {
+                    rotatedFillCenter.X - fillSize.X * 0.5f,
+                    rotatedFillCenter.Y - fillSize.Y * 0.5f
+                };
+                if (fillTextureId != 0u) {
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIImage(fillPos, fillSize, fillTextureId, fullUVRect, slider.FillColor,
+                            slider.FillTextureFilter, rotationRadians);
+                    } else {
+                        renderer->SubmitGUIImage(fillPos, fillSize, fillTextureId, fullUVRect, slider.FillColor,
+                            slider.FillTextureFilter, rotationRadians);
+                    }
+                } else if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius, rotationRadians);
                 } else {
-                    renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius);
+                    renderer->SubmitGUIPanel(fillPos, fillSize, slider.FillColor, slider.CornerRadius, rotationRadians);
                 }
 
                 // Knob is centered at the end of the fill for consistent dragging.
@@ -655,10 +716,28 @@ namespace ECS {
                     knobPos.X = trackPos.X + (trackSize.X - knobSize.X) * 0.5f;
                     knobPos.Y = trackPos.Y + trackSize.Y * t - knobSize.Y * 0.5f;
                 }
-                if (isWorldSpace) {
-                    renderer->SubmitWorldGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+
+                const Vector2D knobCenter = {
+                    knobPos.X + knobSize.X * 0.5f,
+                    knobPos.Y + knobSize.Y * 0.5f
+                };
+                const Vector2D rotatedKnobCenter = rotatePointAroundTrackCenter(knobCenter);
+                knobPos = {
+                    rotatedKnobCenter.X - knobSize.X * 0.5f,
+                    rotatedKnobCenter.Y - knobSize.Y * 0.5f
+                };
+                if (knobTextureId != 0u) {
+                    if (isWorldSpace) {
+                        renderer->SubmitWorldGUIImage(knobPos, knobSize, knobTextureId, fullUVRect, slider.KnobColor,
+                            slider.KnobTextureFilter, rotationRadians);
+                    } else {
+                        renderer->SubmitGUIImage(knobPos, knobSize, knobTextureId, fullUVRect, slider.KnobColor,
+                            slider.KnobTextureFilter, rotationRadians);
+                    }
+                } else if (isWorldSpace) {
+                    renderer->SubmitWorldGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius, rotationRadians);
                 } else {
-                    renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius);
+                    renderer->SubmitGUIPanel(knobPos, knobSize, slider.KnobColor, slider.CornerRadius, rotationRadians);
                 }
                 break;
             }

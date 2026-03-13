@@ -311,12 +311,13 @@ namespace ECS {
 
         // Queue a screen-space rounded panel quad for GUI rendering
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                            const Color& color, float cornerRadius = 0.0f);
+                            const Color& color, float cornerRadius = 0.0f, float rotationRadians = 0.0f);
 
         // Queue a screen-space textured GUI image quad
         void SubmitGUIImage(const Vector2D& position, const Vector2D& size,
                             uint32_t textureId, const Vector4D& uvRect, const Color& color,
-                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+                            Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest,
+                            float rotationRadians = 0.0f);
 
         // Queue a screen-space text draw request
         void SubmitGUIText(const Vector2D& position, const std::string& text,
@@ -324,12 +325,13 @@ namespace ECS {
 
         // Queue a world-space panel that is rendered with scene camera transforms
         void SubmitWorldGUIPanel(const Vector2D& position, const Vector2D& size,
-                                 const Color& color, float cornerRadius = 0.0f);
+                                 const Color& color, float cornerRadius = 0.0f, float rotationRadians = 0.0f);
 
         // Queue a world-space textured GUI image
         void SubmitWorldGUIImage(const Vector2D& position, const Vector2D& size,
                                  uint32_t textureId, const Vector4D& uvRect, const Color& color,
-                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
+                                 Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest,
+                                 float rotationRadians = 0.0f);
 
         // Queue world-space text to be composited in the scene pass
         void SubmitWorldGUIText(const Vector2D& position, const std::string& text,
@@ -484,6 +486,7 @@ namespace ECS {
             Vector2D size;
             Color color;
             float cornerRadius = 0.0f;
+            float rotation = 0.0f;
         };
         std::vector<GUIPanelSubmission> m_guiPanelQueue;
 
@@ -503,6 +506,7 @@ namespace ECS {
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+            float rotation = 0.0f;
         };
         std::vector<GUIImageSubmission> m_guiImageQueue;
 
@@ -511,6 +515,7 @@ namespace ECS {
             Vector2D size;
             Color color;
             float cornerRadius = 0.0f;
+            float rotation = 0.0f;
         };
         std::vector<WorldGUIPanelSubmission> m_worldGuiPanelQueue;
 
@@ -530,6 +535,7 @@ namespace ECS {
             Vector4D uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };
             Color color;
             Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
+            float rotation = 0.0f;
         };
         std::vector<WorldGUIImageSubmission> m_worldGuiImageQueue;
 
