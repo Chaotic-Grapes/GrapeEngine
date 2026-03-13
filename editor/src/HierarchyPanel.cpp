@@ -2135,32 +2135,31 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return false;
 
+    auto normalize = [](std::string value) {
+        value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](unsigned char c) {
+            return !std::isspace(c);
+        }));
+        value.erase(std::find_if(value.rbegin(), value.rend(), [](unsigned char c) {
+            return !std::isspace(c);
+        }).base(), value.end());
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return value;
+    };
+
     if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
         std::string entityName = ECS::StringTable::Resolve(nameComp->Value);
         if (entityName.empty()) {
             entityName = "Entity";
         }
 
-        // Convert both to lowercase for case-insensitive search
-        std::string lowerName = entityName;
-        std::string lowerFilter = m_searchFilter;
-
-        // Apply transform values
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
-        std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-
-        // Check if entity name contains the filter string
-        return lowerName.find(lowerFilter) != std::string::npos;
+        // Exact name match (case-insensitive, trimmed)
+        return normalize(entityName) == normalize(m_searchFilter);
     }
 
-    // No name component, check if searching for "Entity"
-    std::string defaultName = "Entity";
-    std::string lowerFilter = m_searchFilter;
-
-    // Apply transform values
-    std::transform(defaultName.begin(), defaultName.end(), defaultName.begin(), ::tolower);
-    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-    return defaultName.find(lowerFilter) != std::string::npos;
+    // No name component fallback
+    return normalize("Entity") == normalize(m_searchFilter);
 }
 
 // -------------------------------------------------------------------------
