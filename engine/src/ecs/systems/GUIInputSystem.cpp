@@ -13,6 +13,7 @@ pointer capture within the GUI system.
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include "ecs/Components.h"
 #include "ecs/systems/GUIInputSystem.h"
 #include "ecs/systems/GUIRenderUtils.h"
@@ -59,15 +60,50 @@ namespace ECS {
         double mouseY = 0.0;
         Input::GetMousePosition(mouseX, mouseY);
 
-        const Vector2D mouse = {
-            static_cast<float>(mouseX / std::max(0.0001f, viewport.DisplayScale.X)),
-            static_cast<float>(mouseY / std::max(0.0001f, viewport.DisplayScale.Y))
+        const float scaleX = std::max(0.0001f, viewport.DisplayScale.X);
+        const float scaleY = std::max(0.0001f, viewport.DisplayScale.Y);
+
+        // Some platforms report cursor in logical units while others report framebuffer units.
+        // Choose the coordinate space that actually maps into the configured GUI viewport.
+        const Vector2D mouseRaw = {
+            static_cast<float>(mouseX),
+            static_cast<float>(mouseY)
         };
+        const Vector2D mouseScaled = {
+            static_cast<float>(mouseX / scaleX),
+            static_cast<float>(mouseY / scaleY)
+        };
+        const bool rawInViewport = PointInRect(mouseRaw, viewport.Origin, viewport.Size);
+        const bool scaledInViewport = PointInRect(mouseScaled, viewport.Origin, viewport.Size);
+        const Vector2D mouse = (rawInViewport != scaledInViewport)
+            ? (rawInViewport ? mouseRaw : mouseScaled)
+            : mouseRaw;
 
         // Snapshot mouse button state for this frame.
         const bool mouseDown = Input::IsMouseDown(MOUSE_LEFT);
         const bool mousePressed = Input::IsMousePressed(MOUSE_LEFT);
         const bool mouseReleased = Input::IsMouseUp(MOUSE_LEFT);
+
+        // Resolve top-most hovered element by z-order so overlapping widgets do not all receive hover/press.
+        Entity topHovered = NULL_ENTITY;
+        int16_t topHoveredZ = std::numeric_limits<int16_t>::min();
+        world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput&) {
+            if (!world.IsActiveInHierarchy(entity) || !element.Visible) {
+                return;
+            }
+
+            const bool isWorldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
+            const Vector2D pos = isWorldSpace ? element.ScreenPosition : element.ResolvedPosition;
+            const Vector2D size = isWorldSpace ? element.ScreenSize : element.ResolvedSize;
+            if (!PointInRect(mouse, pos, size)) {
+                return;
+            }
+
+            if (element.ZOrder >= topHoveredZ) {
+                topHoveredZ = element.ZOrder;
+                topHovered = entity;
+            }
+        });
 
         // Iterate GUI elements and update per-entity input state.
         world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput& input) {
@@ -98,7 +134,7 @@ namespace ECS {
             const bool isWorldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
             const Vector2D pos = isWorldSpace ? element.ScreenPosition : element.ResolvedPosition;
             const Vector2D size = isWorldSpace ? element.ScreenSize : element.ResolvedSize;
-            const bool hovered = PointInRect(mouse, pos, size);
+            const bool hovered = (entity == topHovered);
             const bool wasHovered = input.Hovered;
             input.Hovered = hovered;
             input.Entered = (!wasHovered && hovered);
