@@ -45,6 +45,7 @@ Notes:
    ├── managed/        # C# scripting and tools
    ├── runtime/        # Runtime assets/binaries for game export
    ├── TestSuite/      # Sample project (To add in editor for testing)
+   ├── EchoesBelow/    # Game project (To add in editor for game project)
    ├── CMakeLists.txt  # Main CMake configuration
    ├── run.bat         # Configure/build editor in Debug + Release
    └── clean.bat       # Remove generated build folders
