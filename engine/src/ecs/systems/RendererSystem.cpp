@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.cpp
-\author Choi Meng Yew
+\author Choi Meng Yew (99%)
 \date   31st January 2026
 \brief
 Implementation of the RendererSystem, the high-level rendering pipeline

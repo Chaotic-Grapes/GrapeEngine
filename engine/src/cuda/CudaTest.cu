@@ -1,3 +1,40 @@
+/* Start Header *****************************************************************/
+/*!
+\file   CudaTest.cpp
+\author Choi Meng Yew (100%)
+\date   13th March 2026
+\brief
+Provides a simple CUDA diagnostic test used to verify that CUDA is
+properly installed and functioning in the GrapeEngine environment.
+
+The test performs the following steps:
+    - Allocates device memory
+    - Launches a CUDA kernel
+    - Copies results back to host memory
+    - Verifies correctness of the computation
+
+This utility is intended for engine users or developers to confirm that
+the CUDA runtime, device driver, and kernel execution pipeline are
+working correctly before enabling CUDA-based engine systems such as
+GPU boids or particle simulation.
+
+Responsibilities:
+    - Validate CUDA device memory allocation
+    - Launch and execute a simple CUDA kernel
+    - Verify device-to-host memory transfers
+    - Provide pass/fail diagnostic output
+
+Used by:
+    - Engine startup validation
+    - CUDA feature detection
+    - Debugging CUDA installation issues
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include <cuda_runtime.h>
 #include <stdio.h>
 
