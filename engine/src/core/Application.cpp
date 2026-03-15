@@ -80,14 +80,19 @@ namespace Engine {
     }
 
     void Application::Initialize(EngineMode mode, bool enableConsole) {
-        #ifdef GRAPE_HAS_CUDA
-                CudaTestRun();
-        #endif
-
         if (m_initialized) {
             LOG_WARNING("Application already initialized");
             return;
         }
+
+        #ifdef GRAPE_HAS_CUDA
+                m_cudaAvailable = CudaTestRun();
+                if (!m_cudaAvailable) {
+                    LOG_WARNING("CUDA runtime test failed. BoidSystem will be disabled on this machine.");
+                } else {
+                    LOG_INFO("CUDA runtime test passed. BoidSystem enabled.");
+                }
+        #endif
 
         m_mode = mode;
         m_shouldStop = false;
@@ -453,7 +458,15 @@ namespace Engine {
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         m_sceneManager.SetAudioSystem(audioSystem);
-        m_systemManager.RegisterSystem<ECS::BoidSystem>();
+        #ifdef GRAPE_HAS_CUDA
+        if (m_cudaAvailable) {
+            m_systemManager.RegisterSystem<ECS::BoidSystem>();
+        } else {
+            LOG_WARNING("SystemManager: Skipping BoidSystem registration (CUDA unavailable)");
+        }
+        #else
+        LOG_INFO("SystemManager: Skipping BoidSystem registration (engine built without CUDA)");
+        #endif
 
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs
