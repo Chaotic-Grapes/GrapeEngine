@@ -82,6 +82,8 @@ namespace ECS {
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
     private:
+        friend class PhysicsPipelineRunner;
+
         // Caches runtime tilemap state needed for collision and physics synchronization
         struct RuntimeTileMapEntry {
             std::shared_ptr<TileMap> Map;  // Pointer to active tilemap asset used during physics step
