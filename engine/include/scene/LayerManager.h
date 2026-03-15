@@ -577,10 +577,13 @@ namespace Scenes {
             constexpr uint16_t UILayer = 98;
             constexpr uint16_t DebugLayer = 99;
 
-            // Initialize Background
-            m_layers[BackgroundLayer].name = "Background";
-            m_nameToId["Background"] = BackgroundLayer;
-            m_drawOrder.push_back(BackgroundLayer);
+             // Initialize Background
+             m_layers[BackgroundLayer].name = "Background";
+             m_nameToId["Background"] = BackgroundLayer;
+             m_drawOrder.push_back(BackgroundLayer);
+            // Default: background objects should not collide with each other.
+            // Keep collisions with other layers enabled (symmetrical masks still apply).
+            m_layers[BackgroundLayer].collisionMask &= ~(1u << BackgroundLayer);
 
             // Initialize World
             m_layers[WorldLayer].name = "World";

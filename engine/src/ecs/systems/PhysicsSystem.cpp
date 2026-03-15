@@ -616,43 +616,68 @@ namespace ECS {
 
     // Runs full physics frame integration broad-phase narrow-phase resolution and event dispatch
     void PhysicsSystem::OnUpdate(World& world) {
-        const double dtd = TimeSystem::Instance().GetDeltaTime();
-        const float dt = static_cast<float>(dtd);
         if (!Engine::Physics::IsEnabled()) return;
-        if (dt <= 0.0f) return;
 
-        int collisionEnterCount = 0;
-        int collisionExitCount = 0;
-        int triggerEnterCount = 0;
-        int triggerExitCount = 0;
-        int triggerStayCount = 0;
-        bool loggedMissingLayer = false;
-        bool loggedMissingPhysicsPair = false;
+        const float frameDt = static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
+        const float fixedDt = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
+        if (frameDt <= 0.0f || fixedDt <= 0.0f) return;
 
-        // =====================
-        // Simulation Settings
-        // =====================
+        constexpr int kMaxFixedStepsPerFrame = 5;
+        static float s_fixedAccumulator = 0.0f;
+        s_fixedAccumulator = std::min(s_fixedAccumulator + frameDt, fixedDt * static_cast<float>(kMaxFixedStepsPerFrame));
+        if (s_fixedAccumulator < fixedDt) return;
 
-        // Choose substep count; make it a tunable or cvar if you like
-        const int   substeps = 8;                         //higher = more stable, slower
-        const float subDt = dt / static_cast<float>(substeps);
-
-        // Create event dispatcher for firing collision events
-        ECS::Events::EventDispatcher eventDispatcher(&world);
-
-        // Track collisions and trigger overlaps for the whole frame (across substeps)
-        std::unordered_set<PackedEntityPair, PackedEntityPairHash> frameCollisions;
-        std::unordered_set<PackedEntityPair, PackedEntityPairHash> currentTriggerOverlaps;
-
-        // Running frame counter to reset per-frame SFX dedupe
-        static uint64_t s_frameCounter = 0;
-        ++s_frameCounter;
-
-        // Get LayerManager for layer-wide physics gating
-        auto* layerManager = world.GetLayerManager();
-
-        // Sync runtime tilemap cache for grid-based collisions
+        // Sync runtime tilemap cache once per frame before fixed simulation steps.
         RefreshRuntimeTileMaps(world);
+
+        static bool s_collisionCueLoaded = false;
+        if (!s_collisionCueLoaded) {
+            if (auto* audio = PHYSICS_AUDIO_DEVICE) {
+                const std::string cue = "sfx_collide";
+                const std::string path = std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
+                Audio::SoundParams sp;
+                sp.Stream = false;
+                sp.Is3D = false;
+                audio->LoadCue(cue, path, sp);
+                s_collisionCueLoaded = true;
+            }
+        }
+
+        int fixedStepsExecuted = 0;
+        while (s_fixedAccumulator >= fixedDt && fixedStepsExecuted < kMaxFixedStepsPerFrame) {
+            s_fixedAccumulator -= fixedDt;
+            ++fixedStepsExecuted;
+
+            const float dt = fixedDt;
+
+            int collisionEnterCount = 0;
+            int collisionExitCount = 0;
+            int triggerEnterCount = 0;
+            int triggerExitCount = 0;
+            int triggerStayCount = 0;
+            bool loggedMissingLayer = false;
+            bool loggedMissingPhysicsPair = false;
+
+            // =====================
+            // Simulation Settings
+            // =====================
+            constexpr int kSubsteps = 4;
+            const int substeps = kSubsteps;
+            const float subDt = dt / static_cast<float>(substeps);
+
+            // Create event dispatcher for firing collision events
+            ECS::Events::EventDispatcher eventDispatcher(&world);
+
+            // Track collisions and trigger overlaps for the whole frame (across substeps)
+            std::unordered_set<PackedEntityPair, PackedEntityPairHash> frameCollisions;
+            std::unordered_set<PackedEntityPair, PackedEntityPairHash> currentTriggerOverlaps;
+
+            // Running frame counter to reset per-frame SFX dedupe
+            static uint64_t s_frameCounter = 0;
+            ++s_frameCounter;
+
+            // Get LayerManager for layer-wide physics gating
+            auto* layerManager = world.GetLayerManager();
 
         // =====================
         // Entity Collection
@@ -819,10 +844,40 @@ namespace ECS {
             // =====================
 
             // Rebuild grid each substep because poses changed
+            std::unordered_map<EntityId, Components::LocalTransform> worldTransformCache;
+            worldTransformCache.reserve(dynamicEntities.size() + staticEntities.size());
+
+            auto getWorldTransformCached = [&](const Entity e, Components::LocalTransform& outTransform) -> bool {
+                auto it = worldTransformCache.find(e.Index);
+                if (it != worldTransformCache.end()) {
+                    outTransform = it->second;
+                    return true;
+                }
+
+                Components::LocalTransform computed{};
+                if (!GetPhysicsWorldTransform(world, e, computed)) {
+                    return false;
+                }
+
+                worldTransformCache.emplace(e.Index, computed);
+                outTransform = computed;
+                return true;
+            };
+
+            auto refreshWorldTransformCache = [&](const Entity e) {
+                Components::LocalTransform updated{};
+                if (GetPhysicsWorldTransform(world, e, updated)) {
+                    worldTransformCache[e.Index] = updated;
+                }
+                else {
+                    worldTransformCache.erase(e.Index);
+                }
+            };
+
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
                 Components::LocalTransform worldTransform{};
-                if (!GetPhysicsWorldTransform(world, e, worldTransform)) return;
+                if (!getWorldTransformCached(e, worldTransform)) return;
                 if (const auto* c = world.TryGet<Components::CircleCollider2D>(e)) {
 
                     // Step 2: Use world-space circle (includes scale and offset)
@@ -872,7 +927,8 @@ namespace ECS {
             // =====================
 
             // You can reduce the inner iterative solver because substeps already help stability
-            const int solverIters = 4;
+            constexpr int kSolverIters = 3;
+            const int solverIters = kSolverIters;
 
             // run several small correction passes to improve stability
             for (int it = 0; it < solverIters; ++it) {
@@ -892,8 +948,8 @@ namespace ECS {
                     if (!tA || !tB) continue;
                     Components::LocalTransform tAWorld{};
                     Components::LocalTransform tBWorld{};
-                    if (!GetPhysicsWorldTransform(world, A, tAWorld)) continue;
-                    if (!GetPhysicsWorldTransform(world, B, tBWorld)) continue;
+                    if (!getWorldTransformCached(A, tAWorld)) continue;
+                    if (!getWorldTransformCached(B, tBWorld)) continue;
 
                     // Honor Active flags (including parents): if disabled, skip
                     if (!world.IsActiveInHierarchy(A)) continue;
@@ -1117,6 +1173,8 @@ namespace ECS {
                     // Write back
                     if (vAp) *vAp = vA;
                     if (vBp) *vBp = vB;
+                    refreshWorldTransformCache(A);
+                    refreshWorldTransformCache(B);
 
                     ++resolved;
                     {
@@ -1144,20 +1202,13 @@ namespace ECS {
 
                             if (sfxPlayedThisFrame.insert(pk).second) {
                                 if (auto* audio = PHYSICS_AUDIO_DEVICE) {
-                                    const std::string cue = "sfx_collide";
-                                    const std::string path = std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
-                                    Audio::SoundParams sp; sp.Stream = false; sp.Is3D = false;
-
-                                    // Preload is cheap after first time; keep for safety:
-                                    audio->LoadCue(cue, path, sp);
-
                                     Audio::PlaySettings ps;
                                     ps.Loop = false;
 
                                     // Scale volume by impact; clamp to [0.2, 1.0]
                                     ps.Volume = std::max(0.2f, std::min(impactSpeed / 350.0f, 1.0f));
                                     ps.Pitch = 1.0f;
-                                    audio->PlaySingle(cue, ps, Audio::PlayPolicy::SingleInstanceRestart);
+                                    audio->PlaySingle("sfx_collide", ps, Audio::PlayPolicy::SingleInstanceRestart);
                                 }
                             }
                         }
@@ -1236,6 +1287,28 @@ namespace ECS {
                         (mA.PositionCorrectPercent + mB.PositionCorrectPercent) * 0.5f
                     };
 
+                    Components::LocalTransform tAWorld{};
+                    Engine::WorldCircle worldCircle{};
+                    Engine::WorldOBB worldObb{};
+                    Engine::WorldAABB worldAABB{};
+                    auto refreshEntityWorldShape = [&]() -> bool {
+                        if (!getWorldTransformCached(e, tAWorld)) {
+                            return false;
+                        }
+
+                        if (circA) {
+                            worldCircle = Engine::Physics::GetWorldCircle(*circA, tAWorld);
+                            worldAABB.Center = worldCircle.Center;
+                            worldAABB.HalfExtents = Vector2D(worldCircle.Radius, worldCircle.Radius);
+                        }
+                        else {
+                            worldObb = Engine::Physics::GetWorldOBB(*boxA, tAWorld);
+                            worldAABB = Engine::Physics::GetWorldAABB(*boxA, tAWorld);
+                        }
+                        return true;
+                    };
+                    if (!refreshEntityWorldShape()) continue;
+
                     // Check collisions against all enabled tilemaps that collide with this entity's layer
                     for (const auto& entryPair : m_runtimeTileMaps) {
                         const RuntimeTileMapEntry& entry = entryPair.second;
@@ -1260,23 +1333,6 @@ namespace ECS {
 
                         // Compute the world-space AABB of the entity's collider to find which tiles it overlaps with
                         // We query tiles in this range rather than every tile in the map for efficiency
-                        Engine::WorldAABB worldAABB{};
-                        Components::LocalTransform tAWorld{};
-                        if (!GetPhysicsWorldTransform(world, e, tAWorld)) {
-                            continue;
-                        }
-                        if (circA) {
-
-                            // Circle AABB: centered on the circle's world position, half-extents equal to radius on both axes
-                            const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, tAWorld);
-                            worldAABB.Center = worldCircle.Center;
-                            worldAABB.HalfExtents = Vector2D(worldCircle.Radius, worldCircle.Radius);
-                        }
-                        else {
-
-                            // Box AABB: derived from the OBB in world space (accounts for rotation)
-                            worldAABB = Engine::Physics::GetWorldAABB(*boxA, tAWorld);
-                        }
 
                         // Compute the world-space min/max corners of the entity's AABB
                         const float minX = worldAABB.Center.X - worldAABB.HalfExtents.X;
@@ -1339,16 +1395,10 @@ namespace ECS {
                                     const Vector2D cellCenter(tileWorldX + centerOffsetX, tileWorldY + centerOffsetY);
                                     Engine::Collision::ContactManifold manifold;
 
-                                    Components::LocalTransform cellWorldTransform{};
-                                    if (!GetPhysicsWorldTransform(world, e, cellWorldTransform)) {
-                                        return;
-                                    }
-
                                     if (circA) {
 
                                         // Circle vs. tile cell OBB test
                                         // Build an axis-aligned OBB for the cell (rotation = 0, standard axes)
-                                        const Engine::WorldCircle worldCircle = Engine::Physics::GetWorldCircle(*circA, cellWorldTransform);
                                         Engine::WorldOBB tileObb;
                                         tileObb.Center = cellCenter;
                                         tileObb.HalfExtents = halfExtents;
@@ -1372,7 +1422,6 @@ namespace ECS {
                                     else {
 
                                         // Box vs. tile cell OBB test (entity box may be rotated; tile cell is always axis-aligned)
-                                        const Engine::WorldOBB worldObb = Engine::Physics::GetWorldOBB(*boxA, cellWorldTransform);
                                         Engine::WorldOBB tileObb;
                                         tileObb.Center = cellCenter;
                                         tileObb.HalfExtents = halfExtents;
@@ -1399,6 +1448,10 @@ namespace ECS {
                                     // Apply impulse-based collision resolution and positional correction
                                     Engine::Physics::ResolveCollisionManifold(
                                         *rbAp, rbB, *vAp, vB, *tA, tB, manifold, mCombined);
+                                    refreshWorldTransformCache(e);
+                                    if (!refreshEntityWorldShape()) {
+                                        return;
+                                    }
                                     };
 
                                 // Dispatch collision cells based on the tile's collision mask
@@ -1517,6 +1570,6 @@ namespace ECS {
         }
 
         m_previousTriggerOverlaps = std::move(currentTriggerOverlaps);
-
+        }
     }
 }  // namespace ECS

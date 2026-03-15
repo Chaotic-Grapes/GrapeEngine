@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 #include <set>
 #include <unordered_set>
+#include <unordered_map>
 #include "core/Application.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -37,7 +38,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 #include "ecs/StringTable.h"
 #include <filesystem>
+#include <exception>
 #include <fmod_dsp_effects.h>
+
+namespace ECS {
+    class AudioSystem;
+}
 
 namespace {
     // convert raw bus value to a valid enum
@@ -48,6 +54,37 @@ namespace {
         }
         return static_cast<Audio::Bus>(raw);
     }
+
+    // Audio backend teardown can invalidate handles mid-frame; guard stop paths.
+    void SafeStopAudio(Services::AudioService& audioService,
+                       Audio::PlaybackHandle handle,
+                       uint32_t entityIndex,
+                       const char* context) {
+        if (!handle) {
+            return;
+        }
+
+        try {
+            audioService.Stop(handle, Audio::StopMode::Immediate);
+        }
+        catch (const std::exception& ex) {
+            LOG_ERROR("AudioSystem: Stop failed in " << context
+                      << " for entity " << entityIndex
+                      << " (handle=" << handle.Id << "): " << ex.what());
+        }
+        catch (...) {
+            LOG_ERROR("AudioSystem: Stop failed in " << context
+                      << " for entity " << entityIndex
+                      << " (handle=" << handle.Id << "): unknown exception");
+        }
+    }
+
+    struct AudioSystemSubscriptions {
+        Messaging::SubscriptionHandle sceneChanged;
+        Messaging::SubscriptionHandle sceneChanging;
+    };
+
+    std::unordered_map<const ECS::AudioSystem*, AudioSystemSubscriptions> g_audioSystemSubscriptions;
 }
 
 namespace ECS {
@@ -62,6 +99,15 @@ namespace ECS {
     void AudioSystem::OnCreate(World& world) {
         (void)world;
         m_world = &world;
+        auto& subscriptions = g_audioSystemSubscriptions[this];
+
+        if (subscriptions.sceneChanged.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::SceneChanged>(subscriptions.sceneChanged);
+        }
+        if (subscriptions.sceneChanging.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::SceneChanging>(subscriptions.sceneChanging);
+        }
+
         // Ensure cue registry is populated before the first entity update.
         m_audioService.CueRegistry().Refresh(Engine::ProjectPaths::GetProjectRoot());
 
@@ -69,7 +115,7 @@ namespace ECS {
         _initializeMasterDsp();
 
         // Subscribe to scene change events to clean up audio state
-        Messaging::MessageSystem::Subscribe<Messaging::SceneChanged>([this](const Messaging::SceneChanged& msg) {
+        subscriptions.sceneChanged = Messaging::MessageSystem::Subscribe<Messaging::SceneChanged>([this](const Messaging::SceneChanged& msg) {
             // When scene changes, clear all active sounds and stop any lingering fades in the engine
             // This ensures the AudioEngine doesn't carry over fade state from the previous scene
             m_sceneUnloadInProgress = false;
@@ -97,7 +143,7 @@ namespace ECS {
         });
 
         // subscribe to scene changing events to prepare for audio transitions
-        Messaging::MessageSystem::Subscribe<Messaging::SceneChanging>([this](const Messaging::SceneChanging&) {
+        subscriptions.sceneChanging = Messaging::MessageSystem::Subscribe<Messaging::SceneChanging>([this](const Messaging::SceneChanging&) {
             if (!Engine::CORE) {
                 return;
             }
@@ -360,6 +406,17 @@ namespace ECS {
     // shutdown audio state owned by this system
     void AudioSystem::OnDestroy(World& world) {
         (void)world;
+
+        if (auto it = g_audioSystemSubscriptions.find(this); it != g_audioSystemSubscriptions.end()) {
+            if (it->second.sceneChanged.IsValid()) {
+                Messaging::MessageSystem::Unsubscribe<Messaging::SceneChanged>(it->second.sceneChanged);
+            }
+            if (it->second.sceneChanging.IsValid()) {
+                Messaging::MessageSystem::Unsubscribe<Messaging::SceneChanging>(it->second.sceneChanging);
+            }
+            g_audioSystemSubscriptions.erase(it);
+        }
+
         m_world = nullptr;
         // Stop all active playback owned by this system.
         OnSceneStop();
@@ -410,7 +467,7 @@ namespace ECS {
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
-            m_audioService.Stop(handle, Audio::StopMode::Immediate);
+            SafeStopAudio(m_audioService, handle, entity.Index, "OnSceneStop");
         }
         m_activeSounds.clear();
 
@@ -424,20 +481,52 @@ namespace ECS {
         auto it = m_activeSounds.find(entity);
         if (it == m_activeSounds.end()) return;
 
-        // Check if entity has AudioSource with fade-out enabled
-		if (allowFade && world.Has<Components::AudioSource>(entity)) {
-            auto& src = world.Get<Components::AudioSource>(entity);
-            if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
-                _fadeOutHandle(it->second, src.FadeOutDuration);
-                m_activeSounds.erase(it);
-                LOG_DEBUG("AudioSystem: Fade-out started for entity " << entity.Index
-                         << " (duration=" << src.FadeOutDuration << "s)");
-                return;
+        Audio::PlaybackHandle handle = it->second;
+
+        // Fade-out decision can touch ECS state; keep it exception-safe for teardown.
+        bool shouldFade = false;
+        float fadeDuration = 0.0f;
+        if (allowFade) {
+            try {
+                if (world.Has<Components::AudioSource>(entity)) {
+                    auto& src = world.Get<Components::AudioSource>(entity);
+                    if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
+                        shouldFade = true;
+                        fadeDuration = src.FadeOutDuration;
+                    }
+                }
+            }
+            catch (const std::exception& ex) {
+                LOG_ERROR("AudioSystem: Fade-out query failed in _stopSound for entity "
+                          << entity.Index << ": " << ex.what());
+            }
+            catch (...) {
+                LOG_ERROR("AudioSystem: Fade-out query failed in _stopSound for entity "
+                          << entity.Index << ": unknown exception");
             }
         }
 
-		// No fade-out; stop immediately
-        m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+        if (shouldFade) {
+            try {
+                _fadeOutHandle(handle, fadeDuration);
+                m_activeSounds.erase(it);
+                LOG_DEBUG("AudioSystem: Fade-out started for entity " << entity.Index
+                          << " (duration=" << fadeDuration << "s)");
+                return;
+            }
+            catch (const std::exception& ex) {
+                LOG_ERROR("AudioSystem: Fade-out failed in _stopSound for entity "
+                          << entity.Index << ": " << ex.what());
+            }
+            catch (...) {
+                LOG_ERROR("AudioSystem: Fade-out failed in _stopSound for entity "
+                          << entity.Index << ": unknown exception");
+            }
+            // Fall through to an immediate stop attempt.
+        }
+
+        // No fade-out (or fade-out failed); stop immediately.
+        SafeStopAudio(m_audioService, handle, entity.Index, "_stopSound");
         m_activeSounds.erase(it);
         LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
     }
@@ -532,7 +621,7 @@ namespace ECS {
                 anyFadeStarted = true;
             }
             else {
-                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                SafeStopAudio(m_audioService, handle, entity.Index, "OnSceneWillUnload");
             }
         }
 
@@ -555,7 +644,7 @@ namespace ECS {
         if (duration <= 0.0f) {
             LOG_WARNING("AudioSystem::FadeOutAllAudio called with duration <= 0, using immediate stop");
             for (auto& [entity, handle] : m_activeSounds) {
-                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                SafeStopAudio(m_audioService, handle, entity.Index, "FadeOutAllAudio");
             }
             m_activeSounds.clear();
             return;
