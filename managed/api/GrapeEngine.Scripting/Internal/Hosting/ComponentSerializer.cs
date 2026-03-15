@@ -31,6 +31,7 @@ namespace GrapeEngine.Scripting.Internal.Hosting;
 internal static class ComponentSerializer
 {
     private static readonly ConcurrentDictionary<uint, Type> _types = new();
+    private static readonly StringComparer _nameComparer = StringComparer.OrdinalIgnoreCase;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -210,6 +211,8 @@ internal static class ComponentSerializer
             return false;
         }
 
+        ResetRuntimeSentinelState(t, obj);
+
         GCHandle handle = default;
         try
         {
@@ -360,6 +363,52 @@ internal static class ComponentSerializer
         }
 
         return true;
+    }
+
+    private static void ResetRuntimeSentinelState(Type targetType, object target)
+    {
+        const string runtimeStartSentinel = "start";
+        int resetCount = 0;
+
+        foreach (var prop in targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.GetIndexParameters().Length != 0 || !prop.CanWrite || prop.PropertyType != typeof(bool))
+                continue;
+
+            if (!_nameComparer.Equals(prop.Name, runtimeStartSentinel))
+                continue;
+
+            if ((bool)(prop.GetValue(target) ?? false))
+            {
+                prop.SetValue(target, false);
+                resetCount++;
+            }
+        }
+
+        foreach (var field in targetType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+        {
+            if (field.IsStatic || field.IsInitOnly || field.FieldType != typeof(bool))
+                continue;
+
+            if (!_nameComparer.Equals(field.Name, runtimeStartSentinel))
+                continue;
+
+            if (field.Name.Contains("k__BackingField", StringComparison.Ordinal))
+                continue;
+
+            if ((bool)(field.GetValue(target) ?? false))
+            {
+                field.SetValue(target, false);
+                resetCount++;
+            }
+        }
+
+        if (resetCount > 0)
+        {
+            Logging.LogInternal(
+                $"[ComponentSerializer] Reset runtime sentinel 'start' on {targetType.Name} ({resetCount} member(s))",
+                LogLevel.Debug);
+        }
     }
 
     private static bool TryConvertJsonToType(JsonElement element, Type targetType, out object? value)
