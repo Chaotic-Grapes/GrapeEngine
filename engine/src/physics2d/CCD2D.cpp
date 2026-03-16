@@ -4,6 +4,10 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Speculative contact expansion pass for fast-moving bodies.
+\references
+- https://box2d.org/documentation/
+- https://box2d.org/files/ErinCatto_ContinuousCollision_GDC2013.pdf
+- https://www.toptal.com/game/video-game-physics-part-ii-collision-detection-for-solid-objects
 */
 /* End Header *******************************************************************/
 
@@ -20,6 +24,7 @@ namespace Engine::Physics2D {
     {
         for (auto& c : contacts) {
             if (c.IsTrigger) {
+                // Trigger contacts do not participate in CCD penetration inflation.
                 continue;
             }
             BodyRuntime2D& a = bodies[c.BodyA];
@@ -29,6 +34,7 @@ namespace Engine::Physics2D {
             }
             const Vector2D va = a.Velocity ? a.Velocity->Value : Vector2D(0.0f, 0.0f);
             const Vector2D vb = b.Velocity ? b.Velocity->Value : Vector2D(0.0f, 0.0f);
+            // Relative speed estimates tunneling risk between the pair.
             const Vector2D rel = vb - va;
             const float speed = rel.Length();
             if (speed < config.SpeculativeCCDVelocityThreshold) {

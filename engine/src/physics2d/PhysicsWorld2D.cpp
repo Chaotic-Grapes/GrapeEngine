@@ -4,6 +4,11 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Fixed-step 2D physics pipeline orchestration and ECS sync.
+\references
+- https://gafferongames.com/post/fix_your_timestep/
+- https://box2d.org/documentation/
+- https://box2d.org/files/ErinCatto_IterativeDynamics_GDC2005.pdf
+- https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf
 */
 /* End Header *******************************************************************/
 
@@ -204,6 +209,7 @@ namespace Engine::Physics2D {
      * @brief Sync physics runtime cache from ECS components.
      */
     void PhysicsWorld2D::SyncFromECS(ECS::World& world, Scenes::LayerManager& layerManager) {
+        // Rebuild body cache every fixed step so it always reflects latest ECS state.
         m_bodies.clear();
         world.Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, ECS::Components::LocalTransform&) {
             if (!world.IsAlive(e) || !world.IsActiveInHierarchy(e)) {
@@ -228,6 +234,7 @@ namespace Engine::Physics2D {
             body.Material = world.Has<ECS::Components::PhysicsMaterial2D>(e) ?
                 world.Get<ECS::Components::PhysicsMaterial2D>(e) :
                 ECS::Components::PhysicsMaterial2D{};
+            // Dynamic = has rigidbody + velocity + positive mass (mass <= 0 treated as static/kinematic).
             body.IsDynamic = body.Rigidbody && body.Velocity && body.Rigidbody->Mass > 0.0f;
             body.IsTrigger = (circle && (circle->Flags & 0x1u)) || (box && (box->Flags & 0x1u));
             const auto* layer = world.TryGet<ECS::Components::Layer>(e);
@@ -249,6 +256,7 @@ namespace Engine::Physics2D {
         });
 
         std::sort(m_bodies.begin(), m_bodies.end(), [](const BodyRuntime2D& a, const BodyRuntime2D& b) {
+            // Deterministic order keeps broadphase/narrowphase outputs stable frame to frame.
             return a.Packed < b.Packed;
             });
 
@@ -286,16 +294,19 @@ namespace Engine::Physics2D {
             if (!body.IsDynamic || !body.Local || !body.Rigidbody || !body.Velocity) {
                 continue;
             }
+            // Integrate linear velocity first from damping/gravity acceleration.
             Vector2D acc = Engine::Physics::CalculateAcceleration(*body.Rigidbody, *body.Velocity);
             if (body.Rigidbody->Flags & (1u << 1)) {
                 acc += Engine::Physics::GetGravity() * body.Rigidbody->GravityScale;
             }
             body.Velocity->Value += acc * fixedDt;
+            // Explicit Euler integration of world position.
             body.Local->Position.X += body.Velocity->Value.X * fixedDt;
             body.Local->Position.Y += body.Velocity->Value.Y * fixedDt;
             if (body.AngularVelocity && !(body.Rigidbody->Flags & (1u << 2))) {
                 const float angAcc = Engine::Physics::CalculateAngularAcceleration(*body.Rigidbody, *body.AngularVelocity);
                 body.AngularVelocity->Value += angAcc * fixedDt;
+                // Apply incremental Z-rotation quaternion for 2D angular motion.
                 body.Local->Rotation = Quaternion::FromEulerRad(0.0f, 0.0f, body.AngularVelocity->Value * fixedDt) * body.Local->Rotation;
             }
         }
@@ -334,6 +345,7 @@ namespace Engine::Physics2D {
                 const float maxX = body.WorldAabb.Center.X + body.WorldAabb.HalfExtents.X;
                 const float minY = body.WorldAabb.Center.Y - body.WorldAabb.HalfExtents.Y;
                 const float maxY = body.WorldAabb.Center.Y + body.WorldAabb.HalfExtents.Y;
+                // Convert overlapping world range into tile coordinates for narrow tile scan.
                 int32_t tileMinX = tilemap.Map->WorldToTileSigned(minX - tilemap.Origin.X);
                 int32_t tileMinY = tilemap.Map->WorldToTileSigned(minY - tilemap.Origin.Y);
                 int32_t tileMaxX = tilemap.Map->WorldToTileSigned(maxX - tilemap.Origin.X - kTileCoordEpsilon);
@@ -348,6 +360,7 @@ namespace Engine::Physics2D {
                 };
 
                 auto resolveTileCell = [&](const Vector2D& cellCenter, const Vector2D& halfExtents) {
+                    // Build temporary static OBB representing the tile piece.
                     Engine::WorldOBB tileObb{};
                     tileObb.Center = cellCenter;
                     tileObb.HalfExtents = halfExtents;
@@ -385,6 +398,7 @@ namespace Engine::Physics2D {
 
                     ECS::Components::Rigidbody2D dynamicRb = *body.Rigidbody;
                     ECS::Components::LinearVelocity2D dynamicVel = *body.Velocity;
+                    // Reuse shared manifold resolver by pairing body against a static tile body.
                     Engine::Physics::ResolveCollisionManifold(dynamicRb, staticRb, dynamicVel, staticVel, *body.Local, staticXf, manifold, mat);
                     *body.Velocity = dynamicVel;
                     // Keep derived world-shape cache in sync after each tile response.
@@ -457,6 +471,7 @@ namespace Engine::Physics2D {
             const bool lowLinear = body.Velocity->Value.Length() < m_config.SleepLinearThreshold;
             const bool lowAngular = std::abs(body.AngularVelocity->Value) < m_config.SleepAngularThreshold;
             if (lowLinear && lowAngular) {
+                // Body must stay below thresholds for a full duration before sleeping.
                 body.SleepTimer += fixedDt;
                 if (body.SleepTimer >= m_config.SleepTimeThresholdSeconds) {
                     body.IsSleeping = true;
@@ -505,28 +520,34 @@ namespace Engine::Physics2D {
         (void)fixedDt;
         m_stats.ResetFrame();
         const auto t0 = std::chrono::high_resolution_clock::now();
+        // 1) Pull ECS state into contiguous runtime cache.
         SyncFromECS(world, layerManager);
         BuildWorldShapes(world);
+        // 2) Integrate motion for dynamic bodies.
         IntegrateDynamic(m_config.FixedDeltaSeconds);
         const auto t1 = std::chrono::high_resolution_clock::now();
 
+        // 3) Broadphase finds candidate overlapping pairs quickly via AABB tree.
         BuildWorldShapes(world);
-        m_broadphase.Build(m_bodies, m_config.FatAABBPadding);
+        m_broadphase.Update(m_bodies, m_config.FatAABBPadding);
         m_pairs = m_broadphase.GeneratePairsDeterministicParallel(m_bodies);
         m_stats.BroadphaseTaskCount = std::min<uint32_t>(8u, static_cast<uint32_t>(std::max<size_t>(1, m_bodies.size())));
         const auto t2 = std::chrono::high_resolution_clock::now();
 
+        // 4) Narrowphase builds manifolds, CCD inflates risky fast contacts, islands group constraints.
         m_contacts = m_narrowphase.BuildContactsParallel(m_bodies, m_pairs);
         m_stats.NarrowphaseTaskCount = std::min<uint32_t>(8u, static_cast<uint32_t>(std::max<size_t>(1, m_pairs.size())));
         m_ccd.ApplySpeculativeContacts(m_config, m_bodies, m_contacts);
         m_islands = m_islandBuilder.Build(m_bodies, m_contacts);
         const auto t3 = std::chrono::high_resolution_clock::now();
 
+        // 5) Solver applies impulses/position correction, then optional tilemap collision pass.
         m_solver.Solve(m_config, m_bodies, m_contacts, m_islands);
         m_stats.SolverTaskCount = std::min<uint32_t>(8u, static_cast<uint32_t>(std::max<size_t>(1, m_islands.size())));
         ResolveTilemaps(world, layerManager, tilemaps);
         const auto t4 = std::chrono::high_resolution_clock::now();
 
+        // 6) Sleep update + event emission + ECS writeback.
         UpdateSleepState(m_config.FixedDeltaSeconds);
         const auto t5 = std::chrono::high_resolution_clock::now();
 
@@ -557,6 +578,7 @@ namespace Engine::Physics2D {
         m_stats.WritebackMs = ms(t6, t7);
 
         if (m_debugDraw) {
+            // Debug draw uses runtime cache after solve so overlays match final step state.
             for (const auto& body : m_bodies) {
                 const Vector2D mn = body.WorldAabb.Center - body.WorldAabb.HalfExtents;
                 const Vector2D mx = body.WorldAabb.Center + body.WorldAabb.HalfExtents;

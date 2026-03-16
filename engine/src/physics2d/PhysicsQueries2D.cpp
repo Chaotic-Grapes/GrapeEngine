@@ -4,6 +4,11 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Runtime physics query utilities (raycast, overlap, point query).
+\references
+- https://tavianator.com/2011/ray_box.html
+- https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection.html
+- https://box2d.org/documentation/
+- https://realtimecollisiondetection.net/books/rtcd/
 */
 /* End Header *******************************************************************/
 
@@ -18,6 +23,7 @@ namespace Engine::Physics2D {
     RayCastHit2D PhysicsQueries2D::RayCast(const std::vector<BodyRuntime2D>& bodies, const RayCastInput2D& input) {
         RayCastHit2D best{};
         best.Distance = input.MaxDistance;
+        // Normalize once so all distance values are measured along same direction vector.
         const Vector2D dir = input.Direction.Normalized();
 
         for (const auto& b : bodies) {
@@ -25,6 +31,7 @@ namespace Engine::Physics2D {
                 continue;
             }
 
+            // Query currently uses world AABB proxy (fast, conservative).
             Engine::Collision::AABB aabb = Engine::Collision::MakeAABBCenterSize(
                 b.WorldAabb.Center, b.WorldAabb.HalfExtents * 2.0f);
             const Vector2D invDir(
@@ -39,10 +46,12 @@ namespace Engine::Physics2D {
             const float ty2 = (mx.Y - input.Origin.Y) * invDir.Y;
             const float tmin = std::max(std::min(tx1, tx2), std::min(ty1, ty2));
             const float tmax = std::min(std::max(tx1, tx2), std::max(ty1, ty2));
+            // Reject misses, behind-origin intersections, and hits farther than current best.
             if (tmax < 0.0f || tmin > tmax || tmin < 0.0f || tmin > best.Distance) {
                 continue;
             }
 
+            // Keep nearest hit only.
             best.Hit = true;
             best.Entity = b.Entity;
             best.Distance = tmin;
@@ -69,6 +78,7 @@ namespace Engine::Physics2D {
                 continue;
             }
             const Vector2D d = b.WorldAabb.Center - query.Center;
+            // Axis-aligned overlap test on both X and Y intervals.
             const bool overlap = std::abs(d.X) <= (b.WorldAabb.HalfExtents.X + query.HalfExtents.X) &&
                 std::abs(d.Y) <= (b.WorldAabb.HalfExtents.Y + query.HalfExtents.Y);
             if (overlap) {
@@ -88,6 +98,7 @@ namespace Engine::Physics2D {
                 continue;
             }
             const Vector2D d = point - b.WorldAabb.Center;
+            // Point-in-AABB test in local offset form.
             if (std::abs(d.X) <= b.WorldAabb.HalfExtents.X && std::abs(d.Y) <= b.WorldAabb.HalfExtents.Y) {
                 out.push_back(b.Entity);
             }

@@ -44,9 +44,12 @@ namespace Engine::Physics2D {
         size_t BodyB = 0;
         PackedEntityId PackedA = 0;
         PackedEntityId PackedB = 0;
+        uint32_t FeatureId = 0;
         bool IsTrigger = false;
         bool TriggerA = false;
         bool TriggerB = false;
+        float NormalImpulse = 0.0f;
+        float TangentImpulse = 0.0f;
         Engine::Collision::ContactManifold Manifold{};
     };
 

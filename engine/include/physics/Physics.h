@@ -30,14 +30,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Engine {
     class GRAPEENGINE_API Physics {
     public:
-        // Boundary collision
+        /**
+         * @brief Global world-boundary constraint configuration.
+         */
         struct BoundaryConstraint {
             float MinX, MaxX, MinY, MaxY;
             bool KillVelocity;
             float Restitution; // Bounciness when hitting boundaries (0 = no bounce, 1 = perfect bounce)
         };
 
-        //Generic Collision 
+        /**
+         * @brief Result payload for collision manifold resolution.
+         */
         struct CollisionResult {
             bool Collided; //flag to show collision
             Vector2D Normal;
@@ -45,39 +49,137 @@ namespace Engine {
             float RelativeNormalVelocity;
         };
 
-        // Gravity management
+        /**
+         * @brief Set global gravity acceleration.
+         * @param gravity Gravity vector in world units per second squared.
+         */
         static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
+
+        /**
+         * @brief Get global gravity acceleration.
+         * @return Current gravity vector.
+         */
         static Vector2D GetGravity() { return m_gravity; }
 
-        // Force and impulse application
+        /**
+         * @brief Compute linear acceleration from damping terms.
+         * @param rb Rigidbody parameters.
+         * @param vel Current linear velocity.
+         * @return Linear acceleration.
+         */
         static Vector2D CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel);
+
+        /**
+         * @brief Apply a continuous force as velocity change.
+         * @param rb Rigidbody parameters.
+         * @param vel Velocity to modify.
+         * @param force Force in world space.
+         */
         static void ApplyForce(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& force);
+
+        /**
+         * @brief Apply an instantaneous impulse as velocity change.
+         * @param rb Rigidbody parameters.
+         * @param vel Velocity to modify.
+         * @param impulse Impulse in world space.
+         */
         static void ApplyImpulse(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& impulse);
 
-        // Physics system control
+        /**
+         * @brief Enable or disable physics processing globally.
+         * @param enabled True to enable physics.
+         */
         static void SetEnabled(bool enabled) { m_enabled = enabled; }
+
+        /**
+         * @brief Check whether global physics processing is enabled.
+         * @return True when physics is enabled.
+         */
         static bool IsEnabled() { return m_enabled; }
 
-        // World boundary management
+        /**
+         * @brief Configure world-boundary limits and response behavior.
+         * @param minX Minimum X bound.
+         * @param maxX Maximum X bound.
+         * @param minY Minimum Y bound.
+         * @param maxY Maximum Y bound.
+         * @param killVelocity Whether to zero velocity on collision.
+         * @param restitution Bounce coefficient in [0,1].
+         */
         static void SetWorldBounds(float minX, float maxX, float minY, float maxY, bool killVelocity = false, float restitution = 0.8f);
+
+        /**
+         * @brief Enable or disable world-boundary enforcement.
+         * @param enable True to enforce configured world bounds.
+         */
         static void EnableWorldBounds(bool enable) { m_worldBoundsEnabled = enable; }
-        // Check whether world bounds enabled.
+
+        /**
+         * @brief Check whether world-boundary constraints are enabled.
+         * @return True when world bounds are enabled.
+         */
         static bool IsWorldBoundsEnabled() { return m_worldBoundsEnabled; }
-        // Return the current world bounds configuration.
+
+        /**
+         * @brief Access current world-boundary configuration.
+         * @return Boundary constraint settings.
+         */
         static const BoundaryConstraint& GetWorldBounds() { return m_worldBounds; }
 
-        // Utility methods
+        /**
+         * @brief Return inverse mass with static-body safety.
+         * @param mass Mass value.
+         * @return `1/mass` for positive mass, else `0`.
+         */
         static float GetInverseMass(float mass);
+
+        /**
+         * @brief Compute 2D dot product.
+         * @param a First vector.
+         * @param b Second vector.
+         * @return Dot product result.
+         */
         static float Dot(const Vector2D& a, const Vector2D& b);
 
-        // Velocity manipulation
+        /**
+         * @brief Scale linear velocity by a damping factor.
+         * @param vel Velocity to damp.
+         * @param dampingFactor Multiplicative damping factor.
+         */
         static void ApplyVelocityDamping(ECS::Components::LinearVelocity2D& vel, const float dampingFactor);
+
+        /**
+         * @brief Remove inward normal component from velocity.
+         * @param vel Velocity to modify.
+         * @param normal Surface normal.
+         */
         static void ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal);
+
+        /**
+         * @brief Zero one signed component of velocity.
+         * @param vel Velocity to modify.
+         * @param isXAxis True to target X, false to target Y.
+         * @param isPositive True to zero positive values, false for negative values.
+         */
         static void ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, bool isXAxis, bool isPositive);
 
-        // Angular Damping
+        /**
+         * @brief Compute angular acceleration from angular damping.
+         * @param rb Rigidbody parameters.
+         * @param angVel Current angular velocity.
+         * @return Angular acceleration.
+         */
         static float CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel);
 
+        /**
+         * @brief Resolve a circle-like boundary collision against world bounds.
+         * @param position Body position.
+         * @param velocity Body velocity.
+         * @param radius Body collision radius.
+         * @param bounds Boundary constraints.
+         * @param entityRestitution Optional per-entity restitution override.
+         * @return True when any boundary collision occurred.
+         */
         static bool ApplyBoundaryConstraint(
             Vector2D& position, 
             Vector2D& velocity, 
@@ -86,6 +188,18 @@ namespace Engine {
             float entityRestitution = -1.0f  // -1 means use bounds.Restitution
         );
 
+        /**
+         * @brief Resolve impulse and position correction for a contact manifold.
+         * @param rbA Rigidbody A.
+         * @param rbB Rigidbody B.
+         * @param velA Velocity A (in/out).
+         * @param velB Velocity B (in/out).
+         * @param transformA Transform A (in/out).
+         * @param transformB Transform B (in/out).
+         * @param manifold Contact manifold.
+         * @param physics Effective collision material.
+         * @return Collision resolution summary.
+         */
         static CollisionResult ResolveCollisionManifold(
             const ECS::Components::Rigidbody2D& rbA,
             const ECS::Components::Rigidbody2D& rbB,
@@ -104,7 +218,9 @@ namespace Engine {
 
         /**
          * @brief Compute world-space circle from components.
-         * Applies transform position, collider offset, and scale to radius.
+         * @param circle Circle collider component.
+         * @param transform Entity transform component.
+         * @return World-space circle.
          */
         static WorldCircle GetWorldCircle(
             const ECS::Components::CircleCollider2D& circle,
@@ -137,7 +253,9 @@ namespace Engine {
 
         /**
          * @brief Compute world-space AABB from components.
-         * Applies transform position, collider offset, and scale to half-extents.
+         * @param box Box collider component.
+         * @param transform Entity transform component.
+         * @return World-space AABB enclosing the oriented box.
          */
         static WorldAABB GetWorldAABB(
             const ECS::Components::BoxCollider2D& box,
@@ -179,7 +297,9 @@ namespace Engine {
 
         /**
          * @brief Compute world-space OBB from components.
-         * Applies transform position, collider offset, scale, and rotation.
+         * @param box Box collider component.
+         * @param transform Entity transform component.
+         * @return World-space oriented bounding box.
          */
         static WorldOBB GetWorldOBB(
             const ECS::Components::BoxCollider2D& box,

@@ -4,6 +4,10 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Deterministic contact-graph island construction.
+\references
+- https://box2d.org/documentation/
+- https://en.wikipedia.org/wiki/Breadth-first_search
+- https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
 */
 /* End Header *******************************************************************/
 
@@ -20,12 +24,14 @@ namespace Engine::Physics2D {
         const std::vector<BodyRuntime2D>& bodies,
         const std::vector<ContactConstraint2D>& contacts) const
     {
+        // Graph representation: body nodes, edges are non-trigger contacts.
         std::vector<std::vector<size_t>> adjacency(bodies.size());
         std::vector<std::vector<size_t>> contactRefs(bodies.size());
 
         for (size_t i = 0; i < contacts.size(); ++i) {
             const auto& c = contacts[i];
             if (c.IsTrigger) {
+                // Trigger-only contacts do not participate in solver islands.
                 continue;
             }
             adjacency[c.BodyA].push_back(c.BodyB);
@@ -38,6 +44,7 @@ namespace Engine::Physics2D {
         order.reserve(bodies.size());
         for (size_t i = 0; i < bodies.size(); ++i) {
             if (bodies[i].IsDynamic) {
+                // Start BFS only from dynamic bodies; static-only components are pulled in via edges.
                 order.push_back(i);
             }
         }
@@ -57,6 +64,7 @@ namespace Engine::Physics2D {
             q.push(root);
             visited[root] = true;
             while (!q.empty()) {
+                // Standard BFS gathers one connected component.
                 const size_t current = q.front();
                 q.pop();
                 island.Bodies.push_back(current);
@@ -81,6 +89,7 @@ namespace Engine::Physics2D {
                 return bodies[a].Packed < bodies[b].Packed;
                 });
             std::sort(island.Contacts.begin(), island.Contacts.end());
+            // Same contact can be reached from both endpoint bodies; deduplicate indices.
             island.Contacts.erase(std::unique(island.Contacts.begin(), island.Contacts.end()), island.Contacts.end());
             islands.push_back(std::move(island));
         }

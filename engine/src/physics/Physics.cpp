@@ -9,6 +9,13 @@
  * impulse and force application, boundary constraint handling, and full collision
  * resolution with restitution and friction responses between entities.
  * Used by PhysicsSystem.cpp for per-frame updates and collision response.
+ *
+ * @References:
+ * https://box2d.org/documentation/
+ * https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf
+ * https://box2d.org/files/ErinCatto_IterativeDynamics_GDC2005.pdf
+ * https://gafferongames.com/post/integration_basics/
+ * https://www.toptal.com/game/video-game-physics-part-i-an-introduction-to-rigid-body-dynamics
  * 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

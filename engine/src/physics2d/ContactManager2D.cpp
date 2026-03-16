@@ -4,6 +4,11 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Collision and trigger event transition management.
+\references
+- https://box2d.org/documentation/
+- https://box2d.org/documentation/md_simulation.html#autotoc_md127
+- https://docs.unity3d.com/Manual/collider-interactions-oncollision.html
+- https://docs.unity3d.com/Manual/collider-interactions-ontrigger.html
 */
 /* End Header *******************************************************************/
 
@@ -35,13 +40,20 @@ namespace Engine::Physics2D {
         ECS::World& world,
         const std::vector<ContactConstraint2D>& contacts)
     {
+        auto pairLess = [](const PairKey2D& lhs, const PairKey2D& rhs) {
+            if (lhs.A != rhs.A) return lhs.A < rhs.A;
+            return lhs.B < rhs.B;
+            };
+
         std::unordered_set<PairKey2D, PairKeyHash> frameCollisions;
         std::unordered_set<PairKey2D, PairKeyHash> frameTriggerOverlaps;
+        // Reserve upfront to reduce hash-table reallocation churn each frame.
         frameCollisions.reserve(contacts.size());
         frameTriggerOverlaps.reserve(contacts.size());
 
         for (const auto& c : contacts) {
             if (c.IsTrigger) {
+                // Track trigger pairs directionally (trigger entity stored first).
                 if (c.TriggerA) {
                     frameTriggerOverlaps.insert(MakeTriggerPair(c.PackedA, c.PackedB));
                 }
@@ -66,19 +78,25 @@ namespace Engine::Physics2D {
             }
         }
 
-        for (const auto& pair : m_previousCollisions) {
+        std::vector<PairKey2D> previousCollisionsSorted(m_previousCollisions.begin(), m_previousCollisions.end());
+        std::sort(previousCollisionsSorted.begin(), previousCollisionsSorted.end(), pairLess);
+        for (const auto& pair : previousCollisionsSorted) {
             if (frameCollisions.contains(pair)) {
+                // Still colliding this frame; no exit event.
                 continue;
             }
             const ECS::Entity a = ECS::EntityUtils::Unpack(pair.A);
             const ECS::Entity b = ECS::EntityUtils::Unpack(pair.B);
             if (!world.IsAlive(a) || !world.IsAlive(b)) {
+                // Skip exits for entities that were destroyed before event dispatch.
                 continue;
             }
             dispatcher.FireCollisionExitEvent(pair.A, pair.B, Vector3D(0.0f, 0.0f, 0.0f));
         }
 
-        for (const auto& pair : frameTriggerOverlaps) {
+        std::vector<PairKey2D> frameTriggerSorted(frameTriggerOverlaps.begin(), frameTriggerOverlaps.end());
+        std::sort(frameTriggerSorted.begin(), frameTriggerSorted.end(), pairLess);
+        for (const auto& pair : frameTriggerSorted) {
             const ECS::Entity trigger = ECS::EntityUtils::Unpack(pair.A);
             const ECS::Entity other = ECS::EntityUtils::Unpack(pair.B);
             if (!world.IsAlive(trigger) || !world.IsAlive(other)) {
@@ -89,11 +107,14 @@ namespace Engine::Physics2D {
                 dispatcher.FireTriggerStayEvent(pair.A, pair.B);
             }
             else {
+                // New overlap this frame -> trigger enter.
                 dispatcher.FireTriggerEnterEvent(pair.A, pair.B);
             }
         }
 
-        for (const auto& pair : m_previousTriggerOverlaps) {
+        std::vector<PairKey2D> previousTriggerSorted(m_previousTriggerOverlaps.begin(), m_previousTriggerOverlaps.end());
+        std::sort(previousTriggerSorted.begin(), previousTriggerSorted.end(), pairLess);
+        for (const auto& pair : previousTriggerSorted) {
             if (frameTriggerOverlaps.contains(pair)) {
                 continue;
             }
@@ -105,6 +126,7 @@ namespace Engine::Physics2D {
             dispatcher.FireTriggerExitEvent(pair.A, pair.B);
         }
 
+        // Current frame becomes previous frame for next transition detection.
         m_previousCollisions = std::move(frameCollisions);
         m_previousTriggerOverlaps = std::move(frameTriggerOverlaps);
     }

@@ -58,9 +58,7 @@ Key rules you must follow when adding or changing Components:
 
 Minimal example:
     // In Components.h
-    /**
-     * @brief Data structure: MyComponent.
-     */
+    // Example component:
     struct MyComponent {
             int Value = 0;
             float Factor = 1.0f;

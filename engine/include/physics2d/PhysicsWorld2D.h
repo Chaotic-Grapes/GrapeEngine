@@ -57,52 +57,65 @@ namespace Engine::Physics2D {
 
         /**
          * @brief Access last frame statistics.
+         * @return Immutable frame statistics.
          */
         const PhysicsStats2D& GetStats() const { return m_stats; }
 
         /**
          * @brief Mutable physics configuration.
+         * @return Mutable configuration object.
          */
         PhysicsConfig2D& Config() { return m_config; }
 
         /**
          * @brief Runtime body cache from the most recent step.
+         * @return Immutable runtime body list.
          */
         const std::vector<BodyRuntime2D>& Bodies() const { return m_bodies; }
 
         /**
          * @brief Set debug draw callback, or null to disable.
+         * @param debugDraw Debug draw callback instance.
          */
         void SetDebugDraw(IPhysicsDebugDraw2D* debugDraw) { m_debugDraw = debugDraw; }
 
     private:
         /**
          * @brief Pull relevant ECS components into runtime body cache.
+         * @param world ECS world.
+         * @param layerManager Layer settings used by filtering.
          */
         void SyncFromECS(ECS::World& world, Scenes::LayerManager& layerManager);
 
         /**
          * @brief Recompute world-space collider representations for cached bodies.
+         * @param world ECS world.
          */
         void BuildWorldShapes(ECS::World& world);
 
         /**
          * @brief Integrate dynamic body velocities and transforms.
+         * @param fixedDt Fixed timestep duration in seconds.
          */
         void IntegrateDynamic(float fixedDt);
 
         /**
          * @brief Resolve dynamic-vs-tilemap collisions.
+         * @param world ECS world.
+         * @param layerManager Layer settings used by filtering.
+         * @param tilemaps Tilemap collision proxies.
          */
         void ResolveTilemaps(ECS::World& world, Scenes::LayerManager& layerManager, const std::vector<TilemapCollisionProxy2D>& tilemaps);
 
         /**
          * @brief Advance sleep timers and sleeping flags.
+         * @param fixedDt Fixed timestep duration in seconds.
          */
         void UpdateSleepState(float fixedDt);
 
         /**
          * @brief Publish physics runtime state back into ECS components/tags.
+         * @param world ECS world.
          */
         void WriteBackToECS(ECS::World& world);
 

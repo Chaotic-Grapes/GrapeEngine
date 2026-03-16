@@ -4,6 +4,11 @@
 \author Dalton Koh Shi Hao (100%)
 \par d.koh@digipen.edu
 \brief Deterministic dynamic AABB-tree broadphase implementation.
+\references
+- https://box2d.org/posts/2014/08/balancing-dynamic-trees/
+- https://box2d.org/documentation/
+- https://realtimecollisiondetection.net/books/rtcd/
+- https://allenchou.net/2014/02/game-physics-broadphase-dynamic-aabb-tree/
 */
 /* End Header *******************************************************************/
 
@@ -11,6 +16,7 @@
 #include "physics2d/internal/ParallelFor.h"
 #include "physics2d/internal/SimdKernels2D.h"
 #include <algorithm>
+#include <cmath>
 
 namespace Engine::Physics2D {
     /**
@@ -35,6 +41,34 @@ namespace Engine::Physics2D {
     bool Broadphase2D::Overlap(const Engine::WorldAABB& a, const Engine::WorldAABB& b) { return Internal::OverlapAABB2D(a, b); }
 
     /**
+     * @brief Test whether `outer` fully contains `inner`.
+     * @param outer Candidate containing AABB.
+     * @param inner Candidate contained AABB.
+     * @return True when `inner` is fully enclosed by `outer`.
+     */
+    bool Broadphase2D::Contains(const Engine::WorldAABB& outer, const Engine::WorldAABB& inner) {
+        const Vector2D outerMin = outer.Center - outer.HalfExtents;
+        const Vector2D outerMax = outer.Center + outer.HalfExtents;
+        const Vector2D innerMin = inner.Center - inner.HalfExtents;
+        const Vector2D innerMax = inner.Center + inner.HalfExtents;
+        return innerMin.X >= outerMin.X && innerMin.Y >= outerMin.Y &&
+            innerMax.X <= outerMax.X && innerMax.Y <= outerMax.Y;
+    }
+
+    /**
+     * @brief Expand an AABB by configured fat padding.
+     * @param source Source AABB.
+     * @param fatPadding Extra half-extent on each axis.
+     * @return Expanded AABB.
+     */
+    Engine::WorldAABB Broadphase2D::ExpandFat(const Engine::WorldAABB& source, float fatPadding) {
+        Engine::WorldAABB out = source;
+        out.HalfExtents.X += fatPadding;
+        out.HalfExtents.Y += fatPadding;
+        return out;
+    }
+
+    /**
      * @brief Heuristic perimeter metric used by tree insertion.
      */
     float Broadphase2D::Perimeter(const Engine::WorldAABB& a) {
@@ -45,6 +79,7 @@ namespace Engine::Physics2D {
      * @brief Insert a body AABB leaf into the broadphase tree.
      */
     void Broadphase2D::InsertLeaf(size_t bodyIndex, const Engine::WorldAABB& fatAabb) {
+        // Create new leaf node that stores one runtime body index.
         TreeNode leaf{};
         leaf.Box = fatAabb;
         leaf.BodyIndex = bodyIndex;
@@ -59,6 +94,7 @@ namespace Engine::Physics2D {
 
         int sibling = m_root;
         while (!m_nodes[sibling].IsLeaf) {
+            // Descend toward child that causes smaller perimeter growth.
             const int left = m_nodes[sibling].Left;
             const int right = m_nodes[sibling].Right;
             const auto mergedLeft = Merge(m_nodes[left].Box, fatAabb);
@@ -70,6 +106,7 @@ namespace Engine::Physics2D {
 
         const int oldParent = m_nodes[sibling].Parent;
         const int newParent = static_cast<int>(m_nodes.size());
+        // Insert a new internal parent above sibling + new leaf.
         TreeNode parent{};
         parent.IsLeaf = false;
         parent.Left = sibling;
@@ -95,6 +132,7 @@ namespace Engine::Physics2D {
         int index = newParent;
         while (index != -1) {
             if (!m_nodes[index].IsLeaf) {
+                // Recompute internal AABB from both children.
                 m_nodes[index].Box = Merge(m_nodes[m_nodes[index].Left].Box, m_nodes[m_nodes[index].Right].Box);
             }
             index = m_nodes[index].Parent;
@@ -102,11 +140,68 @@ namespace Engine::Physics2D {
     }
 
     /**
+     * @brief Refit internal-node bounds from a node's parent up to root.
+     * @param nodeIndex First node to refit.
+     * @return None.
+     */
+    void Broadphase2D::RefitAncestors(int nodeIndex) {
+        int current = nodeIndex;
+        while (current != -1) {
+            if (!m_nodes[current].IsLeaf) {
+                m_nodes[current].Box = Merge(m_nodes[m_nodes[current].Left].Box, m_nodes[m_nodes[current].Right].Box);
+            }
+            current = m_nodes[current].Parent;
+        }
+    }
+
+    /**
+     * @brief Check whether incremental updates should fallback to full rebuild.
+     * @param bodies Runtime body cache.
+     * @param fatPadding Current fat AABB padding.
+     * @return True when rebuild is required.
+     */
+    bool Broadphase2D::RequiresRebuild(const std::vector<BodyRuntime2D>& bodies, float fatPadding) {
+        if (m_root == -1 || m_bindings.empty()) {
+            return true;
+        }
+        if (std::abs(m_fatPadding - fatPadding) > 1e-6f) {
+            return true;
+        }
+        if (++m_stepsSinceRebuild > 240u) {
+            return true;
+        }
+
+        std::vector<PackedEntityId> packed;
+        packed.reserve(bodies.size());
+        for (const auto& body : bodies) {
+            if (body.Shape != ShapeType2D::None) {
+                packed.push_back(body.Packed);
+            }
+        }
+        // Any body-set mismatch means bindings/tree topology is stale.
+        if (packed.size() != m_bindings.size()) {
+            return true;
+        }
+        std::sort(packed.begin(), packed.end());
+        for (size_t i = 0; i < packed.size(); ++i) {
+            if (packed[i] != m_bindings[i].Packed) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @brief Rebuild broadphase tree from body cache.
      */
     void Broadphase2D::Build(const std::vector<BodyRuntime2D>& bodies, float fatPadding) {
+        // Full rebuild resets tree + proxy mapping from scratch.
         m_nodes.clear();
+        m_bindings.clear();
+        m_bindingByPacked.clear();
         m_root = -1;
+        m_fatPadding = fatPadding;
+        m_stepsSinceRebuild = 0;
 
         std::vector<size_t> order;
         order.reserve(bodies.size());
@@ -122,10 +217,62 @@ namespace Engine::Physics2D {
             });
 
         for (size_t idx : order) {
-            auto fat = bodies[idx].WorldAabb;
-            fat.HalfExtents.X += fatPadding;
-            fat.HalfExtents.Y += fatPadding;
+            const auto fat = ExpandFat(bodies[idx].WorldAabb, fatPadding);
+            const int nodeIndex = static_cast<int>(m_nodes.size());
             InsertLeaf(idx, fat);
+            // Keep packed-id -> binding index mapping for fast incremental updates.
+            ProxyBinding binding{};
+            binding.Packed = bodies[idx].Packed;
+            binding.BodyIndex = idx;
+            binding.NodeIndex = nodeIndex;
+            m_bindingByPacked[binding.Packed] = m_bindings.size();
+            m_bindings.push_back(binding);
+        }
+    }
+
+    /**
+     * @brief Incrementally update broadphase proxy bindings and leaf bounds.
+     * @param bodies Runtime body cache.
+     * @param fatPadding Extra half-extent padding for leaf AABBs.
+     * @return None.
+     */
+    void Broadphase2D::Update(const std::vector<BodyRuntime2D>& bodies, float fatPadding) {
+        if (RequiresRebuild(bodies, fatPadding)) {
+            Build(bodies, fatPadding);
+            return;
+        }
+
+        // Build quick packed-id -> body-index map for this frame's runtime body cache.
+        std::unordered_map<PackedEntityId, size_t> bodyByPacked;
+        bodyByPacked.reserve(m_bindings.size());
+        for (size_t i = 0; i < bodies.size(); ++i) {
+            if (bodies[i].Shape == ShapeType2D::None) {
+                continue;
+            }
+            bodyByPacked[bodies[i].Packed] = i;
+        }
+
+        for (auto& binding : m_bindings) {
+            const auto it = bodyByPacked.find(binding.Packed);
+            if (it == bodyByPacked.end()) {
+                Build(bodies, fatPadding);
+                return;
+            }
+
+            const size_t bodyIndex = it->second;
+            binding.BodyIndex = bodyIndex;
+            TreeNode& node = m_nodes[binding.NodeIndex];
+            node.BodyIndex = bodyIndex;
+
+            const Engine::WorldAABB currentFat = ExpandFat(bodies[bodyIndex].WorldAabb, fatPadding);
+            if (Contains(node.Box, currentFat)) {
+                // Existing fat box still valid; no tree mutation required.
+                continue;
+            }
+
+            // Expand leaf bounds and refit ancestors. A periodic full rebuild prevents unbounded fat growth.
+            node.Box = Merge(node.Box, currentFat);
+            RefitAncestors(node.Parent);
         }
     }
 
@@ -136,6 +283,7 @@ namespace Engine::Physics2D {
         if (m_root == -1) {
             return;
         }
+        // Iterative DFS avoids recursion and keeps traversal deterministic.
         std::vector<int> stack;
         stack.reserve(64);
         stack.push_back(m_root);
@@ -150,6 +298,7 @@ namespace Engine::Physics2D {
                 outBodies.push_back(node.BodyIndex);
             }
             else {
+                // Push both children for continued overlap traversal.
                 stack.push_back(node.Left);
                 stack.push_back(node.Right);
             }
@@ -182,6 +331,7 @@ namespace Engine::Physics2D {
                 const size_t bodyIndexA = sorted[i];
                 const BodyRuntime2D& a = bodies[bodyIndexA];
                 overlaps.clear();
+                // Query all bodies with AABB overlap against body A.
                 QueryOverlaps(a.WorldAabb, overlaps);
                 for (size_t bodyIndexB : overlaps) {
                     if (bodyIndexA == bodyIndexB) {
@@ -193,6 +343,7 @@ namespace Engine::Physics2D {
                         continue;
                     }
                     if (!a.IsDynamic && !b.IsDynamic) {
+                        // Static-static pairs cannot generate solver constraints.
                         continue;
                     }
                     BroadphasePair2D pair{};
