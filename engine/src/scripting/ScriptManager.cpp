@@ -71,6 +71,9 @@ namespace ECS {
     }
 
     ScriptManager::~ScriptManager() {
+        if (g_scriptManagerInstance == this) {
+            g_scriptManagerInstance = nullptr;
+        }
         ShutdownCLR();
     }
 
@@ -127,6 +130,23 @@ namespace ECS {
         if (!m_initialized) return;
 
         LOG_INFO("[ScriptManager] Shutting down CoreCLR...");
+
+        // Stop managed watcher callbacks before managed teardown to prevent
+        // callbacks into a partially-shutdown native scripting layer.
+        if (m_stopWatching) {
+            try {
+                m_stopWatching();
+            } catch (...) {
+                LOG_WARNING("[ScriptManager] Exception while stopping script watcher during shutdown");
+            }
+        }
+        if (m_registerScriptChangedCallback) {
+            try {
+                m_registerScriptChangedCallback(nullptr);
+            } catch (...) {
+                LOG_WARNING("[ScriptManager] Exception while unregistering script changed callback during shutdown");
+            }
+        }
 
         // Cleanup scripted systems
         CleanupScriptedSystems();
@@ -308,6 +328,13 @@ namespace ECS {
             m_scriptedSystems.push_back(std::move(wrapper));
         }
 
+        // DiscoverSystems allocates this buffer via Marshal.AllocHGlobal in managed code.
+        if (m_freeManagedString) {
+            m_freeManagedString(systemHandlesPtr);
+        } else {
+            LOG_WARNING("[ScriptManager] DiscoverSystems returned unmanaged handles but no free delegate is available");
+        }
+
         LOG_INFO("[ScriptManager] Discovered " << systemCount << " scripted systems");
         return systems;
     }
@@ -391,11 +418,12 @@ namespace ECS {
      */
     bool ScriptManager::CallSystemShouldRun(uint64_t handle, void* worldPtr)
     {
-        if (!m_initialized || !m_callSystemShouldRun) return true;
+        if (!m_initialized) return false;
+        if (!m_callSystemShouldRun) return true;
         try {
             return m_callSystemShouldRun(handle, worldPtr) != 0;
         } catch (...) {
-            return true;
+            return false;
         }
     }
 

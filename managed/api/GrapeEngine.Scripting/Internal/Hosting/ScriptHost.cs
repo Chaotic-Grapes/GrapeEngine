@@ -115,6 +115,7 @@ public static class ScriptHost
     /// Callback function pointer for removing components (set by native code during initialization).
     /// </summary>
     private static IntPtr _nativeRemoveComponentCallback = IntPtr.Zero;
+    private static NativeRemoveComponentCallback? _nativeRemoveComponent;
 
     /// <summary>
     /// Called from C++ to register the native RemoveComponentFromAllEntities callback.
@@ -122,7 +123,13 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static void RegisterRemoveComponentCallback(IntPtr callbackPtr)
     {
-        _nativeRemoveComponentCallback = callbackPtr;
+        lock (s_stateLock)
+        {
+            _nativeRemoveComponentCallback = callbackPtr;
+            _nativeRemoveComponent = callbackPtr != IntPtr.Zero
+                ? Marshal.GetDelegateForFunctionPointer<NativeRemoveComponentCallback>(callbackPtr)
+                : null;
+        }
         Logging.LogInternal("[ScriptHost] Remove component callback registered", LogLevel.Info);
     }
 
@@ -130,6 +137,8 @@ public static class ScriptHost
     /// Callback function pointer passed from C++ native code.
     /// </summary>
     private static IntPtr _nativeHotReloadCallback = IntPtr.Zero;
+    private static NativeHotReloadCallback? _nativeHotReload;
+    private static readonly object s_stateLock = new();
 
     /// <summary>
     /// Cache of World wrapper objects to avoid allocating new World objects every frame.
@@ -155,7 +164,10 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static void SetCurrentWorldForHotReload(IntPtr worldPtr)
     {
-        _currentWorldPtr = worldPtr;
+        lock (s_stateLock)
+        {
+            _currentWorldPtr = worldPtr;
+        }
         Logging.LogInternal($"[ScriptHost] Set current world for hot reload: {worldPtr:X16}", LogLevel.Info);
     }
 
@@ -165,14 +177,17 @@ public static class ScriptHost
     /// </summary>
     private static World GetOrCreateWorldWrapper(IntPtr worldPtr)
     {
-        if (_worldCache.TryGetValue(worldPtr, out var cachedWorld))
+        lock (s_stateLock)
         {
-            return cachedWorld;
+            if (_worldCache.TryGetValue(worldPtr, out World? cachedWorld))
+            {
+                return cachedWorld;
+            }
+
+            var newWorld = new World(worldPtr);
+            _worldCache[worldPtr] = newWorld;
+            return newWorld;
         }
-        
-        var newWorld = new World(worldPtr);
-        _worldCache[worldPtr] = newWorld;
-        return newWorld;
     }
 
     /// <summary>
@@ -186,8 +201,12 @@ public static class ScriptHost
     {
         try
         {
-            int count = _worldCache.Count;
-            _worldCache.Clear();
+            int count;
+            lock (s_stateLock)
+            {
+                count = _worldCache.Count;
+                _worldCache.Clear();
+            }
             if (count > 0)
             {
                 Logging.LogInternal($"[ScriptHost] Cleared {count} cached World wrappers before assembly unload", LogLevel.Info);
@@ -233,7 +252,13 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static void RegisterHotReloadCallback(IntPtr callbackPtr)
     {
-        _nativeHotReloadCallback = callbackPtr;
+        lock (s_stateLock)
+        {
+            _nativeHotReloadCallback = callbackPtr;
+            _nativeHotReload = callbackPtr != IntPtr.Zero
+                ? Marshal.GetDelegateForFunctionPointer<NativeHotReloadCallback>(callbackPtr)
+                : null;
+        }
         Logging.LogInternal("[ScriptHost] Hot reload callback registered", LogLevel.Info);
     }
 
@@ -242,17 +267,24 @@ public static class ScriptHost
     /// </summary>
     private static void NotifyHotReloadComplete(string assemblyPath)
     {
-        if (_nativeHotReloadCallback != IntPtr.Zero)
+        NativeHotReloadCallback? callback;
+        lock (s_stateLock)
         {
-            try
-            {
-                var callback = Marshal.GetDelegateForFunctionPointer<NativeHotReloadCallback>(_nativeHotReloadCallback);
-                callback?.Invoke(assemblyPath);
-            }
-            catch (Exception ex)
-            {
-                Logging.LogInternal($"[ScriptHost] Error invoking hot reload callback: {ex.Message}", LogLevel.Error);
-            }
+            callback = _nativeHotReload;
+        }
+
+        if (callback == null)
+        {
+            return;
+        }
+
+        try
+        {
+            callback(assemblyPath);
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error invoking hot reload callback: {ex.Message}", LogLevel.Error);
         }
     }
     /// Called from C++ ScriptManager::LoadAssembly()
@@ -297,10 +329,13 @@ public static class ScriptHost
             // Capture current managed component schemas before cache clear.
             // We will remove only deleted/changed components after the new assembly is loaded.
             _preUnloadManagedSchemas = CaptureManagedComponentSchemas();
-            _reconcileWorldPtr = _currentWorldPtr;
+            lock (s_stateLock)
+            {
+                _reconcileWorldPtr = _currentWorldPtr;
+                _currentWorldPtr = IntPtr.Zero;
+            }
             _preUnloadComponentSnapshots = CaptureManagedComponentSnapshots(_reconcileWorldPtr, _preUnloadManagedSchemas.Keys);
             _hasPendingSchemaReconcile = true;
-            _currentWorldPtr = IntPtr.Zero;
             
             // Clear World wrapper cache (holds instances that reference assembly types)
             ClearWorldCache();
@@ -861,7 +896,13 @@ public static class ScriptHost
             Logging.LogInternal($"[ScriptHost] Found {allComponentTypes.Count} managed component types to clear", LogLevel.Info);
             
             // For each component type, notify the native side to remove it from all entities
-            if (_nativeRemoveComponentCallback != IntPtr.Zero)
+            NativeRemoveComponentCallback? callback;
+            lock (s_stateLock)
+            {
+                callback = _nativeRemoveComponent;
+            }
+
+            if (callback != null)
             {
                 foreach (var componentType in allComponentTypes)
                 {
@@ -875,8 +916,7 @@ public static class ScriptHost
                         // This iterates all entities in the world and removes the component if present
                         Logging.LogInternal($"[ScriptHost] Removing component type: {componentType.FullName} (name: {shortName}, hash: 0x{typeHash:X8})", LogLevel.Debug);
                         
-                        var callback = Marshal.GetDelegateForFunctionPointer<NativeRemoveComponentCallback>(_nativeRemoveComponentCallback);
-                        callback?.Invoke(typeHash);
+                        callback(typeHash);
                     }
                     catch (Exception ex)
                     {
@@ -1217,7 +1257,10 @@ public static class ScriptHost
     // Clear the cached required component hashes for a system, called after assembly reload to ensure we re-extract updated metadata
     private static void ClearRequireForUpdateCache()
     {
-        _requireForUpdateCache.Clear();
+        lock (s_stateLock)
+        {
+            _requireForUpdateCache.Clear();
+        }
     }
 
     private static Dictionary<uint, ManagedComponentSchema> CaptureManagedComponentSchemas()
@@ -1320,7 +1363,13 @@ public static class ScriptHost
         // Reconcile in two phases:
         // 1) remove deleted/shape-changed component hashes globally
         // 2) restore JSON snapshots only for shape-changed hashes
-        if (_nativeRemoveComponentCallback == IntPtr.Zero)
+        NativeRemoveComponentCallback? callback;
+        lock (s_stateLock)
+        {
+            callback = _nativeRemoveComponent;
+        }
+
+        if (callback == null)
         {
             Logging.LogInternal("[ScriptHost] Cannot reconcile managed components: remove callback not registered", LogLevel.Warning);
             _reconcileWorldPtr = IntPtr.Zero;
@@ -1353,12 +1402,11 @@ public static class ScriptHost
 
         if (hashesToRemove.Count > 0)
         {
-            var callback = Marshal.GetDelegateForFunctionPointer<NativeRemoveComponentCallback>(_nativeRemoveComponentCallback);
             foreach (uint hash in hashesToRemove)
             {
                 try
                 {
-                    callback?.Invoke(hash);
+                    callback(hash);
                     Logging.LogInternal($"[ScriptHost] Removed outdated managed component hash 0x{hash:X8}", LogLevel.Info);
                 }
                 catch (Exception ex)
@@ -1419,22 +1467,31 @@ public static class ScriptHost
     private static uint[] GetRequireForUpdateHashes(ulong handle)
     {
         // Check cache first to avoid reflection on every ShouldRun call
-        if (_requireForUpdateCache.TryGetValue(handle, out var hashes))
+        lock (s_stateLock)
         {
-            return hashes;
+            if (_requireForUpdateCache.TryGetValue(handle, out uint[]? cachedHashes))
+            {
+                return cachedHashes;
+            }
         }
 
         // If not in cache, extract from system type and cache it
         Type? systemType = SystemDiscovery.GetSystemType(handle);
         if (systemType == null)
         {
-            hashes = [];
-            _requireForUpdateCache[handle] = hashes;
-            return hashes;
+            uint[] emptyHashes = [];
+            lock (s_stateLock)
+            {
+                _requireForUpdateCache[handle] = emptyHashes;
+            }
+            return emptyHashes;
         }
 
-        hashes = ComponentAccessBridge.ExtractRequireForUpdateComponentHashes(systemType).ToArray();
-        _requireForUpdateCache[handle] = hashes;
+        uint[] hashes = ComponentAccessBridge.ExtractRequireForUpdateComponentHashes(systemType).ToArray();
+        lock (s_stateLock)
+        {
+            _requireForUpdateCache[handle] = hashes;
+        }
         return hashes;
     }
 
@@ -1468,7 +1525,7 @@ public static class ScriptHost
             if (instance == null)
             {
                 Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
-                return 1;
+                return 0;
             }
 
             // If the system implements ISystem, call ShouldRun and return the result
@@ -1488,7 +1545,7 @@ public static class ScriptHost
             Logging.LogInternal($"[ScriptHost] Error in ShouldRun: {ex.Message}", LogLevel.Error);
         }
 
-        return 1;
+        return 0;
     }
 
 

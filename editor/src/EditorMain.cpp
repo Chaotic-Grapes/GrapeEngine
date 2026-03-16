@@ -29,6 +29,7 @@ Launches the application in editor mode with the level editor interface.
 #include "core/Logger.h"
 #include "scripting/ScriptsCompiler.h"
 #include "ecs/events/EventDispatcher.h"
+#include "scene/Scene.h"
 
 extern "C" {
     // Forward declare the component deserialize callback registration function
@@ -93,6 +94,7 @@ int main() {
 
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
+    size_t previousActiveSceneIndex = static_cast<size_t>(-1);
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
@@ -100,6 +102,23 @@ int main() {
     while (engine.IsRunning()) {
         if (editor.IsProjectInitialized()) {
             if (activeProjectRoot != editor.GetProjectRoot()) {
+                // Tear down loaded scripted systems/assembly from previous project.
+                ECS::World* targetWorld = &emptyWorld;
+                if (auto* activeScene = engine.GetSceneManager().GetActive()) {
+                    targetWorld = &activeScene->GetWorld();
+                }
+                systemManager.UnregisterScriptedSystems(*targetWorld);
+
+                if (scriptManager && scriptManager->IsInitialized() &&
+                    !scriptManager->GetLoadedScriptAssembly().empty()) {
+                    scriptManager->SetCurrentWorldForHotReload(targetWorld);
+                    if (!scriptManager->UnloadScriptAssembly()) {
+                        LOG_WARNING("[EditorMain] Failed to unload script assembly while switching projects");
+                    } else {
+                        LOG_INFO("[EditorMain] Unloaded script assembly for previous project");
+                    }
+                }
+
                 if (scriptsCompiler) { // Check if scriptsCompiler is initialized before trying to shut it down
                     scriptsCompiler->Shutdown();
                     scriptsCompiler.reset();
@@ -188,7 +207,9 @@ int main() {
         
         // Editor controls which systems execute based on playback state
         // Get the current scene
+        const size_t currentActiveSceneIndex = engine.GetSceneManager().GetActiveIndex();
         auto* currentScene = engine.GetSceneManager().GetActive();
+        const bool sceneChanged = (currentActiveSceneIndex != previousActiveSceneIndex);
         if (currentScene) {
             ECS::World& world = currentScene->GetWorld();
             // float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
@@ -213,6 +234,15 @@ int main() {
                     systemManager.CreateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
                     systemManager.OnSceneStart(world);
                 }
+            }
+
+            // Scene switches during active playback should emit scene lifecycle callbacks.
+            if (!isInEdit && sceneChanged && !(stateChanged && wasInEdit && !isInEdit)) {
+                auto* previousScene = engine.GetSceneManager().GetScene(previousActiveSceneIndex);
+                if (previousScene) {
+                    systemManager.OnSceneStop(const_cast<Scenes::Scene*>(previousScene)->GetWorld());
+                }
+                systemManager.OnSceneStart(world);
             }
             
             // Run gameplay systems based on playback state
@@ -243,6 +273,15 @@ int main() {
             engine.UpdateSystemsByMode(systemModes, world);
             ECS::Events::ClearFrameEventComponents(world);
         }
+        else if (!isInEdit && sceneChanged) {
+            // Active scene became null while in playback state.
+            auto* previousScene = engine.GetSceneManager().GetScene(previousActiveSceneIndex);
+            if (previousScene) {
+                systemManager.OnSceneStop(const_cast<Scenes::Scene*>(previousScene)->GetWorld());
+            }
+        }
+
+        previousActiveSceneIndex = currentActiveSceneIndex;
         
         // ============================================================
         // EDITOR RENDER - Render editor UI and viewports

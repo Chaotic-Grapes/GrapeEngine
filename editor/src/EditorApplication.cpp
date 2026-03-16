@@ -413,6 +413,36 @@ void EditorApplication::HandleProjectSelected(const std::string& projectRoot) {
     }
     m_projectLoadInProgress = true;
 
+    // If switching to a different project, proactively tear down currently loaded
+    // scripted systems/assembly before scene/project state is replaced.
+    if (m_projectInitialized && m_projectRoot != projectRoot) {
+        ECS::World* targetWorld = nullptr;
+        if (auto* activeScene = m_engine->GetSceneManager().GetActive()) {
+            targetWorld = &activeScene->GetWorld();
+        }
+
+        if (!targetWorld) {
+            targetWorld = s_editorWorld;
+        }
+
+        if (targetWorld) {
+            m_engine->GetSystemManager().UnregisterScriptedSystems(*targetWorld);
+        }
+
+        if (auto* scriptManager = m_engine->GetScriptManager();
+            scriptManager && scriptManager->IsInitialized() &&
+            !scriptManager->GetLoadedScriptAssembly().empty()) {
+            if (targetWorld) {
+                scriptManager->SetCurrentWorldForHotReload(targetWorld);
+            }
+            if (!scriptManager->UnloadScriptAssembly()) {
+                LOG_WARNING("[EditorApplication] Failed to unload previous project's script assembly");
+            } else {
+                LOG_INFO("[EditorApplication] Unloaded previous project's script assembly");
+            }
+        }
+    }
+
     // Clear any existing scenes and editor state before loading the new project
     if (m_editorService) {
         // Drop the current level editor instance before destroying scenes to avoid dangling pointers.

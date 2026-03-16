@@ -34,6 +34,7 @@ internal static class AssemblyManager
     /// Value: (Assembly instance, Custom LoadContext for hot reload)
     /// </summary>
     private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object s_sync = new();
 
     private static string NormalizeAssemblyKey(string assemblyPath)
     {
@@ -136,7 +137,13 @@ internal static class AssemblyManager
 
             // If this assembly is already loaded under the tracking key, unload it first.
             // Overwriting the dictionary entry without unloading would leak the old context.
-            if (s_loadedAssemblies.ContainsKey(trackingKey))
+            bool wasLoaded;
+            lock (s_sync)
+            {
+                wasLoaded = s_loadedAssemblies.ContainsKey(trackingKey);
+            }
+
+            if (wasLoaded)
             {
                 Logging.LogInternal($"[AssemblyManager] Assembly already loaded, unloading previous instance: {trackingKey}", LogLevel.Info);
                 UnloadAssembly(trackingKey);
@@ -155,7 +162,10 @@ internal static class AssemblyManager
             Assembly assembly = loadContext.LoadFromAssemblyPath(pathToLoad);
 
             // Track by the (original) path so we can reload it consistently
-            s_loadedAssemblies[trackingKey] = (assembly, loadContext);
+            lock (s_sync)
+            {
+                s_loadedAssemblies[trackingKey] = (assembly, loadContext);
+            }
 
             Logging.LogInternal($"[AssemblyManager] Loaded: {assembly.FullName}", LogLevel.Info);
             return assembly;
@@ -182,10 +192,17 @@ internal static class AssemblyManager
         {
             string trackingKey = NormalizeAssemblyKey(assemblyPath);
 
-            if (!s_loadedAssemblies.TryGetValue(trackingKey, out var entry))
+            (Assembly Assembly, ScriptLoadContext? Context) entry;
+            lock (s_sync)
             {
-                Logging.LogInternal($"[AssemblyManager] Assembly not loaded: {assemblyPath}", LogLevel.Warning);
-                return false;
+                if (!s_loadedAssemblies.TryGetValue(trackingKey, out entry))
+                {
+                    Logging.LogInternal($"[AssemblyManager] Assembly not loaded: {assemblyPath}", LogLevel.Warning);
+                    return false;
+                }
+
+                // Remove only the target entry. Clearing all entries breaks multi-assembly tracking.
+                s_loadedAssemblies.Remove(trackingKey);
             }
 
             Assembly? assembly = entry.Assembly;
@@ -194,14 +211,7 @@ internal static class AssemblyManager
 
             Logging.LogInternal($"[AssemblyManager] Unloading assembly: {trackingKey}", LogLevel.Info);
 
-            // Remove strong references COMPLETELY from the dictionary.
-            // Dictionary.Remove() doesn't deallocate the Entry[] backing array - it just marks as deleted.
-            // We need to clear the ENTIRE dictionary to force deallocation of the Entry[] array,
-            // which was holding a strong reference to the Assembly and LoadContext.
-            // This is CRITICAL for the AssemblyLoadContext to be garbage collected.
-            int countBefore = s_loadedAssemblies.Count;
-            s_loadedAssemblies.Clear();
-            Logging.LogInternal($"[AssemblyManager] Cleared {countBefore} entries from loaded assemblies dictionary", LogLevel.Debug);
+            Logging.LogInternal($"[AssemblyManager] Removed tracking entry: {trackingKey}", LogLevel.Debug);
 
             WeakReference? weakRef = null;
             if (loadContext != null)
@@ -271,7 +281,10 @@ internal static class AssemblyManager
     public static Assembly? GetLoadedAssembly(string assemblyPath)
     {
         string trackingKey = NormalizeAssemblyKey(assemblyPath);
-        return s_loadedAssemblies.TryGetValue(trackingKey, out var entry) ? entry.Assembly : null;
+        lock (s_sync)
+        {
+            return s_loadedAssemblies.TryGetValue(trackingKey, out var entry) ? entry.Assembly : null;
+        }
     }
 
     /// <summary>
@@ -279,7 +292,10 @@ internal static class AssemblyManager
     /// </summary>
     public static IEnumerable<Assembly> GetAllLoadedAssemblies()
     {
-        return s_loadedAssemblies.Values.Select(x => x.Assembly);
+        lock (s_sync)
+        {
+            return s_loadedAssemblies.Values.Select(x => x.Assembly).ToArray();
+        }
     }
 
     /// <summary>
@@ -288,7 +304,10 @@ internal static class AssemblyManager
     public static bool IsAssemblyLoaded(string assemblyPath)
     {
         string trackingKey = NormalizeAssemblyKey(assemblyPath);
-        return s_loadedAssemblies.ContainsKey(trackingKey);
+        lock (s_sync)
+        {
+            return s_loadedAssemblies.ContainsKey(trackingKey);
+        }
     }
 
     /// <summary>

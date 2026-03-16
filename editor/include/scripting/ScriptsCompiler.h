@@ -104,6 +104,8 @@ private:
     std::thread m_bgProgressThread;
     std::atomic<bool> m_compileDone{false};
     std::atomic<bool> m_registryRebuildPending{false};
+    bool m_queuedScriptChange{false};
+    std::string m_queuedScriptsDir;
 
     /** Register callbacks with the ScriptManager (hot-reload, file watcher). */
     void _registerCallbacks();

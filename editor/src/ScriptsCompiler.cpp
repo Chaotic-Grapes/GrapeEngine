@@ -44,6 +44,9 @@ ScriptsCompiler::~ScriptsCompiler() {
 void ScriptsCompiler::Initialize(ECS::ScriptManager* scriptManager) {
     m_scriptManager = scriptManager;
     m_shutdownRequested.store(false);
+    m_compileDone.store(false);
+    m_queuedScriptChange = false;
+    m_queuedScriptsDir.clear();
     if (m_scriptManager) {
         _registerCallbacks();
     }
@@ -140,7 +143,10 @@ void ScriptsCompiler::_registerCallbacks() {
         {
             std::lock_guard<std::mutex> lock(m_stateMutex);
             if (m_hotReloadState != HotReloadState::Idle) {
-                LOG_INFO("[ScriptsCompiler] Hot reload already in progress, ignoring");
+                // Queue the most recent change and process it once current work settles.
+                m_queuedScriptChange = true;
+                m_queuedScriptsDir = scriptsDir;
+                LOG_INFO("[ScriptsCompiler] Hot reload busy, queued script change");
                 return;
             }
             m_hotReloadState = HotReloadState::ScriptsChanged;
@@ -203,6 +209,18 @@ void ScriptsCompiler::Update() {
 
         default:
             break;
+    }
+
+    // If a file change arrived while a reload was in flight, schedule another attempt.
+    {
+        std::lock_guard<std::mutex> lock(m_stateMutex);
+        if (m_hotReloadState == HotReloadState::Idle && m_queuedScriptChange) {
+            m_pendingScriptsDir = m_queuedScriptsDir;
+            m_queuedScriptsDir.clear();
+            m_queuedScriptChange = false;
+            m_hotReloadState = HotReloadState::ScriptsChanged;
+            LOG_INFO("[ScriptsCompiler] Processing queued script change");
+        }
     }
 
     if (m_registryRebuildPending.exchange(false)) {
@@ -333,6 +351,10 @@ bool ScriptsCompiler::_doMoveCompiledAssemblyWithRetry(const std::string& tempPa
 void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
     if (!m_scriptManager) {
         LOG_ERROR("[ScriptsCompiler] ScriptManager is null, aborting hot reload");
+        std::lock_guard<std::mutex> lock(m_stateMutex);
+        m_hotReloadState = HotReloadState::Failed;
+        m_lastError = "ScriptManager is null";
+        m_stateChanged.notify_one();
         return;
     }
 
@@ -498,6 +520,10 @@ void ScriptsCompiler::_mainThreadLoad() {
 void ScriptsCompiler::Shutdown() {
     m_shutdownRequested.store(true);
     m_stateChanged.notify_all();
+
+    if (m_scriptManager) {
+        m_scriptManager->StopScriptWatching();
+    }
     
     try {
         // Join all worker threads to guarantee no callbacks race after shutdown.
@@ -507,4 +533,11 @@ void ScriptsCompiler::Shutdown() {
     try {
         if (m_bgProgressThread.joinable()) m_bgProgressThread.join();
     } catch (...) {}
+
+    {
+        std::lock_guard<std::mutex> lock(m_stateMutex);
+        m_hotReloadState = HotReloadState::Idle;
+        m_queuedScriptChange = false;
+        m_queuedScriptsDir.clear();
+    }
 }
