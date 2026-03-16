@@ -62,7 +62,7 @@ public class SetComponentChange : IChangeHandler
                 Logging.LogInternal($"[DeferredChanges] SetComponent failed: Could not find method for {ComponentType.Name}", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[DeferredChanges] SetComponent error: {ex.Message}", LogLevel.Error);
         }
@@ -70,4 +70,5 @@ public class SetComponentChange : IChangeHandler
 
     public string GetDescription() => $"SetComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+
 

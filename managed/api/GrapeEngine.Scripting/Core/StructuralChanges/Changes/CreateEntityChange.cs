@@ -51,7 +51,7 @@ public class CreateEntityChange : IChangeHandler
                         Logging.LogInternal($"[DeferredChanges] CreateEntity failed: Could not find AddComponent method for {componentType.Name}", LogLevel.Warning);
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
                 {
                     Logging.LogInternal($"[DeferredChanges] CreateEntity error adding {componentType.Name}: {ex.Message}", LogLevel.Error);
                 }
@@ -61,4 +61,5 @@ public class CreateEntityChange : IChangeHandler
 
     public string GetDescription() => $"CreateEntity(archetype={ArchetypeId ?? 0}, components={InitialComponents?.Count ?? 0})";
 }
+
 

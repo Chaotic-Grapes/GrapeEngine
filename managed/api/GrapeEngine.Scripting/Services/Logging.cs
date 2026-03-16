@@ -28,18 +28,6 @@ using System.Text;
 namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
-/// Log level for script logging. Ordered by severity for filtering.
-/// </summary>
-public enum LogLevel : byte
-{
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Fatal = 4
-}
-
-/// <summary>
 /// Public logging API for scripts. Provides static methods to log messages
 /// at different severity levels with optional source location tracking.
 /// 
@@ -113,59 +101,6 @@ public static class Log
     {
 #if DEBUG
         DebugAPI.ScriptLogWithLocation(messageFactory(), (byte)level, file, line);
-#endif
-    }
-}
-
-/// <summary>
-/// Internal logging utility used by systems to log messages at different levels.
-/// Uses buffering to batch multiple log messages into fewer P/Invoke calls.
-/// This significantly reduces the overhead of logging from hot paths.
-/// 
-/// NOTE: This is internal-only. Scripts should use the public Log API instead.
-/// </summary>
-internal static class Logging
-{
-    internal static void LogInternal(string message, LogLevel level)
-    {
-#if !DEBUG
-        return;
-#else
-        // Log level colors:
-        // Debug: Cyan
-        // Info: White
-        // Warning: Yellow
-        // Error: Red
-        // Fatal: Red
-
-        // Timestamp in hh:mm format
-        var time = TimeOnly.FromDateTime(DateTime.Now)
-            .ToString(@"hh:mm");
-
-        switch (level)
-        {
-            case LogLevel.Info:
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"[{time}] [INF C#] {message}");
-                break;
-            case LogLevel.Debug:
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[{time}] [DBG C#] {message}");
-                break;
-            case LogLevel.Warning:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[{time}] [WRN C#] {message}");
-                break;
-            case LogLevel.Error:
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[{time}] [ERR C#] {message}");
-                break;
-            case LogLevel.Fatal:
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[{time}] [FTL C#] {message}");
-                break;
-        }
-        Console.ResetColor();
 #endif
     }
 }

@@ -134,7 +134,7 @@ public static class ScriptFileWatcher
             Logging.LogInternal($"[ScriptFileWatcher] File watcher started successfully", LogLevel.Info);
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ScriptFileWatcher] Error starting watcher: {ex.Message}", LogLevel.Error);
             return -1;
@@ -269,11 +269,12 @@ public static class ScriptFileWatcher
                 Logging.LogInternal("[ScriptFileWatcher] No C++ callback registered", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ScriptFileWatcher] Error notifying C++ of script changes: {ex.Message}", LogLevel.Error);
         }
     }
 }
+
 
 

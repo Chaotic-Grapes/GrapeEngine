@@ -119,7 +119,7 @@ internal static class ComponentDiscovery
                     .Where(IsComponent)
                 );
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 Logging.LogInternal($"[ComponentDiscovery] Failed to scan assembly {assembly.GetName().Name}: {ex.Message}", LogLevel.Error);
             }
@@ -199,7 +199,7 @@ internal static class ComponentDiscovery
                 return result;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentDiscovery] IsUnmanagedType reflection failed: {ex.Message}", LogLevel.Warning);
         }
@@ -211,7 +211,7 @@ internal static class ComponentDiscovery
             Logging.LogInternal($"[ComponentDiscovery] {type.FullName}: unmanaged via Marshal.SizeOf", LogLevel.Info);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentDiscovery] {type.FullName}: Marshal.SizeOf failed: {ex.Message}", LogLevel.Warning);
         }
@@ -244,7 +244,7 @@ internal static class ComponentDiscovery
             
             Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentDiscovery] Failed to register {componentType.Name}: {ex.Message}", LogLevel.Error);
         }
@@ -290,12 +290,13 @@ internal static class ComponentDiscovery
                 Logging.LogInternal($"[ComponentDiscovery] Cleared {count} component type cache entries", LogLevel.Info);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentDiscovery] Error clearing type cache: {ex.Message}", LogLevel.Error);
         }
     }
 
 }
+
 
 

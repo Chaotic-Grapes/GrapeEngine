@@ -89,7 +89,7 @@ internal static class ComponentSerializer
                 Logging.LogInternal($"[ComponentSerializer] Cleared {count} registered component types", LogLevel.Info);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentSerializer] Error clearing registered types: {ex.Message}", LogLevel.Error);
         }
@@ -125,7 +125,7 @@ internal static class ComponentSerializer
             // Return as CoTaskMem UTF8
             return StringToCoTaskMemUTF8(json);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentSerializer] Serialize error: {ex.Message}", LogLevel.Error);
             return IntPtr.Zero;
@@ -150,7 +150,7 @@ internal static class ComponentSerializer
                 return;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[ComponentSerializer] Deserialize error: {ex.Message}", LogLevel.Error);
         }
@@ -229,7 +229,7 @@ internal static class ComponentSerializer
             Buffer.MemoryCopy((void*)boxedPtr, (void*)data, managedSize, managedSize);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             // Keep compatibility with prior behavior if pin/copy fails.
             Logging.LogInternal($"[ComponentSerializer] Byte-copy deserialize fallback for {t.Name}: {ex.Message}", LogLevel.Debug);
@@ -514,5 +514,6 @@ internal static class ComponentSerializer
         return mem;
     }
 }
+
 
 

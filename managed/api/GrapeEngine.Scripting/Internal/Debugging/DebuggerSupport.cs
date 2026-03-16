@@ -1,19 +1,3 @@
-/* Start Header *****************************************************************/
-/*!
-\file   DebuggerSupport.cs
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\brief
-Debugger support and diagnostics for managed scripting system.
-Enables attaching debuggers and logging diagnostic information.
-
-Copyright (C) 2025 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
-*/
-/* End Header *******************************************************************/
-
-using GrapeEngine.Math;
 using System.Diagnostics;
 
 namespace GrapeEngine.Scripting.Internal.Debugging;
@@ -24,7 +8,7 @@ namespace GrapeEngine.Scripting.Internal.Debugging;
 /// </summary>
 public static class DebuggerSupport
 {
-    private static readonly Lock _lock = new();
+    private static readonly Lock s_lock = new();
 
     /// <summary>
     /// Check if a debugger is currently attached.
@@ -37,7 +21,7 @@ public static class DebuggerSupport
     /// </summary>
     public static void AttachDebugger()
     {
-        lock (_lock)
+        lock (s_lock)
         {
             if (Debugger.IsAttached)
             {
@@ -49,13 +33,17 @@ public static class DebuggerSupport
             {
                 Logging.LogInternal("[DebuggerSupport] Attempting to attach debugger...", LogLevel.Info);
                 Debugger.Launch();
-                
+
                 if (Debugger.IsAttached)
+                {
                     Logging.LogInternal("[DebuggerSupport] Debugger attached successfully", LogLevel.Info);
+                }
                 else
+                {
                     Logging.LogInternal("[DebuggerSupport] Debugger attach was cancelled", LogLevel.Info);
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
             {
                 Logging.LogInternal($"[DebuggerSupport] Failed to attach debugger: {ex.Message}", LogLevel.Error);
             }
@@ -74,212 +62,3 @@ public static class DebuggerSupport
         }
     }
 }
-
-/// <summary>
-/// System diagnostics collector for debugging and profiling.
-/// </summary>
-public class SystemDiagnostics
-{
-    public string SystemName { get; set; } = string.Empty;
-    public Type? SystemType { get; set; }
-    public object? Instance { get; set; }
-    public bool IsLoaded { get; set; }
-    public DateTime LoadedAt { get; set; }
-    public long TotalUpdateCalls { get; set; }
-    public double AverageUpdateTimeMs { get; set; }
-    public double MaxUpdateTimeMs { get; set; }
-    public string LastError { get; set; } = string.Empty;
-    public DateTime? LastErrorTime { get; set; }
-}
-
-/// <summary>
-/// Diagnostics collector for the scripting system.
-/// </summary>
-public static class ScriptingDiagnostics
-{
-    private static readonly Dictionary<ulong, SystemDiagnostics> s_systemDiagnostics = [];
-    private static readonly Lock _lockObj = new();
-
-    /// <summary>
-    /// Record a system's creation.
-    /// </summary>
-    public static void RecordSystemCreation(ulong handle, Type systemType, object instance, string name)
-    {
-        lock (_lockObj)
-        {
-            var diags = new SystemDiagnostics
-            {
-                SystemName = name,
-                SystemType = systemType,
-                Instance = instance,
-                IsLoaded = true,
-                LoadedAt = DateTime.UtcNow,
-            };
-            s_systemDiagnostics[handle] = diags;
-        }
-    }
-
-    /// <summary>
-    /// Record a system's destruction.
-    /// </summary>
-    public static void RecordSystemDestruction(ulong handle)
-    {
-        lock (_lockObj)
-        {
-            s_systemDiagnostics.Remove(handle);
-        }
-    }
-
-    /// <summary>
-    /// Record an update call for a system.
-    /// </summary>
-    public static void RecordSystemUpdate(ulong handle, double updateTimeMs)
-    {
-        lock (_lockObj)
-        {
-            if (s_systemDiagnostics.TryGetValue(handle, out var diags))
-            {
-                diags.TotalUpdateCalls++;
-                diags.AverageUpdateTimeMs = 
-                    (diags.AverageUpdateTimeMs * (diags.TotalUpdateCalls - 1) + updateTimeMs) / 
-                    diags.TotalUpdateCalls;
-                diags.MaxUpdateTimeMs = GMath.Max(diags.MaxUpdateTimeMs, updateTimeMs);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Record an error in a system.
-    /// </summary>
-    public static void RecordSystemError(ulong handle, string errorMessage)
-    {
-        lock (_lockObj)
-        {
-            if (s_systemDiagnostics.TryGetValue(handle, out var diags))
-            {
-                diags.LastError = errorMessage;
-                diags.LastErrorTime = DateTime.UtcNow;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Get diagnostics for a specific system.
-    /// </summary>
-    public static SystemDiagnostics? GetSystemDiagnostics(ulong handle)
-    {
-        lock (_lockObj)
-        {
-            return s_systemDiagnostics.TryGetValue(handle, out var diags) ? diags : null;
-        }
-    }
-
-    /// <summary>
-    /// Get diagnostics for all loaded systems.
-    /// </summary>
-    public static List<SystemDiagnostics> GetAllSystemDiagnostics()
-    {
-        lock (_lockObj)
-        {
-            return [..s_systemDiagnostics.Values];
-        }
-    }
-
-    /// <summary>
-    /// Print a diagnostic report for all systems.
-    /// </summary>
-    public static void PrintDiagnosticReport()
-    {
-        lock (_lockObj)
-        {
-            if (s_systemDiagnostics.Count == 0)
-            {
-                Logging.LogInternal("[ScriptingDiagnostics] No systems loaded", LogLevel.Info);
-                return;
-            }
-
-            Logging.LogInternal("\n" + new string('=', 120), LogLevel.Info);
-            Logging.LogInternal("System Diagnostics Report".PadRight(120), LogLevel.Info);
-            Logging.LogInternal(new string('=', 120), LogLevel.Info);
-            Logging.LogInternal("System Name".PadRight(40) + "Updates".PadRight(12) + "Avg Time (ms)".PadRight(15) + "Max Time (ms)".PadRight(15) + "Last Error".PadRight(40), LogLevel.Info);
-            Logging.LogInternal(new string('-', 120), LogLevel.Info);
-
-            foreach (var diags in s_systemDiagnostics.Values.OrderBy(d => d.SystemName))
-            {
-                var errorMsg = string.IsNullOrEmpty(diags.LastError) 
-                    ? "None" 
-                    : diags.LastError[..GMath.Min(30, diags.LastError.Length)];
-
-                Logging.LogInternal(diags.SystemName.PadRight(40) + diags.TotalUpdateCalls.ToString().PadRight(12) + diags.AverageUpdateTimeMs.ToString("F3").PadRight(15) + diags.MaxUpdateTimeMs.ToString("F3").PadRight(15) + errorMsg.PadRight(40), LogLevel.Info);
-            }
-
-            Logging.LogInternal(new string('=', 120) + "\n", LogLevel.Info);
-        }
-    }
-
-    /// <summary>
-    /// Get the total number of systems currently loaded.
-    /// </summary>
-    public static int GetLoadedSystemCount()
-    {
-        lock (_lockObj)
-        {
-            return s_systemDiagnostics.Count;
-        }
-    }
-
-    /// <summary>
-    /// Get the total number of update calls across all systems.
-    /// </summary>
-    public static long GetTotalUpdateCalls()
-    {
-        lock (_lockObj)
-        {
-            return s_systemDiagnostics.Values.Sum(d => d.TotalUpdateCalls);
-        }
-    }
-
-    /// <summary>
-    /// Clear all diagnostic data.
-    /// </summary>
-    public static void Reset()
-    {
-        lock (_lockObj)
-        {
-            s_systemDiagnostics.Clear();
-        }
-    }
-}
-
-/// <summary>
-/// Configuration for debugging features.
-/// </summary>
-public static class DebugConfiguration
-{
-    /// <summary>
-    /// Enable verbose logging of script system operations.
-    /// </summary>
-    public static bool VerboseLogging { get; set; } = false;
-
-    /// <summary>
-    /// Enable automatic diagnostics collection.
-    /// </summary>
-    public static bool EnableDiagnostics { get; set; } = true;
-
-    /// <summary>
-    /// Break into debugger on script system errors.
-    /// </summary>
-    public static bool BreakOnError { get; set; } = false;
-
-    /// <summary>
-    /// Enable stack trace capture on errors.
-    /// </summary>
-    public static bool CaptureStackTraces { get; set; } = true;
-
-    /// <summary>
-    /// Maximum stack trace depth to capture.
-    /// </summary>
-    public static int MaxStackTraceDepth { get; set; } = 20;
-}
-
-

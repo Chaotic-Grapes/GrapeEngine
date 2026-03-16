@@ -22,36 +22,6 @@ using System.Runtime.InteropServices;
 namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
-/// Window mode flags.
-/// </summary>
-[Flags]
-public enum WindowMode
-{
-    Windowed = 1,
-    Fullscreen = 2,
-    Borderless = 4 // Borderless windowed; engine snaps to monitor size.
-}
-
-/// <summary>
-/// Display mode data (resolution + refresh rate).
-/// </summary>
-public readonly struct DisplayMode
-{
-    public readonly int Width;
-    public readonly int Height;
-    public readonly int RefreshRate;
-    public readonly int BitsPerPixel;
-
-    public DisplayMode(int width, int height, int refreshRate, int bitsPerPixel)
-    {
-        Width = width;
-        Height = height;
-        RefreshRate = refreshRate;
-        BitsPerPixel = bitsPerPixel;
-    }
-}
-
-/// <summary>
 /// Provides access to window management and queries.
 /// </summary>
 public static class Window

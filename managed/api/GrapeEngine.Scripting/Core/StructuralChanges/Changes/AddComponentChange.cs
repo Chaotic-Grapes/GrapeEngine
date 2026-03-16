@@ -61,7 +61,7 @@ public class AddComponentChange : IChangeHandler
                 Logging.LogInternal($"[DeferredChanges] AddComponent failed: Could not find AddComponent method in World for {ComponentType.Name}", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
             Logging.LogInternal($"[DefferedChanges] AddComponent error: {ex.Message}", LogLevel.Error);
         }
@@ -69,4 +69,5 @@ public class AddComponentChange : IChangeHandler
 
     public string GetDescription() => $"AddComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+
 

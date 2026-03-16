@@ -1,17 +1,8 @@
-/* Start Header *****************************************************************/
-/*!
-\file   CameraComponents.cs
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\date   26th October 2025
-\brief
-Camera-related ECS component types.
-*/
-/* End Header *******************************************************************/
-
 using GrapeEngine.Scripting.Components;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
+
 
 [StructLayout(LayoutKind.Sequential)]
 public record struct Camera3D
@@ -52,12 +43,3 @@ public record struct Camera3D
         };
     }
 }
-
-[StructLayout(LayoutKind.Sequential)]
-public record struct CameraMatrices
-{
-    public Matrix4x4 View;
-    public Matrix4x4 Projection;
-    public Matrix4x4 ViewProjection;
-}
-

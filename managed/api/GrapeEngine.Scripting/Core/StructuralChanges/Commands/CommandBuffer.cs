@@ -15,9 +15,9 @@ Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
-/* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
+using System.Reflection;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
@@ -51,6 +51,17 @@ public class CommandBuffer(World world) : IDisposable
     private int _commandCount = 0;
     private bool _isRecording = true;
     private uint _frameIndex = 0;
+
+    private static bool IsRecoverableCommandException(Exception ex)
+    {
+        return ex is InvalidOperationException
+            or ArgumentException
+            or NotSupportedException
+            or TargetInvocationException
+            or TargetParameterCountException
+            or MethodAccessException
+            or AmbiguousMatchException;
+    }
 
     /// <summary>
     /// Internal accessor for the world reference.
@@ -243,7 +254,7 @@ public class CommandBuffer(World world) : IDisposable
                 ExecuteCommand(command);
                 executedCount++;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsRecoverableCommandException(ex))
             {
                 Logging.LogInternal($"Error executing command {command.Type}: {ex.Message}", LogLevel.Error);
             }
@@ -321,7 +332,7 @@ public class CommandBuffer(World world) : IDisposable
                 Logging.LogInternal($"[CommandBuffer] AddComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (IsRecoverableCommandException(ex))
         {
             Logging.LogInternal($"[CommandBuffer] AddComponent error: {ex.Message}", LogLevel.Error);
         }
@@ -352,7 +363,7 @@ public class CommandBuffer(World world) : IDisposable
                 Logging.LogInternal($"[CommandBuffer] RemoveComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (IsRecoverableCommandException(ex))
         {
             Logging.LogInternal($"[CommandBuffer] RemoveComponent error: {ex.Message}", LogLevel.Error);
         }
@@ -382,7 +393,7 @@ public class CommandBuffer(World world) : IDisposable
                 Logging.LogInternal($"[CommandBuffer] SetComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (IsRecoverableCommandException(ex))
         {
             Logging.LogInternal($"[CommandBuffer] SetComponent error: {ex.Message}", LogLevel.Error);
         }
