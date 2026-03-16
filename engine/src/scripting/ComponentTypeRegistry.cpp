@@ -105,6 +105,10 @@ namespace ECS {
         REGISTER_COMPONENT(Rigidbody2D);
         REGISTER_COMPONENT(BoxCollider2D);
         REGISTER_COMPONENT(CircleCollider2D);
+        REGISTER_COMPONENT(PhysicsBodyHandle2D);
+        REGISTER_COMPONENT(PhysicsActiveTag);
+        REGISTER_COMPONENT(SleepingTag);
+        REGISTER_COMPONENT(PhysicsContactCache2D);
 
         // Compute
         REGISTER_COMPONENT(BoidFlock);
@@ -184,6 +188,10 @@ namespace ECS {
         LogComponentTypeIds("Rigidbody2D", FNV1a_Hash("Rigidbody2D"));
         LogComponentTypeIds("BoxCollider2D", FNV1a_Hash("BoxCollider2D"));
         LogComponentTypeIds("CircleCollider2D", FNV1a_Hash("CircleCollider2D"));
+        LogComponentTypeIds("PhysicsBodyHandle2D", FNV1a_Hash("PhysicsBodyHandle2D"));
+        LogComponentTypeIds("PhysicsActiveTag", FNV1a_Hash("PhysicsActiveTag"));
+        LogComponentTypeIds("SleepingTag", FNV1a_Hash("SleepingTag"));
+        LogComponentTypeIds("PhysicsContactCache2D", FNV1a_Hash("PhysicsContactCache2D"));
 
         LogComponentTypeIds("SpriteRenderer2D", FNV1a_Hash("SpriteRenderer2D"));
         LogComponentTypeIds("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));

@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+﻿/* Start Header *****************************************************************/
 /*!
 \file   PhysicsSystem.h
 \author Dalton Koh (95%)
@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include "physics2d/PhysicsWorld2D.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -33,18 +34,28 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 class TileMap;
 
 namespace ECS {
+    /**
+     * @brief Canonical packed entity-pair key used for collision/trigger tracking.
+     */
     struct PackedEntityPair {
         PackedEntityId A{};
         PackedEntityId B{};
 
-        // Compares packed pairs by value so unordered containers can detect exact pair identity
+        /**
+         * @brief Compare pair keys for equality.
+         */
         bool operator==(const PackedEntityPair& other) const {
             return A == other.A && B == other.B;
         }
     };
 
+    /**
+     * @brief Hash functor for PackedEntityPair.
+     */
     struct PackedEntityPairHash {
-        // Hashes packed pair fields and mixes them to reduce clustering in unordered containers
+        /**
+         * @brief Compute hash code for a packed pair key.
+         */
         size_t operator()(const PackedEntityPair& pair) const noexcept {
             const size_t h1 = std::hash<uint64_t>{}(pair.A);
             const size_t h2 = std::hash<uint64_t>{}(pair.B);
@@ -55,36 +66,71 @@ namespace ECS {
     // Handles 2D physics simulation using broad and narrow phase collision workflow
     class PhysicsSystem : public ISystem {
     public:
-        // Uses default construction because runtime caches are value initialized members
+        /**
+         * @brief Construct system with default-initialized runtime caches.
+         */
         PhysicsSystem() = default;
 
-        // Uses default destruction because owned state is standard containers and smart pointers
+        /**
+         * @brief Default destructor.
+         */
         ~PhysicsSystem() override = default;
 
         // ISystem interface
 
-        // Called when the system is created and currently keeps no world owned state
+        /**
+         * @brief Initialize system state.
+         */
         void OnCreate(World& world) override { (void)world; }
 
-        // Runs one physics update tick including collision and tilemap synchronization logic
+        /**
+         * @brief Execute physics update for the current frame.
+         */
         void OnUpdate(World& world) override;
 
-        // Called before system shutdown to release runtime references and cached state
+        /**
+         * @brief Release runtime references and caches.
+         */
         void OnDestroy(World& world) override;
 
-        // Returns metadata describing dependencies access patterns and execution ordering
+        /**
+         * @brief Describe scheduler component access and run policy.
+         */
         SystemMetadata GetMetadata() const override;
 
-        // Declares this system as part of physics group for scheduler grouping
+        /**
+         * @brief Return scheduler system group.
+         */
         SystemGroup GetSystemGroup() const override { return SystemGroup::Physics; }
 
-        // Restricts this system to play mode so editor mode stays deterministic and non-simulated
+        /**
+         * @brief Restrict system execution to play mode.
+         */
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
-    private:
-        friend class PhysicsPipelineRunner;
+        /**
+         * @brief Ray cast against current runtime body cache.
+         */
+        Engine::Physics2D::RayCastHit2D RayCast(const Engine::Physics2D::RayCastInput2D& input) const;
 
-        // Caches runtime tilemap state needed for collision and physics synchronization
+        /**
+         * @brief Query entities whose AABBs overlap the supplied AABB.
+         */
+        std::vector<Entity> OverlapAABB(const Engine::WorldAABB& query) const;
+
+        /**
+         * @brief Query entities whose AABBs contain the supplied point.
+         */
+        std::vector<Entity> QueryPoint(const Vector2D& point) const;
+
+        /**
+         * @brief Return latest physics performance and workload stats.
+         */
+        const Engine::Physics2D::PhysicsStats2D& GetStats() const { return m_physicsWorld2D.GetStats(); }
+
+        /**
+         * @brief Cached tilemap state mirrored from ECS for physics stepping.
+         */
         struct RuntimeTileMapEntry {
             std::shared_ptr<TileMap> Map;  // Pointer to active tilemap asset used during physics step
             std::string MapPath;           // Cached map asset path for quick lookup and change tracking
@@ -97,8 +143,18 @@ namespace ECS {
             uint32_t Generation = 0;       // Tracks tilemap revision so updates can skip unchanged data
         };
 
-        // Refreshes runtime tilemap cache by reconciling world tilemap components with cached entries
+    private:
+        friend class PhysicsPipelineRunner;
+
+        /**
+         * @brief Reconcile runtime tilemap cache with ECS tilemap components.
+         */
         void RefreshRuntimeTileMaps(World& world);
+
+        /**
+         * @brief Convert runtime tilemap cache into PhysicsWorld2D proxy payloads.
+         */
+        std::vector<Engine::Physics2D::TilemapCollisionProxy2D> BuildTilemapProxies() const;
 
         // Stores collision pairs from previous frame to drive enter and exit event transitions
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousCollisions;
@@ -108,6 +164,11 @@ namespace ECS {
 
         // Runtime tilemap cache keyed by entity id for fast physics queries and sync checks
         std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;
+
+        // Fixed-step coordinator state.
+        Engine::Physics2D::PhysicsWorld2D m_physicsWorld2D;
+        float m_accumulatorSeconds = 0.0f;
+        const World* m_lastWorld = nullptr;
     };
 }
 

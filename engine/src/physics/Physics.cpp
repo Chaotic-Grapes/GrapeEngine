@@ -28,6 +28,12 @@ namespace Engine {
     bool Physics::m_worldBoundsEnabled = false;
     Physics::BoundaryConstraint Physics::m_worldBounds = { 0.0f, 1600.0f, 0.0f, 900.0f, false, 0.8f };
 
+    /**
+     * @brief Compute linear acceleration from damping terms.
+     * @param rb Rigidbody parameters.
+     * @param vel Current linear velocity.
+     * @return Linear acceleration.
+     */
     Vector2D Physics::CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel) {
         Vector2D acceleration(0.f, 0.f);
         //acceleration += m_gravity * rb.GravityScale;
@@ -35,11 +41,23 @@ namespace Engine {
         return acceleration;
     }
 
+    /**
+     * @brief Apply a continuous force as velocity change.
+     * @param rb Rigidbody parameters.
+     * @param vel Velocity to modify.
+     * @param force Force in world space.
+     */
     void Physics::ApplyForce(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& force) {
         if (rb.Mass > 0)
             vel.Value += force / rb.Mass;
     }
 
+    /**
+     * @brief Apply an instantaneous impulse as velocity change.
+     * @param rb Rigidbody parameters.
+     * @param vel Velocity to modify.
+     * @param impulse Impulse in world space.
+     */
     void Physics::ApplyImpulse(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& impulse) {
         if (rb.Mass > 0)
             vel.Value += impulse / rb.Mass;
@@ -49,6 +67,15 @@ namespace Engine {
     // Utility Methods
     // ============================================================================
 
+    /**
+     * @brief Configure global world-boundary constraints.
+     * @param minX Minimum X bound.
+     * @param maxX Maximum X bound.
+     * @param minY Minimum Y bound.
+     * @param maxY Maximum Y bound.
+     * @param killVelocity Whether to zero velocity on boundary collision.
+     * @param restitution Bounce coefficient in [0,1].
+     */
     void Physics::SetWorldBounds(const float minX, const float maxX, const float minY, const float maxY, const bool killVelocity, const float restitution) {
         m_worldBounds.MinX = minX;
         m_worldBounds.MaxX = maxX;
@@ -59,10 +86,21 @@ namespace Engine {
         m_worldBoundsEnabled = true;
     }
 
+    /**
+     * @brief Return inverse mass with static-body safety.
+     * @param mass Mass value.
+     * @return `1/mass` for positive mass, else `0`.
+     */
     float Physics::GetInverseMass(const float mass) {
         return (mass > 0.0f) ? 1.0f / mass : 0.0f;
     }
 
+    /**
+     * @brief Compute 2D dot product.
+     * @param a First vector.
+     * @param b Second vector.
+     * @return Dot product result.
+     */
     float Physics::Dot(const Vector2D& a, const Vector2D& b) {
         return a.X * b.X + a.Y * b.Y;
     }
@@ -71,10 +109,20 @@ namespace Engine {
     // Velocity Manipulation
     // ============================================================================
 
+    /**
+     * @brief Scale linear velocity by a damping factor.
+     * @param vel Velocity to damp.
+     * @param dampingFactor Multiplicative damping factor.
+     */
     void Physics::ApplyVelocityDamping(ECS::Components::LinearVelocity2D& vel, const float dampingFactor) {
         vel.Value *= dampingFactor;
     }
 
+    /**
+     * @brief Remove inward normal component from velocity.
+     * @param vel Velocity to modify.
+     * @param normal Surface normal.
+     */
     void Physics::ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal) {
         const float normalVelocity = Dot(vel.Value, normal);
         if (normalVelocity < 0.0f) {
@@ -82,6 +130,12 @@ namespace Engine {
         }
     }
 
+    /**
+     * @brief Zero selected signed velocity component.
+     * @param vel Velocity to modify.
+     * @param isXAxis True to target X, false to target Y.
+     * @param isPositive True to zero positive component, false for negative component.
+     */
     void Physics::ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, const bool isXAxis, const bool isPositive) {
         if (isXAxis) {
             if ((isPositive && vel.Value.X > 0.0f) || (!isPositive && vel.Value.X < 0.0f)) {
@@ -99,6 +153,12 @@ namespace Engine {
     // Angular Damping
     // ============================================================================
 
+    /**
+     * @brief Compute angular acceleration from angular damping.
+     * @param rb Rigidbody parameters.
+     * @param angVel Current angular velocity.
+     * @return Angular acceleration.
+     */
     float Physics::CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel) {
         return -angVel.Value * rb.AngularDamping;
     }
@@ -107,6 +167,15 @@ namespace Engine {
     // Boundary Collision
     // ============================================================================
 
+    /**
+     * @brief Resolve a circle-like boundary collision against world bounds.
+     * @param position Body position.
+     * @param velocity Body velocity.
+     * @param radius Body collision radius.
+     * @param bounds Boundary constraints.
+     * @param entityRestitution Optional per-entity restitution override.
+     * @return True when any boundary collision occurred.
+     */
     bool Physics::ApplyBoundaryConstraint(
         Vector2D& position,
         Vector2D& velocity,
@@ -316,6 +385,18 @@ namespace Engine {
 
 
 
+    /**
+     * @brief Resolve collision impulse and position correction for a contact manifold.
+     * @param rbA Rigidbody A.
+     * @param rbB Rigidbody B.
+     * @param velA Velocity A (in/out).
+     * @param velB Velocity B (in/out).
+     * @param transformA Transform A (in/out).
+     * @param transformB Transform B (in/out).
+     * @param manifold Contact manifold.
+     * @param physics Effective collision material.
+     * @return Collision resolution summary.
+     */
     Physics::CollisionResult Physics::ResolveCollisionManifold(
         const ECS::Components::Rigidbody2D& rbA,
         const ECS::Components::Rigidbody2D& rbB,
@@ -353,12 +434,7 @@ namespace Engine {
             // Only resolve if moving toward each other
             if (normalVelocity < 0.0f) {
                 // Restitution (bounciness)
-                float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
-
-                // No bounce for slow collisions (threshold: 1 m/s)
-                if (std::abs(normalVelocity) < 1.0f) {
-                    restitution = 0.0f;
-                }
+                const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
 
                 // Calculate impulse scalar
                 // j = -(1 + e) * vrel·n / (1/mA + 1/mB)
@@ -405,8 +481,8 @@ namespace Engine {
         // POSITION CORRECTION (applied once per manifold, not per contact)
         // ========================================================================
 
-        const float slop = 0.0001f;     // 1cm penetration allowance
-        const float percent = 0.4f;   // 20% correction per frame
+        const float slop = 0.0001f;
+        const float percent = std::clamp(physics.PositionCorrectPercent, 0.0f, 1.0f);
 
         const float correctionMagnitude = std::max(manifold.penetration - slop, 0.0f) * percent;
         const Vector2D correction = manifold.normal * (correctionMagnitude / invMassSum);

@@ -42,7 +42,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 ********************************************************************************/
 
 #include "ecs/systems/PhysicsSystem.h"
-#include "ecs/systems/internal/PhysicsPipelineRunner.h"
 #include "services/TimeSystem.h"
 #include "physics/Physics.h"
 #include "ecs/Components.h"
@@ -51,11 +50,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/StringTable.h"
 #include <unordered_set>
 #include <filesystem>
+#include <algorithm>
 #include "helpers/TransformUtils.h"
 #include "math/Vector3D.h"
+#include "ecs/events/EventDispatcher.h"
+#include "physics2d/PhysicsQueries2D.h"
 
 namespace {
-    // Resolve a project-relative path to an absolute path for loading assets
+    /**
+     * @brief Resolve a project-relative asset path into an absolute normalized path.
+     * @param path Relative or absolute input path.
+     * @return Absolute normalized path when project paths are initialized; otherwise original path.
+     */
     std::string ResolveProjectPathForLoad(const std::string& path) {
 
         // If path is empty or project paths not initialized, return as-is (likely to fail later)
@@ -74,7 +80,15 @@ namespace {
         return absolute.lexically_normal().string();
     }
 
-    // Helper to get the effective transform for runtime tilemaps
+    /**
+     * @brief Resolve effective transform data for a tilemap entity.
+     * @param world ECS world.
+     * @param entity Tilemap entity.
+     * @param lt Fallback local transform.
+     * @param outPosition Output world position.
+     * @param outRotation Output world rotation.
+     * @param outScale Output world scale.
+     */
     static void GetTileMapTransform(ECS::World& world, const ECS::Entity entity, const ECS::Components::LocalTransform& lt, 
         Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) 
     {
@@ -95,8 +109,10 @@ namespace {
 }
 
 namespace ECS {
-
-    // Declares scheduler metadata including component access requirements and run policy
+    /**
+     * @brief Build scheduler metadata for PhysicsSystem.
+     * @return Component access and run configuration.
+     */
     SystemMetadata PhysicsSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Physics");
 
@@ -105,12 +121,26 @@ namespace ECS {
         builder.ReadComponent<Components::CircleCollider2D>();
         builder.ReadComponent<Components::BoxCollider2D>();
         builder.ReadComponent<Components::Rigidbody2D>();
+        builder.ReadComponent<Components::LinearVelocity2D>();
+        builder.ReadComponent<Components::AngularVelocity2D>();
+        builder.ReadComponent<Components::PhysicsMaterial2D>();
+        builder.ReadComponent<Components::Layer>();
         builder.ReadComponent<Components::Active>();
         builder.ReadComponent<Components::Parent>();
 
         // Write accesses
         builder.WriteComponent<Components::LocalTransform>();
         builder.WriteComponent<Components::Rigidbody2D>();
+        builder.WriteComponent<Components::LinearVelocity2D>();
+        builder.WriteComponent<Components::AngularVelocity2D>();
+        builder.WriteComponent<Components::PhysicsBodyHandle2D>();
+        builder.WriteComponent<Components::PhysicsActiveTag>();
+        builder.WriteComponent<Components::SleepingTag>();
+        builder.WriteComponent<Components::PhysicsContactCache2D>();
+        builder.WriteComponent<ECS::Events::CollisionEventBuffer>();
+        builder.WriteComponent<ECS::Events::TriggerEventBuffer>();
+        builder.WriteComponent<ECS::Events::CollisionExitEventBuffer>();
+        builder.WriteComponent<ECS::Events::TriggerExitEventBuffer>();
 
         // Execution parameters
         builder.SetExecutionOrder(0);
@@ -119,14 +149,23 @@ namespace ECS {
         return builder.Build();
     }
 
-    // Clears cached collision and tilemap runtime state when system is destroyed
+    /**
+     * @brief Clear runtime state when the system is destroyed.
+     * @param world ECS world (unused).
+     */
     void PhysicsSystem::OnDestroy(World& /*world*/) {
         m_previousCollisions.clear();
         m_previousTriggerOverlaps.clear();
         m_runtimeTileMaps.clear();
+        m_accumulatorSeconds = 0.0f;
+        m_lastWorld = nullptr;
+        m_physicsWorld2D = Engine::Physics2D::PhysicsWorld2D{};
     }
 
-    // Refreshes runtime tilemap cache so physics uses current tilemap components and paths
+    /**
+     * @brief Refresh tilemap runtime cache from ECS components.
+     * @param world ECS world.
+     */
     void PhysicsSystem::RefreshRuntimeTileMaps(World& world) {
 
         // Track entities observed this frame so stale cache entries can be removed later
@@ -214,10 +253,24 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Advance fixed-step 2D physics simulation.
+     * @param world ECS world.
+     */
     void PhysicsSystem::OnUpdate(World& world) {
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
         if (!Engine::Physics::IsEnabled() || dt <= 0.0f) {
             return;
+        }
+
+        // Reset cached runtime/contact state when the active world changes.
+        if (m_lastWorld != &world) {
+            m_lastWorld = &world;
+            m_runtimeTileMaps.clear();
+            m_previousCollisions.clear();
+            m_previousTriggerOverlaps.clear();
+            m_accumulatorSeconds = 0.0f;
+            m_physicsWorld2D = Engine::Physics2D::PhysicsWorld2D{};
         }
 
         auto* layerManager = world.GetLayerManager();
@@ -225,6 +278,74 @@ namespace ECS {
             return;
         }
 
-        RunPhysicsPipeline(*this, world, *layerManager, dt);
+        RefreshRuntimeTileMaps(world);
+        m_physicsWorld2D.Config().FixedDeltaSeconds = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
+        m_accumulatorSeconds += dt;
+        uint32_t steps = 0;
+        const uint32_t maxSteps = m_physicsWorld2D.Config().MaxFixedStepsPerFrame;
+        const float fixed = m_physicsWorld2D.Config().FixedDeltaSeconds;
+        ECS::Events::EventDispatcher dispatcher(&world);
+        const auto tileProxies = BuildTilemapProxies();
+
+        while (m_accumulatorSeconds >= fixed && steps < maxSteps) {
+            m_physicsWorld2D.StepFixed(world, *layerManager, dispatcher, fixed, tileProxies);
+            m_accumulatorSeconds -= fixed;
+            ++steps;
+        }
+    }
+
+    /**
+     * @brief Build sorted tilemap collision proxies from runtime cache.
+     * @return Deterministically ordered tilemap proxies.
+     */
+    std::vector<Engine::Physics2D::TilemapCollisionProxy2D> PhysicsSystem::BuildTilemapProxies() const {
+        std::vector<Engine::Physics2D::TilemapCollisionProxy2D> proxies;
+        proxies.reserve(m_runtimeTileMaps.size());
+        for (const auto& [entityId, entry] : m_runtimeTileMaps) {
+            (void)entityId;
+            Engine::Physics2D::TilemapCollisionProxy2D p{};
+            p.Map = entry.Map;
+            p.Origin = entry.Origin;
+            p.LayerId = entry.LayerId;
+            p.Enabled = entry.Enabled;
+            proxies.push_back(std::move(p));
+        }
+        std::sort(proxies.begin(), proxies.end(), [](const auto& a, const auto& b) {
+            if (a.LayerId != b.LayerId) {
+                return a.LayerId < b.LayerId;
+            }
+            if (a.Origin.X != b.Origin.X) {
+                return a.Origin.X < b.Origin.X;
+            }
+            return a.Origin.Y < b.Origin.Y;
+            });
+        return proxies;
+    }
+
+    /**
+     * @brief Ray cast against the current physics runtime body cache.
+     * @param input Ray input.
+     * @return Nearest ray hit result.
+     */
+    Engine::Physics2D::RayCastHit2D PhysicsSystem::RayCast(const Engine::Physics2D::RayCastInput2D& input) const {
+        return Engine::Physics2D::PhysicsQueries2D::RayCast(m_physicsWorld2D.Bodies(), input);
+    }
+
+    /**
+     * @brief Query entities overlapping an AABB.
+     * @param query Query AABB.
+     * @return Matching entities.
+     */
+    std::vector<Entity> PhysicsSystem::OverlapAABB(const Engine::WorldAABB& query) const {
+        return Engine::Physics2D::PhysicsQueries2D::OverlapAABB(m_physicsWorld2D.Bodies(), query);
+    }
+
+    /**
+     * @brief Query entities containing a point.
+     * @param point World-space query point.
+     * @return Matching entities.
+     */
+    std::vector<Entity> PhysicsSystem::QueryPoint(const Vector2D& point) const {
+        return Engine::Physics2D::PhysicsQueries2D::QueryPoint(m_physicsWorld2D.Bodies(), point);
     }
 }  // namespace ECS

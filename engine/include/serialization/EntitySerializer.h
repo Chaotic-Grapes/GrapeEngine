@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+﻿/* Start Header *****************************************************************/
 /*!
 \file    EntitySerializer.h
 \authors Daniel Neo Zuo Feng Kay (85%)
@@ -205,6 +205,10 @@ namespace ECS {
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsBodyHandle2D, BodyIndex)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsActiveTag, Enabled)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SleepingTag, Sleeping)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsContactCache2D, ContactCount)
 
         /**
          * @brief Serializes SpriteRenderer2D with normalized path fields.
@@ -1253,6 +1257,9 @@ namespace Serialization {
         using HasFn = std::function<bool(const ECS::World&, ECS::Entity)>;
         using RemoveFn = std::function<void(ECS::World&, ECS::Entity)>;
 
+        /**
+         * @brief Data structure: ComponentInfo.
+         */
         struct ComponentInfo {
             std::string Name;
             uint32_t TypeHash;
@@ -1662,6 +1669,10 @@ namespace Serialization {
     REGISTER_COMPONENT_SERIALIZER(Rigidbody2D, ECS::Components::Rigidbody2D, "Rigidbody2D")
     REGISTER_COMPONENT_SERIALIZER(BoxCollider2D, ECS::Components::BoxCollider2D, "BoxCollider2D")
     REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D, "CircleCollider2D")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsBodyHandle2D, ECS::Components::PhysicsBodyHandle2D, "PhysicsBodyHandle2D")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsActiveTag, ECS::Components::PhysicsActiveTag, "PhysicsActiveTag")
+    REGISTER_COMPONENT_SERIALIZER(SleepingTag, ECS::Components::SleepingTag, "SleepingTag")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsContactCache2D, ECS::Components::PhysicsContactCache2D, "PhysicsContactCache2D")
     REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D, "SpriteRenderer2D")
     REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D, "SpriteFlip2D")
     REGISTER_COMPONENT_SERIALIZER(TileMapComponent, ECS::Components::TileMapComponent, "TileMapComponent")

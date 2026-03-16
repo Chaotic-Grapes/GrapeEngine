@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+ï»¿/* Start Header *****************************************************************/
 /*!
 \file    Components.h
 \author  Muhammad Nur Fadzly Bin Zulkifli (~90%), Choi Meng Yew (~10%)
@@ -58,6 +58,9 @@ Key rules you must follow when adding or changing Components:
 
 Minimal example:
     // In Components.h
+    /**
+     * @brief Data structure: MyComponent.
+     */
     struct MyComponent {
             int Value = 0;
             float Factor = 1.0f;
@@ -103,6 +106,9 @@ namespace ECS {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
         // Lightweight name (StringId).
+        /**
+         * @brief Data structure: Name.
+         */
         struct Name {
         public:
             // Interned string ID (0 = invalid).
@@ -111,6 +117,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Name>, "Name must be trivially copyable");
 
         // Bitmask-based tag component (32 customizable tags).
+        /**
+         * @brief Data structure: TagMask.
+         */
         struct TagMask {
         public:
             uint32_t Mask = 0;
@@ -118,6 +127,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<TagMask>, "TagMask must be trivially copyable");
 
         // Enabled/disabled flag for quick filtering.
+        /**
+         * @brief Data structure: Active.
+         */
         struct Active {
         public:
             bool Enabled = true;
@@ -125,6 +137,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
         // Parent relationship for hierarchy.
+        /**
+         * @brief Data structure: Parent.
+         */
         struct Parent {
         public:
             Entity ParentEntity{NULL_ENTITY};
@@ -133,26 +148,41 @@ namespace ECS {
 
         // [DEPRECATED] Legacy prefab link - kept for backward compatibility during migration
         // Use PrefabInstanceMetadata instead in new code
+        /**
+         * @brief Data structure: PrefabLink.
+         */
         struct PrefabLink {
         public:
             // Interned prefab path ID (StringTable). 0 = invalid.
             uint32_t PrefabPath = 0;
             PrefabLink() = default;
 
-            // Construct from std::string
+            /**
+             * @brief Construct prefab link from a path string.
+             * @param path Project-relative prefab path.
+             */
             PrefabLink(const std::string& path) { setPath(path); }
 
-            // Intern path into the StringTable
+            /**
+             * @brief Intern and store prefab path.
+             * @param path Project-relative prefab path.
+             */
             void setPath(const std::string& path) {
                 PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
             }
-            // Convert back to std::string for convenience
+            /**
+             * @brief Resolve stored prefab path ID into string.
+             * @return Resolved prefab path or empty string when unset.
+             */
             std::string getPath() const { return PrefabPath ? ECS::StringTable::Resolve(PrefabPath) : std::string(); }
         };
         static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
 
         // Prefab instance metadata: runtime tracking of prefab associations
         // NOTE: This component is NEVER serialized. It's reconstructed during scene load.
+        /**
+         * @brief Data structure: PrefabInstanceMetadata.
+         */
         struct PrefabInstanceMetadata {
             uint32_t PrefabHash = 0;     // FNV-1a hash of prefab path (resolved by PrefabManager)
             uint16_t Flags = 0;          // Bit 0: IsModified, Bit 1: Synced, rest reserved
@@ -163,6 +193,9 @@ namespace ECS {
 
         // ---------------------------------- Layers and Transforms ----------------------------------
         // Layers: one component holding a small integer id per entity
+        /**
+         * @brief Data structure: Layer.
+         */
         struct Layer { 
         public:
             uint16_t Id = 0; 
@@ -170,6 +203,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Layer>, "Layer must be trivially copyable");
 
         // Local transform is relative to parent entity (if any)
+        /**
+         * @brief Data structure: LocalTransform.
+         */
         struct LocalTransform { 
         public:
             Vector3D Position{0,0,0};
@@ -179,6 +215,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<LocalTransform>, "LocalTransform must be trivially copyable");
 
         // World transform is relative to world origin
+        /**
+         * @brief Data structure: WorldTransform.
+         */
         struct WorldTransform { 
         public:
             Matrix4x4 Matrix{};
@@ -189,18 +228,27 @@ namespace ECS {
         // ---------------------------------- 3D kinematics/physics ----------------------------------
 
         // Kinematics
+        /**
+         * @brief Data structure: Velocity.
+         */
         struct Velocity {
         public:
             Vector3D Value{0.0f, 0.0f, 0.0f};
         };
         static_assert(std::is_trivially_copyable_v<Velocity>, "Velocity must be trivially copyable");
 
+        /**
+         * @brief Data structure: Acceleration.
+         */
         struct Acceleration {
         public:
             Vector3D Value{0.0f, 0.0f, 0.0f};
         };
         static_assert(std::is_trivially_copyable_v<Acceleration>, "Acceleration must be trivially copyable");
 
+        /**
+         * @brief Data structure: AngularVelocity.
+         */
         struct AngularVelocity {
         public:
             // Radians per second around local axes
@@ -209,6 +257,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<AngularVelocity>, "AngularVelocity must be trivially copyable");
 
         // Rigidbody placeholder
+        /**
+         * @brief Data structure: Rigidbody.
+         */
         struct Rigidbody {
         public:
             float Mass = 1.0f;       // Mass <= 0 implies static
@@ -219,6 +270,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody>, "Rigidbody must be trivially copyable");
 
+        /**
+         * @brief Data structure: PhysicsMaterial2D.
+         */
         struct PhysicsMaterial2D {
         public:
             float Friction = 0.2f;               // 0..1
@@ -227,6 +281,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
 
+        /**
+         * @brief Data structure: BoxCollider.
+         */
         struct BoxCollider {
         public:
             Vector3D HalfExtents{0.5f, 0.5f, 0.5f};
@@ -234,6 +291,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<BoxCollider>, "BoxCollider must be trivially copyable");
 
+        /**
+         * @brief Data structure: SphereCollider.
+         */
         struct SphereCollider {
         public:
             float Radius = 0.5f;
@@ -245,6 +305,9 @@ namespace ECS {
 
         // 2D linear velocity for X/Y; systems should update LocalTransform.Position.X/Y
         // Velocity is the rate of change of position per second.
+        /**
+         * @brief Data structure: LinearVelocity2D.
+         */
         struct LinearVelocity2D {
         public:
             Vector2D Value{0.0f, 0.0f};
@@ -253,6 +316,9 @@ namespace ECS {
 
         // 2D acceleration for X/Y
         // Acceleration is the rate of change of velocity per second.
+        /**
+         * @brief Data structure: Acceleration2D.
+         */
         struct Acceleration2D {
         public:
             Vector2D Value{0.0f, 0.0f};
@@ -260,6 +326,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Acceleration2D>, "Acceleration2D must be trivially copyable");
 
         // 2D angular velocity around Z axis (radians/sec); systems rotate LocalTransform.Rotation about Z
+        /**
+         * @brief Data structure: AngularVelocity2D.
+         */
         struct AngularVelocity2D {
         public:
             float Value = 0.0f;
@@ -267,6 +336,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<AngularVelocity2D>, "AngularVelocity2D must be trivially copyable");
 
         // 2D rigidbody
+        /**
+         * @brief Data structure: Rigidbody2D.
+         */
         struct Rigidbody2D {
         public:
             float Mass = 1.0f;          // Mass <= 0 => static
@@ -279,6 +351,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Rigidbody2D>, "Rigidbody2D must be trivially copyable");
 
         // Axis-aligned or oriented rectangle collider in 2D
+        /**
+         * @brief Data structure: BoxCollider2D.
+         */
         struct BoxCollider2D {
         public:
             Vector2D HalfExtents{0.5f, 0.5f}; // half-size
@@ -290,6 +365,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<BoxCollider2D>, "BoxCollider2D must be trivially copyable");
 
         // Circle collider in 2D
+        /**
+         * @brief Data structure: CircleCollider2D.
+         */
         struct CircleCollider2D {
         public:
             float Radius = 0.5f;
@@ -298,11 +376,53 @@ namespace ECS {
             uint32_t Flags = 0;               // bit 0: IsTrigger
         };
         static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
+        // Runtime physics linkage into physics-owned SoA buffers.
+        /**
+         * @brief Data structure: PhysicsBodyHandle2D.
+         */
+        struct PhysicsBodyHandle2D {
+        public:
+            uint32_t BodyIndex = UINT32_MAX;
+        };
+        static_assert(std::is_trivially_copyable_v<PhysicsBodyHandle2D>, "PhysicsBodyHandle2D must be trivially copyable");
+
+        // Runtime physics active marker; set by PhysicsSystem during sync.
+        /**
+         * @brief Data structure: PhysicsActiveTag.
+         */
+        struct PhysicsActiveTag {
+        public:
+            bool Enabled = true;
+        };
+        static_assert(std::is_trivially_copyable_v<PhysicsActiveTag>, "PhysicsActiveTag must be trivially copyable");
+
+        // Runtime sleeping state updated after island sleep pass.
+        /**
+         * @brief Data structure: SleepingTag.
+         */
+        struct SleepingTag {
+        public:
+            bool Sleeping = false;
+        };
+        static_assert(std::is_trivially_copyable_v<SleepingTag>, "SleepingTag must be trivially copyable");
+
+        // Runtime per-body contact cache summary for debugging/introspection.
+        /**
+         * @brief Data structure: PhysicsContactCache2D.
+         */
+        struct PhysicsContactCache2D {
+        public:
+            uint32_t ContactCount = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<PhysicsContactCache2D>, "PhysicsContactCache2D must be trivially copyable");
 
 
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
+        /**
+         * @brief Data structure: SpriteRenderer2D.
+         */
         struct SpriteRenderer2D {   
         public:
             uint32_t TextureId = 0;
@@ -329,6 +449,9 @@ namespace ECS {
         
 
         // Optional: sprite flipping flags for atlases
+        /**
+         * @brief Data structure: SpriteFlip2D.
+         */
         struct SpriteFlip2D {
         public:
             bool FlipX = false;
@@ -337,6 +460,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
 
         // Optional: sprite shader options
+        /**
+         * @brief Data structure: SpriteShader2D.
+         */
         struct SpriteShader2D {
         public:
             bool Bloom = false;
@@ -346,6 +472,9 @@ namespace ECS {
 
         // Tile map reference + editor/runtime settings.
         // This is a lightweight handle to external tilemap data + tileset texture.
+        /**
+         * @brief Data structure: TileMapComponent.
+         */
         struct TileMapComponent {
         public:
             uint32_t TileMapPath = 0;           // StringId for the .tilemap asset path
@@ -363,6 +492,9 @@ namespace ECS {
         // ---------------------------------- Animation ----------------------------------
 
         // Sprite sheet animation configuration (POD)
+        /**
+         * @brief Data structure: SpriteSheetAnimation2D.
+         */
         struct SpriteSheetAnimation2D {
         public:
             static constexpr int MaxSegments = 8;
@@ -403,6 +535,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
         // Animation state (runtime data, updated by AnimationSystem)
+        /**
+         * @brief Data structure: AnimationState2D.
+         */
         struct AnimationState2D {
         public:
             int CurrentFrame = 0;             // Current frame index (relative to StartFrame)
@@ -414,6 +549,9 @@ namespace ECS {
         // ---------- Minimal 2D shape data for debug rendering ----------
         // Keep these POD to be fast and compatible with archetype moves.
 
+        /**
+         * @brief Data structure: ShapeCircle2D.
+         */
         struct ShapeCircle2D {
         public:
             float Radius = 0.5f;
@@ -424,6 +562,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ShapeCircle2D>, "ShapeCircle2D must be trivially copyable");
 
+        /**
+         * @brief Data structure: ShapeBox2D.
+         */
         struct ShapeBox2D {
         public:
             Vector2D HalfExtents{0.5f, 0.5f};
@@ -434,6 +575,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ShapeBox2D>, "ShapeBox2D must be trivially copyable");
 
+        /**
+         * @brief Data structure: ShapeLine2D.
+         */
         struct ShapeLine2D {
         public:
             Vector2D A{ 0.0f, 0.0f };     // local-space endpoints
@@ -445,6 +589,9 @@ namespace ECS {
 
         // This is the Z-order for 2D rendering; lower values drawn first
         // Can be used with Layer component
+        /**
+         * @brief Data structure: ZIndex2D.
+         */
         struct ZIndex2D {
         public:
             int16_t ZOrder = 0;  // smaller drawn first
@@ -453,6 +600,9 @@ namespace ECS {
         
         // ---------- Cameras ----------
 
+        /**
+         * @brief Data structure: Camera3D.
+         */
         struct Camera3D {
         public: 
             bool UsePerspective = false;
@@ -469,6 +619,9 @@ namespace ECS {
         // DO NOT USE UNLESS IT IS FOR EDITOR CAMERA ONLY!!!
         // DO NOT EXPOSE THIS TO COMPONENT LIST THAT CAN BE ADDED TO ENTITIES
         // DO NOT EXPOSE THIS TO C# SCRIPTS EITHER
+        /**
+         * @brief Data structure: CameraEditor3D.
+         */
         struct CameraEditor3D {
         public: 
             bool UsePerspective = false;
@@ -482,6 +635,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<CameraEditor3D>, "CameraEditor3D must be trivially copyable");
 
         // Optional matrices output for cameras (computed by CameraSystem)
+        /**
+         * @brief Data structure: CameraMatrices.
+         */
         struct CameraMatrices {
         public:
             Matrix4x4 View{};
@@ -490,6 +646,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CameraMatrices>, "CameraMatrices must be trivially copyable");
 
+        /**
+         * @brief Data structure: Light2D.
+         */
         struct Light2D {
         public:
             enum class Type : uint8_t {
@@ -509,6 +668,9 @@ namespace ECS {
 
         // ---------- Audio ----------
 
+        /**
+         * @brief Data structure: AudioSource.
+         */
         struct AudioSource {
         public:
 
@@ -540,6 +702,9 @@ namespace ECS {
 
         // Material2D: material properties for 2D rendering
         // Used in conjunction with SpriteRenderer2D for enhanced visual effects
+        /**
+         * @brief Data structure: Material2D.
+         */
         struct Material2D {
         public:
             enum class Material2DFlags : uint32_t {
@@ -575,6 +740,9 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<Material2D>, "Material2D must be trivially copyable");
 
         // CUDA-related stuff
+        /**
+         * @brief Data structure: ParticleEmitter.
+         */
         struct ParticleEmitter {
             uint32_t presetId = 0;        // index into ParticleSystem's preset registry
             int      maxParticles = 1000;     // GPU buffer capacity
@@ -616,6 +784,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ParticleEmitter>, "ParticleEmitter must be trivially copyable");
 
+        /**
+         * @brief Data structure: BoidFlock.
+         */
         struct BoidFlock {
             int count               = 5000;
             float separationWeight  = 2.5f;
@@ -631,7 +802,7 @@ namespace ECS {
             float maxForce          = 1.2f;
             float boidSize          = 1.0f;     // world-space size of each boid quad
 
-            // No TexturePath / textureId — uses SpriteRenderer2D on the same entity
+            // No TexturePath / textureId ï¿½ uses SpriteRenderer2D on the same entity
         };
         static_assert(std::is_trivially_copyable_v<BoidFlock>, "BoidFlock must be trivially copyable");
 
@@ -649,11 +820,17 @@ namespace ECS {
             World = 1
         };
 
+        /**
+         * @brief Data structure: GUIRenderMode.
+         */
         struct GUIRenderMode {
             GUIRenderSpace Space = GUIRenderSpace::Screen; // Screen = pixels, World = world units
         };
         static_assert(std::is_trivially_copyable_v<GUIRenderMode>, "GUIRenderMode must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUICanvas.
+         */
         struct GUICanvas {
             Vector2D ReferenceSize{ 1920.0f, 1080.0f }; // logical design size used for scaling
             Vector2D Offset{ 0.0f, 0.0f };              // pixel offset applied after scaling
@@ -673,6 +850,9 @@ namespace ECS {
             BottomRight = 8
         };
 
+        /**
+         * @brief Data structure: GUIElement.
+         */
         struct GUIElement {
             Vector2D Position{ 0.0f, 0.0f };           // local offset from the anchor
             Vector2D Size{ 100.0f, 100.0f };           // logical size before scaling
@@ -694,12 +874,18 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUIPanel.
+         */
         struct GUIPanel {
             Color Color{ 0.2f, 0.2f, 0.2f, 1.0f };
             float CornerRadius = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<GUIPanel>, "GUIPanel must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUIText.
+         */
         struct GUIText {
             uint32_t TextId = 0;     // StringTable id for text content
             uint32_t FontPathId = 0; // StringTable id for font asset path
@@ -723,18 +909,34 @@ namespace ECS {
             HorizontalAlign HAlign = HorizontalAlign::Left; // horizontal text alignment
             VerticalAlign VAlign = VerticalAlign::Top;      // vertical text alignment
 
+            /**
+             * @brief Set text content.
+             * @param text Display text.
+             */
             void SetText(const std::string& text) {
                 TextId = text.empty() ? 0 : ECS::StringTable::Intern(text);
             }
 
+            /**
+             * @brief Get text content.
+             * @return Resolved text string.
+             */
             std::string GetText() const {
                 return TextId ? ECS::StringTable::Resolve(TextId) : std::string();
             }
 
+            /**
+             * @brief Set font asset path.
+             * @param path Project-relative font path.
+             */
             void SetFontPath(const std::string& path) {
                 FontPathId = path.empty() ? 0 : ECS::StringTable::Intern(path);
             }
 
+            /**
+             * @brief Get font asset path.
+             * @return Resolved font path string.
+             */
             std::string GetFontPath() const {
                 return FontPathId ? ECS::StringTable::Resolve(FontPathId) : std::string();
             }
@@ -747,6 +949,9 @@ namespace ECS {
             Fill = 2
         };
 
+        /**
+         * @brief Data structure: GUIImage.
+         */
         struct GUIImage {
             uint32_t TextureId = 0;      // runtime texture handle (optional)
             uint32_t TexturePathId = 0;  // StringTable id for texture path
@@ -760,6 +965,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUIImage>, "GUIImage must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUIInput.
+         */
         struct GUIInput {
             bool Hovered = false;  // pointer currently over element
             bool Pressed = false;  // pointer down while captured
@@ -771,6 +979,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUIInput>, "GUIInput must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUIStateStyle.
+         */
         struct GUIStateStyle {
             Color NormalColor{ 1.0f, 1.0f, 1.0f, 1.0f };   // default color
             Color HoverColor{ 0.9f, 0.9f, 0.9f, 1.0f };    // hover state color
@@ -779,6 +990,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUIStateStyle>, "GUIStateStyle must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUIButton.
+         */
         struct GUIButton {
             uint32_t TextId = 0;
             uint32_t FontPathId = 0;
@@ -796,6 +1010,9 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUIButton>, "GUIButton must be trivially copyable");
 
+        /**
+         * @brief Data structure: GUISlider.
+         */
         struct GUISlider {
             float Value = 0.0f; // current value
             float Min = 0.0f;   // minimum value
@@ -829,4 +1046,5 @@ namespace ECS {
     }
 }
 #endif
+
 
