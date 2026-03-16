@@ -648,6 +648,11 @@ if(BUILD_GAME AND TARGET GrapeRuntime)
               COMMAND ${CMAKE_COMMAND} -E copy_directory
                   "$<TARGET_FILE_DIR:GrapeRuntime>"
                   "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+              COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.Scripting/GrapeEngine.Scripting.csproj"
+                  --configuration Release
+                  --output "${EXPORT_OUTPUT_DIR}/$<CONFIG>"
+                  --no-restore
+                  /p:GrapeEngineGameExport=true
               ${EXPORT_ENGINE_DLL_COMMAND}
               COMMAND ${CMAKE_COMMAND} -E copy_directory
                   "${EXPORT_PROJECT_DIR}"

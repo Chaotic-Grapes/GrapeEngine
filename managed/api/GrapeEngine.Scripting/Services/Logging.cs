@@ -49,7 +49,7 @@ public static class Log
         string message,
         LogLevel level = LogLevel.Info)
     {
-#if DEBUG
+#if !GAME_EXPORT
         DebugAPI.ScriptLog(message, (byte)level);
 #endif
     }
@@ -63,7 +63,7 @@ public static class Log
         Func<string> messageFactory,
         LogLevel level = LogLevel.Info)
     {
-#if DEBUG
+#if !GAME_EXPORT
         DebugAPI.ScriptLog(messageFactory(), (byte)level);
 #endif
     }
@@ -81,7 +81,7 @@ public static class Log
         string file = "",
         int line = 0)
     {
-#if DEBUG
+#if !GAME_EXPORT
         DebugAPI.ScriptLogWithLocation(message, (byte)level, file, line);
 #endif
     }
@@ -99,7 +99,7 @@ public static class Log
         string file = "",
         int line = 0)
     {
-#if DEBUG
+#if !GAME_EXPORT
         DebugAPI.ScriptLogWithLocation(messageFactory(), (byte)level, file, line);
 #endif
     }

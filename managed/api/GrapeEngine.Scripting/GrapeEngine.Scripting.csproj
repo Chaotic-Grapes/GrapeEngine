@@ -12,6 +12,10 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(GrapeEngineGameExport)' == 'true'">
+    <DefineConstants>$(DefineConstants);GAME_EXPORT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- For Roslyn compilation support (hot reload) -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />

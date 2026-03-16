@@ -1,3 +1,5 @@
+using GrapeEngine.Scripting.Internal.Unsafe;
+
 namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
@@ -6,37 +8,101 @@ namespace GrapeEngine.Scripting.Services;
 /// </summary>
 internal static class Logging
 {
-    internal static void LogInternal(string message, LogLevel level)
+    private static bool IsRecoverableLoggingException(Exception ex)
     {
-#if !DEBUG
+        return ex is not OutOfMemoryException and not StackOverflowException;
+    }
+
+    private static byte ToNativeLogLevel(LogLevel level)
+    {
+        return level switch
+        {
+            LogLevel.Debug => 0,
+            LogLevel.Info => 1,
+            LogLevel.Warning => 2,
+            LogLevel.Error => 3,
+            LogLevel.Fatal => 4,
+            _ => 1
+        };
+    }
+
+    private static bool ShouldMirrorToConsolePanel(LogLevel level, bool logToConsolePanel)
+    {
+        if (logToConsolePanel)
+        {
+            return true;
+        }
+
+        return level is LogLevel.Warning or LogLevel.Error or LogLevel.Fatal;
+    }
+
+    private static string SanitizeForConsolePanel(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return message;
+        }
+
+        int index = 0;
+        while (index < message.Length)
+        {
+            while (index < message.Length && char.IsWhiteSpace(message[index]))
+            {
+                index++;
+            }
+
+            if (index >= message.Length || message[index] != '[')
+            {
+                break;
+            }
+
+            int closing = message.IndexOf(']', index + 1);
+            if (closing < 0)
+            {
+                break;
+            }
+
+            index = closing + 1;
+        }
+
+        if (index <= 0 || index >= message.Length)
+        {
+            return message.Trim();
+        }
+
+        return message[index..].TrimStart();
+    }
+
+    internal static void LogInternal(string message, LogLevel level, bool logToConsolePanel = false)
+    {
+#if GAME_EXPORT
         return;
 #else
+        // Keep stdout logging regardless of native logging availability.
         var time = TimeOnly.FromDateTime(DateTime.Now).ToString(@"hh:mm");
-
-        switch (level)
+        string prefix = level switch
         {
-            case LogLevel.Info:
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"[{time}] [INF C#] {message}");
-                break;
-            case LogLevel.Debug:
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[{time}] [DBG C#] {message}");
-                break;
-            case LogLevel.Warning:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[{time}] [WRN C#] {message}");
-                break;
-            case LogLevel.Error:
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[{time}] [ERR C#] {message}");
-                break;
-            case LogLevel.Fatal:
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[{time}] [FTL C#] {message}");
-                break;
+            LogLevel.Debug => "DBG",
+            LogLevel.Info => "INF",
+            LogLevel.Warning => "WRN",
+            LogLevel.Error => "ERR",
+            LogLevel.Fatal => "FTL",
+            _ => "INF"
+        };
+        Console.WriteLine($"[{time}] [{prefix} C#] {message}");
+
+        if (!ShouldMirrorToConsolePanel(level, logToConsolePanel))
+        {
+            return;
         }
-        Console.ResetColor();
+
+        try
+        {
+            DebugAPI.ScriptLog(SanitizeForConsolePanel(message), ToNativeLogLevel(level));
+        }
+        catch (Exception ex) when (IsRecoverableLoggingException(ex))
+        {
+        }
 #endif
     }
 }

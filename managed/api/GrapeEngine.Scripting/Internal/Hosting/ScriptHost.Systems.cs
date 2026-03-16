@@ -10,6 +10,21 @@ namespace GrapeEngine.Scripting.Internal.Hosting;
 
 public static partial class ScriptHost
 {
+    private static bool IsRecoverableSystemCallbackException(Exception ex)
+    {
+        return ex is not OutOfMemoryException and not StackOverflowException;
+    }
+
+    private static string GetSystemLabel(ulong handle)
+    {
+        Type? systemType = SystemDiscovery.GetSystemType(handle);
+        if (systemType != null)
+        {
+            return systemType.FullName ?? systemType.Name;
+        }
+
+        return "unknown system";
+    }
 
         /// <summary>
         /// Called from C++ when creating ScriptSystemWrapper.
@@ -270,9 +285,9 @@ public static partial class ScriptHost
                     system.OnCreate(managedWorld);
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnCreate: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnCreate failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -300,9 +315,9 @@ public static partial class ScriptHost
                     system.OnUpdate(managedWorld);
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnUpdate: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnUpdate failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -384,9 +399,9 @@ public static partial class ScriptHost
                     return system.ShouldRun(managedWorld) ? 1 : 0;
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in ShouldRun: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] ShouldRun failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
 
             return 0;
@@ -416,9 +431,9 @@ public static partial class ScriptHost
                     system.OnDestroy(managedWorld);
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnDestroy failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -443,9 +458,9 @@ public static partial class ScriptHost
                     system.OnSceneStart();
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnSceneStart: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnSceneStart failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -470,9 +485,9 @@ public static partial class ScriptHost
                     system.OnSceneStop();
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnSceneStop: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnSceneStop failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -499,9 +514,9 @@ public static partial class ScriptHost
                     system.OnStartRunning(managedWorld);
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnStartRunning: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnStartRunning failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 
@@ -528,9 +543,9 @@ public static partial class ScriptHost
                     system.OnStopRunning(managedWorld);
                 }
             }
-            catch (Exception ex) when (IsRecoverableInteropException(ex))
+            catch (Exception ex) when (IsRecoverableSystemCallbackException(ex))
             {
-                Logging.LogInternal($"[ScriptHost] Error in OnStopRunning: {ex.Message}", LogLevel.Error);
+                Logging.LogInternal($"[ScriptHost] OnStopRunning failed in {GetSystemLabel(handle)}: {ex}", LogLevel.Error);
             }
         }
 }
