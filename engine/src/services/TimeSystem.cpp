@@ -97,8 +97,8 @@ void TimeSystem::Advance(double rawDeltaSeconds, double /*nowSeconds*/) {
         sum += v;
     m_smoothDeltaTime = sum / static_cast<double>(m_smoothWindow.size());
 
-    // Apply time scale
-    double unscaledSeconds = rawDeltaSeconds;
+    // Apply time scale to the clamped frame delta so fixed-step consumers stay stable on hitches.
+    double unscaledSeconds = clampedDelta;
     double scaledSeconds = unscaledSeconds * (double)m_timeScale.load();
 
     m_unscaledDeltaTime = (float)unscaledSeconds;

@@ -129,6 +129,11 @@ namespace ECS {
         const Engine::Physics2D::PhysicsStats2D& GetStats() const { return m_physicsWorld2D.GetStats(); }
 
         /**
+         * @brief Return unconsumed fixed-step accumulator time for render interpolation.
+         */
+        float GetRemainingAccumulatorSeconds() const { return m_accumulatorSeconds; }
+
+        /**
          * @brief Cached tilemap state mirrored from ECS for physics stepping.
          */
         struct RuntimeTileMapEntry {

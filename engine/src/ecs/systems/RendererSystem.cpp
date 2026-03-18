@@ -33,6 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Engine Systems
 // ============================================================================
 #include "ecs/systems/BoidSystem.h"
+#include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 
 // ============================================================================
@@ -252,21 +253,93 @@ namespace ECS {
         return true;
     }
 
-    // Helper function to get the effective transform for rendering
-    // Uses WorldTransform if available, otherwise falls back to LocalTransform
+    static bool BuildWorldFromLocalHierarchy(
+        World& world,
+        const Entity entity,
+        const Components::LocalTransform& local,
+        Vector3D& outPosition,
+        Quaternion& outRotation,
+        Vector3D& outScale)
+    {
+        Matrix4x4 worldMatrix = TransformUtils::MakeTRS(local.Position, local.Rotation, local.Scale);
+        Entity parent = world.ParentOf(entity);
+        while (!parent.IsNull()) {
+            if (const auto* parentLocal = world.TryGet<Components::LocalTransform>(parent)) {
+                const Matrix4x4 parentMatrix = TransformUtils::MakeTRS(parentLocal->Position, parentLocal->Rotation, parentLocal->Scale);
+                worldMatrix = parentMatrix * worldMatrix;
+            } else if (world.Has<Components::WorldTransform>(parent)) {
+                const auto& parentWorld = world.Get<Components::WorldTransform>(parent);
+                worldMatrix = parentWorld.Matrix * worldMatrix;
+                break;
+            } else {
+                break;
+            }
+            parent = world.ParentOf(parent);
+        }
+
+        TransformUtils::DecomposeTRS(worldMatrix, outPosition, outRotation, outScale);
+        return true;
+    }
+
+    static float GetPhysicsInterpolationSecondsForFrame() {
+        static int cachedFrame = -1;
+        static float cachedSeconds = 0.0f;
+
+        const int frame = TimeSystem::Instance().GetFrameCount();
+        if (frame == cachedFrame) {
+            return cachedSeconds;
+        }
+
+        cachedFrame = frame;
+        cachedSeconds = 0.0f;
+
+        if (!Engine::CORE) {
+            return cachedSeconds;
+        }
+
+        auto* physicsSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::PhysicsSystem>();
+        if (!physicsSystem) {
+            return cachedSeconds;
+        }
+
+        cachedSeconds = physicsSystem->GetRemainingAccumulatorSeconds();
+        if (cachedSeconds < 0.0f) {
+            cachedSeconds = 0.0f;
+        }
+        return cachedSeconds;
+    }
+
+    // Helper function to get the effective transform for rendering.
+    // Dynamic physics bodies use latest LocalTransform hierarchy data to avoid stale pre-physics WorldTransform.
     static void GetRenderTransform(World& world, const Entity entity,
         const Components::LocalTransform& lt,
         Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) {
-        if (world.Has<Components::WorldTransform>(entity)) {
+        const auto* rb = world.TryGet<Components::Rigidbody2D>(entity);
+        const auto* vel = world.TryGet<Components::LinearVelocity2D>(entity);
+        const bool isDynamicPhysicsBody = rb && vel && rb->Mass > 0.0f;
+
+        if (isDynamicPhysicsBody) {
+            BuildWorldFromLocalHierarchy(world, entity, lt, outPosition, outRotation, outScale);
+        } else if (world.Has<Components::WorldTransform>(entity)) {
             const auto& wt = world.Get<Components::WorldTransform>(entity);
-            // Decompose world matrix to get position, rotation, scale
             TransformUtils::DecomposeTRS(wt.Matrix, outPosition, outRotation, outScale);
-        }
-        else {
-            // No WorldTransform, use LocalTransform directly
+        } else {
             outPosition = lt.Position;
             outRotation = lt.Rotation;
             outScale = lt.Scale;
+        }
+
+        if (isDynamicPhysicsBody) {
+            const float interpSeconds = GetPhysicsInterpolationSecondsForFrame();
+            if (interpSeconds > 0.0f) {
+                outPosition.X += vel->Value.X * interpSeconds;
+                outPosition.Y += vel->Value.Y * interpSeconds;
+                if (const auto* angVel = world.TryGet<Components::AngularVelocity2D>(entity)) {
+                    if ((rb->Flags & (1u << 2)) == 0u) {
+                        outRotation = Quaternion::FromEulerRad(0.0f, 0.0f, angVel->Value * interpSeconds) * outRotation;
+                    }
+                }
+            }
         }
     }
 
