@@ -1,10 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileMap.hpp
-\author Choi Meng Yew (100%)
+\author Choi Meng Yew (90%)
+        Samantha Leong (10%)
 \date   31st January 2026
-\co-author Samantha Leong
-\par    s.leong@digipen.edu
+\par    choi.m@digipen.edu
+        s.leong@digipen.edu
 \date   3rd February 2026
 \brief
 Defines the TileMap class, which owns and coordinates multiple tile layers

@@ -71,6 +71,12 @@ INTEROP_API uint32_t PrefabManagerInterop_RegisterPrefab(void* prefabManagerPtr,
     return manager->RegisterPrefab(path);
 }
 
+/**
+ * @brief Resolve a prefab hash back to its registered path.
+ * @param prefabManagerPtr Pointer to the PrefabManager.
+ * @param hash FNV-1a hash of the prefab path.
+ * @return const char* Internal path string pointer, or empty string on error.
+ */
 INTEROP_API const char* PrefabManagerInterop_GetPrefabPath(void* prefabManagerPtr, uint32_t hash) {
     if (!prefabManagerPtr)
         return "";
@@ -101,6 +107,12 @@ INTEROP_API bool PrefabManagerInterop_IsRegistered(void* prefabManagerPtr, uint3
 // Prefab Instantiation
 // ============================================================================
 
+/**
+ * @brief Instantiate a prefab and return the created entity id.
+ * @param prefabManagerPtr Pointer to the PrefabManager.
+ * @param path Path to the prefab asset.
+ * @return uint32_t Entity id of the instantiated prefab, or 0 on failure.
+ */
 INTEROP_API uint32_t PrefabManagerInterop_Instantiate(void* prefabManagerPtr, const char* path) {
     if (!prefabManagerPtr || !path)
         return 0;
@@ -138,6 +150,12 @@ INTEROP_API uint32_t PrefabManagerInterop_InstantiateAsChild(void* prefabManager
 // Instance Tracking
 // ============================================================================
 
+/**
+ * @brief Track an instantiated entity as a prefab instance.
+ * @param prefabManagerPtr Pointer to the PrefabManager.
+ * @param entityId Entity id to track.
+ * @param prefabHash FNV-1a hash of the source prefab path.
+ */
 INTEROP_API void PrefabManagerInterop_TrackInstance(void* prefabManagerPtr, uint32_t entityId, uint32_t prefabHash) {
     if (!prefabManagerPtr)
         return;
@@ -168,6 +186,12 @@ INTEROP_API void PrefabManagerInterop_UntrackInstance(void* prefabManagerPtr, ui
     manager->UntrackInstance(entity);
 }
 
+/**
+ * @brief Get the number of tracked instances for a prefab hash.
+ * @param prefabManagerPtr Pointer to the PrefabManager.
+ * @param prefabHash FNV-1a hash of the prefab path.
+ * @return uint32_t Number of tracked instances, or 0 on error.
+ */
 INTEROP_API uint32_t PrefabManagerInterop_GetInstanceCount(void* prefabManagerPtr, uint32_t prefabHash) {
     if (!prefabManagerPtr)
         return 0;

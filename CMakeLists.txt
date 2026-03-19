@@ -308,6 +308,27 @@ if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
     endif()
 endif()
 
+# Copy transitive runtime DLLs (including CUDA runtime when enabled).
+# This keeps build/export behavior consistent across machines.
+if(WIN32 AND (BUILD_ENGINE_SHARED OR GRAPE_HAS_CUDA OR TARGET fmod))
+    if(BUILD_EDITOR AND TARGET GrapeEditor)
+        add_custom_target(Copy_Runtime_DLLs_Editor ALL
+            COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:GrapeEditor>" $<TARGET_RUNTIME_DLLS:GrapeEditor>
+            COMMAND_EXPAND_LISTS
+            DEPENDS GrapeEditor
+            COMMENT "Copying runtime DLL dependencies for editor"
+        )
+    endif()
+    if(BUILD_GAME AND TARGET GrapeRuntime)
+        add_custom_target(Copy_Runtime_DLLs_Runtime ALL
+            COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:GrapeRuntime>" $<TARGET_RUNTIME_DLLS:GrapeRuntime>
+            COMMAND_EXPAND_LISTS
+            DEPENDS GrapeRuntime
+            COMMENT "Copying runtime DLL dependencies for game"
+        )
+    endif()
+endif()
+
 # Copy FMOD DLL (Windows) for editor
 if(BUILD_EDITOR)
     if(DEFINED FMOD_LIB_DIR AND EXISTS "${FMOD_LIB_DIR}/fmod.dll")

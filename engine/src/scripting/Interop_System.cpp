@@ -20,6 +20,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "core/Logger.h"
 
+/**
+ * @brief Enable or disable a system by name.
+ * @param systemName The target system name.
+ * @param enabled True to enable, false to disable.
+ * @return True if the system state was updated, false otherwise.
+ */
 INTEROP_API bool EngineInterop_System_SetEnabled(const char* systemName, bool enabled) {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
@@ -33,6 +39,11 @@ INTEROP_API bool EngineInterop_System_SetEnabled(const char* systemName, bool en
     return Engine::CORE->GetSystemManager().SetSystemEnabled(systemName, enabled);
 }
 
+/**
+ * @brief Check whether a system is enabled by name.
+ * @param systemName The target system name.
+ * @return True if the system is enabled, false otherwise.
+ */
 INTEROP_API bool EngineInterop_System_IsEnabled(const char* systemName) {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");

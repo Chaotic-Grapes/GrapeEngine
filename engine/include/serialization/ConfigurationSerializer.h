@@ -204,6 +204,11 @@ namespace Serialization {
         }
         
     private:
+        /**
+         * @brief Normalizes window mode input into supported canonical values.
+         * @param mode Raw mode string from settings.
+         * @return Canonical mode string ("Windowed", "Fullscreen", or "Borderless").
+         */
         static std::string _normalizeWindowMode(const std::string& mode) {
             if (mode.empty()) {
                 return "Windowed";
@@ -227,6 +232,11 @@ namespace Serialization {
             return "Windowed";
         }
 
+        /**
+         * @brief Parses and applies window configuration values from JSON.
+         * @param configJson JSON object containing window settings.
+         * @param window Window settings structure to update.
+         */
         static void _parseWindowConfig(const json& configJson, ProjectSettings::Window& window) {
             if (configJson.contains("Width")) {
                 window.Width = configJson["Width"].get<int>();

@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+﻿/* Start Header *****************************************************************/
 /*!
 \file    EntitySerializer.h
 \authors Daniel Neo Zuo Feng Kay (85%)
@@ -58,14 +58,24 @@ using json = nlohmann::json;
 #pragma region nlohmann_adl_helpers
 // ADL helpers: call unqualified to_json/from_json with 'using' to enable ADL
 namespace Serialization {
-    // Route serialization through ADL so component-specific overloads are discovered reliably
+    /**
+     * @brief Routes serialization through ADL for component-specific overload discovery.
+     * @tparam U Serializable type.
+     * @param j Destination JSON object.
+     * @param v Value to serialize.
+     */
     template<typename U>
     inline void to_json_adl(nlohmann::json& j, const U& v) {
         using nlohmann::to_json;
         to_json(j, v);
     }
 
-    // Route deserialization through ADL so component-specific overloads are discovered reliably
+    /**
+     * @brief Routes deserialization through ADL for component-specific overload discovery.
+     * @tparam U Deserializable type.
+     * @param j Source JSON object.
+     * @return Deserialized value of type U.
+     */
     template<typename U>
     inline U from_json_adl(const nlohmann::json& j) {
         U tmp;
@@ -74,7 +84,11 @@ namespace Serialization {
         return tmp;
     }
 
-    // Hash a component name into a stable 32-bit key used by the serializer registry
+    /**
+     * @brief Hashes a component name into a stable 32-bit key.
+     * @param str Null-terminated component name string.
+     * @return FNV-1a hash value.
+     */
     constexpr uint32_t FNV1aHash(const char* str) {
         uint32_t hash = 2166136261u;
         while (*str) {
@@ -101,7 +115,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Matrix4x4, m00, m01, m02, m03, m10, m11, m12,
 // ECS Component Serialization Definitions
 namespace ECS {
     namespace Components {
-        // Convert absolute project paths into project-relative strings for portable saved files
+        /**
+         * @brief Converts absolute project paths into project-relative paths for storage.
+         * @param path Source path to normalize.
+         * @return Project-relative path when possible, otherwise the original input.
+         */
         inline std::string NormalizeProjectPathForStorage(const std::string& path) {
             if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
                 return path;
@@ -116,7 +134,11 @@ namespace ECS {
             return relative.empty() ? path : relative;
         }
 
-        // Expand saved relative project paths back into absolute paths for runtime loading
+        /**
+         * @brief Resolves stored relative project paths back into absolute runtime paths.
+         * @param path Stored path value from serialized data.
+         * @return Absolute path when conversion is possible, otherwise the original input.
+         */
         inline std::string ResolveProjectPathForLoad(const std::string& path) {
             if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
                 return path;
@@ -132,12 +154,21 @@ namespace ECS {
 
         // Place component-specific NLOHMANN macros inside the component namespace so ADL
         // can locate the generated to_json/from_json overloads for these types
-        // Custom serialization for Name component (StringId stored as uint32_t)
+        /**
+         * @brief Serializes Name by resolving StringId to text.
+         * @param j Destination JSON object.
+         * @param n Name component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const Name& n) {
             std::string value = ECS::StringTable::Resolve(n.Value);
             j = nlohmann::json{ {"Value", value} };
         }
 
+        /**
+         * @brief Deserializes Name from either string or legacy uint32 id.
+         * @param j Source JSON object.
+         * @param n Name component to populate.
+         */
         inline void from_json(const nlohmann::json& j, Name& n) {
             if (j.contains("Value")) {
                 if (j["Value"].is_string()) {
@@ -174,8 +205,16 @@ namespace ECS {
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsBodyHandle2D, BodyIndex)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsActiveTag, Enabled)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SleepingTag, Sleeping)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsContactCache2D, ContactCount)
 
-        // Custom serialization for SpriteRenderer2D (StringId paths need special handling)
+        /**
+         * @brief Serializes SpriteRenderer2D with normalized path fields.
+         * @param j Destination JSON object.
+         * @param sprite SpriteRenderer2D component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
             std::string texturePath = ECS::StringTable::Resolve(sprite.TexturePath);
             std::string normalTexturePath = ECS::StringTable::Resolve(sprite.NormalTexturePath);
@@ -198,6 +237,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes SpriteRenderer2D and restores runtime texture ids from paths.
+         * @param j Source JSON object.
+         * @param sprite SpriteRenderer2D component to populate.
+         */
         inline void from_json(const nlohmann::json& j, SpriteRenderer2D& sprite) {
             // Handle TexturePath (StringId) first
             std::string texPath = j.value("TexturePath", std::string());
@@ -273,7 +317,11 @@ namespace ECS {
 
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
 
-        // Custom serialization for SpriteSheetAnimation2D (StringId paths need special handling)
+        /**
+         * @brief Serializes SpriteSheetAnimation2D with normalized texture paths.
+         * @param j Destination JSON object.
+         * @param anim SpriteSheetAnimation2D component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const SpriteSheetAnimation2D& anim) {
             std::string texturePath = ECS::StringTable::Resolve(anim.TexturePath);
             std::string normalTexturePath = ECS::StringTable::Resolve(anim.NormalTexturePath);
@@ -314,6 +362,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes SpriteSheetAnimation2D and restores runtime texture ids.
+         * @param j Source JSON object.
+         * @param anim SpriteSheetAnimation2D component to populate.
+         */
         inline void from_json(const nlohmann::json& j, SpriteSheetAnimation2D& anim) {
             // Handle TexturePath (StringId) first
             std::string texPath = j.value("TexturePath", std::string());
@@ -402,7 +455,11 @@ namespace ECS {
                 j.value("TextureFilter", static_cast<uint8_t>(Graphics::TextureFilter::Nearest)));
         }
 
-        // Custom serialization for TileMapComponent (StringId paths need special handling)
+        /**
+         * @brief Serializes TileMapComponent with normalized path fields.
+         * @param j Destination JSON object.
+         * @param tilemap TileMapComponent to serialize.
+         */
         inline void to_json(nlohmann::json& j, const TileMapComponent& tilemap) {
             std::string mapPath = ECS::StringTable::Resolve(tilemap.TileMapPath); // Resolve StringId -> path string.
             std::string tilesetPath = ECS::StringTable::Resolve(tilemap.TilesetTexturePath); // Resolve StringId -> path string.
@@ -420,6 +477,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes TileMapComponent from JSON.
+         * @param j Source JSON object.
+         * @param tilemap TileMapComponent to populate.
+         */
         inline void from_json(const nlohmann::json& j, TileMapComponent& tilemap) {
             std::string mapPath = j.value("TileMapPath", std::string()); // Read map path from JSON.
             std::string tilesetPath = j.value("TilesetTexturePath", std::string()); // Read tileset path from JSON.
@@ -445,7 +507,11 @@ namespace ECS {
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
         NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabInstanceMetadata, PrefabHash, Flags)
 
-        // Custom serialization for BoidFlock
+        /**
+         * @brief Serializes BoidFlock simulation parameters.
+         * @param j Destination JSON object.
+         * @param b BoidFlock component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const BoidFlock& b)
         {
             j = nlohmann::json{
@@ -462,6 +528,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes BoidFlock simulation parameters.
+         * @param j Source JSON object.
+         * @param b BoidFlock component to populate.
+         */
         inline void from_json(const nlohmann::json& j, BoidFlock& b)
         {
             // Match struct defaults exactly
@@ -479,6 +550,11 @@ namespace ECS {
             b.boidSize = j.value("boidSize", 1.0f);
         }
 
+        /**
+         * @brief Serializes ParticleEmitter fields and normalized texture path.
+         * @param j Destination JSON object.
+         * @param e ParticleEmitter component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const ParticleEmitter& e)
         {
             std::string path = ECS::StringTable::Resolve(e.TexturePath);
@@ -509,6 +585,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes ParticleEmitter fields and restores runtime texture id.
+         * @param j Source JSON object.
+         * @param e ParticleEmitter component to populate.
+         */
         inline void from_json(const nlohmann::json& j, ParticleEmitter& e)
         {
             e.presetId = j.value("presetId", 0u);
@@ -561,21 +642,33 @@ namespace ECS {
             }
         }
         
-        // Custom serialization for PrefabLink component (StringId path needs special handling)
-        // [DEPRECATED] Kept for backward compatibility during migration to PrefabInstanceMetadata
+        /**
+         * @brief Serializes deprecated PrefabLink for backward compatibility.
+         * @param j Destination JSON object.
+         * @param link PrefabLink component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const PrefabLink& link) {
             std::string prefabPath = ECS::StringTable::Resolve(link.PrefabPath);
             prefabPath = NormalizeProjectPathForStorage(prefabPath);
             j = nlohmann::json{ {"prefabPath", prefabPath} };
         }
 
+        /**
+         * @brief Deserializes deprecated PrefabLink for backward compatibility.
+         * @param j Source JSON object.
+         * @param link PrefabLink component to populate.
+         */
         inline void from_json(const nlohmann::json& j, PrefabLink& link) {
             std::string path = j.at("prefabPath").get<std::string>();
             path = NormalizeProjectPathForStorage(path);
             link.PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
         }
 
-        // Custom serialization for Light2D enum
+        /**
+         * @brief Serializes Light2D values to JSON.
+         * @param j Destination JSON object.
+         * @param light Light2D component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const Light2D& light) {
             j = nlohmann::json{
                 {"LightType", static_cast<uint8_t>(light.LightType)},
@@ -588,6 +681,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes Light2D values from JSON.
+         * @param j Source JSON object.
+         * @param light Light2D component to populate.
+         */
         inline void from_json(const nlohmann::json& j, Light2D& light) {
             light.LightType = static_cast<Light2D::Type>(j.at("LightType").get<uint8_t>());
             light.Position = j.at("Position").get<Vector3D>();
@@ -598,8 +696,11 @@ namespace ECS {
             light.CastsShadows = j.at("CastsShadows").get<bool>();
         }
 
-
-        // Custom serialization for AudioSource to handle backward-compatible defaults
+        /**
+         * @brief Serializes AudioSource with backward-compatible cue path fields.
+         * @param j Destination JSON object.
+         * @param src AudioSource component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const AudioSource& src) {
             std::string cuePath = ECS::StringTable::Resolve(src.CuePathId);
             cuePath = NormalizeProjectPathForStorage(cuePath);
@@ -624,6 +725,11 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Deserializes AudioSource with backward-compatible cue fields.
+         * @param j Source JSON object.
+         * @param src AudioSource component to populate.
+         */
         inline void from_json(const nlohmann::json& j, AudioSource& src) {
             std::string cuePath = j.value("CuePath", std::string());
             if (!cuePath.empty()) {
@@ -651,7 +757,11 @@ namespace ECS {
             src.FadeOutDuration = j.value("FadeOutDuration", 1.0f);
         }
     
-        // Custom serialization for Material2D
+        /**
+         * @brief Serializes Material2D including normalized texture paths.
+         * @param j Destination JSON object.
+         * @param mat Material2D component to serialize.
+         */
         inline void to_json(nlohmann::json& j, const Material2D& mat) {
             std::string normalTexturePath = ECS::StringTable::Resolve(mat.NormalTexturePath);
             std::string mraTexturePath = ECS::StringTable::Resolve(mat.MRA_TexturePath);
@@ -671,6 +781,11 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Deserializes Material2D and restores runtime texture ids.
+         * @param j Source JSON object.
+         * @param mat Material2D component to populate.
+         */
         inline void from_json(const nlohmann::json& j, Material2D& mat) {
             // 1. Handle Normal Map
             std::string normPath = j.value("NormalTexturePath", std::string());
@@ -711,17 +826,31 @@ namespace ECS {
             mat.Flags = j.value("Flags", 0u);
         }
 
-        // Resolve a StringTable id to text and return empty when the id is zero
+        /**
+         * @brief Resolves a StringTable id into text.
+         * @param id Interned string id.
+         * @return Resolved string, or empty string when id is zero.
+         */
         inline std::string ResolveStringId(uint32_t id) {
             return id ? ECS::StringTable::Resolve(id) : std::string();
         }
 
-        // Resolve a StringTable id and normalize it for stable on-disk path storage
+        /**
+         * @brief Resolves a StringTable path id and normalizes it for storage.
+         * @param id Interned path id.
+         * @return Normalized storage path string.
+         */
         inline std::string ResolvePathId(uint32_t id) {
             return NormalizeProjectPathForStorage(ResolveStringId(id));
         }
 
-        // Read a path-like field from JSON as either string or legacy uint32 id
+        /**
+         * @brief Reads a path-like JSON field as string or legacy uint32 id.
+         * @param j Source JSON object.
+         * @param key Field name to read.
+         * @param defaultId Fallback id when the field is missing or invalid.
+         * @return Interned string id for the parsed path value.
+         */
         inline uint32_t ReadPathId(const nlohmann::json& j, const char* key, uint32_t defaultId = 0) {
             if (!j.contains(key)) {
                 return defaultId;
@@ -741,6 +870,13 @@ namespace ECS {
             return defaultId;
         }
 
+        /**
+         * @brief Reads a generic StringTable-backed field as string or uint32 id.
+         * @param j Source JSON object.
+         * @param key Field name to read.
+         * @param defaultId Fallback id when the field is missing or invalid.
+         * @return Interned string id resolved from the field.
+         */
         inline uint32_t ReadStringId(const nlohmann::json& j, const char* key, uint32_t defaultId = 0) {
             if (!j.contains(key)) {
                 return defaultId;
@@ -760,16 +896,31 @@ namespace ECS {
         }
 
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUICanvas, ReferenceSize, Offset, ScaleMode)
+    /**
+     * @brief Serializes GUIRenderMode to JSON.
+     * @param j Destination JSON object.
+     * @param mode GUIRenderMode component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIRenderMode& mode) {
         j = nlohmann::json{
             {"Space", static_cast<uint8_t>(mode.Space)}
         };
     }
 
+    /**
+     * @brief Deserializes GUIRenderMode from JSON.
+     * @param j Source JSON object.
+     * @param mode GUIRenderMode component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIRenderMode& mode) {
         mode.Space = static_cast<GUIRenderSpace>(j.value("Space", static_cast<uint8_t>(GUIRenderSpace::Screen)));
     }
 
+    /**
+     * @brief Converts legacy alignment values into anchor coordinates.
+     * @param alignment Legacy GUI alignment enum value.
+     * @return Anchor vector corresponding to the alignment.
+     */
     inline Vector2D LegacyAnchorFromAlignment(GUIAlignment alignment) {
         switch (alignment) {
         case GUIAlignment::Top:
@@ -793,6 +944,11 @@ namespace ECS {
             return { 0.0f, 0.0f };
         }
     }
+    /**
+     * @brief Serializes GUIElement layout and visibility fields.
+     * @param j Destination JSON object.
+     * @param element GUIElement component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIElement& element) {
         j = nlohmann::json{
             {"Position", element.Position},
@@ -807,6 +963,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUIElement layout and visibility fields.
+     * @param j Source JSON object.
+     * @param element GUIElement component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIElement& element) {
         if (j.contains("Position")) element.Position = j.at("Position").get<Vector2D>();
         if (j.contains("Size")) element.Size = j.at("Size").get<Vector2D>();
@@ -835,6 +996,11 @@ namespace ECS {
     }
 
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, Color, CornerRadius)
+    /**
+     * @brief Serializes GUIText values and normalized font path.
+     * @param j Destination JSON object.
+     * @param text GUIText component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIText& text) {
         const std::string value = ECS::StringTable::Resolve(text.TextId);
         std::string fontPath = ECS::StringTable::Resolve(text.FontPathId);
@@ -850,6 +1016,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUIText values and interned text/path ids.
+     * @param j Source JSON object.
+     * @param text GUIText component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIText& text) {
         const std::string value = j.value("Text", "");
         std::string fontPath = j.value("FontPath", "");
@@ -870,7 +1041,12 @@ namespace ECS {
         text.VAlign = static_cast<GUIText::VerticalAlign>(j.value("VAlign", 0));
     }
 
-        inline void to_json(nlohmann::json& j, const GUIImage& image) {
+    /**
+     * @brief Serializes GUIImage values and texture path id.
+     * @param j Destination JSON object.
+     * @param image GUIImage component to serialize.
+     */
+    inline void to_json(nlohmann::json& j, const GUIImage& image) {
             j = nlohmann::json{
                 {"TexturePath", ResolvePathId(image.TexturePathId)},
                 {"Color", image.Color},
@@ -882,6 +1058,11 @@ namespace ECS {
             };
         }
 
+    /**
+     * @brief Deserializes GUIImage values and texture path id.
+     * @param j Source JSON object.
+     * @param image GUIImage component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIImage& image) {
         image.TexturePathId = ReadPathId(j, "TexturePath", 0);
         if (j.contains("Color")) {
@@ -897,6 +1078,11 @@ namespace ECS {
             image.SliceBorder = j.contains("SliceBorder") ? j.at("SliceBorder").get<Vector4D>() : Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
         }
 
+    /**
+     * @brief Serializes GUIInput interaction state flags.
+     * @param j Destination JSON object.
+     * @param input GUIInput component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIInput& input) {
         j = nlohmann::json{
             {"Hovered", input.Hovered},
@@ -909,6 +1095,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUIInput interaction state flags.
+     * @param j Source JSON object.
+     * @param input GUIInput component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIInput& input) {
         input.Hovered = j.value("Hovered", false);
         input.Pressed = j.value("Pressed", false);
@@ -919,6 +1110,11 @@ namespace ECS {
         input.Exited = j.value("Exited", false);
     }
 
+    /**
+     * @brief Serializes GUIStateStyle color values.
+     * @param j Destination JSON object.
+     * @param style GUIStateStyle component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIStateStyle& style) {
         j = nlohmann::json{
             {"NormalColor", style.NormalColor},
@@ -928,6 +1124,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUIStateStyle color values.
+     * @param j Source JSON object.
+     * @param style GUIStateStyle component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIStateStyle& style) {
         if (j.contains("NormalColor")) style.NormalColor = j.at("NormalColor").get<::Color>();
         if (j.contains("HoverColor")) style.HoverColor = j.at("HoverColor").get<::Color>();
@@ -935,6 +1136,11 @@ namespace ECS {
         if (j.contains("DisabledColor")) style.DisabledColor = j.at("DisabledColor").get<::Color>();
     }
 
+    /**
+     * @brief Serializes GUIButton values and StringTable-backed ids.
+     * @param j Destination JSON object.
+     * @param button GUIButton component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUIButton& button) {
         j = nlohmann::json{
             {"Text", ResolveStringId(button.TextId)},
@@ -953,6 +1159,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUIButton values and StringTable-backed ids.
+     * @param j Source JSON object.
+     * @param button GUIButton component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUIButton& button) {
         button.TextId = ReadStringId(j, "Text", 0);
         button.FontPathId = ReadPathId(j, "FontPath", 0);
@@ -969,6 +1180,11 @@ namespace ECS {
         button.Toggled = j.value("Toggled", false);
     }
 
+    /**
+     * @brief Serializes GUISlider values and texture path ids.
+     * @param j Destination JSON object.
+     * @param slider GUISlider component to serialize.
+     */
     inline void to_json(nlohmann::json& j, const GUISlider& slider) {
         j = nlohmann::json{
             {"Value", slider.Value},
@@ -993,6 +1209,11 @@ namespace ECS {
         };
     }
 
+    /**
+     * @brief Deserializes GUISlider values and texture path ids.
+     * @param j Source JSON object.
+     * @param slider GUISlider component to populate.
+     */
     inline void from_json(const nlohmann::json& j, GUISlider& slider) {
         slider.Value = j.value("Value", 0.0f);
         slider.Min = j.value("Min", 0.0f);
@@ -1036,6 +1257,9 @@ namespace Serialization {
         using HasFn = std::function<bool(const ECS::World&, ECS::Entity)>;
         using RemoveFn = std::function<void(ECS::World&, ECS::Entity)>;
 
+        /**
+         * @brief Data structure: ComponentInfo.
+         */
         struct ComponentInfo {
             std::string Name;
             uint32_t TypeHash;
@@ -1045,13 +1269,20 @@ namespace Serialization {
             RemoveFn Remove;
         };
 
-        // Return the singleton component serializer registry keyed by component hash
+        /**
+         * @brief Returns the singleton component serializer registry keyed by type hash.
+         * @return Mutable map of component hash to serializer metadata and callbacks.
+         */
         static std::unordered_map<uint32_t, ComponentInfo>& Registry() {
             static std::unordered_map<uint32_t, ComponentInfo> reg;
             return reg;
         }
 
-        // Register serializer callbacks for one concrete component type
+        /**
+         * @brief Registers serializer callbacks for a concrete component type.
+         * @tparam T Concrete component type.
+         * @param name Stable component name used for hashing and persistence.
+         */
         template<typename T>
         static void RegisterComponent(const char* name) {
             const uint32_t typeHash = Serialization::FNV1aHash(name);
@@ -1136,7 +1367,12 @@ namespace Serialization {
             };
         }
 
-        // Serialize one entity, including registered native components and discovered managed components
+        /**
+         * @brief Serializes one entity and all serializable components to JSON.
+         * @param world Source world containing the entity.
+         * @param e Entity to serialize.
+         * @return JSON object with serialized component entries.
+         */
         static json SerializeEntity(const ECS::World& world, const ECS::Entity e) {
             json entityJson;
             entityJson["Components"] = json::array();
@@ -1238,7 +1474,12 @@ namespace Serialization {
             return entityJson;
         }
 
-        // Deserialize one entity and rebuild native and managed component state from JSON
+        /**
+         * @brief Deserializes one entity from JSON and reconstructs component state.
+         * @param world Destination world where the entity is created.
+         * @param entityJson JSON payload containing entity component data.
+         * @return Newly created entity, or null entity if creation fails.
+         */
         static ECS::Entity DeserializeEntity(ECS::World& world, const json& entityJson) {
             ECS::Entity e = world.Create();
             if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
@@ -1331,7 +1572,12 @@ namespace Serialization {
             return e;
         }
 
-        // Serialize one entity and recursively append all children beneath it
+        /**
+         * @brief Serializes an entity and recursively serializes all descendants.
+         * @param world Source world containing the hierarchy.
+         * @param e Root entity of the hierarchy subtree to serialize.
+         * @return JSON object containing the entity and nested children.
+         */
         static json SerializeEntityHierarchy(const ECS::World& world, const ECS::Entity e) {
             // Serialize the entity's components first
             json entityJson = SerializeEntity(world, e);
@@ -1365,7 +1611,13 @@ namespace Serialization {
             return entityJson;
         }
 
-        // Deserialize one entity hierarchy and reattach parent-child relationships
+        /**
+         * @brief Deserializes an entity hierarchy and restores parent-child links.
+         * @param world Destination world where entities are created.
+         * @param entityJson JSON payload for the current entity node.
+         * @param parentId Optional parent entity id for attachment.
+         * @return Root entity created for the current JSON node, or null entity on failure.
+         */
         static ECS::Entity DeserializeEntityHierarchy(ECS::World& world, const json& entityJson, EntityId parentId = ECS::Entity::NPOS32) {
             // Create this entity from JSON
             ECS::Entity entity = DeserializeEntity(world, entityJson);
@@ -1417,6 +1669,10 @@ namespace Serialization {
     REGISTER_COMPONENT_SERIALIZER(Rigidbody2D, ECS::Components::Rigidbody2D, "Rigidbody2D")
     REGISTER_COMPONENT_SERIALIZER(BoxCollider2D, ECS::Components::BoxCollider2D, "BoxCollider2D")
     REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D, "CircleCollider2D")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsBodyHandle2D, ECS::Components::PhysicsBodyHandle2D, "PhysicsBodyHandle2D")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsActiveTag, ECS::Components::PhysicsActiveTag, "PhysicsActiveTag")
+    REGISTER_COMPONENT_SERIALIZER(SleepingTag, ECS::Components::SleepingTag, "SleepingTag")
+    REGISTER_COMPONENT_SERIALIZER(PhysicsContactCache2D, ECS::Components::PhysicsContactCache2D, "PhysicsContactCache2D")
     REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D, "SpriteRenderer2D")
     REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D, "SpriteFlip2D")
     REGISTER_COMPONENT_SERIALIZER(TileMapComponent, ECS::Components::TileMapComponent, "TileMapComponent")

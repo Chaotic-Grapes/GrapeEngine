@@ -19,10 +19,14 @@
  * checks, and early outs) and are suitable for both gameplay queries and 
  * simple physics responses. All math is done in engine Vector2D.
  *
- * @sources
- * Logics and formulaes derived from GIT trimester 2, with submissions Asteroids
- * and balls/segment in mind.
- * 
+ * @references
+ * https://realtimecollisiondetection.net/books/rtcd/
+ * https://dyn4j.org/2010/01/sat/
+ * https://tavianator.com/2011/ray_box.html
+ * https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection.html
+ * https://box2d.org/files/ErinCatto_ContactManifolds_GDC2007.pdf
+ * https://box2d.org/documentation/
+ *
  *
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

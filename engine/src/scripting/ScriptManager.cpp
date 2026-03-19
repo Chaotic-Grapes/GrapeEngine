@@ -46,7 +46,10 @@ extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath);
 namespace ECS { class ScriptManager; }
 ECS::ScriptManager* g_scriptManagerInstance = nullptr;
 
-// Wrapper callback that invokes the registered callback in ScriptManager
+/**
+ * @brief Native callback invoked when watched script files change.
+ * @param scriptsDir Directory path being watched for script changes.
+ */
 extern "C" void __cdecl Native_OnScriptsChanged(const char* scriptsDir) {
     if (g_scriptManagerInstance) {
         g_scriptManagerInstance->OnScriptsChanged(scriptsDir);
@@ -59,6 +62,9 @@ namespace ECS {
     // ScriptManager Implementation
     // ============================================================================
 
+    /**
+     * @brief Constructs ScriptManager and registers global callback instance.
+     */
     ScriptManager::ScriptManager() {
         // Set global instance for callback access
         g_scriptManagerInstance = this;
@@ -200,6 +206,10 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Sets the active world pointer on managed side for hot reload cleanup.
+     * @param world Pointer to the currently active world.
+     */
     void ScriptManager::SetCurrentWorldForHotReload(World* world) {
         if (!m_initialized || !m_setCurrentWorldForHotReload) {
             LOG_WARNING("[ScriptManager] SetCurrentWorldForHotReload not available");
@@ -306,6 +316,11 @@ namespace ECS {
     // Native wrapper implementations
     // ------------------------------------------------------------------------
 
+    /**
+     * @brief Creates a managed system instance from its type name.
+     * @param typeName Fully qualified managed type name.
+     * @return Managed instance handle, or 0 on failure.
+     */
     uint64_t ScriptManager::CreateSystemInstanceFromTypeName(const char* typeName)
     {
         if (!m_initialized || !m_createSystemWrapper || typeName == nullptr) return 0;
@@ -316,6 +331,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Invokes managed OnCreate for a system instance.
+     * @param handle Managed system instance handle.
+     * @param worldPtr Pointer to the native world.
+     */
     void ScriptManager::CallSystemOnCreate(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemOnCreate) return;
@@ -326,6 +346,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Invokes managed OnDestroy for a system instance.
+     * @param handle Managed system instance handle.
+     * @param worldPtr Pointer to the native world.
+     */
     void ScriptManager::CallSystemOnDestroy(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemOnDestroy) return;
@@ -334,6 +359,10 @@ namespace ECS {
         } catch (...) {}
     }
 
+    /**
+     * @brief Invokes managed OnSceneStart for a system instance.
+     * @param handle Managed system instance handle.
+     */
     void ScriptManager::CallSystemOnSceneStart(uint64_t handle)
     {
         if (!m_initialized || !m_callSystemOnSceneStart) return;
@@ -342,6 +371,10 @@ namespace ECS {
         } catch (...) {}
     }
 
+    /**
+     * @brief Invokes managed OnSceneStop for a system instance.
+     * @param handle Managed system instance handle.
+     */
     void ScriptManager::CallSystemOnSceneStop(uint64_t handle)
     {
         if (!m_initialized || !m_callSystemOnSceneStop) return;
@@ -350,6 +383,12 @@ namespace ECS {
         } catch (...) {}
     }
 
+    /**
+     * @brief Queries managed ShouldRun for a system instance.
+     * @param handle Managed system instance handle.
+     * @param worldPtr Pointer to the native world.
+     * @return true when the system should run, false otherwise.
+     */
     bool ScriptManager::CallSystemShouldRun(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemShouldRun) return true;
@@ -360,6 +399,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Invokes managed OnStartRunning for a system instance.
+     * @param handle Managed system instance handle.
+     * @param worldPtr Pointer to the native world.
+     */
     void ScriptManager::CallSystemOnStartRunning(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemOnStartRunning) return;
@@ -368,6 +412,11 @@ namespace ECS {
         } catch (...) {}
     }
 
+    /**
+     * @brief Invokes managed OnStopRunning for a system instance.
+     * @param handle Managed system instance handle.
+     * @param worldPtr Pointer to the native world.
+     */
     void ScriptManager::CallSystemOnStopRunning(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemOnStopRunning) return;
@@ -393,6 +442,11 @@ namespace ECS {
         return static_cast<int>(systems.size());
     }
 
+    /**
+     * @brief Copies `GrapeEngine.Scripting.dll` to a target directory.
+     * @param targetDir Destination directory path.
+     * @return true when copy succeeds, false otherwise.
+     */
     bool ScriptManager::CopyScriptingAssemblyToDirectory(const std::string& targetDir) {
         try {
             // GrapeEngine.Scripting.dll is typically in the current working directory (build output)
@@ -980,6 +1034,9 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Forwards scene-start notification to the managed system.
+     */
     void ScriptSystemWrapper::OnSceneStart() {
         if (!m_scriptManager) return;
 
@@ -989,6 +1046,9 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Forwards scene-stop notification to the managed system.
+     */
     void ScriptSystemWrapper::OnSceneStop() {
         if (!m_scriptManager) return;
 
@@ -998,6 +1058,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Queries whether the managed system should run this frame.
+     * @param world Reference to the active world.
+     * @return true when the system should run, false otherwise.
+     */
     bool ScriptSystemWrapper::ShouldRun(World& world) {
         if (!m_scriptManager) {
             return true;
@@ -1010,6 +1075,10 @@ namespace ECS {
         return callShouldRun(m_managedHandle, &world) != 0;
     }
 
+    /**
+     * @brief Forwards start-running transition to the managed system.
+     * @param world Reference to the active world.
+     */
     void ScriptSystemWrapper::OnStartRunning(World& world) {
         if (!m_scriptManager) return;
 
@@ -1019,6 +1088,10 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Forwards stop-running transition to the managed system.
+     * @param world Reference to the active world.
+     */
     void ScriptSystemWrapper::OnStopRunning(World& world) {
         if (!m_scriptManager) return;
 
@@ -1153,6 +1226,10 @@ namespace ECS {
 
 }
 
+/**
+ * @brief Retrieves the last compile diagnostics as individual text lines.
+ * @param outLines Output vector populated with diagnostics.
+ */
 void ECS::ScriptManager::GetLastDiagnosticsLines(std::vector<std::string>& outLines) {
     outLines.clear();
 
@@ -1202,6 +1279,12 @@ void ECS::ScriptManager::GetLastDiagnosticsLines(std::vector<std::string>& outLi
 // Native callback and compile-status helpers
 // ============================================================================
 
+/**
+ * @brief Native callback for managed compile status updates.
+ * @param status Compile status code.
+ * @param progress Compile progress percentage.
+ * @param message Optional status message.
+ */
 extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message)
 {
     if (Engine::CORE == nullptr) return;
@@ -1237,6 +1320,12 @@ extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath)
     scriptMgr->HandleHotReloadCompletion(assemblyPath);
 }
 
+/**
+ * @brief Stores latest compile status values in a thread-safe way.
+ * @param status Compile status code.
+ * @param progress Compile progress percentage.
+ * @param message Optional status message.
+ */
 void ECS::ScriptManager::SetCompileStatus(int status, int progress, const char* message)
 {
     std::lock_guard<std::mutex> lock(m_compileMutex);
@@ -1245,6 +1334,12 @@ void ECS::ScriptManager::SetCompileStatus(int status, int progress, const char* 
     m_compileMessage = message ? message : "";
 }
 
+/**
+ * @brief Retrieves latest compile status values in a thread-safe way.
+ * @param outStatus Output compile status code.
+ * @param outProgress Output compile progress percentage.
+ * @param outMessage Output status message.
+ */
 void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage)
 {
     std::lock_guard<std::mutex> lock(m_compileMutex);
@@ -1253,6 +1348,11 @@ void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std:
     outMessage = m_compileMessage;
 }
 
+/**
+ * @brief Removes a component type from all entities using its hash.
+ * @param world World to mutate.
+ * @param componentTypeHash Hash of the component type to remove.
+ */
 void ECS::ScriptManager::RemoveComponentFromAllEntitiesByHash(ECS::World& world, uint32_t componentTypeHash)
 {
     // Get the component type ID from the hash using ComponentRegistry

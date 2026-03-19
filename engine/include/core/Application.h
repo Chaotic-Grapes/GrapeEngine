@@ -258,6 +258,7 @@ namespace Engine {
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
+        bool m_cudaAvailable = false;
         
         // Device management
         std::string m_currentAudioDeviceID;

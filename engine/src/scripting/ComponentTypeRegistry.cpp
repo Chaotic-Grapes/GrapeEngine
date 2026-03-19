@@ -20,7 +20,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cstdint>
 
 namespace {
-    // FNV-1a hash implementation matching C# side
+    /**
+     * @brief Computes a 32-bit FNV-1a hash for a C-string.
+     * @param str Null-terminated string to hash.
+     * @return FNV-1a hash value.
+     */
     constexpr uint32_t FNV1a_Hash(const char* str) {
         uint32_t hash = 2166136261u;
         while (*str) {
@@ -42,6 +46,11 @@ namespace ECS {
 
 #if defined(_DEBUG) || defined(DEBUG)
     namespace {
+        /**
+         * @brief Logs resolved component type id for a name/hash pair in debug builds.
+         * @param name Component display name.
+         * @param hash FNV-1a component hash.
+         */
         void LogComponentTypeIds(const char* name, uint32_t hash) {
             const ComponentTypeId registryId = ComponentRegistry::GetComponentIdFromHash(hash);
 
@@ -96,6 +105,10 @@ namespace ECS {
         REGISTER_COMPONENT(Rigidbody2D);
         REGISTER_COMPONENT(BoxCollider2D);
         REGISTER_COMPONENT(CircleCollider2D);
+        REGISTER_COMPONENT(PhysicsBodyHandle2D);
+        REGISTER_COMPONENT(PhysicsActiveTag);
+        REGISTER_COMPONENT(SleepingTag);
+        REGISTER_COMPONENT(PhysicsContactCache2D);
 
         // Compute
         REGISTER_COMPONENT(BoidFlock);
@@ -175,6 +188,10 @@ namespace ECS {
         LogComponentTypeIds("Rigidbody2D", FNV1a_Hash("Rigidbody2D"));
         LogComponentTypeIds("BoxCollider2D", FNV1a_Hash("BoxCollider2D"));
         LogComponentTypeIds("CircleCollider2D", FNV1a_Hash("CircleCollider2D"));
+        LogComponentTypeIds("PhysicsBodyHandle2D", FNV1a_Hash("PhysicsBodyHandle2D"));
+        LogComponentTypeIds("PhysicsActiveTag", FNV1a_Hash("PhysicsActiveTag"));
+        LogComponentTypeIds("SleepingTag", FNV1a_Hash("SleepingTag"));
+        LogComponentTypeIds("PhysicsContactCache2D", FNV1a_Hash("PhysicsContactCache2D"));
 
         LogComponentTypeIds("SpriteRenderer2D", FNV1a_Hash("SpriteRenderer2D"));
         LogComponentTypeIds("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));

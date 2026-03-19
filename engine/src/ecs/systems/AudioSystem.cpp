@@ -352,7 +352,9 @@ namespace ECS {
         }
 
         for (auto entity : toRemove) {
-            _stopSound(entity, world);
+            // Entity is no longer query-visible this frame; stop immediately without
+            // touching component data that may now belong to another/invalid world.
+            _stopSound(entity, world, false);
             m_playOnStartPlayedCue.erase(entity);
         }
     }
@@ -410,7 +412,17 @@ namespace ECS {
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
-            m_audioService.Stop(handle, Audio::StopMode::Immediate);
+            try {
+                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+            }
+            catch (const std::exception& ex) {
+                LOG_ERROR("AudioSystem: Exception while stopping sound for entity "
+                          << entity.Index << ": " << ex.what());
+            }
+            catch (...) {
+                LOG_ERROR("AudioSystem: Unknown exception while stopping sound for entity "
+                          << entity.Index);
+            }
         }
         m_activeSounds.clear();
 
@@ -425,19 +437,29 @@ namespace ECS {
         if (it == m_activeSounds.end()) return;
 
         // Check if entity has AudioSource with fade-out enabled
-		if (allowFade && world.Has<Components::AudioSource>(entity)) {
-            auto& src = world.Get<Components::AudioSource>(entity);
-            if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
-                _fadeOutHandle(it->second, src.FadeOutDuration);
+		if (allowFade && world.IsAlive(entity)) {
+            auto* src = world.TryGet<Components::AudioSource>(entity);
+            if (src && src->EnableFadeOut && src->FadeOutDuration > 0.0f) {
+                _fadeOutHandle(it->second, src->FadeOutDuration);
                 m_activeSounds.erase(it);
                 LOG_DEBUG("AudioSystem: Fade-out started for entity " << entity.Index
-                         << " (duration=" << src.FadeOutDuration << "s)");
+                         << " (duration=" << src->FadeOutDuration << "s)");
                 return;
             }
         }
 
 		// No fade-out; stop immediately
-        m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+        try {
+            m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+        }
+        catch (const std::exception& ex) {
+            LOG_ERROR("AudioSystem: Exception while stopping sound for entity "
+                      << entity.Index << ": " << ex.what());
+        }
+        catch (...) {
+            LOG_ERROR("AudioSystem: Unknown exception while stopping sound for entity "
+                      << entity.Index);
+        }
         m_activeSounds.erase(it);
         LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
     }
@@ -519,10 +541,10 @@ namespace ECS {
             float duration = fadeDuration;
             bool shouldFade = fadeDuration > 0.0f;
 
-            if (m_world && m_world->Has<Components::AudioSource>(entity)) {
-                auto& src = m_world->Get<Components::AudioSource>(entity);
-                if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
-                    duration = src.FadeOutDuration;
+            if (m_world && m_world->IsAlive(entity)) {
+                if (auto* src = m_world->TryGet<Components::AudioSource>(entity);
+                    src && src->EnableFadeOut && src->FadeOutDuration > 0.0f) {
+                    duration = src->FadeOutDuration;
                     shouldFade = true;
                 }
             }
@@ -532,7 +554,15 @@ namespace ECS {
                 anyFadeStarted = true;
             }
             else {
-                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                try {
+                    m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                }
+                catch (const std::exception& ex) {
+                    LOG_ERROR("AudioSystem: Exception while stopping scene-transition audio: " << ex.what());
+                }
+                catch (...) {
+                    LOG_ERROR("AudioSystem: Unknown exception while stopping scene-transition audio");
+                }
             }
         }
 
@@ -555,7 +585,17 @@ namespace ECS {
         if (duration <= 0.0f) {
             LOG_WARNING("AudioSystem::FadeOutAllAudio called with duration <= 0, using immediate stop");
             for (auto& [entity, handle] : m_activeSounds) {
-                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                try {
+                    m_audioService.Stop(handle, Audio::StopMode::Immediate);
+                }
+                catch (const std::exception& ex) {
+                    LOG_ERROR("AudioSystem: Exception while stopping sound for entity "
+                              << entity.Index << ": " << ex.what());
+                }
+                catch (...) {
+                    LOG_ERROR("AudioSystem: Unknown exception while stopping sound for entity "
+                              << entity.Index);
+                }
             }
             m_activeSounds.clear();
             return;

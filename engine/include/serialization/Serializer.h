@@ -31,11 +31,11 @@ namespace Serialization {
     class Serializer {
     public:
         /**
-		 * @brief Loads JSON from file, enforcing extension
-		 * @param filename The path to the JSON file
-		 * @param expectedExt The expected file extension (without the period)
-		 * @param outJson Reference to json object to populate
-		 * @return true if successful, false otherwise
+         * @brief Loads JSON from a file after validating the extension.
+         * @param filename Path to the JSON file.
+         * @param expectedExt Expected file extension (without the period).
+         * @param outJson Destination JSON object populated on success.
+         * @return true if loading and parsing succeed, false otherwise.
          */
         static bool LoadJson(const std::string& filename, const std::string& expectedExt, json& outJson) {
             // Check file extension
@@ -62,12 +62,12 @@ namespace Serialization {
             }
         }
 
-        /** 
-		 * @brief Saves JSON to file, enforcing extension
-		 * @param filename The path to the JSON file
-		 * @param expectedExt The expected file extension (without dot)
-		 * @param j The json object to save
-		 * @return true if successful, false otherwise
+        /**
+         * @brief Saves JSON to a file after validating the extension.
+         * @param filename Path to the JSON file.
+         * @param expectedExt Expected file extension (without the period).
+         * @param j JSON object to write.
+         * @return true if the file is written successfully, false otherwise.
          */
         static bool SaveJson(const std::string& filename, const std::string& expectedExt, const json& j) {
             if (!HasExtension(filename, expectedExt)) {
@@ -86,11 +86,11 @@ namespace Serialization {
             return true;
         }
 
-        /** 
-		 * @brief Checks if a filename has the specified extension
-		 * @param filename The filename to check
-		 * @param ext The expected file extension (without the period)
-		 * @return true if the filename has the specified extension, false otherwise
+        /**
+         * @brief Checks whether a filename matches the expected extension.
+         * @param filename Filename to validate.
+         * @param ext Expected file extension (without the period).
+         * @return true if the filename ends with the extension, false otherwise.
          */
         static bool HasExtension(const std::string& filename, const std::string& ext) {
             if (filename.length() < ext.length() + 1) // Check if filename is at least as long as ext + 1 (for period)
