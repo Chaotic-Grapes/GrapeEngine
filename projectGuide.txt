@@ -238,11 +238,11 @@ How to select targets:
 APPLICATION CONFIGURATION (EditorSettings.json / ProjectSettings.json)
 ---------------------------------------------------------------------
 
-Editor and project configuration are stored in the user Documents folder:
+Editor and project configuration are split between Documents and the project folder:
 - Editor settings (recent projects, window/UI options):
   Documents\Grape Engine\EditorSettings.json
 - Project settings (per-project runtime options):
-  Documents\Grape Engine\<ProjectName>\ProjectSettings.json
+   <ProjectRoot>\ProjectSettings.json
 
 Notes:
 - The editor writes these files automatically. If they are missing, defaults
@@ -251,8 +251,8 @@ Notes:
   standalone build uses the project-specific settings.
 
 TROUBLESHOOTING:
-- If settings are not loading, verify the Documents folder is writable and
-  the project name matches the folder under Documents\Grape Engine.
+- If project settings are not loading, verify ProjectSettings.json exists in
+   the selected project root.
 
 LEVEL EDITOR MODES
 ------------------

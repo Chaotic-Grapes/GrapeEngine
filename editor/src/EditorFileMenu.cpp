@@ -466,15 +466,8 @@ void EditorFileMenu::_exportProject() {
             m_exportCurrentStep = 5;
             const std::filesystem::path exportProjectDir = exportRoot / projectName;
             const std::filesystem::path localSettingsPath = projectRoot / "ProjectSettings.json";
-            const std::filesystem::path docsSettingsPath = Engine::ProjectPaths::GetSettingsPath();
-            std::filesystem::path settingsSourcePath;
-
-            if (std::filesystem::exists(localSettingsPath)) {
-                settingsSourcePath = localSettingsPath;
-            } else if (std::filesystem::exists(docsSettingsPath)) {
-                settingsSourcePath = docsSettingsPath;
-            } else {
-                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in project root or Documents.", "" });
+            if (!std::filesystem::exists(localSettingsPath)) {
+                pushResult({ "Copy project settings", false, "ProjectSettings.json not found in project root.", "" });
                 m_exportDone = true;
                 m_exportInProgress = false;
                 return;
@@ -492,7 +485,7 @@ void EditorFileMenu::_exportProject() {
             // Copy the ProjectSettings.json to the export output
             const std::filesystem::path exportSettingsPath = exportProjectDir / "ProjectSettings.json";
             std::error_code settingsCopyEc;
-            std::filesystem::copy_file(settingsSourcePath, exportSettingsPath,
+            std::filesystem::copy_file(localSettingsPath, exportSettingsPath,
                 std::filesystem::copy_options::overwrite_existing, settingsCopyEc);
             if (settingsCopyEc) {
                 pushResult({ "Copy project settings", false, "Failed to copy ProjectSettings.json.", "" });

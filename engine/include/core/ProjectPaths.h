@@ -23,9 +23,10 @@ TODO: This is a temporary solution until the editor is separated from the engine
 namespace Engine {
     
     /**
-     * @brief Manages paths to game project directories and files
-     * 
-     * Projects can be loaded from any location; per-project settings live in Documents.
+     * @brief Manages paths to game project directories and files.
+     *
+     * Projects can be loaded from any location; ProjectSettings.json lives in the
+     * selected project root.
      */
     class GRAPEENGINE_API ProjectPaths {
     public:
@@ -53,7 +54,7 @@ namespace Engine {
         
         /**
          * @brief Get the ProjectSettings.json file path
-         * @return Full path to Documents/Grape Engine/<project-name>/ProjectSettings.json
+         * @return Full path to <project-root>/ProjectSettings.json
          */
         static std::string GetSettingsPath();
 

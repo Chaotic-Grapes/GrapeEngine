@@ -78,7 +78,7 @@ namespace Engine {
     }
     
     std::string ProjectPaths::GetSettingsPath() {
-        std::filesystem::path settingsPath = std::filesystem::path(GetProjectDocumentsRoot()) / "ProjectSettings.json";
+        std::filesystem::path settingsPath = std::filesystem::path(GetProjectRoot()) / "ProjectSettings.json";
         EnsureDirectoryExists(settingsPath.parent_path().string());
         return settingsPath.string();
     }

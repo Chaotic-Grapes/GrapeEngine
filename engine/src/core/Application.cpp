@@ -326,11 +326,8 @@ namespace Engine {
         }
 
         std::string settingsPath = ProjectPaths::GetSettingsPath();
-        if (m_mode == EngineMode::Game && !projectRoot.empty()) {
-            std::filesystem::path localPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
-            if (std::filesystem::exists(localPath)) {
-                settingsPath = localPath.string();
-            }
+        if (!projectRoot.empty()) {
+            settingsPath = (std::filesystem::path(projectRoot) / "ProjectSettings.json").string();
         }
         m_hasProjectSettings = Serialization::ConfigurationSerializer::LoadProjectSettings(settingsPath, m_projectSettings);
         if (m_hasProjectSettings) {
@@ -368,7 +365,7 @@ namespace Engine {
             }
 
             std::filesystem::path settingsPath = ProjectPaths::GetSettingsPath();
-            if (m_mode == EngineMode::Game && !projectRoot.empty()) {
+            if (!projectRoot.empty()) {
                 settingsPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
             }
 

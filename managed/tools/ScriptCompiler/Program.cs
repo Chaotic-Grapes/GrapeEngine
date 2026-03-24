@@ -12,10 +12,8 @@ if (args.Length < 2)
 var projectRoot = Path.GetFullPath(args[0]);
 var outputAssemblyPath = Path.GetFullPath(args[1]);
 
-// Validate project settings (stored in Documents/Grape Engine/<Project>/ProjectSettings.json)
-var projectName = new DirectoryInfo(projectRoot).Name;
-var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-var settingsPath = Path.Combine(documents, "Grape Engine", projectName, "ProjectSettings.json");
+// Validate project settings in the selected project root
+var settingsPath = Path.Combine(projectRoot, "ProjectSettings.json");
 
 if (!File.Exists(settingsPath))
 {

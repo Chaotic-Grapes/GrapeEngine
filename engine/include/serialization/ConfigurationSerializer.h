@@ -96,6 +96,9 @@ namespace Serialization {
                 return false;
             }
 
+            // Start from defaults for every load so absent fields do not keep stale values.
+            settings = ProjectSettings{};
+
             // Parse root-level fields
             if (settingsJson.contains("Title")) {
                 settings.Title = settingsJson["Title"].get<std::string>();
