@@ -1,6 +1,24 @@
 @echo off
 set CONFIG=%1
-if "%CONFIG%"=="" set CONFIG=DEBUG
+
+if /I "%CONFIG%"=="DEBUG" goto CONFIG_SELECTED
+if /I "%CONFIG%"=="RELEASE" goto CONFIG_SELECTED
+
+echo Select editor configuration:
+echo 1. Debug
+echo 2. Release
+set /p CONFIG_CHOICE=Enter your choice (1-2): 
+
+if "%CONFIG_CHOICE%"=="1" (
+    set CONFIG=DEBUG
+) else if "%CONFIG_CHOICE%"=="2" (
+    set CONFIG=RELEASE
+) else (
+    echo Invalid choice. Defaulting to DEBUG.
+    set CONFIG=DEBUG
+)
+
+:CONFIG_SELECTED
 
 REM Check if build directory exists
 if not exist build (

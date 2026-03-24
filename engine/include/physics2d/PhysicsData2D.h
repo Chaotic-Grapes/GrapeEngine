@@ -67,12 +67,19 @@ namespace Engine::Physics2D {
         const ECS::Components::CircleCollider2D* Circle = nullptr;
         const ECS::Components::BoxCollider2D* Box = nullptr;
         ShapeType2D Shape = ShapeType2D::None;
+        uint32_t ShapePayloadIndex = 0;
         uint16_t LayerId = 0;
         uint32_t LayerMask = 0xFFFFFFFFu;
         bool IsDynamic = false;
         bool IsSleeping = false;
         bool IsTrigger = false;
         float SleepTimer = 0.0f;
+        float CachedFriction = 0.2f;
+        float CachedRestitution = 0.0f;
+        float CachedPositionCorrectPercent = 0.2f;
+        float InverseMass = 0.0f;
+        float Inertia = 0.0f;
+        float InverseInertia = 0.0f;
 
         Engine::WorldCircle WorldCircle{};
         Engine::WorldOBB WorldObb{};
@@ -87,6 +94,7 @@ namespace Engine::Physics2D {
         Vector2D Origin{ 0.0f, 0.0f };
         uint16_t LayerId = 0;
         bool Enabled = false;
+        PackedEntityId SourcePackedEntity = 0;
     };
 
     /**

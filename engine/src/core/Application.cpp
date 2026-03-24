@@ -247,9 +247,6 @@ namespace Engine {
             // Game mode: always run systems
             // Editor mode: editor controls system execution via UpdateSystemsByMode()
             if (m_mode == EngineMode::Game) {
-                // Update physics
-                _updatePhysics(world);
-                
                 // Update systems - always run for game mode
                 m_systemManager.UpdateWithDependencies(world);
                 ECS::Events::ClearFrameEventComponents(world);
@@ -502,18 +499,7 @@ namespace Engine {
     }
 
     void Application::_updatePhysics(ECS::World& /*world*/) {
-        // Handle fixed timestep accumulation for physics
-        // Only called in Game mode - always accumulates
-        
-        m_accumulator += static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
-
-        const float maxAccumulator = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep()) * 5.0f;
-        if (m_accumulator > maxAccumulator)
-            m_accumulator = maxAccumulator;
-
-        while (m_accumulator >= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep())) {
-            m_accumulator -= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
-        }
+        // Fixed-step physics is owned by PhysicsSystem::OnUpdate.
     }
 
     // ==================== Device Management ====================

@@ -154,7 +154,7 @@ static bool GetPhysicsWorldTransform(ECS::World& world, const ECS::Entity entity
     Matrix4x4 worldMatrix = TransformUtils::MakeTRS(localTransform->Position, localTransform->Rotation, localTransform->Scale);
     ECS::Entity parent = world.ParentOf(entity);
 
-    while (!parent.IsNull()) {
+    while (!parent.IsNull() && world.IsAlive(parent)) {
         if (const auto* parentLocal = world.TryGet<ECS::Components::LocalTransform>(parent)) {
 
             // Parent has a local transform, so keep walking up; pre-multiply to accumulate
@@ -855,7 +855,7 @@ namespace ECS {
                     }
 
                     const bool firstSeenThisFrame = frameCollisions.insert(pairId).second;
-                    const bool isNewCollision = !system.m_previousCollisions.contains(pairId);
+                    const bool isNewCollision = !previousCollisions.contains(pairId);
                     if (firstSeenThisFrame && isNewCollision) {
                         eventDispatcher.FireCollisionEvent(
                             a.packed,
@@ -1040,7 +1040,7 @@ namespace ECS {
         }
 
         void FinalizeEvents() {
-            for (const PackedEntityPair& pairId : system.m_previousCollisions) {
+            for (const PackedEntityPair& pairId : previousCollisions) {
                 if (frameCollisions.contains(pairId)) {
                     continue;
                 }
@@ -1058,10 +1058,10 @@ namespace ECS {
                 ++collisionExitCount;
             }
 
-            system.m_previousCollisions = std::move(frameCollisions);
+            previousCollisions = std::move(frameCollisions);
 
             for (const PackedEntityPair& pairId : currentTriggerOverlaps) {
-                const bool wasOverlapping = system.m_previousTriggerOverlaps.contains(pairId);
+                const bool wasOverlapping = previousTriggerOverlaps.contains(pairId);
                 const Entity triggerEntity = ECS::EntityUtils::Unpack(pairId.A);
                 const Entity otherEntity = ECS::EntityUtils::Unpack(pairId.B);
                 if (!world.IsAlive(triggerEntity) || !world.IsAlive(otherEntity)) {
@@ -1078,7 +1078,7 @@ namespace ECS {
                 }
             }
 
-            for (const PackedEntityPair& pairId : system.m_previousTriggerOverlaps) {
+            for (const PackedEntityPair& pairId : previousTriggerOverlaps) {
                 if (currentTriggerOverlaps.contains(pairId)) {
                     continue;
                 }
@@ -1091,7 +1091,7 @@ namespace ECS {
                 ++triggerExitCount;
             }
 
-            system.m_previousTriggerOverlaps = std::move(currentTriggerOverlaps);
+            previousTriggerOverlaps = std::move(currentTriggerOverlaps);
             (void)collisionEnterCount;
             (void)collisionExitCount;
             (void)triggerEnterCount;
@@ -1114,6 +1114,8 @@ namespace ECS {
 
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> frameCollisions;
         std::unordered_set<PackedEntityPair, PackedEntityPairHash> currentTriggerOverlaps;
+        static std::unordered_set<PackedEntityPair, PackedEntityPairHash> previousCollisions;
+        static std::unordered_set<PackedEntityPair, PackedEntityPairHash> previousTriggerOverlaps;
 
         bool loggedMissingLayer = false;
         bool loggedMissingPhysicsPair = false;
@@ -1123,6 +1125,9 @@ namespace ECS {
         int triggerExitCount = 0;
         int triggerStayCount = 0;
     };
+
+    std::unordered_set<PackedEntityPair, PackedEntityPairHash> PhysicsPipelineRunner::previousCollisions;
+    std::unordered_set<PackedEntityPair, PackedEntityPairHash> PhysicsPipelineRunner::previousTriggerOverlaps;
 
     /**
      * @brief Execute one full frame of the internal staged physics pipeline.

@@ -31,16 +31,44 @@ namespace {
     }
 
     /**
-     * @brief Resolve inverse mass for runtime body logic.
-     * @param rb Rigidbody pointer (can be null).
-     * @return Inverse mass, or `0` for static/invalid bodies.
+     * @brief Compute 2D scalar cross product.
      */
-    static float InvMassOf(const ECS::Components::Rigidbody2D* rb) {
-        if (!rb || rb->Mass <= 0.0f) {
-            return 0.0f;
-        }
-        return (rb->InverseMass > 0.0f) ? rb->InverseMass : (1.0f / rb->Mass);
+    static float Cross2D(const Vector2D& a, const Vector2D& b) {
+        return a.X * b.Y - a.Y * b.X;
     }
+
+    /**
+     * @brief Compute omega x r in 2D.
+     */
+    static Vector2D Cross2D(const float omega, const Vector2D& r) {
+        return Vector2D(-omega * r.Y, omega * r.X);
+    }
+
+    struct SolverBodySoA {
+        std::vector<float> InvMass;
+        std::vector<float> InvInertia;
+        std::vector<float> Friction;
+        std::vector<float> Restitution;
+        std::vector<float> PositionPercent;
+        std::vector<Vector2D> LinearVelocity;
+        std::vector<float> AngularVelocity;
+        std::vector<Vector2D> Positions;
+        std::vector<uint8_t> ShapeType;
+        std::vector<uint32_t> ShapePayloadIndex;
+
+        void Resize(const size_t count) {
+            InvMass.assign(count, 0.0f);
+            InvInertia.assign(count, 0.0f);
+            Friction.assign(count, 0.0f);
+            Restitution.assign(count, 0.0f);
+            PositionPercent.assign(count, 0.0f);
+            LinearVelocity.assign(count, Vector2D(0.0f, 0.0f));
+            AngularVelocity.assign(count, 0.0f);
+            Positions.assign(count, Vector2D(0.0f, 0.0f));
+            ShapeType.assign(count, 0u);
+            ShapePayloadIndex.assign(count, 0u);
+        }
+    };
 
     /**
      * @brief Check whether a runtime body has writable transform state.
@@ -98,10 +126,13 @@ namespace Engine::Physics2D {
         const PhysicsConfig2D& config,
         std::vector<ContactConstraint2D>& contacts,
         const PhysicsIsland2D& island,
+        const std::vector<Vector2D>& positions,
         const std::vector<float>& invMass,
+        const std::vector<float>& invInertia,
         const std::vector<float>& friction,
         const std::vector<float>& restitution,
-        std::vector<Vector2D>& linearVelocity)
+        std::vector<Vector2D>& linearVelocity,
+        std::vector<float>& angularVelocity)
     {
         // Multiple iterations improve convergence of coupled constraints.
         for (uint32_t it = 0; it < config.VelocityIterations; ++it) {
@@ -116,21 +147,38 @@ namespace Engine::Physics2D {
 
                 const float invMassA = invMass[c.BodyA];
                 const float invMassB = invMass[c.BodyB];
-                const float invMassSum = invMassA + invMassB;
-                if (invMassSum <= 0.0f) {
+                const float invInertiaA = invInertia[c.BodyA];
+                const float invInertiaB = invInertia[c.BodyB];
+                if (invMassA + invMassB + invInertiaA + invInertiaB <= 0.0f) {
                     // Nothing to move if both bodies are effectively static.
                     continue;
                 }
 
                 Vector2D vA = linearVelocity[c.BodyA];
                 Vector2D vB = linearVelocity[c.BodyB];
+                float wA = angularVelocity[c.BodyA];
+                float wB = angularVelocity[c.BodyB];
                 const Vector2D n = c.Manifold.normal;
-                const Vector2D rv = vB - vA;
+
+                const Vector2D contact = (c.Manifold.pointCount > 0)
+                    ? c.Manifold.points[0]
+                    : ((positions[c.BodyA] + positions[c.BodyB]) * 0.5f);
+                const Vector2D rA = contact - positions[c.BodyA];
+                const Vector2D rB = contact - positions[c.BodyB];
+                const Vector2D rv = (vB + Cross2D(wB, rB)) - (vA + Cross2D(wA, rA));
                 const float vn = Dot2D(rv, n);
+                const float raCrossN = Cross2D(rA, n);
+                const float rbCrossN = Cross2D(rB, n);
+                const float kNormal = invMassA + invMassB +
+                    (raCrossN * raCrossN) * invInertiaA +
+                    (rbCrossN * rbCrossN) * invInertiaB;
+                if (kNormal <= 1e-8f) {
+                    continue;
+                }
 
                 // Normal impulse handles restitution and blocks interpenetrating velocity.
                 const float e = std::max(restitution[c.BodyA], restitution[c.BodyB]);
-                float lambdaN = -(vn * (1.0f + e)) / invMassSum;
+                float lambdaN = -(vn * (1.0f + e)) / kNormal;
                 const float oldNormalImpulse = c.NormalImpulse;
                 // Keep accumulated normal impulse non-negative (no attractive impulses).
                 c.NormalImpulse = std::max(oldNormalImpulse + lambdaN, 0.0f);
@@ -138,15 +186,20 @@ namespace Engine::Physics2D {
                 const Vector2D impulseN = n * lambdaN;
                 vA -= impulseN * invMassA;
                 vB += impulseN * invMassB;
+                wA -= invInertiaA * Cross2D(rA, impulseN);
+                wB += invInertiaB * Cross2D(rB, impulseN);
 
-                const Vector2D rvPost = vB - vA;
-                Vector2D tangent = rvPost - n * Dot2D(rvPost, n);
-                const float tLenSq = Dot2D(tangent, tangent);
-                if (tLenSq > 1e-8f) {
+                const Vector2D rvPost = (vB + Cross2D(wB, rB)) - (vA + Cross2D(wA, rA));
+                const Vector2D tangent(-n.Y, n.X);
+                const float raCrossT = Cross2D(rA, tangent);
+                const float rbCrossT = Cross2D(rB, tangent);
+                const float kTangent = invMassA + invMassB +
+                    (raCrossT * raCrossT) * invInertiaA +
+                    (rbCrossT * rbCrossT) * invInertiaB;
+                if (kTangent > 1e-8f) {
                     // Tangential impulse is clamped by Coulomb friction cone.
-                    tangent = tangent / std::sqrt(tLenSq);
                     const float mu = std::clamp((friction[c.BodyA] + friction[c.BodyB]) * 0.5f, 0.0f, 1.0f);
-                    float lambdaT = -Dot2D(rvPost, tangent) / invMassSum;
+                    float lambdaT = -Dot2D(rvPost, tangent) / kTangent;
                     const float maxT = mu * c.NormalImpulse;
                     const float oldTangentImpulse = c.TangentImpulse;
                     // Friction is limited by |jt| <= mu * jn.
@@ -155,10 +208,14 @@ namespace Engine::Physics2D {
                     const Vector2D impulseT = tangent * lambdaT;
                     vA -= impulseT * invMassA;
                     vB += impulseT * invMassB;
+                    wA -= invInertiaA * Cross2D(rA, impulseT);
+                    wB += invInertiaB * Cross2D(rB, impulseT);
                 }
 
                 linearVelocity[c.BodyA] = vA;
                 linearVelocity[c.BodyB] = vB;
+                angularVelocity[c.BodyA] = wA;
+                angularVelocity[c.BodyB] = wB;
             }
         }
     }
@@ -236,22 +293,22 @@ namespace Engine::Physics2D {
             return PairKey{ a, b, featureId };
             };
 
-        // Stage hot body properties in contiguous SoA arrays for tight cache access in inner loops.
-        std::vector<float> invMass(bodies.size(), 0.0f);
-        std::vector<float> friction(bodies.size(), 0.0f);
-        std::vector<float> restitution(bodies.size(), 0.0f);
-        std::vector<float> positionPercent(bodies.size(), 0.0f);
-        std::vector<Vector2D> linearVelocity(bodies.size(), Vector2D(0.0f, 0.0f));
-        std::vector<Vector2D> positions(bodies.size(), Vector2D(0.0f, 0.0f));
+        // Stage hot body properties in strict SoA arrays for tight cache access in inner loops.
+        SolverBodySoA soa{};
+        soa.Resize(bodies.size());
 
         for (size_t i = 0; i < bodies.size(); ++i) {
             const BodyRuntime2D& b = bodies[i];
-            invMass[i] = InvMassOf(b.Rigidbody);
-            friction[i] = std::clamp(b.Material.Friction, 0.0f, 1.0f);
-            restitution[i] = std::clamp(b.Material.Restitution, 0.0f, 1.0f);
-            positionPercent[i] = std::clamp(b.Material.PositionCorrectPercent, 0.0f, 1.0f);
-            linearVelocity[i] = b.Velocity ? b.Velocity->Value : Vector2D(0.0f, 0.0f);
-            positions[i] = b.Local ? Vector2D(b.Local->Position.X, b.Local->Position.Y) : Vector2D(0.0f, 0.0f);
+            soa.InvMass[i] = std::max(b.InverseMass, 0.0f);
+            soa.InvInertia[i] = std::max(b.InverseInertia, 0.0f);
+            soa.Friction[i] = b.CachedFriction;
+            soa.Restitution[i] = b.CachedRestitution;
+            soa.PositionPercent[i] = b.CachedPositionCorrectPercent;
+            soa.LinearVelocity[i] = b.Velocity ? b.Velocity->Value : Vector2D(0.0f, 0.0f);
+            soa.AngularVelocity[i] = b.AngularVelocity ? b.AngularVelocity->Value : 0.0f;
+            soa.Positions[i] = b.Local ? Vector2D(b.Local->Position.X, b.Local->Position.Y) : Vector2D(0.0f, 0.0f);
+            soa.ShapeType[i] = static_cast<uint8_t>(b.Shape);
+            soa.ShapePayloadIndex[i] = b.ShapePayloadIndex;
         }
 
         for (ContactConstraint2D& c : contacts) {
@@ -273,22 +330,35 @@ namespace Engine::Physics2D {
                 c.TangentImpulse = 0.0f;
             }
 
-            const float invMassA = invMass[c.BodyA];
-            const float invMassB = invMass[c.BodyB];
+            const float invMassA = soa.InvMass[c.BodyA];
+            const float invMassB = soa.InvMass[c.BodyB];
+            const float invInertiaA = soa.InvInertia[c.BodyA];
+            const float invInertiaB = soa.InvInertia[c.BodyB];
             if (invMassA + invMassB <= 0.0f || c.NormalImpulse == 0.0f) {
                 continue;
             }
 
             // Apply warm-start impulse before iterations so solver starts close to previous solution.
-            Vector2D vA = linearVelocity[c.BodyA];
-            Vector2D vB = linearVelocity[c.BodyB];
+            Vector2D vA = soa.LinearVelocity[c.BodyA];
+            Vector2D vB = soa.LinearVelocity[c.BodyB];
+            float wA = soa.AngularVelocity[c.BodyA];
+            float wB = soa.AngularVelocity[c.BodyB];
             const Vector2D n = c.Manifold.normal;
             const Vector2D tangent(-n.Y, n.X);
+            const Vector2D contact = (c.Manifold.pointCount > 0)
+                ? c.Manifold.points[0]
+                : ((soa.Positions[c.BodyA] + soa.Positions[c.BodyB]) * 0.5f);
+            const Vector2D rA = contact - soa.Positions[c.BodyA];
+            const Vector2D rB = contact - soa.Positions[c.BodyB];
             const Vector2D warmImpulse = n * c.NormalImpulse + tangent * c.TangentImpulse;
             vA -= warmImpulse * invMassA;
             vB += warmImpulse * invMassB;
-            linearVelocity[c.BodyA] = vA;
-            linearVelocity[c.BodyB] = vB;
+            wA -= invInertiaA * Cross2D(rA, warmImpulse);
+            wB += invInertiaB * Cross2D(rB, warmImpulse);
+            soa.LinearVelocity[c.BodyA] = vA;
+            soa.LinearVelocity[c.BodyB] = vB;
+            soa.AngularVelocity[c.BodyA] = wA;
+            soa.AngularVelocity[c.BodyB] = wB;
         }
 
         // Stable ordering removes scheduler-dependent solve permutations.
@@ -314,22 +384,25 @@ namespace Engine::Physics2D {
 #endif
 
         constexpr uint32_t workerCap = 8;
-        Internal::ParallelForStatic(islandOrder.size(), workerCap, [&config, &bodies, &contacts, &islandOrder, &islands, &invMass, &friction, &restitution, &positionPercent, &linearVelocity, &positions](size_t begin, size_t end, uint32_t) {
+        Internal::ParallelForStatic(islandOrder.size(), workerCap, [&config, &bodies, &contacts, &islandOrder, &islands, &soa](size_t begin, size_t end, uint32_t) {
             for (size_t i = begin; i < end; ++i) {
                 const PhysicsIsland2D& island = islands[islandOrder[i]];
                 // Deterministic static scheduling + disjoint islands avoids cross-thread body writes.
-                SolveIslandVelocity(config, contacts, island, invMass, friction, restitution, linearVelocity);
-                SolveIslandPosition(config, bodies, contacts, island, invMass, positionPercent, positions);
+                SolveIslandVelocity(config, contacts, island, soa.Positions, soa.InvMass, soa.InvInertia, soa.Friction, soa.Restitution, soa.LinearVelocity, soa.AngularVelocity);
+                SolveIslandPosition(config, bodies, contacts, island, soa.InvMass, soa.PositionPercent, soa.Positions);
             }
             });
 
         for (size_t i = 0; i < bodies.size(); ++i) {
             if (bodies[i].Velocity) {
-                bodies[i].Velocity->Value = linearVelocity[i];
+                bodies[i].Velocity->Value = soa.LinearVelocity[i];
+            }
+            if (bodies[i].AngularVelocity) {
+                bodies[i].AngularVelocity->Value = soa.AngularVelocity[i];
             }
             if (bodies[i].Local) {
-                bodies[i].Local->Position.X = positions[i].X;
-                bodies[i].Local->Position.Y = positions[i].Y;
+                bodies[i].Local->Position.X = soa.Positions[i].X;
+                bodies[i].Local->Position.Y = soa.Positions[i].Y;
             }
         }
 

@@ -28,6 +28,7 @@
 #include <chrono>
 #include <cfloat>
 #include <cmath>
+#include <unordered_set>
 
 namespace {
     constexpr uint8_t kCollisionMaskBottomLeft = 1u << 0;
@@ -51,7 +52,7 @@ namespace {
 
         Matrix4x4 worldMatrix = TransformUtils::MakeTRS(localTransform->Position, localTransform->Rotation, localTransform->Scale);
         ECS::Entity parent = world.ParentOf(entity);
-        while (!parent.IsNull()) {
+        while (!parent.IsNull() && world.IsAlive(parent)) {
             // Walk up hierarchy to reconstruct world transform when only local data exists.
             if (const auto* parentLocal = world.TryGet<ECS::Components::LocalTransform>(parent)) {
                 const Matrix4x4 parentMatrix = TransformUtils::MakeTRS(parentLocal->Position, parentLocal->Rotation, parentLocal->Scale);
@@ -92,6 +93,52 @@ namespace {
             return true;
         }
         return false;
+    }
+
+    /**
+     * @brief Recompute rotational inertia cache from mass and world-shape geometry.
+     */
+    static void RebuildBodyInertiaCache(Engine::Physics2D::BodyRuntime2D& body) {
+        body.InverseMass = 0.0f;
+        body.Inertia = 0.0f;
+        body.InverseInertia = 0.0f;
+        if (!body.Rigidbody || body.Rigidbody->Mass <= 0.0f) {
+            return;
+        }
+
+        body.InverseMass = (body.Rigidbody->InverseMass > 0.0f)
+            ? body.Rigidbody->InverseMass
+            : (1.0f / body.Rigidbody->Mass);
+
+        if (body.Rigidbody->Flags & (1u << 2)) {
+            return;
+        }
+
+        const float mass = body.Rigidbody->Mass;
+        if (body.Shape == Engine::Physics2D::ShapeType2D::Circle) {
+            const float radius = std::max(body.WorldCircle.Radius, 1e-4f);
+            body.Inertia = 0.5f * mass * radius * radius;
+        }
+        else if (body.Shape == Engine::Physics2D::ShapeType2D::Box) {
+            const float hx = std::max(body.WorldObb.HalfExtents.X, 1e-4f);
+            const float hy = std::max(body.WorldObb.HalfExtents.Y, 1e-4f);
+            const float width = 2.0f * hx;
+            const float height = 2.0f * hy;
+            body.Inertia = (mass * (width * width + height * height)) / 12.0f;
+        }
+
+        if (body.Inertia > 1e-8f) {
+            body.InverseInertia = 1.0f / body.Inertia;
+        }
+    }
+
+    /**
+     * @brief Cache clamped material scalars used by solver/tile response.
+     */
+    static void RebuildBodyMaterialCache(Engine::Physics2D::BodyRuntime2D& body) {
+        body.CachedFriction = std::clamp(body.Material.Friction, 0.0f, 1.0f);
+        body.CachedRestitution = std::clamp(body.Material.Restitution, 0.0f, 1.0f);
+        body.CachedPositionCorrectPercent = std::clamp(body.Material.PositionCorrectPercent, 0.0f, 1.0f);
     }
 
     /**
@@ -211,6 +258,9 @@ namespace Engine::Physics2D {
     void PhysicsWorld2D::SyncFromECS(ECS::World& world, Scenes::LayerManager& layerManager) {
         // Rebuild body cache every fixed step so it always reflects latest ECS state.
         m_bodies.clear();
+        uint32_t circlePayloadIndex = 0;
+        uint32_t boxPayloadIndex = 0;
+        std::unordered_set<PackedEntityId> seenBodies;
         world.Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, ECS::Components::LocalTransform&) {
             if (!world.IsAlive(e) || !world.IsActiveInHierarchy(e)) {
                 return;
@@ -231,9 +281,12 @@ namespace Engine::Physics2D {
             body.Circle = circle;
             body.Box = box;
             body.Shape = circle ? ShapeType2D::Circle : ShapeType2D::Box;
+            body.ShapePayloadIndex = (body.Shape == ShapeType2D::Circle) ? circlePayloadIndex++ : boxPayloadIndex++;
             body.Material = world.Has<ECS::Components::PhysicsMaterial2D>(e) ?
                 world.Get<ECS::Components::PhysicsMaterial2D>(e) :
                 ECS::Components::PhysicsMaterial2D{};
+            RebuildBodyMaterialCache(body);
+
             // Dynamic = has rigidbody + velocity + positive mass (mass <= 0 treated as static/kinematic).
             body.IsDynamic = body.Rigidbody && body.Velocity && body.Rigidbody->Mass > 0.0f;
             body.IsTrigger = (circle && (circle->Flags & 0x1u)) || (box && (box->Flags & 0x1u));
@@ -251,6 +304,15 @@ namespace Engine::Physics2D {
             if (!RebuildBodyWorldShape(world, body)) {
                 return;
             }
+            RebuildBodyInertiaCache(body);
+
+            // Restore persistent sleep state from previous fixed steps.
+            if (const auto sleepIt = m_sleepStateCache.find(body.Packed); sleepIt != m_sleepStateCache.end()) {
+                body.IsSleeping = sleepIt->second.IsSleeping;
+                body.SleepTimer = sleepIt->second.SleepTimer;
+            }
+
+            seenBodies.insert(body.Packed);
 
             m_bodies.push_back(body);
         });
@@ -275,6 +337,16 @@ namespace Engine::Physics2D {
                 world.Get<ECS::Components::PhysicsActiveTag>(e).Enabled = true;
             }
         }
+
+        // Drop cached sleep state for bodies no longer present in this world step.
+        for (auto it = m_sleepStateCache.begin(); it != m_sleepStateCache.end(); ) {
+            if (!seenBodies.contains(it->first)) {
+                it = m_sleepStateCache.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
     }
 
     /**
@@ -294,6 +366,19 @@ namespace Engine::Physics2D {
             if (!body.IsDynamic || !body.Local || !body.Rigidbody || !body.Velocity) {
                 continue;
             }
+
+            if (body.IsSleeping) {
+                // Wake sleeping bodies when user/game code drives velocity above sleep thresholds.
+                const bool wakeLinear = body.Velocity->Value.Length() >= m_config.SleepLinearThreshold;
+                const float angVel = body.AngularVelocity ? std::abs(body.AngularVelocity->Value) : 0.0f;
+                const bool wakeAngular = angVel >= m_config.SleepAngularThreshold;
+                if (!wakeLinear && !wakeAngular) {
+                    continue;
+                }
+                body.IsSleeping = false;
+                body.SleepTimer = 0.0f;
+            }
+
             // Integrate linear velocity first from damping/gravity acceleration.
             Vector2D acc = Engine::Physics::CalculateAcceleration(*body.Rigidbody, *body.Velocity);
             if (body.Rigidbody->Flags & (1u << 1)) {
@@ -354,9 +439,9 @@ namespace Engine::Physics2D {
                 if (tileMaxY < tileMinY) std::swap(tileMaxY, tileMinY);
 
                 const ECS::Components::PhysicsMaterial2D mat{
-                    (body.Material.Friction + tileMaterial.Friction) * 0.5f,
-                    std::max(body.Material.Restitution, tileMaterial.Restitution),
-                    (body.Material.PositionCorrectPercent + tileMaterial.PositionCorrectPercent) * 0.5f
+                    (body.CachedFriction + tileMaterial.Friction) * 0.5f,
+                    std::max(body.CachedRestitution, tileMaterial.Restitution),
+                    (body.CachedPositionCorrectPercent + tileMaterial.PositionCorrectPercent) * 0.5f
                 };
 
                 auto resolveTileCell = [&](const Vector2D& cellCenter, const Vector2D& halfExtents) {
@@ -465,11 +550,12 @@ namespace Engine::Physics2D {
      */
     void PhysicsWorld2D::UpdateSleepState(float fixedDt) {
         for (auto& body : m_bodies) {
-            if (!body.IsDynamic || !body.Velocity || !body.AngularVelocity) {
+            if (!body.IsDynamic || !body.Velocity) {
                 continue;
             }
             const bool lowLinear = body.Velocity->Value.Length() < m_config.SleepLinearThreshold;
-            const bool lowAngular = std::abs(body.AngularVelocity->Value) < m_config.SleepAngularThreshold;
+            const float angularVel = body.AngularVelocity ? std::abs(body.AngularVelocity->Value) : 0.0f;
+            const bool lowAngular = angularVel < m_config.SleepAngularThreshold;
             if (lowLinear && lowAngular) {
                 // Body must stay below thresholds for a full duration before sleeping.
                 body.SleepTimer += fixedDt;
@@ -488,10 +574,23 @@ namespace Engine::Physics2D {
      * @brief Write runtime sleep/contact state back to ECS.
      */
     void PhysicsWorld2D::WriteBackToECS(ECS::World& world) {
+        std::vector<uint32_t> contactCounts(m_bodies.size(), 0u);
+        for (const auto& contact : m_contacts) {
+            if (contact.BodyA < contactCounts.size()) {
+                ++contactCounts[contact.BodyA];
+            }
+            if (contact.BodyB < contactCounts.size()) {
+                ++contactCounts[contact.BodyB];
+            }
+        }
+
         for (const auto& body : m_bodies) {
             if (!world.IsAlive(body.Entity)) {
                 continue;
             }
+
+            m_sleepStateCache[body.Packed] = SleepStateCacheEntry{ body.IsSleeping, body.SleepTimer };
+
             if (body.IsDynamic) {
                 if (!world.Has<ECS::Components::SleepingTag>(body.Entity)) {
                     world.Add<ECS::Components::SleepingTag>(body.Entity, ECS::Components::SleepingTag{ body.IsSleeping });
@@ -503,6 +602,14 @@ namespace Engine::Physics2D {
             if (!world.Has<ECS::Components::PhysicsContactCache2D>(body.Entity)) {
                 world.Add<ECS::Components::PhysicsContactCache2D>(body.Entity, ECS::Components::PhysicsContactCache2D{ 0 });
             }
+        }
+
+        for (size_t i = 0; i < m_bodies.size(); ++i) {
+            const auto& body = m_bodies[i];
+            if (!world.IsAlive(body.Entity) || !world.Has<ECS::Components::PhysicsContactCache2D>(body.Entity)) {
+                continue;
+            }
+            world.Get<ECS::Components::PhysicsContactCache2D>(body.Entity).ContactCount = contactCounts[i];
         }
     }
 
@@ -522,7 +629,6 @@ namespace Engine::Physics2D {
         const auto t0 = std::chrono::high_resolution_clock::now();
         // 1) Pull ECS state into contiguous runtime cache.
         SyncFromECS(world, layerManager);
-        BuildWorldShapes(world);
         // 2) Integrate motion for dynamic bodies.
         IntegrateDynamic(m_config.FixedDeltaSeconds);
         const auto t1 = std::chrono::high_resolution_clock::now();

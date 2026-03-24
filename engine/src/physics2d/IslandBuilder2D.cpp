@@ -72,11 +72,7 @@ namespace Engine::Physics2D {
                     island.Contacts.push_back(cidx);
                 }
 
-                auto neighbors = adjacency[current];
-                // Sort neighbors by packed ID before BFS expansion for deterministic island order.
-                std::sort(neighbors.begin(), neighbors.end(), [&bodies](size_t a, size_t b) {
-                    return bodies[a].Packed < bodies[b].Packed;
-                    });
+                const auto& neighbors = adjacency[current];
                 for (size_t n : neighbors) {
                     if (!visited[n]) {
                         visited[n] = true;

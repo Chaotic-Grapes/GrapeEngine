@@ -34,6 +34,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 class TileMap;
 
 namespace ECS {
+    class PhysicsPipelineRunner;
+
     /**
      * @brief Canonical packed entity-pair key used for collision/trigger tracking.
      */
@@ -66,6 +68,8 @@ namespace ECS {
     // Handles 2D physics simulation using broad and narrow phase collision workflow
     class PhysicsSystem : public ISystem {
     public:
+        struct RuntimeTileMapEntry;
+
         /**
          * @brief Construct system with default-initialized runtime caches.
          */
@@ -134,6 +138,16 @@ namespace ECS {
         float GetRemainingAccumulatorSeconds() const { return m_accumulatorSeconds; }
 
         /**
+         * @brief Internal bridge for legacy staged pipeline to refresh tilemap runtime cache.
+         */
+        void RefreshRuntimeTileMapsForPipeline(World& world) { RefreshRuntimeTileMaps(world); }
+
+        /**
+         * @brief Internal bridge exposing tilemap runtime cache for legacy staged pipeline.
+         */
+        const std::unordered_map<EntityId, RuntimeTileMapEntry>& GetRuntimeTileMapsForPipeline() const { return m_runtimeTileMaps; }
+
+        /**
          * @brief Cached tilemap state mirrored from ECS for physics stepping.
          */
         struct RuntimeTileMapEntry {
@@ -148,27 +162,27 @@ namespace ECS {
             uint32_t Generation = 0;       // Tracks tilemap revision so updates can skip unchanged data
         };
 
-    private:
-        friend class PhysicsPipelineRunner;
-
+    public:
         /**
          * @brief Reconcile runtime tilemap cache with ECS tilemap components.
+         *
+         * Internal: exposed for legacy staged physics runner.
          */
         void RefreshRuntimeTileMaps(World& world);
+
+    private:
 
         /**
          * @brief Convert runtime tilemap cache into PhysicsWorld2D proxy payloads.
          */
         std::vector<Engine::Physics2D::TilemapCollisionProxy2D> BuildTilemapProxies() const;
 
-        // Stores collision pairs from previous frame to drive enter and exit event transitions
-        std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousCollisions;
-
-        // Stores trigger overlaps from previous frame for trigger enter and exit tracking
-        std::unordered_set<PackedEntityPair, PackedEntityPairHash> m_previousTriggerOverlaps;
-
-        // Runtime tilemap cache keyed by entity id for fast physics queries and sync checks
+    public:
+        // Runtime tilemap cache keyed by entity id for fast physics queries and sync checks.
+        // Internal: exposed for legacy staged physics runner.
         std::unordered_map<EntityId, RuntimeTileMapEntry> m_runtimeTileMaps;
+
+    private:
 
         // Fixed-step coordinator state.
         Engine::Physics2D::PhysicsWorld2D m_physicsWorld2D;

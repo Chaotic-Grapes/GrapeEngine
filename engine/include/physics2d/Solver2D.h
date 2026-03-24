@@ -96,10 +96,13 @@ namespace Engine::Physics2D {
             const PhysicsConfig2D& config,
             std::vector<ContactConstraint2D>& contacts,
             const PhysicsIsland2D& island,
+            const std::vector<Vector2D>& positions,
             const std::vector<float>& invMass,
+            const std::vector<float>& invInertia,
             const std::vector<float>& friction,
             const std::vector<float>& restitution,
-            std::vector<Vector2D>& linearVelocity);
+            std::vector<Vector2D>& linearVelocity,
+            std::vector<float>& angularVelocity);
 
         /**
          * @brief Solve position correction for one island.

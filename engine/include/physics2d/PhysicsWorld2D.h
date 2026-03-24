@@ -21,6 +21,7 @@
 #include "physics2d/Solver2D.h"
 #include "physics2d/CCD2D.h"
 #include "physics2d/PhysicsQueries2D.h"
+#include <unordered_map>
 
 namespace ECS {
     class World;
@@ -119,6 +120,14 @@ namespace Engine::Physics2D {
          */
         void WriteBackToECS(ECS::World& world);
 
+        /**
+         * @brief Per-body persistent sleep cache entry keyed by packed entity id.
+         */
+        struct SleepStateCacheEntry {
+            bool IsSleeping = false;
+            float SleepTimer = 0.0f;
+        };
+
         PhysicsConfig2D m_config{};
         PhysicsStats2D m_stats{};
         Broadphase2D m_broadphase{};
@@ -133,6 +142,7 @@ namespace Engine::Physics2D {
         std::vector<ContactConstraint2D> m_contacts;
         std::vector<PhysicsIsland2D> m_islands;
         IPhysicsDebugDraw2D* m_debugDraw = nullptr;
+        std::unordered_map<PackedEntityId, SleepStateCacheEntry> m_sleepStateCache;
     };
 }
 

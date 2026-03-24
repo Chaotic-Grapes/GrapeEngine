@@ -154,8 +154,6 @@ namespace ECS {
      * @param world ECS world (unused).
      */
     void PhysicsSystem::OnDestroy(World& /*world*/) {
-        m_previousCollisions.clear();
-        m_previousTriggerOverlaps.clear();
         m_runtimeTileMaps.clear();
         m_accumulatorSeconds = 0.0f;
         m_lastWorld = nullptr;
@@ -267,8 +265,6 @@ namespace ECS {
         if (m_lastWorld != &world) {
             m_lastWorld = &world;
             m_runtimeTileMaps.clear();
-            m_previousCollisions.clear();
-            m_previousTriggerOverlaps.clear();
             m_accumulatorSeconds = 0.0f;
             m_physicsWorld2D = Engine::Physics2D::PhysicsWorld2D{};
         }
@@ -284,6 +280,10 @@ namespace ECS {
         uint32_t steps = 0;
         const uint32_t maxSteps = m_physicsWorld2D.Config().MaxFixedStepsPerFrame;
         const float fixed = m_physicsWorld2D.Config().FixedDeltaSeconds;
+        const float maxAccumulator = fixed * static_cast<float>(maxSteps);
+        if (m_accumulatorSeconds > maxAccumulator) {
+            m_accumulatorSeconds = maxAccumulator;
+        }
         ECS::Events::EventDispatcher dispatcher(&world);
         const auto tileProxies = BuildTilemapProxies();
 
@@ -302,12 +302,12 @@ namespace ECS {
         std::vector<Engine::Physics2D::TilemapCollisionProxy2D> proxies;
         proxies.reserve(m_runtimeTileMaps.size());
         for (const auto& [entityId, entry] : m_runtimeTileMaps) {
-            (void)entityId;
             Engine::Physics2D::TilemapCollisionProxy2D p{};
             p.Map = entry.Map;
             p.Origin = entry.Origin;
             p.LayerId = entry.LayerId;
             p.Enabled = entry.Enabled;
+            p.SourcePackedEntity = static_cast<PackedEntityId>(entityId);
             proxies.push_back(std::move(p));
         }
         std::sort(proxies.begin(), proxies.end(), [](const auto& a, const auto& b) {
@@ -317,7 +317,10 @@ namespace ECS {
             if (a.Origin.X != b.Origin.X) {
                 return a.Origin.X < b.Origin.X;
             }
-            return a.Origin.Y < b.Origin.Y;
+            if (a.Origin.Y != b.Origin.Y) {
+                return a.Origin.Y < b.Origin.Y;
+            }
+            return a.SourcePackedEntity < b.SourcePackedEntity;
             });
         return proxies;
     }
