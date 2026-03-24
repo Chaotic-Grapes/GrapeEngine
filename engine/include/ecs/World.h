@@ -204,6 +204,19 @@ namespace ECS {
         // Destroy.
         void Destroy(const Entity e) {
             // Assume entity is alive
+            // Orphan direct children first so no alive entity retains a dead parent handle.
+            // This keeps hierarchy indices and Parent components consistent after parent deletion.
+            std::vector<Entity> childrenToDetach;
+            ForChildren(e, [&](const Entity child) {
+                childrenToDetach.push_back(child);
+            });
+
+            for (const Entity child : childrenToDetach) {
+                if (IsAlive(child) && Has<Components::Parent>(child)) {
+                    Detach(child);
+                }
+            }
+
             // If entity participates in hierarchy, unlink it first
             if (Has<Components::Parent>(e)) {
                 _onComponentRemoving(e, TypeIdOf<Components::Parent>());

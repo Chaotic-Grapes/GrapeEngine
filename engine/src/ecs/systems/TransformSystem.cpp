@@ -45,7 +45,7 @@ namespace ECS {
         // Find roots (entities without a parent in the world's index)
         world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
             Entity parent = world.ParentOf(e);
-            if (parent.IsNull()) {
+            if (parent.IsNull() || !world.IsAlive(parent)) {
                 roots.push_back(e);
             }
         });

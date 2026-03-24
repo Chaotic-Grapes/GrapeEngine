@@ -327,7 +327,7 @@ namespace Scenes {
                 // Save hierarchy relationships separately (as child->parent index mappings)
                 world.Each([&](const ECS::Entity entity) {
                     ECS::Entity parent = world.ParentOf(entity);
-                    if (!parent.IsNull()) {
+                    if (!parent.IsNull() && world.IsAlive(parent)) {
                         auto childIt = entityToSaveIndex.find(entity.Index);
                         auto parentIt = entityToSaveIndex.find(parent.Index);
                         
@@ -461,7 +461,9 @@ namespace Scenes {
                         if (childIndex < restoredEntities.size() && parentIndex < restoredEntities.size()) {
                             ECS::Entity child = restoredEntities[childIndex];
                             ECS::Entity parent = restoredEntities[parentIndex];
-                            world.Attach(child, parent);
+                            if (!child.IsNull() && !parent.IsNull() && world.IsAlive(child) && world.IsAlive(parent)) {
+                                world.Attach(child, parent);
+                            }
                         }
                     }
                 }
