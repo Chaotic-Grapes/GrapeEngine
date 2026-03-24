@@ -12,6 +12,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#ifndef TRANSFORM_UTILS_H
+#define TRANSFORM_UTILS_H
+
 #include "math/Vector3D.h"
 #include "math/Matrix4x4.h"
 #include "math/Quaternion.h"
@@ -142,3 +145,5 @@ private:
         }
     }
 };
+
+#endif

@@ -1226,7 +1226,35 @@ namespace ECS {
          * @note Assumes both entities are alive
          */
         // Resolve parent relationships.
-        void Attach(const Entity child, const Entity parent) { Set<Components::Parent>(child, Components::Parent{parent}); }
+        void Attach(const Entity child, const Entity parent) {
+            if (child.IsNull() || parent.IsNull()) {
+                return;
+            }
+            if (!IsAlive(child) || !IsAlive(parent)) {
+                return;
+            }
+            if (child == parent) {
+                return;
+            }
+
+            // Reject cycle creation by walking up from the new parent.
+            Entity cursor = parent;
+            int depth = 0;
+            while (!cursor.IsNull() && depth < 1024) {
+                if (cursor == child) {
+                    return;
+                }
+
+                const Entity next = ParentOf(cursor);
+                if (next.IsNull() || !IsAlive(next)) {
+                    break;
+                }
+                cursor = next;
+                ++depth;
+            }
+
+            Set<Components::Parent>(child, Components::Parent{ parent });
+        }
 
         /**
 		 * @brief Detach a child entity from its parent in the hierarchy.

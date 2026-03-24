@@ -36,6 +36,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
+#include "helpers/TransformUtils.h"
 #include "ecs/systems/AudioSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "services/ResourceManager.h"
@@ -468,6 +469,10 @@ namespace Scenes {
                     }
                 }
 
+                // Force one transform propagation pass so loaded parent-child relationships
+                // produce correct world-space transforms before the next frame update.
+                _recomputeWorldTransforms(world);
+
                 LOG_DEBUG("Scene successfully loaded: "
                     << sceneJson.value("SceneName", "Unknown") << '\n'
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
@@ -699,6 +704,108 @@ namespace Scenes {
         }
 
         // Initialize runtime prefab metadata post-load
+        static void _recomputeWorldTransforms(ECS::World& world) {
+            std::vector<ECS::Entity> roots;
+            std::vector<ECS::Entity> needsWorldTransform;
+
+            // Identify all entities with LocalTransform that lack WorldTransform
+            world.Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, ECS::Components::LocalTransform&) {
+                if (!world.Has<ECS::Components::WorldTransform>(e)) {
+                    needsWorldTransform.push_back(e);
+                }
+            });
+
+            // Add missing WorldTransform components for entities that need them
+            for (const ECS::Entity e : needsWorldTransform) {
+                ECS::Components::WorldTransform wt{};
+                wt.Dirty = true;
+                world.Add<ECS::Components::WorldTransform>(e, wt);
+            }
+
+            // Identify root entities (those without a parent or with a non-alive parent)
+            world.Each<ECS::Components::LocalTransform, ECS::Components::WorldTransform>(
+                [&](const ECS::Entity e, ECS::Components::LocalTransform&, ECS::Components::WorldTransform&) {
+                    const ECS::Entity parent = world.ParentOf(e);
+                    if (parent.IsNull() || !world.IsAlive(parent)) {
+                        roots.push_back(e);
+                    }
+                });
+
+            // Iterative DFS to compute world transforms, starting from roots
+            struct TransformNode {
+                ECS::Entity Entity = ECS::NULL_ENTITY;
+                bool HasParentWorld = false;
+                Matrix4x4 ParentWorld{};
+            };
+
+            // Reserve stack capacity to minimize reallocations (worst case: all roots are separate hierarchies)
+            std::vector<TransformNode> stack;
+            stack.reserve(roots.size());
+            for (const ECS::Entity root : roots) {
+                stack.push_back(TransformNode{ root, false, Matrix4x4{} });
+            }
+
+            // Track visited entities to prevent infinite loops in malformed hierarchies (e.g., cycles)
+            std::unordered_set<uint32_t> visited;
+            visited.reserve(needsWorldTransform.size() + roots.size() + 64);
+
+            // Lambda to process a single node: compute its world transform and enqueue its children
+            auto processNode = [&](const TransformNode& node) {
+                if (node.Entity.IsNull() || !world.IsAlive(node.Entity)) {
+                    return;
+                }
+                if (!world.Has<ECS::Components::LocalTransform>(node.Entity)
+                    || !world.Has<ECS::Components::WorldTransform>(node.Entity)) {
+                    return;
+                }
+
+                // Check if we've already visited this entity (protect against cycles). If insert returns false, it means the entity was already visited
+                if (!visited.insert(node.Entity.Index).second) {
+                    return;
+                }
+
+                // Compute world transform: World = ParentWorld * Local (if parent) or Local (if root)
+                const auto& lt = world.Get<ECS::Components::LocalTransform>(node.Entity);
+                auto& wt = world.Get<ECS::Components::WorldTransform>(node.Entity);
+
+                // Note: The order of multiplication is important. Assuming column-major matrices and column vectors,
+                // the world transform is computed as World = ParentWorld * Local.
+                const Matrix4x4 local = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
+                const Matrix4x4 worldM = node.HasParentWorld ? (node.ParentWorld * local) : local;
+
+                // Update the WorldTransform component with the computed world matrix and mark it as clean
+                wt.Matrix = worldM;
+                wt.Dirty = false;
+
+                // Enqueue children with current world as their parent world
+                world.ForChildren(node.Entity, [&](const ECS::Entity child) {
+                    stack.push_back(TransformNode{ child, true, worldM });
+                });
+            };
+
+            // Process the stack until all reachable entities have their world transforms computed
+            while (!stack.empty()) {
+                const TransformNode node = stack.back();
+                stack.pop_back();
+                processNode(node);
+            }
+
+            // Handle malformed hierarchies (e.g., cycles) by ensuring every transform
+            // is computed at least once, treating unvisited entities as temporary roots.
+            world.Each<ECS::Components::LocalTransform, ECS::Components::WorldTransform>(
+                [&](const ECS::Entity e, ECS::Components::LocalTransform&, ECS::Components::WorldTransform&) {
+                    if (visited.find(e.Index) != visited.end()) {
+                        return;
+                    }
+                    stack.push_back(TransformNode{ e, false, Matrix4x4{} });
+                    while (!stack.empty()) {
+                        const TransformNode node = stack.back();
+                        stack.pop_back();
+                        processNode(node);
+                    }
+                });
+        }
+
         void _reconstructPrefabMetadata(ECS::World& world, const std::vector<ECS::Entity>& restoredEntities) {
             // Initialize PrefabManager if not already done
             if (!m_prefabManager) {
