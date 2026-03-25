@@ -25,7 +25,7 @@ namespace Platform {
     /**
      * @brief GLFW implementation of IInputSystem interface
      * 
-     * This class wraps the existing static Input class functionality
+    * This class wraps the existing static Input class functionality
      * and exposes it through the platform-agnostic IInputSystem interface.
      */
     class GLFWInputSystem : public IInputSystem {
@@ -54,6 +54,17 @@ namespace Platform {
 
         double GetScrollX() override;
         double GetScrollY() override;
+
+        bool IsGamepadConnected(int gamepad) override;
+        bool IsGamepadJustConnected(int gamepad) override;
+        bool IsGamepadJustDisconnected(int gamepad) override;
+
+        bool IsGamepadButtonPressed(int gamepad, int button) override;
+        bool IsGamepadButtonDown(int gamepad, int button) override;
+        bool IsGamepadButtonUp(int gamepad, int button) override;
+
+        float GetGamepadAxis(int gamepad, int axis) override;
+        float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) override;
 
         void SetCursorVisible(bool visible) override;
         bool IsCursorVisible() const override;

@@ -69,6 +69,38 @@ namespace Platform {
         return Input::GetScrollY();
     }
 
+    bool GLFWInputSystem::IsGamepadConnected(int gamepad) {
+        return Input::IsGamepadConnected(gamepad);
+    }
+
+    bool GLFWInputSystem::IsGamepadJustConnected(int gamepad) {
+        return Input::IsGamepadJustConnected(gamepad);
+    }
+
+    bool GLFWInputSystem::IsGamepadJustDisconnected(int gamepad) {
+        return Input::IsGamepadJustDisconnected(gamepad);
+    }
+
+    bool GLFWInputSystem::IsGamepadButtonPressed(int gamepad, int button) {
+        return Input::IsGamepadButtonPressed(gamepad, button);
+    }
+
+    bool GLFWInputSystem::IsGamepadButtonDown(int gamepad, int button) {
+        return Input::IsGamepadButtonDown(gamepad, button);
+    }
+
+    bool GLFWInputSystem::IsGamepadButtonUp(int gamepad, int button) {
+        return Input::IsGamepadButtonUp(gamepad, button);
+    }
+
+    float GLFWInputSystem::GetGamepadAxis(int gamepad, int axis) {
+        return Input::GetGamepadAxis(gamepad, axis);
+    }
+
+    float GLFWInputSystem::GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) {
+        return Input::GetGamepadAxisWithDeadzone(gamepad, axis, deadzone);
+    }
+
     void GLFWInputSystem::SetCursorVisible(bool visible) {
         if (!m_window) return;
         

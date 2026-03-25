@@ -5,7 +5,7 @@
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
 Platform abstraction interface for input system. Provides a clean API
-for keyboard and mouse input without exposing underlying platform
+for keyboard, mouse, and gamepad input without exposing underlying platform
 implementation (e.g., GLFW, Win32).
 
 This allows the editor to handle input without directly depending on
@@ -27,7 +27,7 @@ namespace Platform {
     /**
      * @brief Platform-agnostic input system interface
      * 
-     * This interface abstracts keyboard and mouse input handling, allowing
+    * This interface abstracts keyboard, mouse, and gamepad input handling, allowing
      * the editor and engine to query input state without knowing the
      * specific platform implementation.
      */
@@ -101,6 +101,62 @@ namespace Platform {
          * @brief Get vertical scroll offset this frame
          */
         virtual double GetScrollY() = 0;
+
+        // ==================== Gamepad Input ====================
+
+        /**
+         * @brief Check whether a gamepad slot is currently connected
+         * @param gamepad Gamepad index (0..15, maps to GLFW joystick ids)
+         */
+        virtual bool IsGamepadConnected(int gamepad) = 0;
+
+        /**
+         * @brief Check if a gamepad was connected this frame
+         * @param gamepad Gamepad index (0..15)
+         */
+        virtual bool IsGamepadJustConnected(int gamepad) = 0;
+
+        /**
+         * @brief Check if a gamepad was disconnected this frame
+         * @param gamepad Gamepad index (0..15)
+         */
+        virtual bool IsGamepadJustDisconnected(int gamepad) = 0;
+
+        /**
+         * @brief Check if a gamepad button transitioned from up to down this frame
+         * @param gamepad Gamepad index (0..15)
+         * @param button Gamepad button index (GLFW gamepad button enum)
+         */
+        virtual bool IsGamepadButtonPressed(int gamepad, int button) = 0;
+
+        /**
+         * @brief Check if a gamepad button is currently held
+         * @param gamepad Gamepad index (0..15)
+         * @param button Gamepad button index (GLFW gamepad button enum)
+         */
+        virtual bool IsGamepadButtonDown(int gamepad, int button) = 0;
+
+        /**
+         * @brief Check if a gamepad button transitioned from down to up this frame
+         * @param gamepad Gamepad index (0..15)
+         * @param button Gamepad button index (GLFW gamepad button enum)
+         */
+        virtual bool IsGamepadButtonUp(int gamepad, int button) = 0;
+
+        /**
+         * @brief Get raw gamepad axis value in range [-1, 1]
+         * @param gamepad Gamepad index (0..15)
+         * @param axis Gamepad axis index (GLFW gamepad axis enum)
+         */
+        virtual float GetGamepadAxis(int gamepad, int axis) = 0;
+
+        /**
+         * @brief Get gamepad axis value after radial deadzone filtering
+         * @param gamepad Gamepad index (0..15)
+         * @param axis Gamepad axis index (GLFW gamepad axis enum)
+         * @param deadzone Deadzone in [0, 1)
+         */
+        virtual float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) = 0;
 
         // ==================== Cursor Management ====================
         

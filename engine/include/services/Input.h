@@ -7,13 +7,14 @@
         muhammadnurfadzly.b@digipen.edu
 \date   12th March 2026
 \brief
-Declares the Input class for handling keyboard and mouse input events through
+Declares the Input class for handling keyboard, mouse, and gamepad input events through
 GLFW. Provides static functions for checking input states, managing window
 events, and accessing system specifications.
 
 Features:
 - Static input state checking (key pressed/down/up, mouse buttons)
 - Mouse position and scroll tracking
+- Gamepad connection, button, and axis tracking
 - Window resize event handling
 - GLFW callback management and error handling
 - OpenGL system specification reporting
@@ -36,6 +37,9 @@ namespace Engine { class Application; }
 // Maximum key and mouse button constants
 static constexpr int MAX_KEYS   = GLFW_KEY_LAST + 1;
 static constexpr int MAX_MOUSE  = GLFW_MOUSE_BUTTON_LAST + 1;
+static constexpr int MAX_GAMEPADS = GLFW_JOYSTICK_LAST + 1;
+static constexpr int MAX_GAMEPAD_BUTTONS = GLFW_GAMEPAD_BUTTON_LAST + 1;
+static constexpr int MAX_GAMEPAD_AXES = GLFW_GAMEPAD_AXIS_LAST + 1;
 
 // Static input management class for keyboard and mouse events
 class GRAPEENGINE_API Input {
@@ -76,6 +80,30 @@ public:
     // Get the current vertical scroll offset
     static double GetScrollY() { return m_scrollY; }
 
+    // Check whether a gamepad index is connected this frame
+    static bool IsGamepadConnected(int gamepad);
+
+    // Check whether a gamepad index was connected this frame
+    static bool IsGamepadJustConnected(int gamepad);
+
+    // Check whether a gamepad index was disconnected this frame
+    static bool IsGamepadJustDisconnected(int gamepad);
+
+    // Check if a gamepad button transitioned from up to down this frame
+    static bool IsGamepadButtonPressed(int gamepad, int button);
+
+    // Check if a gamepad button is currently held
+    static bool IsGamepadButtonDown(int gamepad, int button);
+
+    // Check if a gamepad button transitioned from down to up this frame
+    static bool IsGamepadButtonUp(int gamepad, int button);
+
+    // Get raw gamepad axis in range [-1, 1]
+    static float GetGamepadAxis(int gamepad, int axis);
+
+    // Get gamepad axis after applying deadzone and response scaling
+    static float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone);
+
     // Set up all GLFW event callbacks for input handling
     static void SetupEventCallbacks();
 
@@ -107,6 +135,13 @@ private:
     // ************** Mouse state tracking ************** //
     static bool s_mouseCurrent[MAX_MOUSE];
     static bool s_mousePrevious[MAX_MOUSE];
+
+    // ************** Gamepad state tracking ************** //
+    static bool s_gamepadConnectedCurrent[MAX_GAMEPADS];
+    static bool s_gamepadConnectedPrevious[MAX_GAMEPADS];
+    static bool s_gamepadButtonCurrent[MAX_GAMEPADS][MAX_GAMEPAD_BUTTONS];
+    static bool s_gamepadButtonPrevious[MAX_GAMEPADS][MAX_GAMEPAD_BUTTONS];
+    static float s_gamepadAxisCurrent[MAX_GAMEPADS][MAX_GAMEPAD_AXES];
 
     // Mouse wheel tracking
     static double m_scrollX;      // Horizontal scroll offset from last scroll event
@@ -140,6 +175,21 @@ private:
 
     // Process input events and update internal state (called once per frame)
     static void _processInput();
+
+    // Poll all gamepads and update connection/button/axis state arrays
+    static void _updateGamepadStates();
+
+    // Validate a gamepad index against storage bounds
+    static bool _isGamepadIndexValid(int gamepad);
+
+    // Validate a gamepad button index against storage bounds
+    static bool _isGamepadButtonValid(int button);
+
+    // Validate a gamepad axis index against storage bounds
+    static bool _isGamepadAxisValid(int axis);
+
+    // Apply centered deadzone and re-scale remaining axis range back to [-1, 1]
+    static float _applyAxisDeadzone(float value, float deadzone);
 };
 
 
@@ -248,5 +298,30 @@ constexpr int KEY_CAPS_LOCK = GLFW_KEY_CAPS_LOCK;
 constexpr int MOUSE_LEFT    = GLFW_MOUSE_BUTTON_LEFT;
 constexpr int MOUSE_RIGHT   = GLFW_MOUSE_BUTTON_RIGHT;
 constexpr int MOUSE_MIDDLE  = GLFW_MOUSE_BUTTON_MIDDLE;
+
+// Gamepad button constants
+constexpr int GAMEPAD_BUTTON_A = GLFW_GAMEPAD_BUTTON_A;
+constexpr int GAMEPAD_BUTTON_B = GLFW_GAMEPAD_BUTTON_B;
+constexpr int GAMEPAD_BUTTON_X = GLFW_GAMEPAD_BUTTON_X;
+constexpr int GAMEPAD_BUTTON_Y = GLFW_GAMEPAD_BUTTON_Y;
+constexpr int GAMEPAD_BUTTON_LEFT_BUMPER = GLFW_GAMEPAD_BUTTON_LEFT_BUMPER;
+constexpr int GAMEPAD_BUTTON_RIGHT_BUMPER = GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER;
+constexpr int GAMEPAD_BUTTON_BACK = GLFW_GAMEPAD_BUTTON_BACK;
+constexpr int GAMEPAD_BUTTON_START = GLFW_GAMEPAD_BUTTON_START;
+constexpr int GAMEPAD_BUTTON_GUIDE = GLFW_GAMEPAD_BUTTON_GUIDE;
+constexpr int GAMEPAD_BUTTON_LEFT_THUMB = GLFW_GAMEPAD_BUTTON_LEFT_THUMB;
+constexpr int GAMEPAD_BUTTON_RIGHT_THUMB = GLFW_GAMEPAD_BUTTON_RIGHT_THUMB;
+constexpr int GAMEPAD_BUTTON_DPAD_UP = GLFW_GAMEPAD_BUTTON_DPAD_UP;
+constexpr int GAMEPAD_BUTTON_DPAD_RIGHT = GLFW_GAMEPAD_BUTTON_DPAD_RIGHT;
+constexpr int GAMEPAD_BUTTON_DPAD_DOWN = GLFW_GAMEPAD_BUTTON_DPAD_DOWN;
+constexpr int GAMEPAD_BUTTON_DPAD_LEFT = GLFW_GAMEPAD_BUTTON_DPAD_LEFT;
+
+// Gamepad axis constants
+constexpr int GAMEPAD_AXIS_LEFT_X = GLFW_GAMEPAD_AXIS_LEFT_X;
+constexpr int GAMEPAD_AXIS_LEFT_Y = GLFW_GAMEPAD_AXIS_LEFT_Y;
+constexpr int GAMEPAD_AXIS_RIGHT_X = GLFW_GAMEPAD_AXIS_RIGHT_X;
+constexpr int GAMEPAD_AXIS_RIGHT_Y = GLFW_GAMEPAD_AXIS_RIGHT_Y;
+constexpr int GAMEPAD_AXIS_LEFT_TRIGGER = GLFW_GAMEPAD_AXIS_LEFT_TRIGGER;
+constexpr int GAMEPAD_AXIS_RIGHT_TRIGGER = GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER;
 
 #endif

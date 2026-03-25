@@ -22,6 +22,9 @@ Features:
 /* End Header *******************************************************************/
 
 #include "services/Input.h"
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <sstream>
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -37,6 +40,13 @@ bool Input::s_keyPrevious[MAX_KEYS] = { false };
 // Mouse state
 bool Input::s_mouseCurrent[MAX_MOUSE] = { false };
 bool Input::s_mousePrevious[MAX_MOUSE] = { false };
+
+// Gamepad state
+bool Input::s_gamepadConnectedCurrent[MAX_GAMEPADS] = { false };
+bool Input::s_gamepadConnectedPrevious[MAX_GAMEPADS] = { false };
+bool Input::s_gamepadButtonCurrent[MAX_GAMEPADS][MAX_GAMEPAD_BUTTONS] = { false };
+bool Input::s_gamepadButtonPrevious[MAX_GAMEPADS][MAX_GAMEPAD_BUTTONS] = { false };
+float Input::s_gamepadAxisCurrent[MAX_GAMEPADS][MAX_GAMEPAD_AXES] = { 0.0f };
 
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
@@ -97,6 +107,59 @@ double Input::GetMouseY() {
     return yPos;
 }
 
+bool Input::IsGamepadConnected(const int gamepad) {
+    if (!_isGamepadIndexValid(gamepad)) {
+        return false;
+    }
+    return s_gamepadConnectedCurrent[gamepad];
+}
+
+bool Input::IsGamepadJustConnected(const int gamepad) {
+    if (!_isGamepadIndexValid(gamepad)) {
+        return false;
+    }
+    return s_gamepadConnectedCurrent[gamepad] && !s_gamepadConnectedPrevious[gamepad];
+}
+
+bool Input::IsGamepadJustDisconnected(const int gamepad) {
+    if (!_isGamepadIndexValid(gamepad)) {
+        return false;
+    }
+    return !s_gamepadConnectedCurrent[gamepad] && s_gamepadConnectedPrevious[gamepad];
+}
+
+bool Input::IsGamepadButtonPressed(const int gamepad, const int button) {
+    if (!_isGamepadIndexValid(gamepad) || !_isGamepadButtonValid(button) || !s_gamepadConnectedCurrent[gamepad]) {
+        return false;
+    }
+    return s_gamepadButtonCurrent[gamepad][button] && !s_gamepadButtonPrevious[gamepad][button];
+}
+
+bool Input::IsGamepadButtonDown(const int gamepad, const int button) {
+    if (!_isGamepadIndexValid(gamepad) || !_isGamepadButtonValid(button) || !s_gamepadConnectedCurrent[gamepad]) {
+        return false;
+    }
+    return s_gamepadButtonCurrent[gamepad][button];
+}
+
+bool Input::IsGamepadButtonUp(const int gamepad, const int button) {
+    if (!_isGamepadIndexValid(gamepad) || !_isGamepadButtonValid(button)) {
+        return false;
+    }
+    return !s_gamepadButtonCurrent[gamepad][button] && s_gamepadButtonPrevious[gamepad][button];
+}
+
+float Input::GetGamepadAxis(const int gamepad, const int axis) {
+    if (!_isGamepadIndexValid(gamepad) || !_isGamepadAxisValid(axis) || !s_gamepadConnectedCurrent[gamepad]) {
+        return 0.0f;
+    }
+    return s_gamepadAxisCurrent[gamepad][axis];
+}
+
+float Input::GetGamepadAxisWithDeadzone(const int gamepad, const int axis, const float deadzone) {
+    return _applyAxisDeadzone(GetGamepadAxis(gamepad, axis), deadzone);
+}
+
 // Register all GLFW callbacks so input state and message broadcasts stay synchronized
 void Input::SetupEventCallbacks() {
     glfwSetKeyCallback(m_window, _keyCallback);
@@ -136,6 +199,70 @@ void Input::_processInput() {
 
     // Dispatch pending OS events, which will invoke our registered callbacks
     glfwPollEvents();
+
+    // Poll gamepads after event pump so connection and state reflect this frame
+    _updateGamepadStates();
+}
+
+void Input::_updateGamepadStates() {
+    // Preserve previous-frame gamepad state for edge detection
+    std::memcpy(s_gamepadConnectedPrevious, s_gamepadConnectedCurrent, sizeof(s_gamepadConnectedCurrent));
+    std::memcpy(s_gamepadButtonPrevious, s_gamepadButtonCurrent, sizeof(s_gamepadButtonCurrent));
+
+    for (int gamepad = 0; gamepad < MAX_GAMEPADS; ++gamepad) {
+        const int joystickId = GLFW_JOYSTICK_1 + gamepad;
+        const bool present = glfwJoystickPresent(joystickId) == GLFW_TRUE;
+        const bool isMappedGamepad = present && (glfwJoystickIsGamepad(joystickId) == GLFW_TRUE);
+
+        s_gamepadConnectedCurrent[gamepad] = isMappedGamepad;
+
+        if (!isMappedGamepad) {
+            // Ensure stale state is cleared immediately on disconnect or unsupported devices
+            std::memset(s_gamepadButtonCurrent[gamepad], 0, sizeof(s_gamepadButtonCurrent[gamepad]));
+            std::fill(std::begin(s_gamepadAxisCurrent[gamepad]), std::end(s_gamepadAxisCurrent[gamepad]), 0.0f);
+            continue;
+        }
+
+        GLFWgamepadstate state{};
+        if (glfwGetGamepadState(joystickId, &state) != GLFW_TRUE) {
+            // Treat transient read failures as disconnected for stable behavior
+            s_gamepadConnectedCurrent[gamepad] = false;
+            std::memset(s_gamepadButtonCurrent[gamepad], 0, sizeof(s_gamepadButtonCurrent[gamepad]));
+            std::fill(std::begin(s_gamepadAxisCurrent[gamepad]), std::end(s_gamepadAxisCurrent[gamepad]), 0.0f);
+            continue;
+        }
+
+        for (int button = 0; button < MAX_GAMEPAD_BUTTONS; ++button) {
+            s_gamepadButtonCurrent[gamepad][button] = (state.buttons[button] == GLFW_PRESS);
+        }
+        for (int axis = 0; axis < MAX_GAMEPAD_AXES; ++axis) {
+            s_gamepadAxisCurrent[gamepad][axis] = state.axes[axis];
+        }
+    }
+}
+
+bool Input::_isGamepadIndexValid(const int gamepad) {
+    return gamepad >= 0 && gamepad < MAX_GAMEPADS;
+}
+
+bool Input::_isGamepadButtonValid(const int button) {
+    return button >= 0 && button < MAX_GAMEPAD_BUTTONS;
+}
+
+bool Input::_isGamepadAxisValid(const int axis) {
+    return axis >= 0 && axis < MAX_GAMEPAD_AXES;
+}
+
+float Input::_applyAxisDeadzone(const float value, float deadzone) {
+    deadzone = std::clamp(deadzone, 0.0f, 0.999f);
+
+    const float absValue = std::fabs(value);
+    if (absValue <= deadzone) {
+        return 0.0f;
+    }
+
+    const float scaled = (absValue - deadzone) / (1.0f - deadzone);
+    return (value < 0.0f ? -scaled : scaled);
 }
 
 // Update keyboard state and broadcast key transition events

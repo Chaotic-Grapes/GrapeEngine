@@ -60,6 +60,45 @@ internal static partial class InputAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetScrollY();
 
+    // Gamepad input
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadConnected")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadConnected(int gamepad);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadJustConnected")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadJustConnected(int gamepad);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadJustDisconnected")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadJustDisconnected(int gamepad);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadButtonPressed")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadButtonPressed(int gamepad, int button);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadButtonDown")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadButtonDown(int gamepad, int button);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadButtonUp")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadButtonUp(int gamepad, int button);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetGamepadAxis")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetGamepadAxis(int gamepad, int axis);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetGamepadAxisWithDeadzone")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone);
+
     //[DllImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsKeyPressed", CallingConvention = CallingConvention.Cdecl)]
     //public static extern bool IsKeyPressed(int key);
 

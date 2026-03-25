@@ -6,7 +6,7 @@
 \date   28th October 2025
 \brief
 This file contains the implementation of the Input static class,
-which provides access to keyboard and mouse input.
+which provides access to keyboard, mouse, and gamepad input.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -20,7 +20,7 @@ using GrapeEngine.Scripting.Internal.Unsafe;
 namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
-/// Provides access to keyboard and mouse input.
+/// Provides access to keyboard, mouse, and gamepad input.
 /// This is a static wrapper around the native Input service.
 /// </summary>
 public static class Input
@@ -115,6 +115,88 @@ public static class Input
         {
             return InputAPI.GetScrollY();
         }
+    }
+
+    // ============================================================================
+    // Gamepad Input
+    // ============================================================================
+
+    /// <summary>
+    /// Check if a gamepad slot is currently connected.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    public static bool IsGamepadConnected(int gamepad)
+    {
+        return InputAPI.IsGamepadConnected(gamepad);
+    }
+
+    /// <summary>
+    /// Check if a gamepad was connected this frame.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    public static bool IsGamepadJustConnected(int gamepad)
+    {
+        return InputAPI.IsGamepadJustConnected(gamepad);
+    }
+
+    /// <summary>
+    /// Check if a gamepad was disconnected this frame.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    public static bool IsGamepadJustDisconnected(int gamepad)
+    {
+        return InputAPI.IsGamepadJustDisconnected(gamepad);
+    }
+
+    /// <summary>
+    /// Check if a gamepad button was pressed this frame.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="button">Gamepad button enum value.</param>
+    public static bool IsGamepadButtonPressed(int gamepad, int button)
+    {
+        return InputAPI.IsGamepadButtonPressed(gamepad, button);
+    }
+
+    /// <summary>
+    /// Check if a gamepad button is currently held.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="button">Gamepad button enum value.</param>
+    public static bool IsGamepadButtonDown(int gamepad, int button)
+    {
+        return InputAPI.IsGamepadButtonDown(gamepad, button);
+    }
+
+    /// <summary>
+    /// Check if a gamepad button was released this frame.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="button">Gamepad button enum value.</param>
+    public static bool IsGamepadButtonUp(int gamepad, int button)
+    {
+        return InputAPI.IsGamepadButtonUp(gamepad, button);
+    }
+
+    /// <summary>
+    /// Get a raw gamepad axis value in range [-1, 1].
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="axis">Gamepad axis enum value.</param>
+    public static float GetGamepadAxis(int gamepad, int axis)
+    {
+        return InputAPI.GetGamepadAxis(gamepad, axis);
+    }
+
+    /// <summary>
+    /// Get a deadzone-filtered gamepad axis value in range [-1, 1].
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="axis">Gamepad axis enum value.</param>
+    /// <param name="deadzone">Deadzone in [0, 1).</param>
+    public static float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone)
+    {
+        return InputAPI.GetGamepadAxisWithDeadzone(gamepad, axis, deadzone);
     }
 }
 
@@ -222,5 +304,63 @@ public static class MouseButton
     public const int Left = 0;
     public const int Right = 1;
     public const int Middle = 2;
+}
+
+/// <summary>
+/// Gamepad slot constants.
+/// </summary>
+public static class GamepadId
+{
+    public const int Gamepad1 = 0;
+    public const int Gamepad2 = 1;
+    public const int Gamepad3 = 2;
+    public const int Gamepad4 = 3;
+    public const int Gamepad5 = 4;
+    public const int Gamepad6 = 5;
+    public const int Gamepad7 = 6;
+    public const int Gamepad8 = 7;
+    public const int Gamepad9 = 8;
+    public const int Gamepad10 = 9;
+    public const int Gamepad11 = 10;
+    public const int Gamepad12 = 11;
+    public const int Gamepad13 = 12;
+    public const int Gamepad14 = 13;
+    public const int Gamepad15 = 14;
+    public const int Gamepad16 = 15;
+}
+
+/// <summary>
+/// Gamepad button codes matching GLFW gamepad mapping.
+/// </summary>
+public static class GamepadButton
+{
+    public const int A = 0;
+    public const int B = 1;
+    public const int X = 2;
+    public const int Y = 3;
+    public const int LeftBumper = 4;
+    public const int RightBumper = 5;
+    public const int Back = 6;
+    public const int Start = 7;
+    public const int Guide = 8;
+    public const int LeftThumb = 9;
+    public const int RightThumb = 10;
+    public const int DPadUp = 11;
+    public const int DPadRight = 12;
+    public const int DPadDown = 13;
+    public const int DPadLeft = 14;
+}
+
+/// <summary>
+/// Gamepad axis codes matching GLFW gamepad mapping.
+/// </summary>
+public static class GamepadAxis
+{
+    public const int LeftX = 0;
+    public const int LeftY = 1;
+    public const int RightX = 2;
+    public const int RightY = 3;
+    public const int LeftTrigger = 4;
+    public const int RightTrigger = 5;
 }
 
