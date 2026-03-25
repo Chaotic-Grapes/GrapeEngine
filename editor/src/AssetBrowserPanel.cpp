@@ -78,6 +78,27 @@ namespace {
             extLower == ".tga" || extLower == ".bmp";
     }
 
+    // Hidden filesystem entries are skipped in browser listings to reduce noise.
+    bool IsHiddenEntry(const std::filesystem::directory_entry& entry) {
+        // Use leaf name so dot-prefix checks are independent of full path.
+        const std::string name = entry.path().filename().string();
+        // Dot-prefixed entries are treated as hidden.
+        if (!name.empty() && name.front() == '.') {
+            return true;
+        }
+
+#ifdef _WIN32
+        // Query native file attributes on Windows.
+        const DWORD attrs = GetFileAttributesA(entry.path().string().c_str());
+        // If attribute query succeeds, treat hidden bit as authoritative.
+        if (attrs != INVALID_FILE_ATTRIBUTES) {
+            return (attrs & FILE_ATTRIBUTE_HIDDEN) != 0;
+        }
+#endif
+        // Default to visible when no hidden condition matches.
+        return false;
+    }
+
     // Captures interaction + bounds for a single grid tile button
     struct GridTileInputState {
         ImVec2 Min;               // Tile min screen position
@@ -783,6 +804,11 @@ std::vector<std::filesystem::directory_entry> AssetBrowserPanel::_getSortedEntri
 
     // Gather entries first so we can sort and render in a stable order
     for (const auto& entry : std::filesystem::directory_iterator(m_currentPath)) {
+        // Skip hidden files and folders from browser listing.
+        if (IsHiddenEntry(entry)) {
+            continue;
+        }
+
         // Collect first so render order is deterministic after sorting
         entries.push_back(entry);
     }

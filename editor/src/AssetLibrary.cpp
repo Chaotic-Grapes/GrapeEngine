@@ -103,6 +103,28 @@ namespace {
         // If we successfully compared all components of the root path, then the input path is inside the root
         return true;
     }
+
+    // Hidden filesystem entries are omitted from browser folder listings.
+    bool IsHiddenPath(const std::filesystem::path& path) {
+        // Use leaf component for consistent hidden checks.
+        const std::string name = path.filename().string();
+        // Dot-prefixed names are hidden.
+        if (!name.empty() && name.front() == '.') {
+            return true;
+        }
+
+#ifdef _WIN32
+        // Query Windows file attributes.
+        const DWORD attrs = GetFileAttributesA(path.string().c_str());
+        // Treat only hidden directories as hidden in this panel context.
+        if (attrs != INVALID_FILE_ATTRIBUTES) {
+            return ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0) && ((attrs & FILE_ATTRIBUTE_HIDDEN) != 0);
+        }
+#endif
+
+        // Fallback: entry is visible.
+        return false;
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -198,6 +220,11 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
 
     // Iterate through each item in directory (file or folder)
     for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+        // Skip hidden entries to keep browser view clean.
+        if (IsHiddenPath(entry.path())) {
+            continue;
+        }
+
         // If item is folder
         if (entry.is_directory()) {
             // Render folder icon with symbols font

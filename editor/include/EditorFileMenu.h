@@ -29,6 +29,8 @@ active scene.
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <cstdint>
+#include <unordered_map>
 #include <imgui.h>
 #include "serialization/ConfigurationSerializer.h"
 #include "EditorState.h"
@@ -162,6 +164,13 @@ private:
         std::string Output;     // Raw output captured from the step
     };
 
+    // Single asset row shown in the Build Size Analyzer window
+    struct BuildSizeAssetEntry {
+        std::string RelativePath;   // Relative to project root so it is stable across machines
+        std::uintmax_t SizeBytes = 0;
+        bool Selected = true;
+    };
+
     // -------------------------------------------------------------------------
     // Internal Helpers
     // -------------------------------------------------------------------------
@@ -173,10 +182,30 @@ private:
     void _saveSceneToFile(const std::string& path);
 
     // Trigger a full project export, launching the export thread
-    void _exportProject();
+    void _exportProject(const std::string& destinationOverride = {},
+        const std::unordered_set<std::string>& selectedAssets = {});
 
     // Render the export summary popup showing per-step results
     void _renderExportSummaryPopup();
+
+    // Render the Build Size Analyzer window and handle its controls
+    void _renderBuildSizeAnalyzerWindow();
+
+    // Rebuild the analyzer asset list from the active project
+    void _refreshBuildSizeAnalyzerAssets();
+
+    // Recalculate total selected size and selected-file count
+    void _recomputeBuildSizeSelectionTotals();
+
+    // Toggle all entries selected/unselected in one operation
+    void _setAllBuildSizeSelections(bool selected);
+
+    // Persist and restore analyzer selection state between window sessions
+    void _loadBuildSizeSelectionCache();
+    void _saveBuildSizeSelectionCache() const;
+
+    // Human-friendly byte formatting used by the analyzer table/footer
+    std::string _formatBytes(std::uintmax_t bytes) const;
 
     // Render the project settings modal for editing project-wide config
     void _renderProjectSettingsModal();
@@ -229,6 +258,17 @@ private:
 
     // Whether project settings have been modified but not yet saved
     bool m_projectSettingsDirty = false;
+
+    // Build Size Analyzer visibility and data cache
+    bool m_showBuildSizeAnalyzer = false;
+    bool m_buildSizeNeedsRefresh = true;
+    bool m_buildSizeSelectionLoaded = false;
+    std::vector<BuildSizeAssetEntry> m_buildSizeAssets;
+    std::unordered_map<std::string, bool> m_buildSizeSelectionCache;
+    std::uintmax_t m_buildSizeSelectedBytes = 0;
+    std::size_t m_buildSizeSelectedCount = 0;
+    std::string m_buildSizeStatusMessage;
+    bool m_buildSizeStatusIsError = false;
 
 public:
 

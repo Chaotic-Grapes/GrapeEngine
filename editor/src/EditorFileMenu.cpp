@@ -1,4 +1,4 @@
-/* Start Header *****************************************************************/
+﻿/* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.cpp
 \author Foo Rui Qin    (60%)
@@ -54,9 +54,33 @@ centralized and consistent with the currently active scene.
 #include <cstdio>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
+#include <sstream>
 #include "serialization/ConfigurationSerializer.h"
 #include <filesystem>
 #include <nlohmann/json.hpp>
+
+namespace {
+    // Treat dot-prefixed paths and OS-hidden entries as hidden content.
+    bool IsHiddenPath(const std::filesystem::path& path) {
+        // Use the leaf name so rules work for both files and folders.
+        const std::string name = path.filename().string();
+        // Unix-style hidden naming convention.
+        if (!name.empty() && name.front() == '.') {
+            return true;
+        }
+#ifdef _WIN32
+        // Windows hidden attribute check.
+        const DWORD attrs = GetFileAttributesA(path.string().c_str());
+        // Only trust attributes when the query succeeded.
+        if (attrs != INVALID_FILE_ATTRIBUTES) {
+            return (attrs & FILE_ATTRIBUTE_HIDDEN) != 0;
+        }
+#endif
+        // Default to visible if no hidden signal is found.
+        return false;
+    }
+}
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -147,7 +171,14 @@ void EditorFileMenu::RenderFileMenu() {
 
         ImGui::Separator();
         if (ImGui::MenuItem("Export Project...")) {
-            m_exportRequested = true;
+            // Open the export analyzer window.
+            m_showBuildSizeAnalyzer = true;
+            // Force a rescan every time the window is opened from the menu.
+            m_buildSizeNeedsRefresh = true;
+            // Clear stale status text from prior runs.
+            m_buildSizeStatusMessage.clear();
+            // Reset status severity.
+            m_buildSizeStatusIsError = false;
         }
 
         ImGui::Separator();
@@ -212,16 +243,519 @@ void EditorFileMenu::RenderFileMenu() {
         ImGui::EndPopup();
     }
 
-    // If user clicked Export Project menu item, trigger the export process
-    if (m_exportRequested) {
-        m_exportRequested = false;  // Clear the flag so we only process once
-        _exportProject();  // Start the export operation
-    }
-
+    _renderBuildSizeAnalyzerWindow();
     _renderExportSummaryPopup();
 }
 
-void EditorFileMenu::_exportProject() {
+std::string EditorFileMenu::_formatBytes(std::uintmax_t bytes) const {
+    // Human-readable unit table.
+    static const char* units[] = { "B", "KB", "MB", "GB", "TB" };
+    // Work in floating point once we leave byte units.
+    double size = static_cast<double>(bytes);
+    // Current unit index in the units table.
+    std::size_t unitIndex = 0;
+    // Scale by 1024 until size is in a readable range.
+    while (size >= 1024.0 && unitIndex < (std::size(units) - 1)) {
+        size /= 1024.0;
+        ++unitIndex;
+    }
+
+    // Output formatter used for the UI text.
+    std::ostringstream out;
+    // Keep bytes as integer text.
+    if (unitIndex == 0) {
+        out << bytes << ' ' << units[unitIndex];
+    }
+    else {
+        // Show two decimals for KB and above.
+        out.setf(std::ios::fixed);
+        out.precision(2);
+        out << size << ' ' << units[unitIndex];
+    }
+    // Return formatted size string.
+    return out.str();
+}
+
+void EditorFileMenu::_recomputeBuildSizeSelectionTotals() {
+    // Reset aggregate counters before accumulation.
+    m_buildSizeSelectedBytes = 0;
+    m_buildSizeSelectedCount = 0;
+
+    // Sum selected files only.
+    for (const auto& asset : m_buildSizeAssets) {
+        if (!asset.Selected) {
+            continue;
+        }
+        // Add selected file size.
+        m_buildSizeSelectedBytes += asset.SizeBytes;
+        // Count selected file.
+        ++m_buildSizeSelectedCount;
+    }
+}
+
+void EditorFileMenu::_setAllBuildSizeSelections(bool selected) {
+    // Apply one state to the entire selection set.
+    for (auto& asset : m_buildSizeAssets) {
+        asset.Selected = selected;
+    }
+    // Recompute footer totals.
+    _recomputeBuildSizeSelectionTotals();
+    // Persist bulk selection changes.
+    _saveBuildSizeSelectionCache();
+}
+
+void EditorFileMenu::_loadBuildSizeSelectionCache() {
+    // Start from an empty in-memory cache.
+    m_buildSizeSelectionCache.clear();
+
+    if (!Engine::ProjectPaths::IsInitialized()) {
+        return;
+    }
+
+    const std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    if (projectRoot.empty()) {
+        return;
+    }
+
+    // Cache file lives at project root.
+    const std::filesystem::path cachePath = projectRoot / ".export.json";
+    // No cache yet is not an error.
+    if (!std::filesystem::exists(cachePath)) {
+        return;
+    }
+
+    try {
+        // Open persisted JSON selection map.
+        std::ifstream in(cachePath);
+        if (!in.is_open()) {
+            return;
+        }
+
+        // Parse file contents into JSON.
+        nlohmann::json payload;
+        in >> payload;
+        // Ignore malformed layouts.
+        if (!payload.contains("assetSelection") || !payload["assetSelection"].is_object()) {
+            return;
+        }
+
+        // Restore every persisted relative-path selection value.
+        for (const auto& [relativePath, selectedNode] : payload["assetSelection"].items()) {
+            if (!selectedNode.is_boolean()) {
+                continue;
+            }
+            m_buildSizeSelectionCache[relativePath] = selectedNode.get<bool>();
+        }
+
+        // Mark that we loaded persisted state successfully.
+        m_buildSizeSelectionLoaded = true;
+    }
+    catch (const std::exception& e) {
+        LOG_WARNING("Failed to read Export Project selection cache: " << e.what());
+    }
+}
+
+void EditorFileMenu::_saveBuildSizeSelectionCache() const {
+    if (!Engine::ProjectPaths::IsInitialized()) {
+        return;
+    }
+
+    const std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    if (projectRoot.empty()) {
+        return;
+    }
+
+    // Cache file path at project root.
+    const std::filesystem::path cachePath = projectRoot / ".export.json";
+
+    try {
+        // Build fresh JSON payload.
+        nlohmann::json payload;
+        payload["assetSelection"] = nlohmann::json::object();
+        // Serialize current check states.
+        for (const auto& asset : m_buildSizeAssets) {
+            payload["assetSelection"][asset.RelativePath] = asset.Selected;
+        }
+
+        // Overwrite previous cache atomically enough for this use-case.
+        std::ofstream out(cachePath, std::ios::trunc);
+        if (!out.is_open()) {
+            LOG_WARNING("Failed to write Export Project selection cache at: " << cachePath.string());
+            return;
+        }
+
+        // Pretty-print for easy manual inspection.
+        out << payload.dump(2);
+    }
+    catch (const std::exception& e) {
+        LOG_WARNING("Failed to save Export Project selection cache: " << e.what());
+    }
+}
+
+void EditorFileMenu::_refreshBuildSizeAnalyzerAssets() {
+    // Rebuild analyzer data from scratch.
+    m_buildSizeAssets.clear();
+    m_buildSizeSelectionLoaded = false;
+
+    if (!Engine::ProjectPaths::IsInitialized()) {
+        m_buildSizeStatusIsError = true;
+        m_buildSizeStatusMessage = "Project paths are not initialized.";
+        m_buildSizeNeedsRefresh = false;
+        _recomputeBuildSizeSelectionTotals();
+        return;
+    }
+
+    const std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    if (projectRoot.empty() || !std::filesystem::exists(projectRoot) || !std::filesystem::is_directory(projectRoot)) {
+        m_buildSizeStatusIsError = true;
+        m_buildSizeStatusMessage = "Project root is invalid.";
+        m_buildSizeNeedsRefresh = false;
+        _recomputeBuildSizeSelectionTotals();
+        return;
+    }
+
+    // Pull previous check state before scanning.
+    _loadBuildSizeSelectionCache();
+
+    // Walk entire project tree while skipping permission failures.
+    std::error_code walkError;
+    const auto options = std::filesystem::directory_options::skip_permission_denied;
+    for (std::filesystem::recursive_directory_iterator it(projectRoot, options, walkError), end;
+         it != end;
+         it.increment(walkError)) {
+        if (walkError) {
+            // Recover from per-entry traversal issues.
+            walkError.clear();
+            continue;
+        }
+
+        // Prune hidden folders and everything below them.
+        std::error_code dirTypeError;
+        if (it->is_directory(dirTypeError) && !dirTypeError && IsHiddenPath(it->path())) {
+            it.disable_recursion_pending();
+            continue;
+        }
+
+        // Keep files only.
+        std::error_code typeError;
+        if (!it->is_regular_file(typeError) || typeError) {
+            continue;
+        }
+
+        // Skip hidden files.
+        if (IsHiddenPath(it->path())) {
+            continue;
+        }
+
+        // Convert to path key relative to project root.
+        std::error_code relError;
+        std::filesystem::path relativePath = std::filesystem::relative(it->path(), projectRoot, relError);
+        if (relError) {
+            continue;
+        }
+
+        // Query file byte size.
+        std::error_code sizeError;
+        const std::uintmax_t sizeBytes = it->file_size(sizeError);
+        if (sizeError) {
+            continue;
+        }
+
+        // Reuse persisted selection state when available.
+        const std::string key = relativePath.generic_string();
+        bool selected = true;
+        const auto cachedIt = m_buildSizeSelectionCache.find(key);
+        if (cachedIt != m_buildSizeSelectionCache.end()) {
+            selected = cachedIt->second;
+        }
+
+        // Push row for tree rendering.
+        m_buildSizeAssets.push_back({ key, sizeBytes, selected });
+    }
+
+    // Stable alphabetical ordering for deterministic UI.
+    std::sort(m_buildSizeAssets.begin(), m_buildSizeAssets.end(),
+        [](const BuildSizeAssetEntry& lhs, const BuildSizeAssetEntry& rhs) {
+            return lhs.RelativePath < rhs.RelativePath;
+        });
+
+    // Finalize totals and status.
+    _recomputeBuildSizeSelectionTotals();
+    m_buildSizeNeedsRefresh = false;
+    m_buildSizeStatusIsError = false;
+    m_buildSizeStatusMessage = "Found " + std::to_string(m_buildSizeAssets.size()) + " assets.";
+}
+
+void EditorFileMenu::_renderBuildSizeAnalyzerWindow() {
+    // Skip work when the export window is closed.
+    if (!m_showBuildSizeAnalyzer) {
+        return;
+    }
+
+    // Remember open state so we can persist when closing.
+    const bool wasOpen = m_showBuildSizeAnalyzer;
+    ImGui::SetNextWindowSize(ImVec2(900.0f, 560.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Export Project", &m_showBuildSizeAnalyzer)) {
+        // Lazy-refresh when flagged.
+        if (m_buildSizeNeedsRefresh) {
+            _refreshBuildSizeAnalyzerAssets();
+        }
+
+        // Manual rescan action.
+        if (ImGui::Button("Refresh")) {
+            m_buildSizeNeedsRefresh = true;
+            _refreshBuildSizeAnalyzerAssets();
+        }
+        ImGui::SameLine();
+        // Bulk select helper.
+        if (ImGui::Button("Select All")) {
+            _setAllBuildSizeSelections(true);
+        }
+        ImGui::SameLine();
+        // Bulk deselect helper.
+        if (ImGui::Button("Deselect All")) {
+            _setAllBuildSizeSelections(false);
+        }
+
+        // Status color reflects error/success state.
+        if (!m_buildSizeStatusMessage.empty()) {
+            const ImVec4 color = m_buildSizeStatusIsError
+                ? ImVec4(0.90f, 0.30f, 0.30f, 1.0f)
+                : ImVec4(0.30f, 0.85f, 0.40f, 1.0f);
+            ImGui::TextColored(color, "%s", m_buildSizeStatusMessage.c_str());
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Assets: %zu", m_buildSizeAssets.size());
+        ImGui::Text("Selected: %zu", m_buildSizeSelectedCount);
+        ImGui::Text("Selected Size: %s", _formatBytes(m_buildSizeSelectedBytes).c_str());
+        ImGui::Separator();
+
+        // Reserve footer height below the tree panel.
+        const float footerHeight = ImGui::GetFrameHeightWithSpacing() * 1.6f;
+        // Track whether any checkbox changed this frame.
+        bool selectionChanged = false;
+
+        if (ImGui::BeginChild("ExportProjectTree", ImVec2(0.0f, -footerHeight), true)) {
+            // Group file rows by directory path for tree rendering.
+            std::unordered_map<std::string, std::vector<std::size_t>> filesByDirectory;
+            // Track parent-to-children directory edges.
+            std::unordered_map<std::string, std::vector<std::string>> childDirectories;
+            // Deduplicate discovered tree edges.
+            std::unordered_set<std::string> edgeSet;
+
+            for (std::size_t i = 0; i < m_buildSizeAssets.size(); ++i) {
+                // Parse each file path into parent directory chain.
+                const std::filesystem::path relPath = std::filesystem::path(m_buildSizeAssets[i].RelativePath);
+                const std::filesystem::path parentPath = relPath.parent_path();
+
+                // Build parent->child directory links from path components.
+                std::string currentDir;
+                for (const auto& component : parentPath) {
+                    const std::string part = component.string();
+                    // Ignore empty and dot components.
+                    if (part.empty() || part == ".") {
+                        continue;
+                    }
+
+                    // Record unique edge then append child.
+                    const std::string nextDir = currentDir.empty() ? part : (currentDir + "/" + part);
+                    const std::string edgeKey = currentDir + "->" + nextDir;
+                    if (edgeSet.insert(edgeKey).second) {
+                        childDirectories[currentDir].push_back(nextDir);
+                    }
+                    currentDir = nextDir;
+                }
+
+                // Register file index under its terminal directory.
+                filesByDirectory[currentDir].push_back(i);
+            }
+
+            // Sort children for deterministic tree order.
+            for (auto& [parent, children] : childDirectories) {
+                std::sort(children.begin(), children.end());
+            }
+
+            // Compute selection stats for a directory subtree.
+            auto directorySelectionState = [&](const std::string& dirPath) {
+                std::size_t selectedCount = 0;
+                std::size_t totalCount = 0;
+                const std::string prefix = dirPath.empty() ? std::string() : (dirPath + "/");
+
+                // Walk all files and count those belonging to this subtree.
+                for (const auto& asset : m_buildSizeAssets) {
+                    const bool belongsToDirectory = dirPath.empty()
+                        ? true
+                        : (asset.RelativePath == dirPath || asset.RelativePath.rfind(prefix, 0) == 0);
+                    if (!belongsToDirectory) {
+                        continue;
+                    }
+
+                    ++totalCount;
+                    if (asset.Selected) {
+                        ++selectedCount;
+                    }
+                }
+
+                // Return selected and total counts.
+                return std::pair<std::size_t, std::size_t>(selectedCount, totalCount);
+            };
+
+            // Apply a selection state to all files in one subtree.
+            auto setDirectorySelection = [&](const std::string& dirPath, const bool selected) {
+                const std::string prefix = dirPath.empty() ? std::string() : (dirPath + "/");
+                for (auto& asset : m_buildSizeAssets) {
+                    const bool belongsToDirectory = dirPath.empty()
+                        ? true
+                        : (asset.RelativePath == dirPath || asset.RelativePath.rfind(prefix, 0) == 0);
+                    if (belongsToDirectory) {
+                        // Update the row state and mark dirty.
+                        asset.Selected = selected;
+                        selectionChanged = true;
+                    }
+                }
+            };
+
+            // Recursive renderer for directory nodes.
+            std::function<void(const std::string&)> renderDirectoryNode;
+            renderDirectoryNode = [&](const std::string& dirPath) {
+                // Evaluate current subtree tri-state.
+                const auto [selectedCount, totalCount] = directorySelectionState(dirPath);
+                bool dirSelected = (totalCount > 0 && selectedCount == totalCount);
+                const bool mixed = (selectedCount > 0 && selectedCount < totalCount);
+
+                ImGui::PushID(dirPath.c_str());
+                // Directory checkbox controls the subtree.
+                if (ImGui::Checkbox("##dir_select", &dirSelected)) {
+                    setDirectorySelection(dirPath, dirSelected);
+                }
+                // Lightweight partial-state marker.
+                if (mixed) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("~");
+                }
+
+                ImGui::SameLine();
+                // Show readable label for root vs child folder.
+                const std::string folderLabel = dirPath.empty()
+                    ? std::string("Project Root")
+                    : std::filesystem::path(dirPath).filename().string();
+
+                // Resolve file and child lists for this directory.
+                const auto filesIt = filesByDirectory.find(dirPath);
+                const auto childrenIt = childDirectories.find(dirPath);
+                const bool hasFiles = (filesIt != filesByDirectory.end() && !filesIt->second.empty());
+                const bool hasChildren = (childrenIt != childDirectories.end() && !childrenIt->second.empty());
+
+                // Leaf nodes have no files and no child folders.
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+                if (!hasFiles && !hasChildren) {
+                    flags |= ImGuiTreeNodeFlags_Leaf;
+                }
+
+                const std::string nodeId = "dir_node_" + (dirPath.empty() ? std::string("root") : dirPath);
+                // Expand/collapse directory row.
+                const bool open = ImGui::TreeNodeEx(nodeId.c_str(), flags, "%s", folderLabel.c_str());
+
+                if (open) {
+                    // Render files under this directory.
+                    if (hasFiles) {
+                        for (const std::size_t index : filesIt->second) {
+                            BuildSizeAssetEntry& entry = m_buildSizeAssets[index];
+                            ImGui::PushID(static_cast<int>(index));
+                            bool selected = entry.Selected;
+                            // File checkbox updates single row selection.
+                            if (ImGui::Checkbox("##file_select", &selected)) {
+                                entry.Selected = selected;
+                                selectionChanged = true;
+                            }
+                            ImGui::SameLine();
+                            ImGui::TextUnformatted(std::filesystem::path(entry.RelativePath).filename().string().c_str());
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("(%s)", _formatBytes(entry.SizeBytes).c_str());
+                            ImGui::PopID();
+                        }
+                    }
+
+                    // Recurse through child directories.
+                    if (hasChildren) {
+                        for (const std::string& childPath : childrenIt->second) {
+                            renderDirectoryNode(childPath);
+                        }
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                ImGui::PopID();
+            };
+
+            // Render the tree from synthetic root.
+            renderDirectoryNode("");
+        }
+        ImGui::EndChild();
+
+        // Persist checkbox changes and recalc totals.
+        if (selectionChanged) {
+            _recomputeBuildSizeSelectionTotals();
+            _saveBuildSizeSelectionCache();
+        }
+
+        // Disable export button when no assets are selected.
+        const bool canExport = (m_buildSizeSelectedCount > 0);
+        if (!canExport) {
+            ImGui::BeginDisabled();
+        }
+        // Start export with explicit selected-asset set.
+        if (ImGui::Button("Export Selected Assets...", ImVec2(220.0f, 0.0f))) {
+            std::string destination;
+#ifdef _WIN32
+            // Ask user for destination folder.
+            destination = _pickExportFolder();
+#endif
+            if (destination.empty()) {
+                // Cancel is non-error feedback.
+                m_buildSizeStatusIsError = false;
+                m_buildSizeStatusMessage = "Export cancelled.";
+            }
+            else {
+                // Build a hash-set for O(1) selection checks in export filtering.
+                std::unordered_set<std::string> selectedAssets;
+                selectedAssets.reserve(m_buildSizeSelectedCount);
+                for (const auto& asset : m_buildSizeAssets) {
+                    if (asset.Selected) {
+                        selectedAssets.insert(asset.RelativePath);
+                    }
+                }
+
+                // Persist latest selection state before launch.
+                _saveBuildSizeSelectionCache();
+                // Run full build/export pipeline with selection filter.
+                _exportProject(destination, selectedAssets);
+                m_buildSizeStatusIsError = false;
+                m_buildSizeStatusMessage = "Export started. See Export Summary for progress.";
+            }
+        }
+        if (!canExport) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+            m_showBuildSizeAnalyzer = false;
+        }
+    }
+    ImGui::End();
+
+    // Persist when window transitions from open to closed.
+    if (wasOpen && !m_showBuildSizeAnalyzer) {
+        _saveBuildSizeSelectionCache();
+    }
+}
+
+void EditorFileMenu::_exportProject(const std::string& destinationOverride,
+    const std::unordered_set<std::string>& selectedAssets) {
+    // Prevent concurrent exports from overlapping.
     if (m_exportInProgress.load()) {
         std::lock_guard<std::mutex> lock(m_exportMutex);
         m_exportResults.clear();
@@ -253,7 +787,10 @@ void EditorFileMenu::_exportProject() {
         return;
     }
 
-    const std::string destFolder =
+    // Use provided destination when invoked from export window; otherwise open picker.
+    const std::string destFolder = !destinationOverride.empty()
+        ? destinationOverride
+        :
 #ifdef _WIN32
         _pickExportFolder();
 #else
@@ -316,6 +853,7 @@ void EditorFileMenu::_exportProject() {
 
     const std::filesystem::path buildRoot = repoRoot / "build_game";
     const std::filesystem::path exportRoot = buildRoot / "export" / projectName / "Release";
+    // Export always lands in a project-named child folder.
     destinationRoot /= projectName;
 
     {
@@ -336,27 +874,107 @@ void EditorFileMenu::_exportProject() {
     m_exportDone = false;
     m_openExportSummary = true;
 
-    m_exportThread = std::thread([this, projectRoot, repoRoot, projectName, buildRoot, exportRoot, destinationRoot]() {
+    // Launch long-running export work off the UI thread.
+    m_exportThread = std::thread([this, projectRoot, repoRoot, projectName, buildRoot, exportRoot, destinationRoot, selectedAssets]() {
         auto pushResult = [&](const ExportStepResult& result) {
+            // Record step result in a thread-safe way for summary UI.
             std::lock_guard<std::mutex> lock(m_exportMutex);
             m_exportResults.push_back(result);
         };
 
         try {
+            // Helper to run external commands and capture output.
             auto runCommand = [&](const std::string& command, const std::string& stepName) {
                 std::string output;
+                // Start time for per-step duration reporting.
                 const auto start = std::chrono::steady_clock::now();
                 {
+                    // Update active step index for progress UI.
                     std::lock_guard<std::mutex> lock(m_exportMutex);
                     const auto it = std::find(m_exportStepNames.begin(), m_exportStepNames.end(), stepName);
                     if (it != m_exportStepNames.end()) {
                         m_exportCurrentStep = static_cast<int>(std::distance(m_exportStepNames.begin(), it));
                     }
                 }
+                int result = 1;
+                bool started = false;
+
+#ifdef _WIN32
+                const std::string fullCmd = "cmd.exe /C " + command;
+
+                SECURITY_ATTRIBUTES sa = {};
+                sa.nLength = sizeof(sa);
+                sa.bInheritHandle = TRUE;
+
+                HANDLE readPipe = nullptr;
+                HANDLE writePipe = nullptr;
+                if (CreatePipe(&readPipe, &writePipe, &sa, 0)) {
+                    SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+
+                    STARTUPINFOA si = {};
+                    si.cb = sizeof(si);
+                    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+                    si.wShowWindow = SW_HIDE;
+                    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+                    si.hStdOutput = writePipe;
+                    si.hStdError = writePipe;
+
+                    PROCESS_INFORMATION pi = {};
+                    std::vector<char> cmdLine(fullCmd.begin(), fullCmd.end());
+                    cmdLine.push_back('\0');
+
+                    started = CreateProcessA(
+                        nullptr,
+                        cmdLine.data(),
+                        nullptr,
+                        nullptr,
+                        TRUE,
+                        CREATE_NO_WINDOW,
+                        nullptr,
+                        nullptr,
+                        &si,
+                        &pi) == TRUE;
+
+                    CloseHandle(writePipe);
+                    writePipe = nullptr;
+
+                    if (started) {
+                        char buffer[512] = {};
+                        DWORD bytesAvailable = 0;
+                        DWORD bytesRead = 0;
+
+                        for (;;) {
+                            while (PeekNamedPipe(readPipe, nullptr, 0, nullptr, &bytesAvailable, nullptr) && bytesAvailable > 0) {
+                                if (!ReadFile(readPipe, buffer, static_cast<DWORD>(sizeof(buffer)), &bytesRead, nullptr) || bytesRead == 0) {
+                                    break;
+                                }
+                                output.append(buffer, bytesRead);
+                            }
+
+                            const DWORD waitResult = WaitForSingleObject(pi.hProcess, 20);
+                            if (waitResult == WAIT_OBJECT_0) {
+                                break;
+                            }
+                        }
+
+                        while (ReadFile(readPipe, buffer, static_cast<DWORD>(sizeof(buffer)), &bytesRead, nullptr) && bytesRead > 0) {
+                            output.append(buffer, bytesRead);
+                        }
+
+                        DWORD exitCode = 1;
+                        GetExitCodeProcess(pi.hProcess, &exitCode);
+                        result = static_cast<int>(exitCode);
+
+                        CloseHandle(pi.hThread);
+                        CloseHandle(pi.hProcess);
+                    }
+
+                    CloseHandle(readPipe);
+                }
+#else
                 const std::string fullCmd = "cmd /C " + command + " 2>&1";
                 FILE* pipe = _popen(fullCmd.c_str(), "r");
-                const bool started = (pipe != nullptr);
-                int result = 1;
+                started = (pipe != nullptr);
                 if (started) {
                     char buffer[512] = {};
                     while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe)) {
@@ -364,6 +982,8 @@ void EditorFileMenu::_exportProject() {
                     }
                     result = _pclose(pipe);
                 }
+#endif
+                // Compute elapsed wall time.
                 const auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::steady_clock::now() - start).count();
 
@@ -379,6 +999,7 @@ void EditorFileMenu::_exportProject() {
                 return true;
             };
 
+            // Clean stale build output to avoid stale artifacts.
             std::error_code cleanEc;
             std::filesystem::remove_all(buildRoot, cleanEc);
             if (cleanEc) {
@@ -389,6 +1010,7 @@ void EditorFileMenu::_exportProject() {
             }
             pushResult({ "Clean build folder", true, "OK", "" });
 
+            // Configure build folder for runtime export target.
             const std::string configureCmd =
                 "cmake -S \"" + repoRoot.string() + "\" -B \"" + buildRoot.string() + "\" "
                 "-G \"Visual Studio 17 2022\" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON "
@@ -402,6 +1024,7 @@ void EditorFileMenu::_exportProject() {
                 return;
             }
 
+            // Build export target with machine concurrency.
             const unsigned int jobs = (std::max)(1u, std::thread::hardware_concurrency());
             const std::string buildCmd =
                 "cmake --build \"" + buildRoot.string() + "\" --config Release --target ExportGame --parallel " + std::to_string(jobs);
@@ -412,6 +1035,7 @@ void EditorFileMenu::_exportProject() {
                 return;
             }
 
+            // Verify expected export output exists.
             if (!std::filesystem::exists(exportRoot)) {
                 m_exportCurrentStep = 3;
                 pushResult({ "Validate export output", false, "Export output folder not found after build.", "" });
@@ -420,6 +1044,7 @@ void EditorFileMenu::_exportProject() {
                 return;
             }
 
+            // Track whether scripts must be compiled for this project.
             bool shouldCompileScripts = true;
             bool foundCsScript = false;
             std::error_code scriptScanEc;
@@ -438,6 +1063,7 @@ void EditorFileMenu::_exportProject() {
             // If there was an error during the script scan, log a warning but continue with the export since scripts are optional 
             // and we don't want to fail the entire export just because of an issue scanning for scripts. If we found .cs scripts, 
             // we will attempt to compile them, but if we didn't find any then we can skip the compile step entirely.
+            // Optional script compilation is skipped when no C# scripts are present.
             if (scriptScanEc) {
                 LOG_WARNING("Failed to fully scan project scripts for export; attempting compile anyway. Error: " << scriptScanEc.message());
             } else if (!foundCsScript) {
@@ -449,6 +1075,7 @@ void EditorFileMenu::_exportProject() {
             // If we found .cs scripts, attempt to compile them. 
             // If the compile fails, we will fail the export since scripts are likely a critical part of the game project, 
             // but if we didn't find any then we can skip this step entirely and still produce a valid export.
+            // Build managed scripts into export output when required.
             if (shouldCompileScripts) {
                 const std::filesystem::path scriptsOutput = exportRoot / "GameScripts.dll";
                 const std::filesystem::path scriptProject = repoRoot / "managed" / "tools" / "ScriptCompiler" / "ScriptCompiler.csproj";
@@ -580,6 +1207,7 @@ void EditorFileMenu::_exportProject() {
             pushResult({ "Copy project settings", true, "OK", "" });
 
             // Error code to remove existing destination if it exists, create destination directory, and copy export output to destination
+            // Prepare destination root by deleting previous output if present.
             std::error_code removeDestEc;
             if (std::filesystem::exists(destinationRoot)) {
                 m_exportCurrentStep = 6;
@@ -593,6 +1221,7 @@ void EditorFileMenu::_exportProject() {
             }
 
             // Create the destination directory if it doesn't exist (it should be removed by the previous step if it already exists, but we will create it here just in case it didn't exist before or there was an error removing it)
+            // Ensure destination path exists for copy.
             std::error_code createEc;
             std::filesystem::create_directories(destinationRoot, createEc);
             if (createEc) {
@@ -603,6 +1232,7 @@ void EditorFileMenu::_exportProject() {
             }
             pushResult({ "Prepare destination", true, "OK", "" });
 
+            // Copy full staged export output first.
             std::error_code copyEc;
             m_exportCurrentStep = 7;
             std::filesystem::copy(exportRoot, destinationRoot,
@@ -614,6 +1244,96 @@ void EditorFileMenu::_exportProject() {
                 return;
             }
 
+            // Apply selected-asset filter to exported project payload only.
+            if (!selectedAssets.empty()) {
+                const std::filesystem::path exportedProjectDir = destinationRoot / projectName;
+                if (!std::filesystem::exists(exportedProjectDir) || !std::filesystem::is_directory(exportedProjectDir)) {
+                    m_exportDone = true;
+                    m_exportInProgress = false;
+                    return;
+                }
+
+                // Remove unselected files while preserving required settings file.
+                std::error_code walkEc;
+                std::size_t removedCount = 0;
+                std::size_t hiddenRemovedCount = 0;
+                for (std::filesystem::recursive_directory_iterator it(exportedProjectDir,
+                         std::filesystem::directory_options::skip_permission_denied, walkEc),
+                     end; !walkEc && it != end; it.increment(walkEc)) {
+                    if (it->is_directory(walkEc)) {
+                        if (IsHiddenPath(it->path())) {
+                            std::error_code removeHiddenDirEc;
+                            std::filesystem::remove_all(it->path(), removeHiddenDirEc);
+                            if (!removeHiddenDirEc) {
+                                ++hiddenRemovedCount;
+                            }
+                            it.disable_recursion_pending();
+                        }
+                        continue;
+                    }
+
+                    if (walkEc || !it->is_regular_file(walkEc)) {
+                        walkEc.clear();
+                        continue;
+                    }
+
+                    if (IsHiddenPath(it->path())) {
+                        std::error_code removeHiddenFileEc;
+                        std::filesystem::remove(it->path(), removeHiddenFileEc);
+                        if (!removeHiddenFileEc) {
+                            ++hiddenRemovedCount;
+                        }
+                        continue;
+                    }
+
+                    // Map file to project-relative key for set lookup.
+                    std::error_code relEc;
+                    const std::filesystem::path rel = std::filesystem::relative(it->path(), exportedProjectDir, relEc);
+                    if (relEc) {
+                        continue;
+                    }
+
+                    // Always preserve project settings for runtime boot.
+                    const std::string relKey = rel.generic_string();
+                    const bool alwaysKeep = (relKey == "ProjectSettings.json");
+                    if (!alwaysKeep && selectedAssets.find(relKey) == selectedAssets.end()) {
+                        std::error_code removeEc;
+                        std::filesystem::remove(it->path(), removeEc);
+                        if (!removeEc) {
+                            ++removedCount;
+                        }
+                    }
+                }
+
+                // Best-effort prune of now-empty directories.
+                std::error_code pruneEc;
+                for (std::filesystem::recursive_directory_iterator it(exportedProjectDir,
+                         std::filesystem::directory_options::skip_permission_denied, pruneEc),
+                     end; !pruneEc && it != end; it.increment(pruneEc)) {
+                    if (!it->is_directory(pruneEc)) {
+                        continue;
+                    }
+
+                    std::error_code emptyEc;
+                    if (std::filesystem::is_empty(it->path(), emptyEc) && !emptyEc) {
+                        std::error_code removeDirEc;
+                        std::filesystem::remove(it->path(), removeDirEc);
+                    }
+                }
+
+                // If the exported runtime embeds shaders, we can remove copied runtime shader files.
+                const std::filesystem::path embeddedShadersMarker = destinationRoot / ".embedded_shaders";
+                if (std::filesystem::exists(embeddedShadersMarker)) {
+                    const std::filesystem::path runtimeShaderDir = destinationRoot / "assets" / "shaders";
+                    if (std::filesystem::exists(runtimeShaderDir) && std::filesystem::is_directory(runtimeShaderDir)) {
+                        std::error_code removeRuntimeShadersEc;
+                        std::filesystem::remove_all(runtimeShaderDir, removeRuntimeShadersEc);
+                    }
+                }
+
+                (void)removedCount;
+                (void)hiddenRemovedCount;
+            }
             {
                 std::lock_guard<std::mutex> lock(m_exportMutex);
                 m_exportDestination = destinationRoot.string();
@@ -2045,3 +2765,4 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
         LOG_INFO("Successfully saved scene: " << path);
     }
 }
+
