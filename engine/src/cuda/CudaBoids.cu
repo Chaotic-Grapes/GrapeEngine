@@ -11,7 +11,7 @@ updating large-scale boid simulations entirely on the GPU. Each thread
 simulates one boid using a double-buffered position+velocity layout.
 
 Features:
-    - Brute-force neighbor evaluation (O(n²))
+    - Spatial hashing for O(1) neighbor queries
     - Separation, Alignment, Cohesion steering rules
     - Per-boid jitter for natural spacing variation
     - Predictive tile-based collision avoidance
@@ -20,20 +20,9 @@ Features:
     - World-space wraparound bounds
     - GPU-based random initialization using cuRAND
 
-Responsibilities:
-    - Compute steering forces per boid
-    - Integrate velocity and position
-    - Enforce force and speed constraints
-    - Handle tile collision avoidance and resolution
-    - Write updated state to output buffer
-    - Provide host launch wrappers for engine systems
-
-Used by:
-    - BoidSystem (GPU simulation path)
-    - CudaGLInterop (for mapped VBO access)
-    - Editor-controlled BoidParams
-
-This module forms the compute core of the GPU Boid pipeline.
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -50,25 +39,12 @@ This module forms the compute core of the GPU Boid pipeline.
 \brief
 Device-side helper that computes tile-based collision avoidance steering.
 
-This is a __device__ function, meaning it runs on the GPU and may only be
-called from other CUDA kernels or device functions. It executes once per
-boid thread and contributes a steering vector used inside the main
-simulation kernel.
-
-The function combines:
-
+Combines:
     - Proximity-based repulsion from nearby solid tiles
     - Predictive lookahead sampling along velocity direction
     - Perpendicular steering when a wall is detected ahead
 
 Returns a steering vector that pushes the boid away from obstacles.
-No memory is written; the result is accumulated into velocity by
-the calling kernel.
-
-\param pos    Current world-space position of the boid
-\param vel    Current velocity of the boid
-\param p      BoidParams containing tile grid and collision data
-\return       Avoidance steering force (float2)
 */
 __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidParams& p)
 {
@@ -80,7 +56,7 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
 
     float avoidRadius = p.tileSize * p.collisionAvoidRadius;
 
-    // 1) Proximity repulsion (existing approach, kept)
+    // 1) Proximity repulsion
     int tx = (int)floorf(pos.x / p.tileSize) - p.collisionOriginX;
     int ty = (int)floorf(pos.y / p.tileSize) - p.collisionOriginY;
     int searchRadius = (int)ceilf(p.collisionAvoidRadius);
@@ -100,7 +76,7 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
             if (dist < 1e-4f || dist > avoidRadius) continue;
 
             float weight = 1.0f - (dist / avoidRadius);
-            weight *= weight; // quadratic falloff — stronger close up
+            weight *= weight; // quadratic falloff
             steer.x += (away.x / dist) * weight;
             steer.y += (away.y / dist) * weight;
         }
@@ -108,7 +84,7 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
 
     // 2) Predictive: sample ahead along velocity direction
     float2 dir = make_float2(vel.x / speed, vel.y / speed);
-    float lookahead = fminf(speed * p.dt * 3.0f, avoidRadius); // look 3 frames ahead
+    float lookahead = fminf(speed * p.dt * 3.0f, avoidRadius);
 
     for (float t = p.tileSize * 0.5f; t <= lookahead; t += p.tileSize * 0.5f) {
         float sx = pos.x + dir.x * t;
@@ -120,17 +96,16 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
         if (stx < 0 || sty < 0 || stx >= p.collisionWidth || sty >= p.collisionHeight) continue;
         if (p.collisionMasks[sty * p.collisionWidth + stx] == 0) continue;
 
-        // Wall ahead! Steer perpendicular to velocity (choose side away from wall)
+        // Wall ahead! Steer perpendicular to velocity
         float2 perp1 = make_float2(-dir.y, dir.x);
         float2 perp2 = make_float2(dir.y, -dir.x);
 
-        // Pick the perpendicular that points away from the wall center
         float tcx = ((stx + p.collisionOriginX) + 0.5f) * p.tileSize;
         float tcy = ((sty + p.collisionOriginY) + 0.5f) * p.tileSize;
         float dot1 = (pos.x - tcx) * perp1.x + (pos.y - tcy) * perp1.y;
 
         float2 chosen = (dot1 >= 0.0f) ? perp1 : perp2;
-        float urgency = 1.0f - (t / lookahead); // more urgent when closer
+        float urgency = 1.0f - (t / lookahead);
         urgency *= urgency;
 
         steer.x += chosen.x * urgency * 2.0f;
@@ -142,7 +117,7 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
 }
 
 // ============================================================
-// Spatial hash helper — maps a 2D cell to a flat table index
+// Spatial hash helper
 // ============================================================
 __device__ __forceinline__ uint32_t HashCell(int cx, int cy, int tableSize) {
     uint32_t h = ((uint32_t)cx * 92837111u) ^ ((uint32_t)cy * 689287499u);
@@ -151,8 +126,6 @@ __device__ __forceinline__ uint32_t HashCell(int cx, int cy, int tableSize) {
 
 // ============================================================
 // Kernel 1: assign each boid to a hash cell
-// One thread per boid. Writes cell id and boid id into arrays
-// that will be sorted together by thrust.
 // ============================================================
 __global__ void assignCellsKernel(
     const float4* __restrict__ posVel,
@@ -175,9 +148,6 @@ __global__ void assignCellsKernel(
 
 // ============================================================
 // Kernel 2: build cell start table
-// After sorting by cell id, find where each cell begins.
-// One thread per boid — checks if its cell differs from the
-// previous boid's cell, and if so marks the start.
 // ============================================================
 __global__ void buildCellStartKernel(
     const uint32_t* __restrict__ d_cellIds,
@@ -189,45 +159,41 @@ __global__ void buildCellStartKernel(
 
     uint32_t cell = d_cellIds[idx];
 
-    // First boid in the sorted array, or first boid of a new cell
     if (idx == 0 || d_cellIds[idx - 1] != cell) {
         d_cellStart[cell] = (uint32_t)idx;
     }
 }
 
 // ============================================================
-// Boids simulation kernel (brute force)
-// Each thread = one boid. Reads all other boids from prev buffer,
-// computes three rules, writes updated pos+vel to output buffer.
+// Boids simulation kernel
 // ============================================================
 __global__ void boidsKernel(float4* __restrict__ posVel,
-                            const float4* __restrict__ posVelPrev,
-                            BoidParams params) {
+    const float4* __restrict__ posVelPrev,
+    BoidParams params) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= params.count) return;
 
     // Read this boid's previous state
     float4 self = posVelPrev[idx];
-    float2 pos  = make_float2(self.x, self.y);
-    float2 vel  = make_float2(self.z, self.w);
+    float2 pos = make_float2(self.x, self.y);
+    float2 vel = make_float2(self.z, self.w);
 
     // Accumulators for the three rules
     float2 separation = make_float2(0.0f, 0.0f);
-    float2 alignment  = make_float2(0.0f, 0.0f);
-    float2 cohesion   = make_float2(0.0f, 0.0f);
+    float2 alignment = make_float2(0.0f, 0.0f);
+    float2 cohesion = make_float2(0.0f, 0.0f);
 
     int neighborCount = 0;
     float visualRangeSq = params.visualRange * params.visualRange;
-    float jitter = 0.3f + 0.4f * ((idx * 2654435761u) % 1000u) / 1000.0f; // 0.3 to 0.7, unique per boid
+    float jitter = 0.3f + 0.4f * ((idx * 2654435761u) % 1000u) / 1000.0f;
     float separationRange = params.visualRange * jitter;
     float separationRangeSq = separationRange * separationRange;
 
-    // After computing separation, before applying weights, add in boidsKernel:
     float noiseSeed = (float)((idx * 1234567u + (unsigned int)(params.dt * 1000)) % 1000u) / 1000.0f;
     separation.x += (noiseSeed - 0.5f) * 0.3f;
     separation.y += (noiseSeed - 0.5f) * 0.3f;
 
-    // Spatial hash neighbor search — O(neighbors) instead of O(n)
+    // Spatial hash neighbor search
     int cx = (int)floorf(pos.x / params.cellSize);
     int cy = (int)floorf(pos.y / params.cellSize);
 
@@ -237,7 +203,6 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
             uint32_t start = params.d_cellStart[cell];
             if (start == 0xFFFFFFFFu) continue;
 
-            // Walk forward from start until cell id changes
             for (uint32_t s = start; s < (uint32_t)params.count; ++s) {
                 if (params.d_cellIds[s] != cell) break;
 
@@ -277,7 +242,6 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
         // Alignment: steer towards average heading
         alignment.x *= invCount;
         alignment.y *= invCount;
-        // Desired = alignment direction * maxSpeed - current velocity
         float alignLen = sqrtf(alignment.x * alignment.x + alignment.y * alignment.y);
         if (alignLen > 0.001f) {
             alignment.x = (alignment.x / alignLen) * params.maxSpeed - vel.x;
@@ -315,15 +279,15 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
 
     // Speed burst: occasional individual bursts
     unsigned int burstHash = (idx * 2654435761u) ^ (params.frameCount * 2246822519u);
-    unsigned int cycle = 200u + (idx * 7919u) % 100u;       // 200-300 frame period, varies per boid
+    unsigned int cycle = 200u + (idx * 7919u) % 100u;
     unsigned int phase = burstHash % cycle;
-    unsigned int burstDuration = 15u + (idx * 1237u) % 10u;  // 15-25 frames
+    unsigned int burstDuration = 15u + (idx * 1237u) % 10u;
 
     float burstMultiplier = 1.0f;
     if (phase < burstDuration) {
         float t = (float)phase / (float)burstDuration;
         float envelope = (t < 0.3f) ? (t / 0.3f) : (1.0f - (t - 0.3f) / 0.7f);
-        burstMultiplier = 1.0f + envelope * 0.8f; // up to 1.8x speed
+        burstMultiplier = 1.0f + envelope * 0.8f;
 
         float spd = sqrtf(vel.x * vel.x + vel.y * vel.y);
         if (spd > 0.001f) {
@@ -333,7 +297,7 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
         }
     }
 
-    // Tile collision avoidance - applied directly to vel, bypasses maxForce
+    // Tile collision avoidance
     if (params.collisionAvoidWeight > 0.0f) {
         float2 avoid = ComputeCollisionAvoidance(pos, vel, params);
         vel.x += avoid.x * params.collisionAvoidWeight * params.dt;
@@ -354,7 +318,7 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
         vel.y = (vel.y / speed) * effectiveMaxSpeed;
     }
 
-    // Enforce minimum speed so boids don't stall
+    // Enforce minimum speed
     float minSpeed = params.maxSpeed * 0.3f;
     if (speed < minSpeed && speed > 0.001f) {
         vel.x = (vel.x / speed) * minSpeed;
@@ -365,26 +329,22 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
     pos.x += vel.x * params.dt;
     pos.y += vel.y * params.dt;
 
-    // Hard collision resolution — don't let boids exist inside walls
+    // Hard collision resolution
     if (params.collisionMasks && params.tileSize > 0.0f) {
         int tx = (int)floorf(pos.x / params.tileSize) - params.collisionOriginX;
         int ty = (int)floorf(pos.y / params.tileSize) - params.collisionOriginY;
 
         if (tx >= 0 && ty >= 0 && tx < params.collisionWidth && ty < params.collisionHeight) {
             if (params.collisionMasks[ty * params.collisionWidth + tx] != 0) {
-                // Step 1: Revert position
                 pos.x = self.x;
                 pos.y = self.y;
 
-                // Step 2: Slide along wall instead of reflecting
-                // Try moving only on X axis
                 float2 tryPos = make_float2(self.x + vel.x * params.dt, self.y);
                 int ttx = (int)floorf(tryPos.x / params.tileSize) - params.collisionOriginX;
                 int tty = (int)floorf(tryPos.y / params.tileSize) - params.collisionOriginY;
                 bool xOk = (ttx >= 0 && tty >= 0 && ttx < params.collisionWidth && tty < params.collisionHeight)
                     ? (params.collisionMasks[tty * params.collisionWidth + ttx] == 0) : true;
 
-                // Try moving only on Y axis
                 tryPos = make_float2(self.x, self.y + vel.y * params.dt);
                 ttx = (int)floorf(tryPos.x / params.tileSize) - params.collisionOriginX;
                 tty = (int)floorf(tryPos.y / params.tileSize) - params.collisionOriginY;
@@ -392,20 +352,17 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
                     ? (params.collisionMasks[tty * params.collisionWidth + ttx] == 0) : true;
 
                 if (xOk && !yOk) {
-                    // Slide along X, zero Y velocity
                     pos.x = self.x + vel.x * params.dt;
                     vel.y = 0.0f;
                 }
                 else if (yOk && !xOk) {
-                    // Slide along Y, zero X velocity
                     pos.y = self.y + vel.y * params.dt;
                     vel.x = 0.0f;
                 }
                 else if (xOk && yOk) {
-                    // Both axes free — pick the one with more velocity
                     if (fabsf(vel.x) > fabsf(vel.y)) {
                         pos.x = self.x + vel.x * params.dt;
-                        vel.y *= -0.3f; // dampen, slight bounce
+                        vel.y *= -0.3f;
                     }
                     else {
                         pos.y = self.y + vel.y * params.dt;
@@ -413,12 +370,10 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
                     }
                 }
                 else {
-                    // Stuck in a corner — stay put, dampen velocity
                     vel.x *= -0.1f;
                     vel.y *= -0.1f;
                 }
 
-                // Re-clamp speed
                 float s = sqrtf(vel.x * vel.x + vel.y * vel.y);
                 if (s > params.maxSpeed) {
                     vel.x = (vel.x / s) * params.maxSpeed;
@@ -450,11 +405,11 @@ __global__ void initRandomKernel(float4* posVel,
     float maxSpeed,
     unsigned long long seed,
     const uint8_t* collisionMasks,
-    int collisionWidth,              // ADD
-    int collisionHeight,             // ADD
-    int collisionOriginX,            // ADD
-    int collisionOriginY,            // ADD
-    float tileSize)                  // ADD
+    int collisionWidth,
+    int collisionHeight,
+    int collisionOriginX,
+    int collisionOriginY,
+    float tileSize)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
@@ -462,7 +417,6 @@ __global__ void initRandomKernel(float4* posVel,
     curandState state;
     curand_init(seed, idx, 0, &state);
 
-    // REPLACE the two px/py lines with this:
     float px, py;
     int attempts = 0;
     do {
@@ -480,7 +434,6 @@ __global__ void initRandomKernel(float4* posVel,
         attempts++;
     } while (attempts < 32);
 
-    // rest unchanged
     float angle = curand_uniform(&state) * 6.2831853f;
     float speed = maxSpeed * (0.3f + 0.7f * curand_uniform(&state));
     float vx = cosf(angle) * speed;
@@ -512,12 +465,12 @@ namespace CudaBoids {
             params.hashTableSize,
             params.count);
 
-        // Step 2: sort boid ids by cell id (thrust respects CUDA streams)
+        // Step 2: sort boid ids by cell id
         thrust::device_ptr<uint32_t> keys(params.d_cellIds);
         thrust::device_ptr<uint32_t> vals(params.d_boidIds);
         thrust::sort_by_key(thrust::cuda::par.on(stream), keys, keys + params.count, vals);
 
-        // Step 3: clear cell start table (0xFF = empty sentinel)
+        // Step 3: clear cell start table
         cudaMemsetAsync(params.d_cellStart, 0xFF,
             sizeof(uint32_t) * params.hashTableSize, stream);
 
@@ -566,6 +519,7 @@ namespace CudaBoids {
             collisionOriginX, collisionOriginY,
             tileSize);
 
+        // Only used at init time, safe to sync default stream here
         cudaDeviceSynchronize();
     }
 

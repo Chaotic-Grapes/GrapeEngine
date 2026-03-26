@@ -152,6 +152,14 @@ if(TARGET GrapeEngineLib)
 	)
     endif()
 endif()
+
+if(MSVC)
+    target_compile_options(GrapeEngineLib PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>
+    )
+endif()
+
 # Build editor if requested
 if(BUILD_EDITOR)
     add_subdirectory(editor)
