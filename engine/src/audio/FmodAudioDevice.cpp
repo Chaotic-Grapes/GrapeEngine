@@ -30,6 +30,30 @@ namespace {
     constexpr float kMinBusLowPassCutoffHz = 20.0f;
     constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
 
+    // The game layer often treats X/Y as the "world plane" and Z as "up"
+    // (out of the screen). FMOD uses Y as up. Convert engine vectors into
+    // FMOD space by swapping Y/Z. We also flip X to match handedness so
+    // left/right panning lines up with world-space +X.
+    inline FMOD_VECTOR ToFmodVec(const Audio::Vec3& v) {
+        return FMOD_VECTOR{ -v.x, v.z, v.y };
+    }
+
+    inline FMOD_VECTOR NormalizeOrDefault(FMOD_VECTOR v, FMOD_VECTOR fallback) {
+        const float len2 = v.x * v.x + v.y * v.y + v.z * v.z;
+        if (len2 <= 1e-8f) {
+            return fallback;
+        }
+        const float invLen = 1.0f / std::sqrt(len2);
+        v.x *= invLen;
+        v.y *= invLen;
+        v.z *= invLen;
+        return v;
+    }
+
+    inline float Dot(FMOD_VECTOR a, FMOD_VECTOR b) {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
     // check fmod results and log failures
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
         // return true on success
@@ -415,8 +439,8 @@ namespace Audio {
     void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         // write position and velocity vectors
         if (auto* ch = _channelFromHandle(handle)) {
-            const FMOD_VECTOR p{ pos.x, pos.y, pos.z };
-            const FMOD_VECTOR v{ vel.x, vel.y, vel.z };
+            const FMOD_VECTOR p = ToFmodVec(pos);
+            const FMOD_VECTOR v = ToFmodVec(vel);
             ch->set3DAttributes(&p, &v);
         }
     }
@@ -458,10 +482,15 @@ namespace Audio {
         // require initialized fmod system
         if (!m_system) return;
         // Update listener attributes.
-        const FMOD_VECTOR pos{ l.Position.x, l.Position.y, l.Position.z };
-        const FMOD_VECTOR vel{ l.Velocity.x, l.Velocity.y, l.Velocity.z };
-        const FMOD_VECTOR fwd{ l.Forward.x, l.Forward.y, l.Forward.z };
-        const FMOD_VECTOR up{ l.Up.x,      l.Up.y,      l.Up.z };
+        const FMOD_VECTOR pos = ToFmodVec(l.Position);
+        const FMOD_VECTOR vel = ToFmodVec(l.Velocity);
+
+        // FMOD expects normalized, non-parallel orientation vectors.
+        FMOD_VECTOR fwd = NormalizeOrDefault(ToFmodVec(l.Forward), FMOD_VECTOR{ 0.0f, 0.0f, 1.0f });
+        FMOD_VECTOR up = NormalizeOrDefault(ToFmodVec(l.Up), FMOD_VECTOR{ 0.0f, 1.0f, 0.0f });
+        if (std::fabs(Dot(fwd, up)) > 0.99f) {
+            up = FMOD_VECTOR{ 0.0f, 1.0f, 0.0f };
+        }
         m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
     }
 
