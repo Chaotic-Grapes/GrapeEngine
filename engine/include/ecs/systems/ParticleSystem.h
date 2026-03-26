@@ -4,15 +4,20 @@
 \author   Choi Meng Yew (100%)
 \date     28th February 2026
 \brief
-ECS system header for GPU-accelerated particles. Mirrors BoidSystem's
-CUDA-GL interop pattern. Includes a preset registry so emitter components
-stay lightweight.
+ECS system header for GPU-accelerated particles.
 
 Architecture:
   - Simulation runs on 3 CUDA-only SoA buffers (d_posVel, d_lifeColor, d_sizeRot)
   - After simulation, Interleave() packs the SoA data into the mapped GL VBO
-  - The VBO is interleaved: [posVel0][lifeColor0][sizeRot0][posVel1]...
-  - The VAO reads the interleaved data via instanced attributes
+  - Double-buffered VBOs: CUDA writes buffer[writeIdx], GL renders buffer[readIdx]
+
+Optimizations:
+  - Double-buffered VBOs (no GL/CUDA contention, eliminates unmap stalls)
+  - Single shared CUDA stream
+  - Single cudaGraphicsMapResources/UnmapResources call per frame
+  - Deferred totalAlive readback
+  - Fused update+markAlive kernel
+  - Early-out for idle emitters
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -43,12 +48,13 @@ namespace Graphics {
 
 namespace ECS {
 
-    // GPU data per emitter entity
     struct EmitterGPUData {
-        // --- OpenGL (render only) ---
-        GLuint vao = 0;
+        // --- OpenGL (double buffered) ---
+        GLuint vao[2] = { 0, 0 };
         GLuint quadVBO = 0;
-        GLuint instanceVBO = 0;        // interleaved output for rendering
+        GLuint instanceVBO[2] = { 0, 0 };
+
+        uint8_t bufferIndex = 0;             // CUDA writes to this index
 
         // --- Simulation state ---
         int maxParticles = 0;
@@ -58,31 +64,27 @@ namespace ECS {
         bool initialized = false;
 
 #ifdef GRAPE_HAS_CUDA
-        cudaGraphicsResource* cudaVBO = nullptr;  // CUDA mapping of instanceVBO
+        cudaGraphicsResource* cudaVBO[2] = { nullptr, nullptr };
+        float4* d_mappedVBO = nullptr;       // mapped write buffer ptr
 
-        // CUDA-only work buffers (simulation runs here)
         float4* d_posVel = nullptr;
         float4* d_lifeColor = nullptr;
         float4* d_sizeRot = nullptr;
 
-        // ------------------------------------------------------------
-        // Persistent scratch (used by Compact every frame; no cudaMalloc)
-        // ------------------------------------------------------------
-        int* d_aliveFlags = nullptr;   // 0/1 flags (size = maxParticles)
-        int* d_offsets = nullptr;   // exclusive scan output (size = maxParticles)
-        int* d_totalAlive = nullptr;   // single int on device
+        int* d_aliveFlags = nullptr;
+        int* d_offsets = nullptr;
+        int* d_totalAlive = nullptr;
+        int* h_totalAlive = nullptr;
 
-        float4* d_tempPV = nullptr;       // compacted temp storage (size = maxParticles)
+        float4* d_tempPV = nullptr;
         float4* d_tempLC = nullptr;
         float4* d_tempSR = nullptr;
 
-        // CUB scan temp storage
         void* d_scanTemp = nullptr;
         size_t  scanTempBytes = 0;
 #endif
     };
 
-    // Render data passed to RendererSystem
     struct EmitterRenderData {
         GLuint vao = 0;
         int    aliveCount = 0;
@@ -103,7 +105,6 @@ namespace ECS {
             const glm::mat4& viewProj,
             Graphics::LightManager& lights, World& world);
 
-        // --- Preset registry ---
         uint32_t RegisterPreset(const ParticlePreset& preset) {
             m_presets.push_back(preset);
             return (uint32_t)(m_presets.size() - 1);
@@ -115,26 +116,27 @@ namespace ECS {
 
         size_t GetPresetCount() const { return m_presets.size(); }
 
-        // --- Collision grid ---
         void UpdateCollisionGrid(const TileMap& tileMap);
 
-        // --- Renderer access ---
         const std::unordered_map<uint32_t, EmitterRenderData>& GetRenderData() const {
             return m_renderData;
         }
 
-        // --- Burst API ---
         void TriggerBurst(uint32_t entityIndex, int count);
 
     private:
         void InitEmitter(uint32_t entityIndex, int maxParticles);
         void DestroyEmitter(uint32_t entityIndex);
-        void CreateQuadVAO(EmitterGPUData& gpu, int maxParticles);
+        void CreateQuadVAO(EmitterGPUData& gpu, int slot, int maxParticles);
 
         std::vector<ParticlePreset>                         m_presets;
         std::unordered_map<uint32_t, EmitterGPUData>        m_emitters;
         std::unordered_map<uint32_t, EmitterRenderData>     m_renderData;
         std::unordered_map<uint32_t, int>                   m_pendingBursts;
+
+#ifdef GRAPE_HAS_CUDA
+        cudaStream_t m_cudaStream = nullptr;
+#endif
 
         struct CollisionGrid {
             uint8_t* d_masks = nullptr;

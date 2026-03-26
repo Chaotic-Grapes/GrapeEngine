@@ -6,11 +6,14 @@
 \brief
 CUDA particle system kernels. Four kernels:
   1. emitKernel   — spawn new particles with randomized properties
-  2. updateKernel — simulate physics, color/size interpolation, lifetime
+  2. updateKernel — simulate physics, color/size interpolation, lifetime,
+                    AND write alive flags (fused markAlive)
   3. compactKernel + prefix scan — remove dead particles
   4. interleaveKernel — pack 3 SoA arrays into interleaved VBO
 
-Uses the same CUDA-GL interop pattern as CudaBoids.
+All kernel launches accept a cudaStream_t for per-emitter overlap.
+Compact uses deferred readback: reads LAST frame's totalAlive from pinned
+host memory (no sync), kicks off async copy for next frame.
 
 Particle layout (3 x float4 per particle, SoA):
   posVel[i]:    { pos.x, pos.y, vel.x, vel.y }
@@ -108,10 +111,12 @@ __global__ void emitKernel(float4* __restrict__ posVel,
 
 // ============================================================
 // Update kernel — each thread updates one alive particle
+// Also writes alive flags (fused markAlive)
 // ============================================================
 __global__ void updateKernel(float4* __restrict__ posVel,
     float4* __restrict__ lifeColor,
     float4* __restrict__ sizeRot,
+    int* __restrict__ aliveFlags,
     ParticleParams params)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -125,8 +130,11 @@ __global__ void updateKernel(float4* __restrict__ posVel,
     float life = lc.x;
     float maxLife = lc.y;
 
-    // Already dead — skip (will be compacted)
-    if (life <= 0.0f) return;
+    // Already dead — mark and skip
+    if (life <= 0.0f) {
+        aliveFlags[idx] = 0;
+        return;
+    }
 
     // Decrement lifetime
     life -= params.dt;
@@ -246,6 +254,9 @@ __global__ void updateKernel(float4* __restrict__ posVel,
     if ((idx * 7919u) % 2u == 1u) rotSpeed = -rotSpeed;
     rotation += rotSpeed * params.dt;
 
+    // --- Write alive flag (fused markAlive) ---
+    aliveFlags[idx] = (life > 0.0f) ? 1 : 0;
+
     // --- Write back ---
     posVel[idx] = make_float4(pos.x, pos.y, vel.x, vel.y);
     lifeColor[idx] = make_float4(life, maxLife, colorR, colorG);
@@ -256,17 +267,7 @@ __global__ void updateKernel(float4* __restrict__ posVel,
 // Compact kernels
 // ============================================================
 
-// Step 1: Mark alive (1) or dead (0)
-__global__ void markAliveKernel(const float4* __restrict__ lifeColor,
-    int* __restrict__ alive,
-    int count)
-{
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= count) return;
-    alive[idx] = (lifeColor[idx].x > 0.0f) ? 1 : 0;
-}
-
-// Step 2: Scatter alive particles to their compacted positions
+// Scatter alive particles to their compacted positions
 __global__ void scatterKernel(const float4* __restrict__ srcPV,
     const float4* __restrict__ srcLC,
     const float4* __restrict__ srcSR,
@@ -317,14 +318,17 @@ namespace CudaParticles {
     void Update(float4* posVel,
         float4* lifeColor,
         float4* sizeRot,
-        const ParticleParams& params)
+        int* d_aliveFlags,
+        const ParticleParams& params,
+        cudaStream_t stream)
     {
         if (params.aliveCount <= 0) return;
 
         int threads = 256;
         int blocks = (params.aliveCount + threads - 1) / threads;
 
-        updateKernel << <blocks, threads >> > (posVel, lifeColor, sizeRot, params);
+        updateKernel << <blocks, threads, 0, stream >> > (posVel, lifeColor, sizeRot,
+            d_aliveFlags, params);
 
 #ifndef NDEBUG
         cudaError_t err = cudaGetLastError();
@@ -336,7 +340,8 @@ namespace CudaParticles {
     int Emit(float4* posVel,
         float4* lifeColor,
         float4* sizeRot,
-        const ParticleParams& params)
+        const ParticleParams& params,
+        cudaStream_t stream)
     {
         int toEmit = params.emitCount + params.burstCount;
         if (toEmit <= 0) return params.aliveCount;
@@ -355,7 +360,8 @@ namespace CudaParticles {
         ParticleParams emitParams = params;
         emitParams.emitCount = toEmit;
 
-        emitKernel << <blocks, threads >> > (posVel, lifeColor, sizeRot, emitParams, baseIndex);
+        emitKernel << <blocks, threads, 0, stream >> > (posVel, lifeColor, sizeRot,
+            emitParams, baseIndex);
 
 #ifndef NDEBUG
         cudaError_t err = cudaGetLastError();
@@ -374,11 +380,13 @@ namespace CudaParticles {
         int* d_aliveFlags,
         int* d_offsets,
         int* d_totalAlive,
+        int* h_totalAlive,
         float4* d_tempPV,
         float4* d_tempLC,
         float4* d_tempSR,
         void* d_scanTemp,
-        size_t scanTempBytes)
+        size_t scanTempBytes,
+        cudaStream_t stream)
     {
         (void)maxParticles;
 
@@ -387,52 +395,63 @@ namespace CudaParticles {
         int threads = 256;
         int blocks = (aliveCount + threads - 1) / threads;
 
-        // Step 1: mark alive
-        markAliveKernel << <blocks, threads >> > (
-            lifeColor,
-            d_aliveFlags,
-            aliveCount);
+        // Step 1: markAlive is ALREADY DONE by the fused updateKernel.
 
-        // Step 2: exclusive scan using CUB
+        // Step 2: exclusive scan using CUB (on the emitter's stream)
         cub::DeviceScan::ExclusiveSum(
             d_scanTemp,
             scanTempBytes,
             d_aliveFlags,
             d_offsets,
-            aliveCount);
+            aliveCount,
+            stream);
 
         // Step 3: compute totalAlive on GPU
-        computeTotalAliveKernel << <1, 1 >> > (d_offsets, d_aliveFlags, d_totalAlive, aliveCount);
+        computeTotalAliveKernel << <1, 1, 0, stream >> > (d_offsets, d_aliveFlags,
+            d_totalAlive, aliveCount);
 
-        // Copy back ONE int
-        int totalAlive = 0;
-        cudaMemcpy(&totalAlive, d_totalAlive, sizeof(int), cudaMemcpyDeviceToHost);
+        // ============================================================
+        // Deferred readback: read LAST frame's result (already complete),
+        // then kick off async copy for THIS frame (read next frame).
+        // On first frame h_totalAlive is 0, which is correct.
+        // ============================================================
+        int totalAlive = *h_totalAlive;  // no sync — last frame's copy is long done
+
+        // Kick off async copy of THIS frame's result (will be read next frame)
+        cudaMemcpyAsync(h_totalAlive, d_totalAlive, sizeof(int),
+            cudaMemcpyDeviceToHost, stream);
+
+        // Clamp: deferred count might slightly overshoot current aliveCount
+        if (totalAlive > aliveCount) totalAlive = aliveCount;
 
         // Step 4: scatter into temp buffers
-        scatterKernel << <blocks, threads >> > (
+        scatterKernel << <blocks, threads, 0, stream >> > (
             posVel, lifeColor, sizeRot,
             d_tempPV, d_tempLC, d_tempSR,
             d_aliveFlags,
             d_offsets,
             aliveCount);
 
-        // Step 5: copy compacted back
+        // Step 5: copy compacted back (async on emitter stream)
         if (totalAlive > 0)
         {
-            cudaMemcpy(posVel,
+            cudaMemcpyAsync(posVel,
                 d_tempPV,
                 sizeof(float4) * totalAlive,
-                cudaMemcpyDeviceToDevice);
+                cudaMemcpyDeviceToDevice,
+                stream);
 
-            cudaMemcpy(lifeColor,
+            cudaMemcpyAsync(lifeColor,
                 d_tempLC,
                 sizeof(float4) * totalAlive,
-                cudaMemcpyDeviceToDevice);
+                cudaMemcpyDeviceToDevice,
+                stream);
 
-            cudaMemcpy(sizeRot,
+            cudaMemcpyAsync(sizeRot,
                 d_tempSR,
                 sizeof(float4) * totalAlive,
-                cudaMemcpyDeviceToDevice);
+                cudaMemcpyDeviceToDevice,
+                stream);
         }
 
         return totalAlive;
@@ -442,14 +461,16 @@ namespace CudaParticles {
         const float4* posVel,
         const float4* lifeColor,
         const float4* sizeRot,
-        int count)
+        int count,
+        cudaStream_t stream)
     {
         if (count <= 0) return;
 
         int threads = 256;
         int blocks = (count + threads - 1) / threads;
 
-        interleaveKernel << <blocks, threads >> > (dst, posVel, lifeColor, sizeRot, count);
+        interleaveKernel << <blocks, threads, 0, stream >> > (dst, posVel, lifeColor,
+            sizeRot, count);
 
 #ifndef NDEBUG
         cudaError_t err = cudaGetLastError();

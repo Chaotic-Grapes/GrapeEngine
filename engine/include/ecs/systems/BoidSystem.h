@@ -8,7 +8,7 @@ Declares the BoidSystem ECS system responsible for managing and
 simulating large-scale boid flocking using GPU acceleration.
 
 BoidSystem integrates CUDA compute with OpenGL rendering through
-CUDA–OpenGL interoperability, allowing boid simulation data to remain
+CUDA-OpenGL interoperability, allowing boid simulation data to remain
 entirely on the GPU. Each BoidFlock entity owns a dedicated GPU-backed
 flock whose position and velocity data are updated every frame by
 CUDA kernels implementing the classic boid steering rules:
@@ -17,20 +17,10 @@ CUDA kernels implementing the classic boid steering rules:
     - Alignment
     - Cohesion
 
-The system maintains GPU buffers and render data required for drawing
-flocks via instanced rendering. Simulation results are written directly
-into OpenGL vertex buffers, enabling a zero-copy pipeline where CUDA
-updates boid state and the RendererSystem consumes the same buffers
-for rendering.
-
-Additional responsibilities include:
-    - Managing per-flock GPU resources
-    - Providing render data for the RendererSystem
-    - Maintaining spatial collision data derived from TileMap geometry
-    - Supporting layered rendering and material parameters for boids
-
-This header defines the public interface and GPU data structures used
-by BoidSystem within the ECS framework.
+Optimizations:
+    - Batched CudaGL Map/Unmap (2 sync points per frame, not 2*N)
+    - Per-flock CUDA streams for GPU overlap
+    - Stream sync before unmap for correctness
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -78,7 +68,7 @@ namespace ECS {
         void DrawFlockForEntity(uint32_t entityIndex, Shader& shader);
 
         // ----------------------------------------------------------------
-        // Render data — read by RendererSystem each frame
+        // Render data - read by RendererSystem each frame
         // ----------------------------------------------------------------
         struct FlockRenderData {
             GLuint   vao = 0;
@@ -93,7 +83,7 @@ namespace ECS {
             float    emissiveStrength = 0.0f;
             glm::vec4 color = glm::vec4(1.0f);
 
-            // From Material2D (optional — zero means no PBR)
+            // From Material2D (optional - zero means no PBR)
             uint32_t normalTexId = 0;
             uint32_t mraTexId = 0;
             float    metallic = 0.0f;
@@ -120,6 +110,11 @@ namespace ECS {
 #ifdef GRAPE_HAS_CUDA
             cudaGraphicsResource_t cudaVBO[2] = { nullptr, nullptr };
             cudaStream_t           stream = nullptr;
+
+            // Mapped VBO pointers (valid between batch map/unmap phases)
+            float4* d_mappedPrev = nullptr;
+            float4* d_mappedCur = nullptr;
+
             uint32_t* d_cellIds = nullptr;  // cell id per boid
             uint32_t* d_boidIds = nullptr;  // boid indices sorted by cell
             uint32_t* d_cellStart = nullptr;  // start index per cell

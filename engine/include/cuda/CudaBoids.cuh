@@ -10,7 +10,7 @@ within GrapeEngine.
 This module defines the parameter structure and host-side launch
 functions required to execute the boid simulation kernels on the GPU.
 The simulation updates boid position and velocity data stored in
-OpenGL vertex buffers via CUDA–OpenGL interoperability.
+OpenGL vertex buffers via CUDA-OpenGL interoperability.
 
 Each CUDA thread simulates a single boid using classic flocking
 behaviors:
@@ -25,13 +25,6 @@ Additional behaviors supported by the simulation include:
     - Tile-based collision avoidance
     - World boundary wrapping
     - Randomized initialization of flock states
-
-The BoidParams structure encapsulates all simulation parameters and
-device buffers required by the CUDA kernels, allowing the BoidSystem
-to configure and launch the simulation each frame.
-
-This header exposes the host-side CUDA API used by the ECS BoidSystem
-while keeping kernel implementations isolated within the CUDA module.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -71,14 +64,14 @@ struct BoidParams {
     float   tileSize;
     float   collisionAvoidWeight;
     float   collisionAvoidRadius;
+
     unsigned int frameCount;  // set from TimeSystem::Instance().GetFrameCount()
 
     // Spatial hashing
     float    cellSize;       // should equal visualRange
     int      hashTableSize;  // prime number, e.g. 100003 for 100K boids
-
     uint32_t* d_cellIds;    // [count] cell id per boid
-    uint32_t* d_boidIds;    // [count] boid indices sorted by cell  
+    uint32_t* d_boidIds;    // [count] boid indices sorted by cell
     uint32_t* d_cellStart;  // [hashTableSize] where each cell starts in sorted array
 };
 

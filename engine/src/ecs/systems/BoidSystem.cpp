@@ -4,21 +4,21 @@
 \author Choi Meng Yew (100%)
 \date   26th February 2026
 \brief
-GPU-accelerated boid flocking simulation using CUDA–OpenGL interop.
+GPU-accelerated boid flocking simulation using CUDA-OpenGL interop.
 Each BoidFlock entity owns a separate GPU-backed flock. Simulation
 is executed entirely on the GPU via CUDA kernels implementing
 separation, alignment, and cohesion rules.
 
-Per-frame workflow:
-    - Map OpenGL instance VBO for CUDA access
-    - Launch boid simulation kernel (reads previous state, writes current)
-    - Synchronize and unmap VBO
-    - RendererSystem draws instances using the updated buffer
+Per-frame workflow (optimized):
+    Phase 1: Bulk-map ALL flock VBOs in ONE cudaGraphicsMapResources call
+    Phase 2: Launch all CUDA kernels on per-flock streams
+    Phase 3: Sync streams, bulk-unmap ALL VBOs in ONE call
 
-The system maintains a double-buffered position/velocity layout
-(previous + current) to ensure deterministic updates. Results live
-directly in an OpenGL VBO, enabling zero CPU copies and fully
-GPU-resident simulation-to-rendering flow.
+Optimizations:
+    - Single cudaGraphicsMapResources/UnmapResources call per frame
+      (not one per VBO). This is the key perf win for many flocks.
+    - Per-flock CUDA streams for GPU overlap
+    - cudaStreamSynchronize before unmap for correctness
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifdef GRAPE_HAS_CUDA
 #include "cuda/CudaBoids.cuh"
 #include "cuda/CudaGLInterop.cuh"
+#include <vector>
 #endif
 
 namespace ECS {
@@ -61,14 +62,48 @@ namespace ECS {
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
 
         // ----------------------------------------------------------
-        // 1. Discover flocks: init new ones, detect removed ones
-        // ----------------------------------------------------------
         // Track which flocks are still alive this frame
+        // ----------------------------------------------------------
         std::unordered_map<uint32_t, bool> alive;
         for (auto& [id, _] : m_flocks) {
             alive[id] = false;
         }
 
+        // ==============================================================
+        // Phase 1: Bulk-map ALL flock VBOs in a SINGLE driver call
+        // ==============================================================
+#ifdef GRAPE_HAS_CUDA
+        // Collect all CUDA graphics resources to map
+        std::vector<cudaGraphicsResource*> resourcesToMap;
+        for (auto& [id, gpu] : m_flocks) {
+            gpu.d_mappedPrev = nullptr;
+            gpu.d_mappedCur = nullptr;
+            if (gpu.initialized && gpu.cudaVBO[0] && gpu.cudaVBO[1]) {
+                resourcesToMap.push_back(gpu.cudaVBO[gpu.bufferIndex]);       // read (prev)
+                resourcesToMap.push_back(gpu.cudaVBO[1 - gpu.bufferIndex]);   // write (cur)
+            }
+        }
+
+        // ONE map call for all resources
+        if (!resourcesToMap.empty()) {
+            cudaGraphicsMapResources((int)resourcesToMap.size(), resourcesToMap.data(), 0);
+        }
+
+        // Get device pointers (cheap, no sync)
+        for (auto& [id, gpu] : m_flocks) {
+            if (gpu.initialized && gpu.cudaVBO[0] && gpu.cudaVBO[1]) {
+                size_t size = 0;
+                cudaGraphicsResourceGetMappedPointer(
+                    (void**)&gpu.d_mappedPrev, &size, gpu.cudaVBO[gpu.bufferIndex]);
+                cudaGraphicsResourceGetMappedPointer(
+                    (void**)&gpu.d_mappedCur, &size, gpu.cudaVBO[1 - gpu.bufferIndex]);
+            }
+        }
+#endif
+
+        // ==============================================================
+        // Phase 2: Simulate all flocks (per-flock streams, no sync)
+        // ==============================================================
         world.Each<Components::BoidFlock>(
             [&](Entity entity, Components::BoidFlock& flock) {
                 const uint32_t id = entity.Index;
@@ -76,30 +111,72 @@ namespace ECS {
 
                 auto it = m_flocks.find(id);
                 if (it == m_flocks.end()) {
-                    // New flock � allocate GPU resources
+                    // New flock - allocate GPU resources
                     InitFlock(id, flock.count);
                     it = m_flocks.find(id);
+
+#ifdef GRAPE_HAS_CUDA
+                    // Late-map this newly created flock (individual map, unavoidable)
+                    FlockGPUData& newGpu = it->second;
+                    if (newGpu.initialized && newGpu.cudaVBO[0] && newGpu.cudaVBO[1]) {
+                        cudaGraphicsResource* lateRes[2] = {
+                            newGpu.cudaVBO[newGpu.bufferIndex],
+                            newGpu.cudaVBO[1 - newGpu.bufferIndex]
+                        };
+                        cudaGraphicsMapResources(2, lateRes, 0);
+                        size_t size = 0;
+                        cudaGraphicsResourceGetMappedPointer(
+                            (void**)&newGpu.d_mappedPrev, &size, lateRes[0]);
+                        cudaGraphicsResourceGetMappedPointer(
+                            (void**)&newGpu.d_mappedCur, &size, lateRes[1]);
+                    }
+#endif
                 }
 
                 // Handle count change (resize)
                 if (it->second.count != flock.count && flock.count > 0) {
+#ifdef GRAPE_HAS_CUDA
+                    // Unmap before destroy
+                    FlockGPUData& oldGpu = it->second;
+                    if (oldGpu.d_mappedPrev || oldGpu.d_mappedCur) {
+                        cudaGraphicsResource* unmapRes[2] = {
+                            oldGpu.cudaVBO[0], oldGpu.cudaVBO[1]
+                        };
+                        cudaGraphicsUnmapResources(2, unmapRes, 0);
+                        oldGpu.d_mappedPrev = nullptr;
+                        oldGpu.d_mappedCur = nullptr;
+                    }
+#endif
                     DestroyFlock(id);
                     InitFlock(id, flock.count);
                     it = m_flocks.find(id);
+
+#ifdef GRAPE_HAS_CUDA
+                    FlockGPUData& newGpu = it->second;
+                    if (newGpu.initialized && newGpu.cudaVBO[0] && newGpu.cudaVBO[1]) {
+                        cudaGraphicsResource* lateRes[2] = {
+                            newGpu.cudaVBO[newGpu.bufferIndex],
+                            newGpu.cudaVBO[1 - newGpu.bufferIndex]
+                        };
+                        cudaGraphicsMapResources(2, lateRes, 0);
+                        size_t size = 0;
+                        cudaGraphicsResourceGetMappedPointer(
+                            (void**)&newGpu.d_mappedPrev, &size, lateRes[0]);
+                        cudaGraphicsResourceGetMappedPointer(
+                            (void**)&newGpu.d_mappedCur, &size, lateRes[1]);
+                    }
+#endif
                 }
 
                 // Update render data each frame (texture/size may change in editor)
-                // Read layer
                 uint16_t layerId = 0;
                 if (world.Has<Components::Layer>(entity))
                     layerId = world.Get<Components::Layer>(entity).Id;
 
-                // Read ZIndex
                 int zOrder = 0;
                 if (world.Has<Components::ZIndex2D>(entity))
                     zOrder = world.Get<Components::ZIndex2D>(entity).ZOrder;
 
-                // Read SpriteRenderer2D for texture + color + emissive
                 FlockRenderData rd{};
                 rd.vao = it->second.vao[1 - it->second.bufferIndex];
                 rd.count = flock.count;
@@ -121,7 +198,6 @@ namespace ECS {
                     rd.color = glm::vec4(1.0f);
                 }
 
-                // Read Material2D for PBR lighting (optional)
                 if (world.Has<Components::Material2D>(entity)) {
                     const auto& mat = world.Get<Components::Material2D>(entity);
                     rd.hasMaterial = true;
@@ -138,24 +214,11 @@ namespace ECS {
 
 #ifdef GRAPE_HAS_CUDA
                 // --------------------------------------------------
-                // 2. Run CUDA simulation kernel
+                // Run CUDA simulation kernel on per-flock stream
                 // --------------------------------------------------
                 FlockGPUData& gpu = it->second;
                 if (!gpu.initialized) return;
-
-                const uint8_t readIdx = gpu.bufferIndex;        // prev frame's output
-                const uint8_t writeIdx = 1 - gpu.bufferIndex;    // this frame's target
-
-                if (!gpu.cudaVBO[readIdx] || !gpu.cudaVBO[writeIdx]) return;
-
-                const float4* d_prev = CudaGL::Map<float4>(gpu.cudaVBO[readIdx]);
-                float4* d_cur = CudaGL::Map<float4>(gpu.cudaVBO[writeIdx]);
-
-                if (!d_prev || !d_cur) {
-                    if (d_prev) CudaGL::Unmap(gpu.cudaVBO[readIdx]);
-                    if (d_cur)  CudaGL::Unmap(gpu.cudaVBO[writeIdx]);
-                    return;
-                }
+                if (!gpu.d_mappedPrev || !gpu.d_mappedCur) return;
 
                 // Build kernel params from component
                 BoidParams params{};
@@ -181,25 +244,52 @@ namespace ECS {
                 params.boundsMaxX = 500.0f;
                 params.boundsMaxY = 500.0f;
 
-                // Spatial hashing stuff
-                params.cellSize = flock.visualRange;  // cell = visual range so 3x3 covers all neighbors
+                // Spatial hashing
+                params.cellSize = flock.visualRange;
                 params.hashTableSize = gpu.hashTableSize;
                 params.d_cellIds = gpu.d_cellIds;
                 params.d_boidIds = gpu.d_boidIds;
                 params.d_cellStart = gpu.d_cellStart;
 
-                CudaBoids::Launch(d_cur, d_prev, params, gpu.stream);
+                CudaBoids::Launch(gpu.d_mappedCur, gpu.d_mappedPrev, params, gpu.stream);
 
-                CudaGL::Unmap(gpu.cudaVBO[readIdx]);
-                CudaGL::Unmap(gpu.cudaVBO[writeIdx]);
-
-                // Flip — no memcpy, just a bit toggle
-                gpu.bufferIndex = writeIdx;
+                // Flip buffer index (no memcpy, just a bit toggle)
+                gpu.bufferIndex = 1 - gpu.bufferIndex;
 #endif
             });
 
+        // ==============================================================
+        // Phase 3: Sync all streams, then bulk-unmap in ONE call
+        // ==============================================================
+#ifdef GRAPE_HAS_CUDA
+        // Sync all streams first (ensure kernels are done writing)
+        for (auto& [id, gpu] : m_flocks) {
+            if (gpu.stream && (gpu.d_mappedPrev || gpu.d_mappedCur)) {
+                cudaStreamSynchronize(gpu.stream);
+            }
+        }
+
+        // Rebuild the resource list for unmap (same resources we mapped)
+        // Note: late-mapped and resize-remapped flocks were added individually,
+        // so we just collect everything that's currently mapped.
+        std::vector<cudaGraphicsResource*> resourcesToUnmap;
+        for (auto& [id, gpu] : m_flocks) {
+            if (gpu.d_mappedPrev || gpu.d_mappedCur) {
+                if (gpu.cudaVBO[0]) resourcesToUnmap.push_back(gpu.cudaVBO[0]);
+                if (gpu.cudaVBO[1]) resourcesToUnmap.push_back(gpu.cudaVBO[1]);
+                gpu.d_mappedPrev = nullptr;
+                gpu.d_mappedCur = nullptr;
+            }
+        }
+
+        // ONE unmap call for all resources
+        if (!resourcesToUnmap.empty()) {
+            cudaGraphicsUnmapResources((int)resourcesToUnmap.size(), resourcesToUnmap.data(), 0);
+        }
+#endif
+
         // ----------------------------------------------------------
-        // 3. Clean up removed flocks
+        // Clean up removed flocks
         // ----------------------------------------------------------
         for (auto& [id, isAlive] : alive) {
             if (!isAlive) {
@@ -269,7 +359,6 @@ namespace ECS {
 
 #ifdef GRAPE_HAS_CUDA
         cudaStreamCreate(&gpu.stream);
-        // Pick a prime just larger than count for good hash distribution
 
         gpu.hashTableSize = (count <= 1000) ? 2003 :
             (count <= 10000) ? 20011 :
@@ -304,7 +393,6 @@ namespace ECS {
         }
 
         // Copy buffer 0 -> buffer 1 so prev is also initialized
-        // (only needed at init, not every frame)
         {
             float4* src = CudaGL::Map<float4>(gpu.cudaVBO[0]);
             float4* dst = CudaGL::Map<float4>(gpu.cudaVBO[1]);
@@ -333,15 +421,16 @@ namespace ECS {
         FlockGPUData& gpu = it->second;
 
 #ifdef GRAPE_HAS_CUDA
+        if (gpu.stream) {
+            cudaStreamSynchronize(gpu.stream);
+            cudaStreamDestroy(gpu.stream);
+            gpu.stream = nullptr;
+        }
         for (int i = 0; i < 2; ++i) {
             if (gpu.cudaVBO[i]) {
                 CudaGL::UnregisterBuffer(gpu.cudaVBO[i]);
                 gpu.cudaVBO[i] = nullptr;
             }
-        }
-        if (gpu.stream) {
-            cudaStreamDestroy(gpu.stream);
-            gpu.stream = nullptr;
         }
 
         if (gpu.d_cellIds) { cudaFree(gpu.d_cellIds);   gpu.d_cellIds = nullptr; }
@@ -373,7 +462,6 @@ namespace ECS {
         glGenVertexArrays(1, &gpu.vao[slot]);
         glBindVertexArray(gpu.vao[slot]);
 
-        // Quad VBO is shared between both VAOs
         if (slot == 0) {
             glGenBuffers(1, &gpu.quadVBO);
             glBindBuffer(GL_ARRAY_BUFFER, gpu.quadVBO);
@@ -402,7 +490,6 @@ namespace ECS {
 #ifdef GRAPE_HAS_CUDA
         const auto& masks = tileMap.GetCollisionMasks();
 
-        // Count non-zero masks to verify collision data exists
         int nonZeroCount = 0;
         for (auto m : masks) if (m != 0) nonZeroCount++;
 
@@ -420,7 +507,6 @@ namespace ECS {
         const size_t byteCount = masks.size();
         const uint32_t newWidth = tileMap.CollisionWidth();
 
-        // Reallocate if size changed
         if (!m_collisionGrid.d_masks || m_collisionGrid.width != (int32_t)newWidth) {
             cudaFree(m_collisionGrid.d_masks);
             cudaMalloc(&m_collisionGrid.d_masks, byteCount);
@@ -446,7 +532,6 @@ namespace ECS {
             shader.setUniform("uBoidSize", rd.boidSize);
             shader.setUniform("uColor", rd.color);
 
-            // Albedo texture
             if (rd.textureId != 0) {
                 shader.setUniform("uHasTexture", 1);
                 shader.setUniform("uTexture", 0);
@@ -457,7 +542,6 @@ namespace ECS {
                 shader.setUniform("uHasTexture", 0);
             }
 
-            // Emissive
             shader.setUniform("uEmissiveStrength", rd.emissiveStrength);
             if (rd.emissiveTexId != 0) {
                 shader.setUniform("uHasEmissive", 1);
@@ -469,7 +553,6 @@ namespace ECS {
                 shader.setUniform("uHasEmissive", 0);
             }
 
-            // Material2D — lighting
             shader.setUniform("uLightingEnabled", rd.hasMaterial ? 1 : 0);
             if (rd.hasMaterial) {
                 shader.setUniform("uMetallic", rd.metallic);
