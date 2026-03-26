@@ -55,6 +55,7 @@ namespace ECS {
         GLuint instanceVBO[2] = { 0, 0 };
 
         uint8_t bufferIndex = 0;             // CUDA writes to this index
+        uint8_t mappedWriteIdx = 0;          // which index was actually mapped
 
         // --- Simulation state ---
         int maxParticles = 0;

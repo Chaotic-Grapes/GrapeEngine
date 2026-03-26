@@ -129,6 +129,17 @@ namespace ECS {
                             (void**)&newGpu.d_mappedPrev, &size, lateRes[0]);
                         cudaGraphicsResourceGetMappedPointer(
                             (void**)&newGpu.d_mappedCur, &size, lateRes[1]);
+
+                        if (newGpu.needsInit && newGpu.d_mappedCur && newGpu.d_mappedPrev) {
+                            CudaBoids::InitRandom(newGpu.d_mappedCur, flock.count,
+                                -200.0f, -200.0f, 200.0f, 200.0f, 100.0f, id,
+                                m_collisionGrid.d_masks, m_collisionGrid.width,
+                                m_collisionGrid.height, m_collisionGrid.originX,
+                                m_collisionGrid.originY, m_collisionGrid.tileSize);
+                            cudaMemcpy(newGpu.d_mappedPrev, newGpu.d_mappedCur,
+                                sizeof(float4) * flock.count, cudaMemcpyDeviceToDevice);
+                            newGpu.needsInit = false;
+                        }
                     }
 #endif
                 }
@@ -164,6 +175,17 @@ namespace ECS {
                             (void**)&newGpu.d_mappedPrev, &size, lateRes[0]);
                         cudaGraphicsResourceGetMappedPointer(
                             (void**)&newGpu.d_mappedCur, &size, lateRes[1]);
+
+                        if (newGpu.needsInit && newGpu.d_mappedCur && newGpu.d_mappedPrev) {
+                            CudaBoids::InitRandom(newGpu.d_mappedCur, flock.count,
+                                -200.0f, -200.0f, 200.0f, 200.0f, 100.0f, id,
+                                m_collisionGrid.d_masks, m_collisionGrid.width,
+                                m_collisionGrid.height, m_collisionGrid.originX,
+                                m_collisionGrid.originY, m_collisionGrid.tileSize);
+                            cudaMemcpy(newGpu.d_mappedPrev, newGpu.d_mappedCur,
+                                sizeof(float4) * flock.count, cudaMemcpyDeviceToDevice);
+                            newGpu.needsInit = false;
+                        }
                     }
 #endif
                 }
@@ -375,32 +397,8 @@ namespace ECS {
 #endif
 
 #ifdef GRAPE_HAS_CUDA
-        // Initialize boid positions into buffer 0
-        float4* d_posVel = CudaGL::Map<float4>(gpu.cudaVBO[0]);
-        if (d_posVel) {
-            CudaBoids::InitRandom(d_posVel, count,
-                -200.0f, -200.0f,
-                200.0f, 200.0f,
-                100.0f,
-                entityIndex,
-                m_collisionGrid.d_masks,
-                m_collisionGrid.width,
-                m_collisionGrid.height,
-                m_collisionGrid.originX,
-                m_collisionGrid.originY,
-                m_collisionGrid.tileSize);
-            CudaGL::Unmap(gpu.cudaVBO[0]);
-        }
-
-        // Copy buffer 0 -> buffer 1 so prev is also initialized
-        {
-            float4* src = CudaGL::Map<float4>(gpu.cudaVBO[0]);
-            float4* dst = CudaGL::Map<float4>(gpu.cudaVBO[1]);
-            if (src && dst)
-                cudaMemcpy(dst, src, sizeof(float4) * count, cudaMemcpyDeviceToDevice);
-            CudaGL::Unmap(gpu.cudaVBO[0]);
-            CudaGL::Unmap(gpu.cudaVBO[1]);
-        }
+        gpu.needsInit = true;
+        cudaGetLastError();   // clear any latent error
 #endif
 
         // Create one VAO per buffer
