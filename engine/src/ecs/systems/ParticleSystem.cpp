@@ -86,6 +86,7 @@ namespace ECS {
         std::vector<cudaGraphicsResource*> resourcesToMap;
         for (auto& [id, gpu] : m_emitters) {
             gpu.d_mappedVBO = nullptr;
+            gpu.mappedWriteIdx = gpu.bufferIndex;
             if (gpu.initialized) {
                 uint8_t writeIdx = gpu.bufferIndex;
                 if (gpu.cudaVBO[writeIdx]) {
@@ -129,6 +130,7 @@ namespace ECS {
                     EmitterGPUData& newGpu = it->second;
                     if (newGpu.initialized) {
                         uint8_t writeIdx = newGpu.bufferIndex;
+                        newGpu.mappedWriteIdx = writeIdx;
                         if (newGpu.cudaVBO[writeIdx]) {
                             cudaGraphicsResource* res = newGpu.cudaVBO[writeIdx];
                             cudaGraphicsMapResources(1, &res, 0);
@@ -161,6 +163,7 @@ namespace ECS {
                     EmitterGPUData& newGpu = it->second;
                     if (newGpu.initialized) {
                         uint8_t writeIdx = newGpu.bufferIndex;
+                        newGpu.mappedWriteIdx = writeIdx;
                         if (newGpu.cudaVBO[writeIdx]) {
                             cudaGraphicsResource* res = newGpu.cudaVBO[writeIdx];
                             cudaGraphicsMapResources(1, &res, 0);
@@ -317,8 +320,7 @@ namespace ECS {
         std::vector<cudaGraphicsResource*> resourcesToUnmap;
         for (auto& [id, gpu] : m_emitters) {
             if (gpu.d_mappedVBO) {
-                // bufferIndex was flipped, so mapped buffer is (1 - bufferIndex)
-                uint8_t mappedIdx = 1 - gpu.bufferIndex;
+                uint8_t mappedIdx = gpu.mappedWriteIdx;
                 if (gpu.cudaVBO[mappedIdx]) {
                     resourcesToUnmap.push_back(gpu.cudaVBO[mappedIdx]);
                 }

@@ -123,6 +123,7 @@ namespace ECS {
             uint8_t  bufferIndex = 0;
             int      count = 0;
             bool     initialized = false;
+            bool     needsInit = false;
         };
 
         // Shared collision grid uploaded once per tilemap change
