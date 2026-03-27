@@ -162,6 +162,12 @@ void TimeSystem::SetMaximumFPS(double fps) {
 
 double TimeSystem::GetMaximumFPS() const { return m_maximumFPS; }
 
+/**
+ * @brief Install or replace the profiler collector callback.
+ * @param cb Callback invoked with raw per-scope samples collected in a frame.
+ * @return void
+ * @note Access is synchronized with sampler collection to avoid data races.
+ */
 void TimeSystem::SetProfilerCollector(ProfilerCollector cb) {
     // The collector may be installed or replaced at runtime. Guard the
     // writer with a mutex to avoid races with _collectThreadSamples().
@@ -221,9 +227,18 @@ TimeSystem::ThreadSamples* TimeSystem::_getOrCreateThreadSamples() {
     return raw;
 }
 
+/**
+ * @brief Collect thread-local samples and aggregate them into frame-level scope data.
+ * @return void
+ * @note Aggregation is per frame: each scope stores total milliseconds and call count
+ *       for the latest frame, plus a bounded history of per-frame totals.
+ * @complexity O(S + H), where S is number of samples this frame and H is
+ *             total retained history touched while recomputing aggregate stats.
+ */
 void TimeSystem::_collectThreadSamples() {
     // Collect all samples produced on threads this frame.
     std::vector<ProfileSample> all;
+    ProfilerCollector collectorCopy;
     {
         std::lock_guard<std::mutex> lk(m_profilerMutex);
 
@@ -235,23 +250,40 @@ void TimeSystem::_collectThreadSamples() {
 
             ts->Samples.clear();
         }
+
+        // Snapshot callback under the same lock used by writers.
+        collectorCopy = m_profilerCollector;
     }
 
-    if (all.empty())
-        return;
-
-    // Aggregate samples into per-id ScopeData for UI consumption.
+    // Aggregate samples into per-id ScopeData for UI consumption. We always reset
+    // this-frame fields so stale values do not leak into frames with no samples.
     {
         std::lock_guard<std::mutex> lk(m_scopeMutex);
 
-        // Reset call counts for this frame
+        // Reset per-frame values for all known scopes.
         for (auto& sd : m_scopeDataById) {
+            sd.LastTimeMs = 0.0f;
             sd.CallCount = 0;
         }
+
+        // Build frame totals per scope id so repeated calls in one frame are summed.
+        struct FrameAggregate {
+            float TotalMs = 0.0f;
+            uint32_t Calls = 0;
+        };
+        std::unordered_map<uint32_t, FrameAggregate> frameByScope;
+        frameByScope.reserve(all.size());
 
         for (const auto &s : all) {
             uint32_t id = s.ScopeId;
             float ms = static_cast<float>(s.DurationSeconds * 1000.0);
+
+            auto& agg = frameByScope[id];
+            agg.TotalMs += ms;
+            ++agg.Calls;
+        }
+
+        for (const auto& [id, agg] : frameByScope) {
 
             if (id >= m_scopeDataById.size()) {
                 m_scopeDataById.resize(id + 1);
@@ -259,14 +291,13 @@ void TimeSystem::_collectThreadSamples() {
             }
 
             auto &sd = m_scopeDataById[id];
-            sd.FrameTimes.push_back(ms);
+            sd.LastTimeMs = agg.TotalMs;
+            sd.CallCount = agg.Calls;
+
+            // Store one value per frame (total scope time this frame).
+            sd.FrameTimes.push_back(agg.TotalMs);
             if (sd.FrameTimes.size() > m_scopeHistorySize)
                 sd.FrameTimes.erase(sd.FrameTimes.begin());
-
-            sd.LastTimeMs = ms;
-            
-            // Increment call count for this scope
-            sd.CallCount++;
 
             // compute average and max
             float sum = 0.0f;
@@ -281,8 +312,8 @@ void TimeSystem::_collectThreadSamples() {
     }
 
     // If a collector is installed, forward the raw sample vector as well
-    if (m_profilerCollector) {
-        m_profilerCollector(all);
+    if (collectorCopy && !all.empty()) {
+        collectorCopy(all);
     }
 }
 
@@ -303,9 +334,14 @@ float TimeSystem::GetFrameTimeMs() const {
     return m_frameTimeMs;
 }
 
+/**
+ * @brief Return a snapshot of all scope aggregates keyed by scope name.
+ * @return Copy of scope data map safe for UI consumption.
+ * @complexity O(N), where N is number of interned scopes.
+ */
 TimeSystem::ScopeDataMap TimeSystem::GetAllScopeData() const {
     ScopeDataMap out;
-    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    std::lock_guard<std::mutex> lk(m_scopeMutex);
     const size_t n = std::min(m_scopeNames.size(), m_scopeDataById.size());
     for (size_t i = 0; i < n; ++i) {
         out[m_scopeNames[i]] = m_scopeDataById[i];
@@ -313,14 +349,25 @@ TimeSystem::ScopeDataMap TimeSystem::GetAllScopeData() const {
     return out;
 }
 
+/**
+ * @brief Resolve an interned scope id to its name.
+ * @param id Scope id returned by internal name interning.
+ * @return Scope name or empty string if id is out of range.
+ * @complexity O(1).
+ */
 std::string TimeSystem::GetScopeName(uint32_t id) const {
-    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    std::lock_guard<std::mutex> lk(m_scopeMutex);
     if (id < m_scopeNames.size()) return m_scopeNames[id];
     return std::string();
 }
 
+/**
+ * @brief Sum latest per-frame totals across all scopes.
+ * @return Total milliseconds attributed to instrumented scopes in latest frame.
+ * @complexity O(N), where N is number of interned scopes.
+ */
 double TimeSystem::GetTotalScopeTimes() const {
-    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    std::lock_guard<std::mutex> lk(m_scopeMutex);
     double total = 0.0;
     const size_t n = std::min(m_scopeNames.size(), m_scopeDataById.size());
     for (size_t i = 0; i < n; ++i) {
@@ -334,9 +381,16 @@ void TimeSystem::ClearProfilerHistory() {
     for (auto &sd : m_scopeDataById) sd.FrameTimes.clear();
 }
 
+/**
+ * @brief Intern a scope name and return its stable numeric id.
+ * @param name Null-terminated scope name.
+ * @return Interned id; returns 0 when name is null.
+ * @note Uses the scope-data mutex so name/id maps and scope vectors stay coherent.
+ * @complexity Average O(1).
+ */
 uint32_t TimeSystem::_internScopeName(const char* name) {
     if (!name) return 0;
-    std::lock_guard<std::mutex> lk(m_internMutex);
+    std::lock_guard<std::mutex> lk(m_scopeMutex);
     auto it = m_scopeNameToId.find(name);
     if (it != m_scopeNameToId.end()) return it->second;
     uint32_t id = static_cast<uint32_t>(m_scopeNames.size());

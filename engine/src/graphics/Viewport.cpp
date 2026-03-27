@@ -44,6 +44,12 @@ namespace Graphics {
             r->SetViewportCamera(name, camera);
     }
 
+    void ViewportManager::SetBloomEnabled(const std::string& name, const bool enabled) {
+        if (auto* r = ECS::RendererSystem::GetInstance()) {
+            r->SetViewportBloomEnabled(name, enabled);
+        }
+    }
+
     uint32_t ViewportManager::GetTexture(const std::string& name) {
         if (auto* r = ECS::RendererSystem::GetInstance())
             return r->GetViewportTexture(name);

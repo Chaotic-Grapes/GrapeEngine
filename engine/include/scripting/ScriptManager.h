@@ -314,6 +314,7 @@ namespace ECS {
         inline auto GetCallSystemOnStartRunning() const { return m_callSystemOnStartRunning; }
         inline auto GetCallSystemOnStopRunning() const { return m_callSystemOnStopRunning; }
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
+        inline auto GetGetSystemRuntimeFlags() const { return m_getSystemRuntimeFlags; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
         inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
         inline auto GetLastCompiledAssemblyPath() const { return m_getLastCompiledTempAssemblyPath; }
@@ -360,6 +361,7 @@ namespace ECS {
         using CreateSystemWrapperFn             = uint64_t(*)(const char* typeName);
         using DestroySystemWrapperFn            = void(*)(uint64_t handle);
         using GetSystemMetadataFn               = void(*)(uint64_t handle, char* outName, int* outGroup, int* outRunMode, int* outOrder);
+        using GetSystemRuntimeFlagsFn           = int(*)(uint64_t handle);
         using GetSystemComponentAccessesFn      = int(*)(uint64_t handle, uint32_t* outReadHashes, uint32_t* outWriteHashes, int maxSize);
         using GetManagedExceptionForHResultFn   = void*(*)(int hr);
         using ReloadAssemblyFn                  = int(*)(const char* assemblyPath);
@@ -397,6 +399,7 @@ namespace ECS {
         CreateSystemWrapperFn               m_createSystemWrapper = nullptr;
         DestroySystemWrapperFn              m_destroySystemWrapper = nullptr;
         GetSystemMetadataFn                 m_getSystemMetadata = nullptr;
+        GetSystemRuntimeFlagsFn             m_getSystemRuntimeFlags = nullptr;
         GetSystemComponentAccessesFn        m_getSystemComponentAccesses = nullptr;
         GetManagedExceptionForHResultFn     m_getExceptionInfoForHR = nullptr;
         CallSystemOnCreateFn                m_callSystemOnCreate = nullptr;
@@ -491,6 +494,7 @@ namespace ECS {
         void OnSceneStart() override;
         void OnSceneStop() override;
         bool ShouldRun(World& world) override;
+        bool RequiresShouldRunCheck() const override;
         void OnStartRunning(World& world) override;
         void OnStopRunning(World& world) override;
 
@@ -511,6 +515,7 @@ namespace ECS {
         mutable std::optional<SystemMetadata> m_metadata;
         mutable SystemGroup m_group = SystemGroup::Update;
         mutable SystemRunMode m_runMode = SystemRunMode::PlayOnly;
+        mutable bool m_requiresShouldRunCheck = true;
 
         void CacheMetadata() const;
     };

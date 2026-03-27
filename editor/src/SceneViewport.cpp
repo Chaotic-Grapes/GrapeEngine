@@ -143,7 +143,11 @@ void SceneViewport::ShowEditorWindows() {
 // Private Rendering Implementation
 // -------------------------------------------------------------------------
 
-// Draws scene viewport UI, image output, overlays, gizmos and tile-palette interaction
+/**
+ * @brief Draw scene viewport UI, scene texture output, and editor overlays.
+ * @param None
+ * @return void
+ */
 void SceneViewport::_renderViewport() {
 
     // Resolve maximize and restore intent before opening the ImGui window
@@ -393,7 +397,7 @@ void SceneViewport::_renderViewport() {
     // Overlay menu toggles helper visuals and viewport diagnostics
     ImGui::PushID("Overlays");
     const bool overlaysActive = m_showGrid || m_showAxes || m_showBounds || m_showColliders ||
-        m_showLights || m_showCameraFrustum || m_showSceneFpsOverlay;
+        m_showLights || m_showCameraFrustum || m_showSceneFpsOverlay || !m_bloomEnabled;
     if (iconButtonTinted("Button", ICON_OVERLAYS, "Overlays", overlaysActive, overlayTint, true)) {
         ImGui::OpenPopup("SceneOverlays");
     }
@@ -406,6 +410,7 @@ void SceneViewport::_renderViewport() {
         ImGui::Separator();
         ImGui::Checkbox("Camera Frustum", &m_showCameraFrustum); // TODO: (currently not working)
         ImGui::Checkbox("FPS Overlay", &m_showSceneFpsOverlay);
+        ImGui::Checkbox("Bloom", &m_bloomEnabled);
         ImGui::EndPopup();
     }
     ImGui::PopID();
@@ -500,6 +505,7 @@ void SceneViewport::_renderViewport() {
 
         // Configure renderer to use EDITOR camera for Scene viewport
         rendererSystem->SetCamera(m_editorCamera->GetCamera());
+        Graphics::ViewportManager::SetBloomEnabled(kSceneViewportName, m_bloomEnabled);
 
         if (!rendererSystem->GetViewport(kSceneViewportName)) {
             const int vpWidth = std::max(1, static_cast<int>(size.x));

@@ -74,6 +74,14 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 /// </summary>
 public static class ScriptHost
 {
+    [Flags]
+    private enum SystemRuntimeFlags : int
+    {
+        None = 0,
+        HasRequireForUpdate = 1 << 0,
+        HasCustomShouldRun = 1 << 1
+    }
+
     private readonly record struct ManagedComponentSchema(uint Hash, int Size, string Signature, string Name);
     private readonly record struct ManagedComponentSnapshot(ulong EntityId, string Json);
     /// <summary>
@@ -137,6 +145,7 @@ public static class ScriptHost
     /// </summary>
     private static readonly Dictionary<IntPtr, World> _worldCache = [];
     private static readonly Dictionary<ulong, uint[]> _requireForUpdateCache = [];
+    private static readonly Dictionary<ulong, SystemRuntimeFlags> _systemRuntimeFlagsCache = [];
 
     /// <summary>
     /// Track the currently active world for hot reload operations.
@@ -1218,6 +1227,104 @@ public static class ScriptHost
     private static void ClearRequireForUpdateCache()
     {
         _requireForUpdateCache.Clear();
+        _systemRuntimeFlagsCache.Clear();
+    }
+
+    /// <summary>
+    /// Compute and cache runtime flags for a scripted system handle.
+    /// </summary>
+    private static SystemRuntimeFlags GetOrComputeSystemRuntimeFlags(ulong handle)
+    {
+        if (_systemRuntimeFlagsCache.TryGetValue(handle, out var cachedFlags))
+        {
+            return cachedFlags;
+        }
+
+        Type? systemType = SystemDiscovery.GetSystemType(handle);
+        if (systemType == null)
+        {
+            _systemRuntimeFlagsCache[handle] = SystemRuntimeFlags.None;
+            return SystemRuntimeFlags.None;
+        }
+
+        SystemRuntimeFlags flags = SystemRuntimeFlags.None;
+
+        // RequireForUpdate always implies dynamic run-state filtering.
+        uint[] requiredHashes = GetRequireForUpdateHashes(handle);
+        if (requiredHashes.Length > 0)
+        {
+            flags |= SystemRuntimeFlags.HasRequireForUpdate;
+        }
+
+        // Detect custom ShouldRun implementation for both SystemBase-derived and direct ISystem implementations.
+        bool hasCustomShouldRun = false;
+
+        MethodInfo? zeroParamShouldRun = systemType.GetMethod(
+            "ShouldRun",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: Type.EmptyTypes,
+            modifiers: null);
+
+        if (zeroParamShouldRun != null &&
+            zeroParamShouldRun.DeclaringType != typeof(SystemBase))
+        {
+            hasCustomShouldRun = true;
+        }
+
+        if (!hasCustomShouldRun)
+        {
+            Type iSystemType = typeof(ISystem);
+            MethodInfo? interfaceShouldRun = iSystemType.GetMethod(
+                nameof(ISystem.ShouldRun),
+                BindingFlags.Instance | BindingFlags.Public,
+                binder: null,
+                types: [typeof(World)],
+                modifiers: null);
+
+            if (interfaceShouldRun != null)
+            {
+                InterfaceMapping map = systemType.GetInterfaceMap(iSystemType);
+                for (int i = 0; i < map.InterfaceMethods.Length; ++i)
+                {
+                    if (map.InterfaceMethods[i] == interfaceShouldRun)
+                    {
+                        MethodInfo target = map.TargetMethods[i];
+                        if (target.DeclaringType != typeof(ISystem) &&
+                            target.DeclaringType != typeof(SystemBase))
+                        {
+                            hasCustomShouldRun = true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (hasCustomShouldRun)
+        {
+            flags |= SystemRuntimeFlags.HasCustomShouldRun;
+        }
+
+        _systemRuntimeFlagsCache[handle] = flags;
+        return flags;
+    }
+
+    /// <summary>
+    /// Returns runtime flags for a scripted system so native can skip unnecessary per-frame checks.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int GetSystemRuntimeFlags(ulong handle)
+    {
+        try
+        {
+            return (int)GetOrComputeSystemRuntimeFlags(handle);
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error getting runtime flags: {ex.Message}", LogLevel.Warning);
+            return (int)SystemRuntimeFlags.HasCustomShouldRun;
+        }
     }
 
     private static Dictionary<uint, ManagedComponentSchema> CaptureManagedComponentSchemas()

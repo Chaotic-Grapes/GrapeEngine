@@ -275,6 +275,14 @@ namespace ECS {
         virtual bool ShouldRun(World& world) { (void)world; return true; }
 
         /**
+         * @brief Indicates whether this system requires a per-frame ShouldRun evaluation.
+         * @return True when SystemManager must call ShouldRun() each frame, false when
+         *         the system is always runnable while enabled and mode-eligible.
+         * @note Default is true to preserve existing behavior for native systems.
+         */
+        virtual bool RequiresShouldRunCheck() const { return true; }
+
+        /**
          * @brief Called when the system transitions from not-running to running.
          * @param world The active scene's World
          *

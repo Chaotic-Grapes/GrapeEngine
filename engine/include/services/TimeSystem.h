@@ -47,10 +47,14 @@ public:
 
     // Profiler data structures
     struct ScopeData {
+        // Per-frame total history in milliseconds (one value per frame where sampled).
         std::vector<float> FrameTimes;
+        // Total time spent in this scope during the latest collected frame.
         float LastTimeMs = 0.0f;
+        // Mean and max of FrameTimes history.
         float AverageTimeMs = 0.0f;
         float MaxTimeMs = 0.0f;
+        // Number of calls to this scope in the latest collected frame.
         uint32_t CallCount = 0;
     };
 
@@ -292,7 +296,7 @@ private:
     std::unordered_map<std::string, uint32_t> m_scopeNameToId;
     std::mutex m_internMutex;
     size_t m_scopeHistorySize = 120;
-    std::mutex m_scopeMutex;
+    mutable std::mutex m_scopeMutex;
 
     // helpers
     double _platformNowSeconds() const;

@@ -100,6 +100,8 @@ namespace {
     constexpr uint32_t kRendererPrepMaxWorkers = 8u;
     constexpr size_t kRendererLightParallelThreshold = 128u;
     constexpr size_t kRendererBucketParallelThreshold = 512u;
+    constexpr int kBloomSampleMin = 12;
+    constexpr int kBloomSampleMax = 48;
 
     // Resolve a project-relative path to an absolute path for loading assets (for existing maps)
     std::string ResolveProjectPathForLoad(const std::string& path) {
@@ -169,6 +171,87 @@ namespace {
         }
         // Return the constructed tileset
         return tileset;
+    }
+
+    /**
+     * @brief Check whether a layer needs Z-order sorting this frame.
+     * @param world ECS world used for component lookup.
+     * @param entities Layer entity list in insertion order.
+     * @return True when at least one entity provides a ZIndex2D component.
+     * @complexity O(n) where n is entities.size().
+     */
+    bool NeedsLayerZSort(ECS::World& world, const std::vector<ECS::Entity>& entities) {
+        for (const ECS::Entity entity : entities) {
+            if (world.TryGet<ECS::Components::ZIndex2D>(entity) != nullptr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @brief Build ordered layer entities, sorting only when ZIndex2D is present.
+     * @param world ECS world used for ZIndex2D lookup.
+     * @param source Layer entities in bucket order.
+     * @param sortedScratch Scratch buffer used when sorting is required.
+     * @return Reference to source or sortedScratch depending on whether sorting ran.
+     * @note Sorting is skipped for common layers that do not use explicit Z ordering.
+     * @complexity O(n) when unsorted; O(n log n) when sorted.
+     */
+    const std::vector<ECS::Entity>& BuildOrderedLayerEntities(
+        ECS::World& world,
+        const std::vector<ECS::Entity>& source,
+        std::vector<ECS::Entity>& sortedScratch) {
+        if (!NeedsLayerZSort(world, source)) {
+            return source;
+        }
+
+        sortedScratch.assign(source.begin(), source.end());
+        std::sort(sortedScratch.begin(), sortedScratch.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
+            const auto* zA = world.TryGet<ECS::Components::ZIndex2D>(A);
+            const auto* zB = world.TryGet<ECS::Components::ZIndex2D>(B);
+            const int za = zA ? zA->ZOrder : 0;
+            const int zb = zB ? zB->ZOrder : 0;
+            if (za != zb) {
+                return za < zb;
+            }
+            return A.Index < B.Index;
+        });
+        return sortedScratch;
+    }
+
+    /**
+     * @brief Filter an ordered entity list to active-in-hierarchy entities once per layer.
+     * @param world ECS world used for hierarchy activity checks.
+     * @param orderedEntities Ordered source entities for the layer.
+     * @param activeOut Output buffer receiving active entities.
+     * @return void
+     * @complexity O(n) where n is orderedEntities.size().
+     */
+    void BuildActiveLayerEntities(
+        ECS::World& world,
+        const std::vector<ECS::Entity>& orderedEntities,
+        std::vector<ECS::Entity>& activeOut) {
+        activeOut.clear();
+        activeOut.reserve(orderedEntities.size());
+        for (const ECS::Entity entity : orderedEntities) {
+            if (world.IsActiveInHierarchy(entity)) {
+                activeOut.push_back(entity);
+            }
+        }
+    }
+
+    /**
+     * @brief Compute a bounded blur sample count from a blur radius.
+     * @param radiusTexels Requested blur radius in texels.
+     * @return Sample count clamped to a quality-safe range.
+     * @note Keeps bloom enabled while capping worst-case shader cost.
+     * @complexity O(1).
+     */
+    int ComputeBloomSampleCount(const float radiusTexels) {
+        const float scaled = radiusTexels * 0.6f;
+        const int requested = static_cast<int>(std::lround(scaled));
+        return std::clamp(requested, kBloomSampleMin, kBloomSampleMax);
     }
 }
 
@@ -656,8 +739,16 @@ namespace ECS {
                     * (vp.Size.y / 2.0f) * zoomScale;
 
                 RenderSceneToHDR(world, vp, viewProj, buckets, maxLayerId);
-                RenderBloom(vp, bloomRadius);
-                ToneMap(vp);
+                if (vp.BloomEnabled) {
+                    RenderBloom(vp, bloomRadius);
+                }
+                else {
+                    // Keep the bloom buffer black so tone mapping and debug views remain deterministic.
+                    vp.BloomExtract->BindAndClear(0, 0, 0, 1);
+                    glViewport(0, 0, vp.BloomExtract->Width(), vp.BloomExtract->Height());
+                    Framebuffer::Unbind();
+                }
+                ToneMap(vp, vp.BloomEnabled);
                 RenderOverlayQuads(vp, viewProj);
                 RenderWireframes(vp, viewProj);
                 RenderGUI(vp);
@@ -702,6 +793,7 @@ namespace ECS {
         // Reusable temporary buffers to avoid per-entity allocations
         std::vector<glm::vec2> transformedCorners;
         std::vector<Entity> sortedLayerEntities;
+        std::vector<Entity> activeLayerEntities;
         std::vector<glm::vec2> polyPoints;
 
         // ============================================================
@@ -711,7 +803,7 @@ namespace ECS {
 
         // Pass 1: Render scene to HDR framebuffer
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
-            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &sortedLayerEntities, &win](ResourceAccessor& res)
+            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &sortedLayerEntities, &activeLayerEntities, &win](ResourceAccessor& res)
             {
                 (void)res;
                 // Get HDR framebuffer from render graph
@@ -753,21 +845,9 @@ namespace ECS {
 
                     int layer = static_cast<int>(layerId);
                     if (layer >= static_cast<int>(buckets.size())) continue;
-                    // Make a local copy of the bucket so we can sort by ZIndex2D
                     const auto& sourceList = buckets[layer];
-                    sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
-                    auto& list = sortedLayerEntities;
-                    // Sort by ZIndex2D.ZOrder ascending (smaller drawn first). Entities
-                    // without ZIndex2D are treated as ZOrder = 0
-                    std::sort(list.begin(), list.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
-                        const auto* zA = world.TryGet<Components::ZIndex2D>(A);
-                        const auto* zB = world.TryGet<Components::ZIndex2D>(B);
-                        const int za = zA ? zA->ZOrder : 0;
-                        const int zb = zB ? zB->ZOrder : 0;
-                        if (za != zb) return za < zb;
-                        // Stable tie-breaker: entity index
-                        return A.Index < B.Index;
-                    });
+                    const auto& orderedEntities = BuildOrderedLayerEntities(world, sourceList, sortedLayerEntities);
+                    BuildActiveLayerEntities(world, orderedEntities, activeLayerEntities);
 
                     glm::mat4 layerViewProj = viewProj;
 
@@ -778,9 +858,7 @@ namespace ECS {
                     m_sdfCircleShader->setUniform("uUseOverrideColor", 0);   // normal circles use their own color
                     m_renderer->beginFrame();
 
-                    for (ECS::Entity entity : list) {
-                        // Skip inactive
-                        if (!world.IsActiveInHierarchy(entity)) continue;
+                    for (ECS::Entity entity : activeLayerEntities) {
 
                         const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
                         if (!sc) continue;
@@ -863,16 +941,11 @@ namespace ECS {
                         }
                     }
 
-                    for (ECS::Entity entity : list) {
-                        // Skip inactive
-                        if (!world.IsActiveInHierarchy(entity)) continue;
+                    for (size_t entityIdx = 0; entityIdx < activeLayerEntities.size(); ++entityIdx) {
+                        ECS::Entity entity = activeLayerEntities[entityIdx];
 
                         // Skip circles here (already drawn by SDF pass)
                         if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
-
-                        // Keep tilemap draw order aligned with Z-sorted entity order
-                        SubmitRuntimeTileMapEntity(entity);
-                        SubmitDebugTileMapEntity(world, entity);
 
                         // Boid flock entity  flush batch, draw instanced at correct Z
                         if (world.TryGet<Components::BoidFlock>(entity)) {
@@ -882,7 +955,38 @@ namespace ECS {
                                 m_boidShader->use();
                                 m_boidShader->setMat4("uViewProj", viewProj);
                                 m_lightManager.Bind(*m_boidShader);
-                                m_boidSystem->DrawFlockForEntity(entity.Index, *m_boidShader);
+
+                                // Process contiguous boid entities in one boid pass to avoid
+                                // repeated batch flush/rebind churn.
+                                while (true) {
+                                    const ECS::Entity boidEntity = activeLayerEntities[entityIdx];
+                                    SubmitRuntimeTileMapEntity(boidEntity);
+                                    SubmitDebugTileMapEntity(world, boidEntity);
+                                    m_boidSystem->DrawFlockForEntity(boidEntity.Index, *m_boidShader);
+
+                                    if (entityIdx + 1 >= activeLayerEntities.size()) {
+                                        break;
+                                    }
+                                    const ECS::Entity nextEntity = activeLayerEntities[entityIdx + 1];
+                                    if (world.TryGet<Components::ShapeCircle2D>(nextEntity) ||
+                                        !world.TryGet<Components::BoidFlock>(nextEntity)) {
+                                        break;
+                                    }
+                                    ++entityIdx;
+                                }
+                            } else {
+                                // If boid rendering is unavailable, still skip contiguous boid
+                                // entities with one flush cycle.
+                                while (entityIdx + 1 < activeLayerEntities.size()) {
+                                    const ECS::Entity nextEntity = activeLayerEntities[entityIdx + 1];
+                                    if (world.TryGet<Components::ShapeCircle2D>(nextEntity) ||
+                                        !world.TryGet<Components::BoidFlock>(nextEntity)) {
+                                        break;
+                                    }
+                                    SubmitRuntimeTileMapEntity(nextEntity);
+                                    SubmitDebugTileMapEntity(world, nextEntity);
+                                    ++entityIdx;
+                                }
                             }
 
                             m_shader->use();
@@ -893,6 +997,10 @@ namespace ECS {
                             m_renderer->beginFrame();
                             continue;
                         }
+
+                        // Keep tilemap draw order aligned with Z-sorted entity order
+                        SubmitRuntimeTileMapEntity(entity);
+                        SubmitDebugTileMapEntity(world, entity);
 
                         // Fetch transform
                         auto* lt = world.TryGet<Components::LocalTransform>(entity);
@@ -1392,7 +1500,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 1);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", ComputeBloomSampleCount(bloomRadiusTexels));
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
@@ -1412,7 +1520,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 0);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", ComputeBloomSampleCount(bloomRadiusTexels));
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
 
                 src->BindColorTexture(0);
@@ -1923,6 +2031,19 @@ namespace ECS {
             vp->Camera = camera;
     }
 
+    /**
+     * @brief Toggle bloom extraction/blur execution for a named viewport.
+     * @param name Viewport name key.
+     * @param enabled True to execute bloom passes; false to bypass bloom.
+     * @return void
+     * @complexity O(V) where V is the number of registered viewports.
+     */
+    void RendererSystem::SetViewportBloomEnabled(const std::string& name, const bool enabled) {
+        if (Viewport* vp = GetViewport(name)) {
+            vp->BloomEnabled = enabled;
+        }
+    }
+
     // Return viewport
     RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
         for (auto& vp : m_viewports)
@@ -2392,7 +2513,7 @@ namespace ECS {
         m_bloomBlurShader->setUniform("uHorizontal", 1);
         m_bloomBlurShader->setUniform("uImage", 0);
         m_bloomBlurShader->setUniform("uRadius", bloomRadius);
-        m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadius * 0.6f)));
+        m_bloomBlurShader->setUniform("uSamples", ComputeBloomSampleCount(bloomRadius));
         m_bloomBlurShader->setUniform("uFalloff", 0.15f);
         vp.BloomExtract->BindColorTexture(0);
         m_renderer->drawFullscreenQuad();
@@ -2407,8 +2528,14 @@ namespace ECS {
         Framebuffer::Unbind();
     }
 
-    // Tone map
-    void RendererSystem::ToneMap(Viewport& vp) {
+    /**
+     * @brief Tone-map HDR scene into LDR and optionally blend bloom.
+     * @param vp Viewport containing HDR/LDR/bloom framebuffers.
+     * @param bloomEnabled True to blend bloom contribution; false to render HDR-only tone mapping.
+     * @return void
+     * @note Bloom texture is still bound when disabled, but strength is forced to 0.
+     */
+    void RendererSystem::ToneMap(Viewport& vp, const bool bloomEnabled) {
         vp.LDR->BindAndClear(0, 0, 0, 1);
         glViewport(0, 0, vp.Size.x, vp.Size.y);
 
@@ -2416,7 +2543,7 @@ namespace ECS {
         m_bloomCombineShader->setUniform("uScene", 0);
         m_bloomCombineShader->setUniform("uBloomBlur", 1);
         m_bloomCombineShader->setUniform("uExposure", 1.3f);
-        m_bloomCombineShader->setUniform("uBloomStrength", 5.2f);
+        m_bloomCombineShader->setUniform("uBloomStrength", bloomEnabled ? 5.2f : 0.0f);
         m_bloomCombineShader->setUniform("uGamma", 1.5f);
 
         vp.HDR->BindColorTexture(0, 0);
@@ -2446,6 +2573,7 @@ namespace ECS {
 
         std::vector<glm::vec2> transformedCorners;
         std::vector<Entity> sortedLayerEntities;
+        std::vector<Entity> activeLayerEntities;
 
         for (uint16_t layerId : renderOrder) {
             if (layerManager) {
@@ -2457,17 +2585,8 @@ namespace ECS {
             if (layer >= static_cast<int>(buckets.size())) continue;
 
             const auto& sourceList = buckets[layer];
-            sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
-            auto& list = sortedLayerEntities;
-            // Finalize rendering pass state
-            std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
-                const auto* zA = world.TryGet<Components::ZIndex2D>(A);
-                const auto* zB = world.TryGet<Components::ZIndex2D>(B);
-                const int za = zA ? zA->ZOrder : 0;
-                const int zb = zB ? zB->ZOrder : 0;
-                if (za != zb) return za < zb;
-                return A.Index < B.Index;
-                });
+            const auto& orderedEntities = BuildOrderedLayerEntities(world, sourceList, sortedLayerEntities);
+            BuildActiveLayerEntities(world, orderedEntities, activeLayerEntities);
 
             // SDF circles
             m_sdfCircleShader->use();
@@ -2476,8 +2595,7 @@ namespace ECS {
             m_sdfCircleShader->setUniform("uUseOverrideColor", 0);
             m_renderer->beginFrame();
 
-            for (Entity entity : list) {
-                if (!world.IsActiveInHierarchy(entity)) continue;
+            for (Entity entity : activeLayerEntities) {
                 const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
                 if (!sc) continue;
                 const auto* lt = world.TryGet<Components::LocalTransform>(entity);
@@ -2535,13 +2653,9 @@ namespace ECS {
                 }
             }
 
-            for (Entity entity : list) {
-                if (!world.IsActiveInHierarchy(entity)) continue;
+            for (size_t entityIdx = 0; entityIdx < activeLayerEntities.size(); ++entityIdx) {
+                Entity entity = activeLayerEntities[entityIdx];
                 if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
-
-                // Keep tilemap draw order aligned with Z-sorted entity order
-                SubmitRuntimeTileMapEntity(entity);
-                SubmitDebugTileMapEntity(world, entity);
 
                 // Boid flock entity  flush batch, draw instanced at correct Z
                 if (world.TryGet<Components::BoidFlock>(entity)) {
@@ -2551,7 +2665,38 @@ namespace ECS {
                         m_boidShader->use();
                         m_boidShader->setMat4("uViewProj", viewProj);
                         m_lightManager.Bind(*m_boidShader);
-                        m_boidSystem->DrawFlockForEntity(entity.Index, *m_boidShader);
+
+                        // Process contiguous boid entities in one boid pass to avoid
+                        // repeated batch flush/rebind churn.
+                        while (true) {
+                            const Entity boidEntity = activeLayerEntities[entityIdx];
+                            SubmitRuntimeTileMapEntity(boidEntity);
+                            SubmitDebugTileMapEntity(world, boidEntity);
+                            m_boidSystem->DrawFlockForEntity(boidEntity.Index, *m_boidShader);
+
+                            if (entityIdx + 1 >= activeLayerEntities.size()) {
+                                break;
+                            }
+                            const Entity nextEntity = activeLayerEntities[entityIdx + 1];
+                            if (world.TryGet<Components::ShapeCircle2D>(nextEntity) ||
+                                !world.TryGet<Components::BoidFlock>(nextEntity)) {
+                                break;
+                            }
+                            ++entityIdx;
+                        }
+                    } else {
+                        // If boid rendering is unavailable, still skip contiguous boid
+                        // entities with one flush cycle.
+                        while (entityIdx + 1 < activeLayerEntities.size()) {
+                            const Entity nextEntity = activeLayerEntities[entityIdx + 1];
+                            if (world.TryGet<Components::ShapeCircle2D>(nextEntity) ||
+                                !world.TryGet<Components::BoidFlock>(nextEntity)) {
+                                break;
+                            }
+                            SubmitRuntimeTileMapEntity(nextEntity);
+                            SubmitDebugTileMapEntity(world, nextEntity);
+                            ++entityIdx;
+                        }
                     }
 
                     m_shader->use();
@@ -2562,6 +2707,10 @@ namespace ECS {
                     m_renderer->beginFrame();
                     continue;
                 }
+
+                // Keep tilemap draw order aligned with Z-sorted entity order
+                SubmitRuntimeTileMapEntity(entity);
+                SubmitDebugTileMapEntity(world, entity);
 
                 auto* lt = world.TryGet<Components::LocalTransform>(entity);
                 if (!lt) {
