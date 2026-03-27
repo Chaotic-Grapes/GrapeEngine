@@ -64,10 +64,12 @@ private:
 
     // Cached data to freeze stats when not playing
     struct CachedScopeData {
+        float LastTimeMs = 0.0f;
         float AverageTimeMs = 0.0f;
         float MaxTimeMs = 0.0f;
         bool isEnabled = true;
         bool isScripted = false;
+        bool isKnownSystem = false;
     };
 
     float m_cachedFps = 0.0f;

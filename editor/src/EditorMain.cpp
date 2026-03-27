@@ -30,6 +30,34 @@ Launches the application in editor mode with the level editor interface.
 #include "scripting/ScriptsCompiler.h"
 #include "ecs/events/EventDispatcher.h"
 
+namespace {
+    /**
+     * @brief RAII profiling guard for frame-phase attribution.
+     * @param name Interned scope label used by TimeSystem profiler.
+     * @note Keeps begin/end pairing exception-safe and branch-light.
+     */
+    class ScopedProfile final {
+    public:
+        /**
+         * @brief Begin a named profiling scope.
+         * @param name Scope name string lifetime must outlive this guard.
+         */
+        explicit ScopedProfile(const char* name) {
+            TimeSystem::Instance().ProfileBegin(name);
+        }
+
+        /**
+         * @brief End the active profiling scope.
+         */
+        ~ScopedProfile() {
+            TimeSystem::Instance().ProfileEnd();
+        }
+
+        ScopedProfile(const ScopedProfile&) = delete;
+        ScopedProfile& operator=(const ScopedProfile&) = delete;
+    };
+}
+
 extern "C" {
     // Forward declare the component deserialize callback registration function
     void RegisterComponentDeserializeCallback(void(*callback)(uint32_t, void*, int, const char*));
@@ -147,6 +175,7 @@ int main() {
 
         // Let ScriptsCompiler handle compilation/hot-reload and deferred registry rebuild
         if (scriptsCompiler) {
+            ScopedProfile profile("Editor.ScriptsCompiler.Update");
             scriptsCompiler->Update();
         }
         
@@ -163,17 +192,26 @@ int main() {
         // ============================================================
         // EDITOR BEGIN FRAME - Handle input and request picking
         // ============================================================
-        editor.BeginFrame();
+        {
+            ScopedProfile profile("Editor.BeginFrame");
+            editor.BeginFrame();
+        }
         
         // ============================================================
         // EDITOR UPDATE - Update editor state and playback controls
         // ============================================================
-        editor.Update();
+        {
+            ScopedProfile profile("Editor.Update");
+            editor.Update();
+        }
         
         // ============================================================
         // ENGINE UPDATE - Process input, time, and services
         // ============================================================
-        engine.Update();
+        {
+            ScopedProfile profile("Engine.Update");
+            engine.Update();
+        }
 
         // Track playback transitions regardless of world/scene availability.
         EditorState state = editor.GetEditorState();
@@ -240,25 +278,37 @@ int main() {
             }
             
             // Execute the filtered systems
-            engine.UpdateSystemsByMode(systemModes, world);
+            {
+                ScopedProfile profile("Engine.UpdateSystemsByMode");
+                engine.UpdateSystemsByMode(systemModes, world);
+            }
             ECS::Events::ClearFrameEventComponents(world);
         }
         
         // ============================================================
         // EDITOR RENDER - Render editor UI and viewports
         // ============================================================
-        editor.Render();
+        {
+            ScopedProfile profile("Editor.Render");
+            editor.Render();
+        }
 
         // ============================================================
         // EDITOR END FRAME - Resolve picking and update selection
         // ============================================================
-        editor.EndFrame();
+        {
+            ScopedProfile profile("Editor.EndFrame");
+            editor.EndFrame();
+        }
 
         // Swap buffers using platform abstraction
-        for (auto* win : platformContext->GetAllWindows()) {
-            if (!win) continue;
-            if (!win->IsVisible() || win->IsMinimized()) continue;
-            win->SwapBuffers();
+        {
+            ScopedProfile profile("Frame.SwapBuffers");
+            for (auto* win : platformContext->GetAllWindows()) {
+                if (!win) continue;
+                if (!win->IsVisible() || win->IsMinimized()) continue;
+                win->SwapBuffers();
+            }
         }
     }
 

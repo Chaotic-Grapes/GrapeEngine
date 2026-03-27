@@ -815,8 +815,66 @@ namespace ECS {
             };
 
             for (SystemGroup group : orderedGroups) {
+                // Profile each run-mode/group bucket separately so editor tooling can
+                // pinpoint hot phases inside UpdateSystemsByMode without API changes.
+                const char* scopeName = _getModeGroupProfileScopeName(mode, group);
+                TimeSystem::Instance().ProfileBegin(scopeName);
                 _updateGroupForMode(group, mode, world);
+                TimeSystem::Instance().ProfileEnd();
             }
+        }
+
+        /**
+         * @brief Resolve a stable profiler scope name for a mode/group execution bucket.
+         * @param mode Active run mode being executed.
+         * @param group System group currently being processed.
+         * @return Interned string literal suitable for per-frame profiling.
+         * @complexity O(1).
+         */
+        static const char* _getModeGroupProfileScopeName(SystemRunMode mode, SystemGroup group) {
+            switch (mode) {
+            case SystemRunMode::Always:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.Always.PreUpdate";
+                case SystemGroup::Update:     return "ECS.Always.Update";
+                case SystemGroup::PostUpdate: return "ECS.Always.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.Always.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.Always.Physics";
+                case SystemGroup::PostPhysics:return "ECS.Always.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.Always.PreRender";
+                case SystemGroup::Render:     return "ECS.Always.Render";
+                case SystemGroup::PostRender: return "ECS.Always.PostRender";
+                }
+                break;
+            case SystemRunMode::PlayOnly:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.PlayOnly.PreUpdate";
+                case SystemGroup::Update:     return "ECS.PlayOnly.Update";
+                case SystemGroup::PostUpdate: return "ECS.PlayOnly.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.PlayOnly.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.PlayOnly.Physics";
+                case SystemGroup::PostPhysics:return "ECS.PlayOnly.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.PlayOnly.PreRender";
+                case SystemGroup::Render:     return "ECS.PlayOnly.Render";
+                case SystemGroup::PostRender: return "ECS.PlayOnly.PostRender";
+                }
+                break;
+            case SystemRunMode::EditOnly:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.EditOnly.PreUpdate";
+                case SystemGroup::Update:     return "ECS.EditOnly.Update";
+                case SystemGroup::PostUpdate: return "ECS.EditOnly.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.EditOnly.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.EditOnly.Physics";
+                case SystemGroup::PostPhysics:return "ECS.EditOnly.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.EditOnly.PreRender";
+                case SystemGroup::Render:     return "ECS.EditOnly.Render";
+                case SystemGroup::PostRender: return "ECS.EditOnly.PostRender";
+                }
+                break;
+            }
+
+            return "ECS.UnknownGroup";
         }
 
         bool IsRunModeActive(SystemRunMode mode) const {

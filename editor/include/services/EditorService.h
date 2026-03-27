@@ -124,6 +124,24 @@ namespace Services {
         // Return the current playback state (Edit, Play, Pause, Step)
         EditorState GetPlaybackState() const;
 
+        /**
+         * @brief Returns true when GPU timing queries are available.
+         * @return True if scene/imgui GPU timing data can be sampled.
+         */
+        bool HasGpuTiming() const;
+
+        /**
+         * @brief Get most recent scene-render GPU elapsed time.
+         * @return Scene render GPU time in milliseconds.
+         */
+        float GetSceneRenderGpuMs() const;
+
+        /**
+         * @brief Get most recent ImGui-render GPU elapsed time.
+         * @return ImGui render GPU time in milliseconds.
+         */
+        float GetImGuiRenderGpuMs() const;
+
         // -------------------------------------------------------------------------
         // Global Access
         // -------------------------------------------------------------------------
@@ -156,6 +174,13 @@ namespace Services {
         Scenes::Scene* m_levelEditorForScene = nullptr;    // Scene the level editor was created for
         bool m_pendingLevelEditorRebuild = false;          // Whether a level editor rebuild is queued for next frame
         Editor::ProjectStartupUI m_projectStartupUI;       // Project browser and startup UI
+        bool m_gpuTimingSupported = false;                 // Whether OpenGL timer queries are available
+        unsigned int m_sceneGpuQuery = 0;                  // Scene render GL query id
+        unsigned int m_imguiGpuQuery = 0;                  // ImGui render GL query id
+        bool m_sceneGpuQueryPending = false;               // Scene query has pending result
+        bool m_imguiGpuQueryPending = false;               // ImGui query has pending result
+        float m_sceneGpuMs = 0.0f;                         // Latest scene GPU time in ms
+        float m_imguiGpuMs = 0.0f;                         // Latest ImGui GPU time in ms
 #endif
     };
 }
