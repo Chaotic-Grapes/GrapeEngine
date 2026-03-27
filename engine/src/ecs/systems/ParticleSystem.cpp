@@ -31,6 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/shader.hpp"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
+#include "scene/LayerManager.h"
 #include "Core/World/TileMap.hpp"
 
 #ifdef GRAPE_HAS_CUDA
@@ -69,10 +70,19 @@ namespace ECS {
         RegisterPreset(ParticlePreset::Sediment());
     }
 
+    /**
+     * @brief Simulate and prepare particle emitters for rendering.
+     * @param world ECS world containing particle emitter components.
+     * @return void
+     * @note Uses layer-first traversal when LayerManager is available.
+     * @note Entities without a Layer component are processed through a fallback pass.
+     * @complexity O(sum(layer entities) + unlayered emitters + GPU simulation work)
+     */
     void ParticleSystem::OnUpdate(World& world) {
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
         const float totalTime = static_cast<float>(TimeSystem::Instance().GetTotalTime());
         const unsigned int frameCount = static_cast<unsigned int>(TimeSystem::Instance().GetFrameCount());
+        auto* layerManager = world.GetLayerManager();
 
         std::unordered_map<uint32_t, bool> alive;
         for (auto& [id, _] : m_emitters) {
@@ -114,9 +124,10 @@ namespace ECS {
         // ==============================================================
         // Phase 2: Simulate all emitters on shared stream
         // ==============================================================
-        world.Each<Components::ParticleEmitter>(
-            [&](Entity entity, Components::ParticleEmitter& emitter) {
-                if (!emitter.active) return;
+        auto processEmitter = [&](Entity entity, Components::ParticleEmitter& emitter, const uint16_t resolvedLayerId) {
+                if (!emitter.active) {
+                    return;
+                }
 
                 const uint32_t id = entity.Index;
                 alive[id] = true;
@@ -200,13 +211,9 @@ namespace ECS {
 
                 // Early-out: nothing to do
                 if (gpu.aliveCount == 0 && emitCount == 0 && burstCount == 0) {
-                    uint16_t layerId = 0;
-                    if (world.Has<Components::Layer>(entity))
-                        layerId = world.Get<Components::Layer>(entity).Id;
-
                     uint8_t readIdx = 1 - gpu.bufferIndex;
                     m_renderData[id] = EmitterRenderData{
-                        gpu.vao[readIdx], 0, emitter.textureId, emitter.particleSize, layerId
+                        gpu.vao[readIdx], 0, emitter.textureId, emitter.particleSize, resolvedLayerId
                     };
                     return;
                 }
@@ -293,23 +300,48 @@ namespace ECS {
                         gpu.aliveCount, m_cudaStream);
                 }
 
-                uint16_t layerId = 0;
-                if (world.Has<Components::Layer>(entity))
-                    layerId = world.Get<Components::Layer>(entity).Id;
-
                 // Render data points to the buffer we just wrote
                 m_renderData[id] = EmitterRenderData{
                     gpu.vao[gpu.bufferIndex],
                     gpu.aliveCount,
                     emitter.textureId,
                     emitter.particleSize,
-                    layerId
+                    resolvedLayerId
                 };
 
                 // Flip for next frame
                 gpu.bufferIndex = 1 - gpu.bufferIndex;
 #endif
+            };
+
+        if (layerManager) {
+            for (const auto layerId : layerManager->DrawOrder()) {
+                if (!layerManager->IsUpdateEnabled(layerId)) {
+                    continue;
+                }
+                for (const Entity entity : layerManager->EntitiesIn(layerId)) {
+                    auto* emitter = world.TryGet<Components::ParticleEmitter>(entity);
+                    if (!emitter) {
+                        continue;
+                    }
+                    processEmitter(entity, *emitter, layerId);
+                }
+            }
+
+            // Keep unlayered emitters in parity with previous behavior.
+            world.Each<Components::ParticleEmitter>([&](Entity entity, Components::ParticleEmitter& emitter) {
+                if (world.TryGet<Components::Layer>(entity)) {
+                    return;
+                }
+                processEmitter(entity, emitter, 0);
             });
+        } else {
+            world.Each<Components::ParticleEmitter>([&](Entity entity, Components::ParticleEmitter& emitter) {
+                const auto* layer = world.TryGet<Components::Layer>(entity);
+                const uint16_t layerId = layer ? layer->Id : 0;
+                processEmitter(entity, emitter, layerId);
+            });
+        }
 
         // ==============================================================
         // Phase 3: ONE sync, then bulk-unmap write buffers

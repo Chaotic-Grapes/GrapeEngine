@@ -10,6 +10,7 @@ Implements the TransformSystem which updates world transforms for entity hierarc
 
 #include "ecs/systems/TransformSystem.h"
 #include "physics2d/internal/ParallelFor.h"
+#include <unordered_set>
 
 namespace {
     constexpr uint32_t kTransformMaxWorkers = 8u;
@@ -30,16 +31,56 @@ namespace ECS {
         return builder.Build();
     }
 
+    /**
+     * @brief Update world transforms for active hierarchy roots.
+     * @param world ECS world containing transform and hierarchy state.
+     * @return void
+     * @note Uses layer-first traversal when LayerManager is present to amortize per-entity layer checks.
+     * @note Entities without a Layer component are still handled through a fallback pass.
+     * @complexity O(sum(layer entities) + unlayered local entities)
+     */
     void TransformSystem::OnUpdate(World& world) {
         std::vector<Entity> roots;
         std::vector<Entity> needsWorldTransform;
+        std::unordered_set<EntityId> visited;
 
-        // First pass: collect entities with LocalTransform that are missing WorldTransform
-        world.Each<Components::LocalTransform>([&](const Entity e, Components::LocalTransform&) {
+        auto* layerManager = world.GetLayerManager();
+
+        auto collectMissingWorldTransform = [&](const Entity e) {
+            if (!world.IsAlive(e)) {
+                return;
+            }
+            if (!visited.insert(e.Index).second) {
+                return;
+            }
+            if (!world.TryGet<Components::LocalTransform>(e)) {
+                return;
+            }
             if (!world.Has<Components::WorldTransform>(e)) {
                 needsWorldTransform.push_back(e);
             }
-        });
+        };
+
+        if (layerManager) {
+            for (const auto layerId : layerManager->DrawOrder()) {
+                for (const Entity e : layerManager->EntitiesIn(layerId)) {
+                    collectMissingWorldTransform(e);
+                }
+            }
+
+            // Fallback for entities that have LocalTransform but are not tracked in LayerManager.
+            world.Each<Components::LocalTransform>([&](const Entity e, Components::LocalTransform&) {
+                if (world.TryGet<Components::Layer>(e)) {
+                    return;
+                }
+                collectMissingWorldTransform(e);
+            });
+        } else {
+            // First pass: collect entities with LocalTransform that are missing WorldTransform.
+            world.Each<Components::LocalTransform>([&](const Entity e, Components::LocalTransform&) {
+                collectMissingWorldTransform(e);
+            });
+        }
 
         // Add missing WorldTransform components
         for (Entity e : needsWorldTransform) {
@@ -48,13 +89,47 @@ namespace ECS {
             world.Add<Components::WorldTransform>(e, wt);
         }
 
-        // Find roots (entities without a parent in the world's index)
-        world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
+        visited.clear();
+        auto collectRoots = [&](const Entity e) {
+            if (!world.IsAlive(e)) {
+                return;
+            }
+            if (!visited.insert(e.Index).second) {
+                return;
+            }
+            if (!world.TryGet<Components::LocalTransform>(e) || !world.TryGet<Components::WorldTransform>(e)) {
+                return;
+            }
+
             Entity parent = world.ParentOf(e);
             if (parent.IsNull() || !world.IsAlive(parent)) {
                 roots.push_back(e);
             }
-        });
+        };
+
+        if (layerManager) {
+            for (const auto layerId : layerManager->DrawOrder()) {
+                if (!layerManager->IsUpdateEnabled(layerId)) {
+                    continue;
+                }
+                for (const Entity e : layerManager->EntitiesIn(layerId)) {
+                    collectRoots(e);
+                }
+            }
+
+            // Keep unlayered roots in update flow.
+            world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
+                if (world.TryGet<Components::Layer>(e)) {
+                    return;
+                }
+                collectRoots(e);
+            });
+        } else {
+            // Find roots (entities without a parent in the world's index).
+            world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
+                collectRoots(e);
+            });
+        }
 
         // Update each independent root subtree; parallelize only when root count is large enough.
         if (roots.size() < kTransformParallelThreshold) {

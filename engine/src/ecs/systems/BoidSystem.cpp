@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
+#include "scene/LayerManager.h"
 #include "Core/World/TileMap.hpp"
 
 #ifdef GRAPE_HAS_CUDA
@@ -58,8 +59,17 @@ namespace ECS {
         LOG_INFO("[BoidSystem] OnCreate");
     }
 
+    /**
+     * @brief Simulate boid flocks and refresh render payloads.
+     * @param world ECS world containing boid flock components.
+     * @return void
+     * @note Traverses entities by layer first when LayerManager exists.
+     * @note Flocks without a Layer component are processed in a fallback pass.
+     * @complexity O(sum(layer entities) + unlayered flocks + GPU simulation work)
+     */
     void BoidSystem::OnUpdate(World& world) {
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        auto* layerManager = world.GetLayerManager();
 
         // ----------------------------------------------------------
         // Track which flocks are still alive this frame
@@ -104,8 +114,7 @@ namespace ECS {
         // ==============================================================
         // Phase 2: Simulate all flocks (per-flock streams, no sync)
         // ==============================================================
-        world.Each<Components::BoidFlock>(
-            [&](Entity entity, Components::BoidFlock& flock) {
+        auto processFlock = [&](Entity entity, Components::BoidFlock& flock, const uint16_t resolvedLayerId) {
                 const uint32_t id = entity.Index;
                 alive[id] = true;
 
@@ -191,27 +200,23 @@ namespace ECS {
                 }
 
                 // Update render data each frame (texture/size may change in editor)
-                uint16_t layerId = 0;
-                if (world.Has<Components::Layer>(entity))
-                    layerId = world.Get<Components::Layer>(entity).Id;
-
                 int zOrder = 0;
-                if (world.Has<Components::ZIndex2D>(entity))
-                    zOrder = world.Get<Components::ZIndex2D>(entity).ZOrder;
+                if (const auto* z = world.TryGet<Components::ZIndex2D>(entity)) {
+                    zOrder = z->ZOrder;
+                }
 
                 FlockRenderData rd{};
                 rd.vao = it->second.vao[1 - it->second.bufferIndex];
                 rd.count = flock.count;
                 rd.boidSize = flock.boidSize;
-                rd.layerId = layerId;
+                rd.layerId = resolvedLayerId;
                 rd.zOrder = zOrder;
 
-                if (world.Has<Components::SpriteRenderer2D>(entity)) {
-                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
-                    rd.textureId = sr.TextureId;
-                    rd.emissiveTexId = sr.EmissiveTextureId;
-                    rd.emissiveStrength = sr.EmissiveStrength;
-                    rd.color = glm::vec4(sr.Color.R, sr.Color.G, sr.Color.B, sr.Color.A);
+                if (const auto* sr = world.TryGet<Components::SpriteRenderer2D>(entity)) {
+                    rd.textureId = sr->TextureId;
+                    rd.emissiveTexId = sr->EmissiveTextureId;
+                    rd.emissiveStrength = sr->EmissiveStrength;
+                    rd.color = glm::vec4(sr->Color.R, sr->Color.G, sr->Color.B, sr->Color.A);
                 }
                 else {
                     rd.textureId = 0;
@@ -220,16 +225,15 @@ namespace ECS {
                     rd.color = glm::vec4(1.0f);
                 }
 
-                if (world.Has<Components::Material2D>(entity)) {
-                    const auto& mat = world.Get<Components::Material2D>(entity);
+                if (const auto* mat = world.TryGet<Components::Material2D>(entity)) {
                     rd.hasMaterial = true;
-                    rd.normalTexId = mat.NormalTextureId != 0 ? mat.NormalTextureId : 0;
-                    rd.mraTexId = mat.MRA_TextureId;
-                    rd.metallic = mat.Metallic;
-                    rd.smoothness = mat.Smoothness;
-                    rd.aoStrength = mat.AOStrength;
-                    rd.normalStrength = mat.NormalStrength;
-                    rd.materialFlags = mat.Flags;
+                    rd.normalTexId = mat->NormalTextureId != 0 ? mat->NormalTextureId : 0;
+                    rd.mraTexId = mat->MRA_TextureId;
+                    rd.metallic = mat->Metallic;
+                    rd.smoothness = mat->Smoothness;
+                    rd.aoStrength = mat->AOStrength;
+                    rd.normalStrength = mat->NormalStrength;
+                    rd.materialFlags = mat->Flags;
                 }
 
                 m_renderData[id] = rd;
@@ -278,7 +282,36 @@ namespace ECS {
                 // Flip buffer index (no memcpy, just a bit toggle)
                 gpu.bufferIndex = 1 - gpu.bufferIndex;
 #endif
+            };
+
+        if (layerManager) {
+            for (const auto layerId : layerManager->DrawOrder()) {
+                if (!layerManager->IsUpdateEnabled(layerId)) {
+                    continue;
+                }
+                for (const Entity entity : layerManager->EntitiesIn(layerId)) {
+                    auto* flock = world.TryGet<Components::BoidFlock>(entity);
+                    if (!flock) {
+                        continue;
+                    }
+                    processFlock(entity, *flock, layerId);
+                }
+            }
+
+            // Keep unlayered flocks in parity with previous behavior.
+            world.Each<Components::BoidFlock>([&](Entity entity, Components::BoidFlock& flock) {
+                if (world.TryGet<Components::Layer>(entity)) {
+                    return;
+                }
+                processFlock(entity, flock, 0);
             });
+        } else {
+            world.Each<Components::BoidFlock>([&](Entity entity, Components::BoidFlock& flock) {
+                const auto* layer = world.TryGet<Components::Layer>(entity);
+                const uint16_t layerId = layer ? layer->Id : 0;
+                processFlock(entity, flock, layerId);
+            });
+        }
 
         // ==============================================================
         // Phase 3: Sync all streams, then bulk-unmap in ONE call
