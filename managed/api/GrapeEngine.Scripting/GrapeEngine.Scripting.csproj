@@ -12,6 +12,10 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(EXPORT_GAME)' == 'true'">
+    <DefineConstants>$(DefineConstants);EXPORT_GAME</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- For Roslyn compilation support (hot reload) -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />

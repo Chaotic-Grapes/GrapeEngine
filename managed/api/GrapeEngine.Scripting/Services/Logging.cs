@@ -60,7 +60,14 @@ public static class Log
     public static void Write(
         string message,
         LogLevel level = LogLevel.Info)
+#if EXPORT_GAME
+    {
+        _ = message;
+        _ = level;
+    }
+#else
         => DebugAPI.ScriptLog(message, (byte)level);
+#endif
 
     /// <summary>
     /// Log a message using a factory function.
@@ -70,7 +77,14 @@ public static class Log
     public static void Write(
         Func<string> messageFactory,
         LogLevel level = LogLevel.Info)
+#if EXPORT_GAME
+    {
+        _ = messageFactory;
+        _ = level;
+    }
+#else
         => DebugAPI.ScriptLog(messageFactory(), (byte)level);
+#endif
 
     /// <summary>
     /// Log a message at the specified level.
@@ -85,7 +99,14 @@ public static class Log
         string file = "",
         int line = 0)
     {
+#if EXPORT_GAME
+        _ = message;
+        _ = level;
+        _ = file;
+        _ = line;
+#else
         DebugAPI.ScriptLogWithLocation(message, (byte)level, file, line);
+#endif
     }
 
     /// <summary>
@@ -101,7 +122,14 @@ public static class Log
         string file = "",
         int line = 0)
     {
+#if EXPORT_GAME
+        _ = messageFactory;
+        _ = level;
+        _ = file;
+        _ = line;
+#else
         DebugAPI.ScriptLogWithLocation(messageFactory(), (byte)level, file, line);
+#endif
     }
 }
 
@@ -116,6 +144,10 @@ internal static class Logging
 {
     internal static void LogInternal(string message, LogLevel level)
     {
+#if EXPORT_GAME
+        _ = message;
+        _ = level;
+#else
         // Log level colors:
         // Debug: Cyan
         // Info: White
@@ -151,5 +183,6 @@ internal static class Logging
                 break;
         }
         Console.ResetColor();
+#endif
     }
 }

@@ -1014,6 +1014,7 @@ void EditorFileMenu::_exportProject(const std::string& destinationOverride,
             const std::string configureCmd =
                 "cmake -S \"" + repoRoot.string() + "\" -B \"" + buildRoot.string() + "\" "
                 "-G \"Visual Studio 17 2022\" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON "
+                "-DEXPORT_GAME=ON "
                 "-DEXPORT_PROJECT_NAME=\"" + projectName + "\" "
                 "-DEXPORT_PROJECT_DIR=\"" + projectRoot.string() + "\" "
                 "-DGAME_OUTPUT_NAME=\"" + projectName + "\"";

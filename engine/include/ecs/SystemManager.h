@@ -32,6 +32,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_set>
 #include <string>
 
+#ifndef GRAPE_ENABLE_PROFILING
+#define GRAPE_ENABLE_PROFILING 1
+#endif
+
 namespace ECS {
 
     // Forward declaration to avoid circular dependency
@@ -728,6 +732,31 @@ namespace ECS {
         }
 
     private:
+        /**
+         * @brief Begin an ECS profiler scope when compile-time profiling is enabled.
+         * @param scopeName Scope name string literal or stable c-string.
+         * @note Compiles to a no-op for export builds where profiling is stripped.
+         * @complexity O(1).
+         */
+        static void _profileBegin(const char* scopeName) {
+    #if GRAPE_ENABLE_PROFILING
+            TimeSystem::Instance().ProfileBegin(scopeName);
+    #else
+            (void)scopeName;
+    #endif
+        }
+
+        /**
+         * @brief End an ECS profiler scope when compile-time profiling is enabled.
+         * @note Compiles to a no-op for export builds where profiling is stripped.
+         * @complexity O(1).
+         */
+        static void _profileEnd() {
+    #if GRAPE_ENABLE_PROFILING
+            TimeSystem::Instance().ProfileEnd();
+    #endif
+        }
+
         // Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
 
@@ -798,7 +827,11 @@ namespace ECS {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
+#if GRAPE_ENABLE_PROFILING
                     _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
                 }
             }
 
@@ -806,11 +839,15 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
+#if GRAPE_ENABLE_PROFILING
                     // Use cached name to avoid expensive P/Invoke metadata lookups.
                     auto it = m_systemNameCache.find(system);
                     const char* systemName = (it != m_systemNameCache.end()) ?
                         it->second.c_str() : "Unknown";
                     _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
                 }
             }
         }
@@ -838,9 +875,9 @@ namespace ECS {
                 // Profile each run-mode/group bucket separately so editor tooling can
                 // pinpoint hot phases inside UpdateSystemsByMode without API changes.
                 const char* scopeName = _getModeGroupProfileScopeName(mode, group);
-                TimeSystem::Instance().ProfileBegin(scopeName);
+                _profileBegin(scopeName);
                 _updateGroupForMode(group, mode, world);
-                TimeSystem::Instance().ProfileEnd();
+                _profileEnd();
             }
         }
 
@@ -864,9 +901,9 @@ namespace ECS {
             };
 
             for (SystemGroup group : orderedGroups) {
-                TimeSystem::Instance().ProfileBegin(_getMaskGroupProfileScopeName(group));
+                _profileBegin(_getMaskGroupProfileScopeName(group));
                 _updateGroupForMask(group, modeMask, world);
-                TimeSystem::Instance().ProfileEnd();
+                _profileEnd();
             }
         }
 
@@ -1008,6 +1045,15 @@ namespace ECS {
             m_pendingEnabledByName.clear();
         }
 
+        /**
+         * @brief Update one system while honoring creation, run-state transitions, and eligibility.
+         * @param system System instance to evaluate and potentially update.
+         * @param world Active world passed into lifecycle/update callbacks.
+         * @param profileName Profiling scope name used for update timing.
+         * @param runModeEligible True when caller has already validated run-mode eligibility.
+         * @note Start/stop transitions are emitted exactly once per state edge.
+         * @complexity O(1) excluding the system's own callback work.
+         */
         void _updateSystemWithRunState(ISystem* system, World& world, const char* profileName, bool runModeEligible) {
             if (!system) {
                 return;
@@ -1035,9 +1081,9 @@ namespace ECS {
                 return;
             }
 
-            TimeSystem::Instance().ProfileBegin(profileName);
+            _profileBegin(profileName);
             system->OnUpdate(world);
-            TimeSystem::Instance().ProfileEnd();
+            _profileEnd();
         }
 
         void _createAllGroupsForMode(SystemRunMode mode, World& world) {
@@ -1161,7 +1207,11 @@ namespace ECS {
                     if (_getCachedRunMode(system.get()) != mode) {
                         continue;
                     }
+#if GRAPE_ENABLE_PROFILING
                     _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
                 }
             }
 
@@ -1169,13 +1219,17 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    auto it = m_systemNameCache.find(system);
-                    const char* systemName = (it != m_systemNameCache.end()) ?
-                        it->second.c_str() : "Unknown";
                     if (_getCachedRunMode(system) != mode) {
                         continue;
                     }
+#if GRAPE_ENABLE_PROFILING
+                    auto it = m_systemNameCache.find(system);
+                    const char* systemName = (it != m_systemNameCache.end()) ?
+                        it->second.c_str() : "Unknown";
                     _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
                 }
             }
         }
@@ -1194,7 +1248,11 @@ namespace ECS {
                     if (!_isModeEnabledInMask(_getCachedRunMode(system.get()), modeMask)) {
                         continue;
                     }
+#if GRAPE_ENABLE_PROFILING
                     _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
                 }
             }
 
@@ -1204,10 +1262,14 @@ namespace ECS {
                     if (!_isModeEnabledInMask(_getCachedRunMode(system), modeMask)) {
                         continue;
                     }
+#if GRAPE_ENABLE_PROFILING
                     auto itName = m_systemNameCache.find(system);
                     const char* systemName = (itName != m_systemNameCache.end()) ?
                         itName->second.c_str() : "Unknown";
                     _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
                 }
             }
         }
@@ -1229,10 +1291,14 @@ namespace ECS {
                 if (!system) {
                     return;
                 }
+#if GRAPE_ENABLE_PROFILING
                 // Use cached name to avoid expensive P/Invoke metadata lookups.
                 auto sysIt = m_systemNameCache.find(system);
                 const char* systemName = (sysIt != m_systemNameCache.end()) ?
                     sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
+#else
+                const char* systemName = nullptr;
+#endif
                 const bool eligible = IsRunModeActive(_getCachedRunMode(system));
                 _updateSystemWithRunState(system, world, systemName, eligible);
             };

@@ -104,6 +104,12 @@ endif()
 option(BUILD_EDITOR "Build the level editor (includes ImGui)" ON)
 option(BUILD_GAME "Build the standalone game runtime (no editor, no ImGui)" OFF)
 option(BUILD_ENGINE_SHARED "Build engine as shared library (DLL)" ON)
+option(EXPORT_GAME "Build shipping/export runtime flavor (compiles out profiler instrumentation)" OFF)
+
+# Backward-compatibility alias: allow -DGAME_EXPORT=ON from external tools/scripts.
+if(DEFINED GAME_EXPORT AND NOT DEFINED EXPORT_GAME)
+    set(EXPORT_GAME ${GAME_EXPORT} CACHE BOOL "Build shipping/export runtime flavor (compiles out profiler instrumentation)" FORCE)
+endif()
 
 if(NOT BUILD_EDITOR AND NOT BUILD_GAME)
     message(FATAL_ERROR "At least one of BUILD_EDITOR or BUILD_GAME must be enabled")
@@ -115,7 +121,18 @@ message(STATUS "  Engine Library: ${CMAKE_CURRENT_LIST_DIR}/engine")
 message(STATUS "  Engine Type: $<IF:$<BOOL:${BUILD_ENGINE_SHARED}>,SHARED (DLL),STATIC>")
 message(STATUS "  BUILD_EDITOR: ${BUILD_EDITOR}")
 message(STATUS "  BUILD_GAME: ${BUILD_GAME}")
+message(STATUS "  EXPORT_GAME: ${EXPORT_GAME}")
 message(STATUS "========================================")
+
+set(GRAPE_DISABLE_PROFILING_FOR_EXPORT OFF)
+if(EXPORT_GAME)
+    if(BUILD_GAME AND NOT BUILD_EDITOR)
+        set(GRAPE_DISABLE_PROFILING_FOR_EXPORT ON)
+        message(STATUS "Export build: profiling instrumentation will be compiled out")
+    else()
+        message(WARNING "EXPORT_GAME is ON but BUILD_GAME is not enabled as a game-only build; profiling instrumentation remains enabled")
+    endif()
+endif()
 
 # ---------------------- Icon / Resource configuration --------------------
 # Default icon (can be overridden via CMake cache):
@@ -140,6 +157,12 @@ endif()
 add_subdirectory(engine)
 # Compiler warnings for engine: keep consistent regardless of editor/game builds.
 if(TARGET GrapeEngineLib)
+    if(GRAPE_DISABLE_PROFILING_FOR_EXPORT)
+        target_compile_definitions(GrapeEngineLib PUBLIC GRAPE_ENABLE_PROFILING=0 EXPORT_GAME=1)
+    else()
+        target_compile_definitions(GrapeEngineLib PUBLIC GRAPE_ENABLE_PROFILING=1)
+    endif()
+
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
     elseif (MSVC)
@@ -424,6 +447,11 @@ if(DOTNET_EXECUTABLE)
     endif()
     
     # Build GrapeEngine.Scripting (managed API and CLR hosting)
+    set(GRAPE_SCRIPTING_EXPORT_PROPERTY "/p:EXPORT_GAME=false")
+    if(GRAPE_DISABLE_PROFILING_FOR_EXPORT)
+        set(GRAPE_SCRIPTING_EXPORT_PROPERTY "/p:EXPORT_GAME=true")
+    endif()
+
     add_custom_target(
         BuildScripting ALL
         COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.Scripting/GrapeEngine.Scripting.csproj"
@@ -431,6 +459,7 @@ if(DOTNET_EXECUTABLE)
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
             --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
             --no-restore
+            ${GRAPE_SCRIPTING_EXPORT_PROPERTY}
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/managed/api"
         COMMENT "Building GrapeEngine.Scripting (managed API and CLR hosting)..."
         VERBATIM
