@@ -74,6 +74,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/TransformUtils.h"
 #include "core/World/TileTypes.hpp"
 #include "ecs/StringTable.h"
+#include "physics2d/internal/ParallelFor.h"
 
 // ============================================================================
 // Standard Library
@@ -96,6 +97,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3.h>
 
 namespace {
+    constexpr uint32_t kRendererPrepMaxWorkers = 8u;
+    constexpr size_t kRendererLightParallelThreshold = 128u;
+    constexpr size_t kRendererBucketParallelThreshold = 512u;
+
     // Resolve a project-relative path to an absolute path for loading assets (for existing maps)
     std::string ResolveProjectPathForLoad(const std::string& path) {
         if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
@@ -2233,32 +2238,83 @@ namespace ECS {
     void RendererSystem::CollectLights(World& world) {
         m_lightManager.BeginFrame();
 
+        struct LightInput {
+            ECS::Entity Entity{};
+            const Components::LocalTransform* Transform = nullptr;
+            const Components::Light2D* Light = nullptr;
+        };
+
+        struct LightOutput {
+            bool Valid = false;
+            bool Directional = false;
+            glm::vec3 Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+            glm::vec3 Position = glm::vec3(0.0f);
+            glm::vec3 Color = glm::vec3(1.0f);
+            float Intensity = 1.0f;
+            float Range = 1.0f;
+        };
+
+        std::vector<LightInput> inputs;
         world.Each<Components::LocalTransform, Components::Light2D>(
             [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
-                if (!world.IsActiveInHierarchy(e)) return;
+                inputs.push_back(LightInput{ e, &lt, &l });
+            });
+
+        std::vector<LightOutput> outputs(inputs.size());
+        auto evaluateLightRange = [&](size_t begin, size_t end, uint32_t) {
+            for (size_t i = begin; i < end; ++i) {
+                const LightInput& in = inputs[i];
+                LightOutput& out = outputs[i];
+
+                if (!world.IsActiveInHierarchy(in.Entity) || !in.Transform || !in.Light) {
+                    continue;
+                }
 
                 Vector3D position, scale;
                 Quaternion rotation;
-                GetRenderTransform(world, e, lt, position, rotation, scale);
+                GetRenderTransform(world, in.Entity, *in.Transform, position, rotation, scale);
 
-                // Convert component color once so both light paths use the same normalized RGB value
-                glm::vec3 color = glm::vec3(ToGlm(l.Color));
+                out.Valid = true;
+                out.Color = glm::vec3(ToGlm(in.Light->Color));
+                out.Intensity = in.Light->Intensity;
 
-                if (l.LightType == Components::Light2D::Type::Directional) {
-                    // Directional lights need only a unit direction vector because position is ignored
-                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
-                    // Prevent NaNs from normalizing a zero-length direction vector
-                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
-                    dir = glm::normalize(dir);
-                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
+                if (in.Light->LightType == Components::Light2D::Type::Directional) {
+                    out.Directional = true;
+                    glm::vec3 dir(in.Light->Direction.X, in.Light->Direction.Y, in.Light->Direction.Z);
+                    if (glm::dot(dir, dir) < 1e-8f) {
+                        dir = glm::vec3(0.0f, -1.0f, 0.0f);
+                    }
+                    out.Direction = glm::normalize(dir);
                 }
                 else {
-                    // Point lights are authored in local space so convert them into world space first
-                    glm::vec3 worldPos(position.X, position.Y, position.Z);
-                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
-                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
+                    out.Directional = false;
+                    out.Position = glm::vec3(position.X, position.Y, position.Z) +
+                        glm::vec3(in.Light->Position.X, in.Light->Position.Y, in.Light->Position.Z);
+                    out.Range = in.Light->Range;
                 }
-            });
+            }
+        };
+
+        if (inputs.size() < kRendererLightParallelThreshold) {
+            evaluateLightRange(0u, inputs.size(), 0u);
+        }
+        else {
+            Engine::Physics2D::Internal::ParallelForStatic(inputs.size(), kRendererPrepMaxWorkers, evaluateLightRange);
+        }
+
+        // Commit in deterministic input order so directional-light overwrite behavior stays stable.
+        for (const LightOutput& out : outputs) {
+            if (!out.Valid) {
+                continue;
+            }
+
+            if (out.Directional) {
+                m_lightManager.SetDirectionalLight(out.Direction, out.Color, out.Intensity);
+            }
+            else {
+                m_lightManager.AddPointLight(out.Position, out.Range, out.Color, out.Intensity);
+            }
+        }
 
         m_lightManager.Upload();
     }
@@ -2276,11 +2332,39 @@ namespace ECS {
         buckets.clear();
         buckets.resize(std::max(1, maxLayerId + 1));
 
+        std::vector<std::pair<uint16_t, Entity>> entries;
         world.Each<Components::LocalTransform, Components::Layer>(
             [&](Entity entity, Components::LocalTransform&, const Components::Layer& ly) {
-                if (ly.Id < buckets.size())
-                    buckets[ly.Id].push_back(entity);
+                entries.emplace_back(ly.Id, entity);
             });
+
+        if (entries.size() < kRendererBucketParallelThreshold) {
+            for (const auto& entry : entries) {
+                if (entry.first < buckets.size()) {
+                    buckets[entry.first].push_back(entry.second);
+                }
+            }
+            return;
+        }
+
+        std::vector<std::vector<std::pair<uint16_t, Entity>>> perWorker(kRendererPrepMaxWorkers);
+        Engine::Physics2D::Internal::ParallelForStatic(entries.size(), kRendererPrepMaxWorkers,
+            [&entries, &perWorker](size_t begin, size_t end, uint32_t workerIdx) {
+                auto& local = perWorker[workerIdx];
+                local.reserve(local.size() + (end - begin));
+                for (size_t i = begin; i < end; ++i) {
+                    local.push_back(entries[i]);
+                }
+            });
+
+        // Merge by worker index to preserve static-partition global order.
+        for (const auto& local : perWorker) {
+            for (const auto& entry : local) {
+                if (entry.first < buckets.size()) {
+                    buckets[entry.first].push_back(entry.second);
+                }
+            }
+        }
     }
 
     // Render bloom

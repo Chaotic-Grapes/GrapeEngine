@@ -9,6 +9,12 @@ Implements the TransformSystem which updates world transforms for entity hierarc
 /* End Header *******************************************************************/
 
 #include "ecs/systems/TransformSystem.h"
+#include "physics2d/internal/ParallelFor.h"
+
+namespace {
+    constexpr uint32_t kTransformMaxWorkers = 8u;
+    constexpr size_t kTransformParallelThreshold = 64u;
+}
 
 namespace ECS {
     SystemMetadata TransformSystem::GetMetadata() const {
@@ -50,10 +56,20 @@ namespace ECS {
             }
         });
 
-        // Update subtree for each root
-        for (Entity r : roots) {
-            _updateSubtree(world, r, std::nullopt);
+        // Update each independent root subtree; parallelize only when root count is large enough.
+        if (roots.size() < kTransformParallelThreshold) {
+            for (Entity r : roots) {
+                _updateSubtree(world, r, std::nullopt);
+            }
+            return;
         }
+
+        Engine::Physics2D::Internal::ParallelForStatic(roots.size(), kTransformMaxWorkers,
+            [this, &world, &roots](size_t begin, size_t end, uint32_t) {
+                for (size_t i = begin; i < end; ++i) {
+                    _updateSubtree(world, roots[i], std::nullopt);
+                }
+            });
     }
 
     void TransformSystem::_updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld) {

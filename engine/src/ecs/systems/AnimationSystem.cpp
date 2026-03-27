@@ -26,6 +26,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 #include <vector>
 #include "services/TimeSystem.h"
+#include "physics2d/internal/ParallelFor.h"
+
+namespace {
+    constexpr uint32_t kAnimationMaxWorkers = 8u;
+    constexpr size_t kAnimationParallelThreshold = 256u;
+}
 
 namespace {
     constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
@@ -98,9 +104,24 @@ namespace ECS {
     void AnimationSystem::OnUpdate(World& world) {
         // Get the delta time since the last frame for animation timing
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-        // Iterate through all entities that have animation and animation state components
+
+        std::vector<Entity> entities;
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
-            [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {
+            [&](Entity entity, Components::SpriteSheetAnimation2D&, Components::AnimationState2D&) {
+                entities.push_back(entity);
+            }
+        );
+
+        auto updateEntity = [&](Entity entity) {
+            auto* animPtr = world.TryGet<Components::SpriteSheetAnimation2D>(entity);
+            auto* statePtr = world.TryGet<Components::AnimationState2D>(entity);
+            if (!animPtr || !statePtr) {
+                return;
+            }
+
+            auto& anim = *animPtr;
+            auto& state = *statePtr;
+
                 // Skip processing if the entity or its parents are disabled.
                 if (!world.IsActiveInHierarchy(entity)) {
                     return;
@@ -212,8 +233,21 @@ namespace ECS {
                     sprite->Offset = Vector2D{ uv.x, uv.y };
                     sprite->TextureFilter = anim.TextureFilter;
                 }
+            };
+
+        if (entities.size() < kAnimationParallelThreshold) {
+            for (const Entity entity : entities) {
+                updateEntity(entity);
             }
-        );
+            return;
+        }
+
+        Engine::Physics2D::Internal::ParallelForStatic(entities.size(), kAnimationMaxWorkers,
+            [&entities, &updateEntity](size_t begin, size_t end, uint32_t) {
+                for (size_t i = begin; i < end; ++i) {
+                    updateEntity(entities[i]);
+                }
+            });
     }
 
 }
