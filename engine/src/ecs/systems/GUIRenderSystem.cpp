@@ -294,19 +294,15 @@ namespace ECS {
             }
 
             // Cache common optional components for styling decisions.
-            const Components::GUIInput* input = world.Has<Components::GUIInput>(item.entity)
-                ? &world.Get<Components::GUIInput>(item.entity)
-                : nullptr;
-            const Components::GUIStateStyle* style = world.Has<Components::GUIStateStyle>(item.entity)
-                ? &world.Get<Components::GUIStateStyle>(item.entity)
-                : nullptr;
+            const Components::GUIInput* input = world.TryGet<Components::GUIInput>(item.entity);
+            const Components::GUIStateStyle* style = world.TryGet<Components::GUIStateStyle>(item.entity);
 
             // Detect disabled state from component type (used for styling).
             bool disabled = false;
-            if (world.Has<Components::GUIButton>(item.entity)) {
-                disabled = world.Get<Components::GUIButton>(item.entity).Disabled;
-            } else if (world.Has<Components::GUISlider>(item.entity)) {
-                disabled = world.Get<Components::GUISlider>(item.entity).Disabled;
+            if (const auto* button = world.TryGet<Components::GUIButton>(item.entity)) {
+                disabled = button->Disabled;
+            } else if (const auto* slider = world.TryGet<Components::GUISlider>(item.entity)) {
+                disabled = slider->Disabled;
             }
             const GUIState state = ResolveState(input, disabled);
 

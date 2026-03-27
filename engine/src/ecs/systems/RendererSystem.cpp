@@ -701,6 +701,7 @@ namespace ECS {
         // already-populated `buckets` and `maxLayerId` variables
         // Reusable temporary buffers to avoid per-entity allocations
         std::vector<glm::vec2> transformedCorners;
+        std::vector<Entity> sortedLayerEntities;
         std::vector<glm::vec2> polyPoints;
 
         // ============================================================
@@ -710,7 +711,7 @@ namespace ECS {
 
         // Pass 1: Render scene to HDR framebuffer
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
-            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &win](ResourceAccessor& res)
+            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &sortedLayerEntities, &win](ResourceAccessor& res)
             {
                 (void)res;
                 // Get HDR framebuffer from render graph
@@ -753,13 +754,16 @@ namespace ECS {
                     int layer = static_cast<int>(layerId);
                     if (layer >= static_cast<int>(buckets.size())) continue;
                     // Make a local copy of the bucket so we can sort by ZIndex2D
-                    auto list = buckets[layer];
+                    const auto& sourceList = buckets[layer];
+                    sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
+                    auto& list = sortedLayerEntities;
                     // Sort by ZIndex2D.ZOrder ascending (smaller drawn first). Entities
                     // without ZIndex2D are treated as ZOrder = 0
                     std::sort(list.begin(), list.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
-                        int za = 0, zb = 0;
-                        if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
-                        if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                        const auto* zA = world.TryGet<Components::ZIndex2D>(A);
+                        const auto* zB = world.TryGet<Components::ZIndex2D>(B);
+                        const int za = zA ? zA->ZOrder : 0;
+                        const int zb = zB ? zB->ZOrder : 0;
                         if (za != zb) return za < zb;
                         // Stable tie-breaker: entity index
                         return A.Index < B.Index;
@@ -778,21 +782,22 @@ namespace ECS {
                         // Skip inactive
                         if (!world.IsActiveInHierarchy(entity)) continue;
 
-                        if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+                        const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
+                        if (!sc) continue;
+                        const auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                        if (!lt) continue;
 
                         // Transform
-                        const auto& lt = world.Get<Components::LocalTransform>(entity);
                         Vector3D position, scale; Quaternion rotation;
-                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+                        GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                         // Draw SDF circle
-                        const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
                         DebugDraw2D::Circle(
                             *m_renderer,
-                            ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
-                            sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                            ToGlm(sc.Color),
-                            sc.Filled ? 0.0f : sc.Thickness,
+                            ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc->Offset),
+                            sc->Radius * ((scale.X + scale.Y) * 0.5f),
+                            ToGlm(sc->Color),
+                            sc->Filled ? 0.0f : sc->Thickness,
                             /*textureId*/ 0
                         );
                     }
@@ -863,14 +868,14 @@ namespace ECS {
                         if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles here (already drawn by SDF pass)
-                        if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+                        if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
 
                         // Keep tilemap draw order aligned with Z-sorted entity order
                         SubmitRuntimeTileMapEntity(entity);
                         SubmitDebugTileMapEntity(world, entity);
 
                         // Boid flock entity  flush batch, draw instanced at correct Z
-                        if (world.Has<Components::BoidFlock>(entity)) {
+                        if (world.TryGet<Components::BoidFlock>(entity)) {
                             m_renderer->endFrame();
 
                             if (m_boidSystem && m_boidShader) {
@@ -890,9 +895,12 @@ namespace ECS {
                         }
 
                         // Fetch transform
-                        auto& lt = world.Get<Components::LocalTransform>(entity);
+                        auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                        if (!lt) {
+                            continue;
+                        }
                         Vector3D position, scale; Quaternion rotation;
-                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+                        GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                         // Boxes
                         if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -973,15 +981,14 @@ namespace ECS {
                             float normalStrength = 1.0f;
                             uint32_t flags = 0;
 
-                            if (world.Has<Components::Material2D>(entity)) {
-                                const auto& mat = world.Get<Components::Material2D>(entity);
-                                normalTexId = mat.NormalTextureId;
-                                mraTexId = mat.MRA_TextureId;
-                                metallic = mat.Metallic;
-                                smoothness = mat.Smoothness;
-                                aoStrength = mat.AOStrength;
-                                normalStrength = mat.NormalStrength;
-                                flags = mat.Flags;
+                            if (const auto* mat = world.TryGet<Components::Material2D>(entity)) {
+                                normalTexId = mat->NormalTextureId;
+                                mraTexId = mat->MRA_TextureId;
+                                metallic = mat->Metallic;
+                                smoothness = mat->Smoothness;
+                                aoStrength = mat->AOStrength;
+                                normalStrength = mat->NormalStrength;
+                                flags = mat->Flags;
                                 if (normalTexId == 0) {
                                     normalTexId = sr.NormalTextureId;
                                 }
@@ -2438,6 +2445,7 @@ namespace ECS {
         }
 
         std::vector<glm::vec2> transformedCorners;
+        std::vector<Entity> sortedLayerEntities;
 
         for (uint16_t layerId : renderOrder) {
             if (layerManager) {
@@ -2448,12 +2456,15 @@ namespace ECS {
             int layer = static_cast<int>(layerId);
             if (layer >= static_cast<int>(buckets.size())) continue;
 
-            auto list = buckets[layer];
+            const auto& sourceList = buckets[layer];
+            sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
+            auto& list = sortedLayerEntities;
             // Finalize rendering pass state
             std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
-                int za = 0, zb = 0;
-                if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
-                if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                const auto* zA = world.TryGet<Components::ZIndex2D>(A);
+                const auto* zB = world.TryGet<Components::ZIndex2D>(B);
+                const int za = zA ? zA->ZOrder : 0;
+                const int zb = zB ? zB->ZOrder : 0;
                 if (za != zb) return za < zb;
                 return A.Index < B.Index;
                 });
@@ -2467,19 +2478,20 @@ namespace ECS {
 
             for (Entity entity : list) {
                 if (!world.IsActiveInHierarchy(entity)) continue;
-                if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+                const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
+                if (!sc) continue;
+                const auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                if (!lt) continue;
 
-                const auto& lt = world.Get<Components::LocalTransform>(entity);
                 Vector3D position, scale; Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
-                const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
                 // Submit circle geometry
                 DebugDraw2D::Circle(*m_renderer,
-                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
-                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                    ToGlm(sc.Color),
-                    sc.Filled ? 0.0f : sc.Thickness, 0);
+                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc->Offset),
+                    sc->Radius * ((scale.X + scale.Y) * 0.5f),
+                    ToGlm(sc->Color),
+                    sc->Filled ? 0.0f : sc->Thickness, 0);
             }
             m_renderer->endFrame();
 
@@ -2525,14 +2537,14 @@ namespace ECS {
 
             for (Entity entity : list) {
                 if (!world.IsActiveInHierarchy(entity)) continue;
-                if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+                if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
 
                 // Keep tilemap draw order aligned with Z-sorted entity order
                 SubmitRuntimeTileMapEntity(entity);
                 SubmitDebugTileMapEntity(world, entity);
 
                 // Boid flock entity  flush batch, draw instanced at correct Z
-                if (world.Has<Components::BoidFlock>(entity)) {
+                if (world.TryGet<Components::BoidFlock>(entity)) {
                     m_renderer->endFrame();
 
                     if (m_boidSystem && m_boidShader) {
@@ -2551,9 +2563,12 @@ namespace ECS {
                     continue;
                 }
 
-                auto& lt = world.Get<Components::LocalTransform>(entity);
+                auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                if (!lt) {
+                    continue;
+                }
                 Vector3D position, scale; Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                 // Boxes
                 if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -2603,18 +2618,17 @@ namespace ECS {
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
 
                     GLuint normalTexId = 0, mraTexId = 0;
-                      float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
-                      uint32_t flags = 0;
+                    float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
+                    uint32_t flags = 0;
 
-                    if (world.Has<Components::Material2D>(entity)) {
-                        const auto& mat = world.Get<Components::Material2D>(entity);
-                        normalTexId = mat.NormalTextureId;
-                        mraTexId = mat.MRA_TextureId;
-                        metallic = mat.Metallic;
-                        smoothness = mat.Smoothness;
-                        aoStrength = mat.AOStrength;
-                        normalStrength = mat.NormalStrength;
-                          flags = mat.Flags;
+                    if (const auto* mat = world.TryGet<Components::Material2D>(entity)) {
+                        normalTexId = mat->NormalTextureId;
+                        mraTexId = mat->MRA_TextureId;
+                        metallic = mat->Metallic;
+                        smoothness = mat->Smoothness;
+                        aoStrength = mat->AOStrength;
+                        normalStrength = mat->NormalStrength;
+                        flags = mat->Flags;
                         if (normalTexId == 0) normalTexId = sr.NormalTextureId;
                     }
 

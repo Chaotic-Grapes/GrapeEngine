@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cassert>
 #include <functional>
 #include <algorithm>
+#include <set>
 #include "ecs/Entity.h"
 #include "ecs/Archetype.h"
 #include "ecs/Components.h"
@@ -96,11 +97,10 @@ namespace ECS {
 
             // Reuse from free list if available
             if (!m_free.empty()) {
-                // Sort to always reuse lowest index first
-                std::sort(m_free.begin(), m_free.end());
-                // Takes from FRONT (lowest index)
-                idx = m_free.front();
-                m_free.erase(m_free.begin());
+                // Reuse the smallest free entity id in O(log n).
+                const auto firstFree = m_free.begin();
+                idx = *firstFree;
+                m_free.erase(firstFree);
             }
             else {
                 // Create new entity based on current size of generations vector
@@ -132,7 +132,7 @@ namespace ECS {
             }
 
             // Check if this ID is in the free list (entity was destroyed)
-            auto it = std::find(m_free.begin(), m_free.end(), targetId);
+            auto it = m_free.find(targetId);
             if (it != m_free.end()) {
                 // Remove from free list and reuse with current generation
                 m_free.erase(it);
@@ -232,7 +232,7 @@ namespace ECS {
             ++m_generations[e.Index];
 
             // Add to free list for reuse
-            m_free.push_back(e.Index);
+            m_free.insert(e.Index);
         }
 
         // ************** Component API ************** //
@@ -1998,7 +1998,7 @@ namespace ECS {
         size_t m_chunkBytes = 16384; // 16 * 1024;
 
         std::vector<uint32_t> m_generations;
-        std::vector<uint32_t> m_free;
+        std::set<uint32_t> m_free;
         std::vector<Location> m_locations;
 
         std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash> m_archetypes;

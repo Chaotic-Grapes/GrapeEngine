@@ -351,6 +351,7 @@ namespace ECS {
             // Create metadata entry for this system
             SystemMetadata meta = system->GetMetadata();
             m_systemMetadata.push_back(meta);
+            m_executionLevelsDirty = true;
         }
     }
 
@@ -368,6 +369,7 @@ namespace ECS {
             m_dependencies[metadata.GetSystemPtr()] = {};
             m_dependents[metadata.GetSystemPtr()] = {};
             m_systemMetadata.push_back(metadata);
+            m_executionLevelsDirty = true;
         }
     }
 
@@ -405,6 +407,8 @@ namespace ECS {
                 }
             }
         }
+
+        m_executionLevelsDirty = true;
     }
 
     /**
@@ -482,8 +486,12 @@ namespace ECS {
      * @brief Get execution levels (systems that can run in parallel).
      * @return Vector of levels, each containing systems that can run in parallel
      */
-    std::vector<std::vector<ISystem*>> SystemDependencyGraph::GetExecutionLevels() const {
-        return _topologicalSort();
+    const std::vector<std::vector<ISystem*>>& SystemDependencyGraph::GetExecutionLevels() const {
+        if (m_executionLevelsDirty) {
+            m_cachedExecutionLevels = _topologicalSort();
+            m_executionLevelsDirty = false;
+        }
+        return m_cachedExecutionLevels;
     }
 
     /**
@@ -511,6 +519,8 @@ namespace ECS {
         m_dependencies.clear();
         m_dependents.clear();
         m_allDependencies.clear();
+        m_cachedExecutionLevels.clear();
+        m_executionLevelsDirty = true;
     }
 
     /**

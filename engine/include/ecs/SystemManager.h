@@ -1050,7 +1050,7 @@ namespace ECS {
             const auto& graph = it->second;
 
             // Get execution levels (all systems per level can run in parallel)
-            auto levels = graph.GetExecutionLevels();
+            const auto& levels = graph.GetExecutionLevels();
 
             for (const auto& level : levels) {
                 // Execute all systems in this level sequentially
