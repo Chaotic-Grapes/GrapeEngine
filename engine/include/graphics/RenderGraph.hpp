@@ -42,19 +42,24 @@ class RenderGraph; // forward declaration
 // Used inside render pass callbacks to fetch textures or FBOs.
 class GRAPEENGINE_API ResourceAccessor {
 public:
-    // ============================================================================
-    // Constructs the accessor and binds it to a RenderGraph instance.
-    // ============================================================================
+    /**
+     * @brief Construct a resource accessor bound to one render graph.
+     * @param graph Owning render graph used for resource lookup.
+     */
     ResourceAccessor(RenderGraph* graph) : m_graph(graph) {}
 
-    // ============================================================================
-    // Returns a pointer to the framebuffer associated with the given name.
-    // ============================================================================
+    /**
+     * @brief Get a framebuffer resource by logical name.
+     * @param name Logical resource name registered in the graph.
+     * @return Pointer to the framebuffer, or nullptr when missing.
+     */
     Framebuffer* GetFramebuffer(const std::string& name);
 
-    // ============================================================================
-    // Returns the OpenGL texture ID of the framebuffer�s first color attachment.
-    // ============================================================================
+    /**
+     * @brief Get the first color attachment texture id for a named framebuffer.
+     * @param name Logical resource name registered in the graph.
+     * @return OpenGL texture id, or 0 when the resource is unavailable.
+     */
     GLuint GetTexture(const std::string& name);
 
 private:
@@ -67,9 +72,9 @@ private:
 // clear, data-driven control over the render pipeline.
 class GRAPEENGINE_API RenderGraph {
 public:
-    // ----------------------------------------------------------------------------
-    // Describes the properties of a texture or render target.
-    // ----------------------------------------------------------------------------
+    /**
+     * @brief Descriptor for one graph texture resource.
+     */
     struct TextureDesc {
         int width = 0;
         int height = 0;
@@ -89,38 +94,44 @@ public:
     RenderGraph(RenderGraph&&) noexcept = default;
     RenderGraph& operator=(RenderGraph&&) noexcept = default;
 
-    // ============================================================================
-    // Creates a framebuffer resource and registers it with the RenderGraph.
-    // Returns a unique handle used for dependency tracking.
-    // ============================================================================
+    /**
+     * @brief Create and register a texture resource in the graph.
+     * @param name Unique logical resource name.
+     * @param desc Resource descriptor including dimensions, format, and target type.
+     * @return Stable handle for the created resource.
+     */
     RGHandle CreateTexture(const std::string& name, const TextureDesc& desc);
 
-    // ============================================================================
-    // Retrieves a framebuffer by its logical name.
-    // Used internally by ResourceAccessor for resource lookups.
-    // ============================================================================
+    /**
+     * @brief Find a framebuffer by logical resource name.
+     * @param name Resource name registered via CreateTexture.
+     * @return Pointer to framebuffer, or nullptr if not found.
+     */
     Framebuffer* GetFramebuffer(const std::string& name);
 
-    // ============================================================================
-    // Adds a render pass that specifies which resources it reads and writes.
-    // The execute callback defines the rendering logic for that pass.
-    // ============================================================================
+    /**
+     * @brief Add one render pass and its declared resource dependencies.
+     * @param name Human-readable pass name.
+     * @param readNames Resource names sampled by the pass.
+     * @param writeNames Resource names written by the pass.
+     * @param execute Callback invoked during Execute for this pass.
+     * @return void
+     */
     void AddPass(const std::string& name,
         const std::vector<std::string>& readNames,
         const std::vector<std::string>& writeNames,
         std::function<void(ResourceAccessor&)> execute);
 
-    // ============================================================================
-    // Executes all registered passes sequentially in submission order.
-    // Each pass receives a ResourceAccessor for resource access.
-    // ============================================================================
+    /**
+     * @brief Execute all registered passes in submission order.
+     * @return void
+     */
     void Execute();
 
-    // ============================================================================
-    // Clears the list of passes while preserving framebuffer resources.
-    // This prevents unnecessary FBO recreation and reduces CPU overhead
-    // by reusing GPU memory across frames.
-    // ============================================================================
+    /**
+     * @brief Clear pass list while keeping allocated resources alive.
+     * @return void
+     */
     void Reset();
 
 private:

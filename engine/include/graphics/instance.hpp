@@ -1,3 +1,16 @@
+/* Start Header *****************************************************************/
+/*!
+\file   instance.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\brief
+Declares per-instance GPU payload layout used by instanced rendering paths.
+
+The struct layout is designed to remain alignment-safe for std140/std430-like
+buffer packing expectations when consumed by shader-side instance data.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <glm/glm.hpp>
 

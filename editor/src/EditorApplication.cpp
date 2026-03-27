@@ -148,6 +148,11 @@ void EditorApplication::EndFrame() {
     }
 }
 
+// Callback bridge design note:
+// - Managed code receives a plain function pointer, so captureless static storage is required.
+// - The callback resolves the active scene world at call time to stay valid across scene switches.
+// - Global pointers are refreshed when callbacks are re-registered (startup/hot reload).
+// - Calls are expected from the main editor thread where engine/editor services are owned.
 void EditorApplication::InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world) {
     if (!scriptManager) {
         LOG_WARNING("[EditorApplication] Cannot initialize script callbacks: scriptManager is null");

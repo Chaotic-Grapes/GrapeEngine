@@ -290,10 +290,9 @@ namespace Messaging {
     };
 
     /**
-     * @brief
+     * @brief Scoped RAII handle that unsubscribes automatically on destruction.
      * RAII wrapper for automatic unsubscription upon destruction.
      */
-    // RAII wrapper for automatic unsubscription
     template<typename T>
     class ScopedSubscription {
     public:

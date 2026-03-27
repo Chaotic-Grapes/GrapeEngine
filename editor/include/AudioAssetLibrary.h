@@ -21,6 +21,10 @@ public:
 
 	using ClipInfo = Audio::AudioCueRegistry::CueInfo;
 
+    /**
+     * @brief Access the singleton AudioAssetLibrary instance.
+     * @return Reference to the global library.
+     */
 	static AudioAssetLibrary& Get() {
 		// reference function to always refer to this one static
 		// local instance that is reusable and only "ONE"
@@ -28,62 +32,47 @@ public:
 		return s_instance;
 	}
 
-    /*
-      Refresh(audioRoot)
-      -------------------
-      Scans a root folder (e.g. project root) and ALL subfolders.
-
-      Finds all supported audio file formats:
-          .wav, .ogg, .mp3, .flac
-
-      For each audio file:
-          - Normalize its path (so \ becomes /)
-          - Extract its filename (without extension)
-          - Generate a stable ID (hash of path)
-          - Store ClipInfo in:
-              m_clips          (vector of all clips)
-              m_byId           (lookup ID -> info)
-              m_byPath         (lookup path -> info)
-
-      This should be called ONCE when the editor loads,
-      or anytime the asset directory changes (optional).
-  */
+    /**
+     * @brief Scan and refresh the audio asset registry from disk.
+     * @param audioRoot Root directory to recursively scan for supported audio files.
+     */
     void Refresh(const std::string& audioRoot) {
         m_registry.Refresh(audioRoot);
     }
 
 
-    // Returns ALL loaded audio clips for UI dropdowns or listing
+    /**
+     * @brief Get all currently registered audio clips.
+     * @return Const vector of clip metadata.
+     */
     const std::vector<ClipInfo>& GetAllClips() const { return m_registry.GetAll(); }
 
 
-    // Lookup a clip by its CueId (used by AudioSource)
+    /**
+     * @brief Find a clip by CueId.
+     * @param id Cue identifier.
+     * @return Pointer to clip metadata, or nullptr if not found.
+     */
     const ClipInfo* FindById(uint32_t id) const {
         return m_registry.FindById(id);
     }
 
 
-    // Lookup by path (used for drag & drop)
+    /**
+     * @brief Find a clip by normalized asset path.
+     * @param p Clip path.
+     * @return Pointer to clip metadata, or nullptr if not found.
+     */
     const ClipInfo* FindByPath(const std::string& p) const {
         return m_registry.FindByPath(p);
     }
 
 
-    /*
-        Register(p)
-        -----------
-
-        Used when an audio file is DISCOVERED dynamically,
-        such as when you drag a ".wav" from AssetBrowser onto the AudioSource inspector.
-
-        If the file is NOT part of the current scan:
-            - Normalize path
-            - Generate a new ID
-            - Insert into clip list
-            - Return that clip info
-
-        Allows the editor to support drag-and-drop addition of audio without rescanning everything.
-    */
+    /**
+     * @brief Register a clip path discovered at runtime.
+     * @param p Clip path to register.
+     * @return Reference to the registered or existing clip metadata.
+     */
     const ClipInfo& Register(const std::string& p) {
         return m_registry.Register(p);
     }
@@ -91,12 +80,9 @@ public:
 
 private:
 
-    /*
-        Private constructor:
-        --------------------
-        Prevents creating new instances elsewhere.
-        Only Get() can produce the one global instance.
-    */
+    /**
+     * @brief Construct singleton instance.
+     */
     AudioAssetLibrary() = default;
 
 

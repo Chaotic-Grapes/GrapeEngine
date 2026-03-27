@@ -42,25 +42,34 @@ namespace Services {
 	//Engine-level service that manages the lifetime of the audio device
 	class AudioService : public Engine::IService {
 	public:
-		
-		// Construct the service and pass a human-readable name to base
+		/**
+		 * @brief Construct the audio service.
+		 */
 		AudioService() : IService("Audio Service") {}
 
 
 
-		//Ensure audio resources are released when the service is destroyed
+		/**
+		 * @brief Destroy the service and release owned audio resources.
+		 */
 		~AudioService() override { Terminate(); }
 
 
-		// Create and initialize the FMOD device
+		/**
+		 * @brief Initialize audio device, engine, and runtime wiring.
+		 */
 		void Initialize() override;
 
 
-		//Pump the audio device (mixing, async I/O) once per frame
+		/**
+		 * @brief Run one audio tick for mixing, fades, and device updates.
+		 */
 		void Update() override;
 
 
-		//Release the audio device and all cached sounds/channels
+		/**
+		 * @brief Terminate audio runtime and release device resources.
+		 */
 		void Terminate() override;
 
 
@@ -68,18 +77,40 @@ namespace Services {
 
 
 
-		// Raw device pointer for read-only use by advanced clients
+		/**
+		 * @brief Access the underlying FMOD device.
+		 * @return Mutable device pointer, or nullptr when uninitialized.
+		 */
 		Audio::FmodAudioDevice* Device() { return m_device.get(); }
 
-		// Const raw device pointer for read-only queries
+		/**
+		 * @brief Access the underlying FMOD device (const).
+		 * @return Const device pointer, or nullptr when uninitialized.
+		 */
 		const Audio::FmodAudioDevice* Device() const { return m_device.get(); }
 
-		// High-level audio engine (mixing/fades/policy)
+		/**
+		 * @brief Access the high-level audio engine facade.
+		 * @return Mutable audio engine pointer, or nullptr when uninitialized.
+		 */
 		Audio::AudioEngine* Engine() { return m_engine.get(); }
+
+		/**
+		 * @brief Access the high-level audio engine facade (const).
+		 * @return Const audio engine pointer, or nullptr when uninitialized.
+		 */
 		const Audio::AudioEngine* Engine() const { return m_engine.get(); }
 
-		// Shared cue registry for CueId/path resolution
+		/**
+		 * @brief Access the shared cue registry.
+		 * @return Mutable cue registry reference.
+		 */
 		Audio::AudioCueRegistry& CueRegistry() { return m_cueRegistry; }
+
+		/**
+		 * @brief Access the shared cue registry (const).
+		 * @return Const cue registry reference.
+		 */
 		const Audio::AudioCueRegistry& CueRegistry() const { return m_cueRegistry; }
 
 
@@ -87,30 +118,81 @@ namespace Services {
 	
 
 
-		// Load (or reuse) a cue by id and file path
+		/**
+		 * @brief Load or reuse a cue and associate it with a cue id.
+		 * @param cueId Logical cue identifier.
+		 * @param path Asset path to audio data.
+		 * @param p Sound loading parameters.
+		 * @return True when cue load or reuse succeeds.
+		 */
 		bool LoadCue(const std::string& cueId, const std::string& path, const Audio::SoundParams& p) const {
 			return m_engine ? m_engine->LoadCue(cueId, path, p) : false;
 		}
 
 
-		// Play a previously-loaded cue with per-call settings
+		/**
+		 * @brief Play a previously loaded cue.
+		 * @param cueId Cue identifier to play.
+		 * @param s Per-playback settings.
+		 * @param bus Mixer bus route for the playback.
+		 * @return Playback handle for subsequent control.
+		 */
 		Audio::PlaybackHandle Play(const std::string& cueId, const Audio::PlaySettings& s, Audio::Bus bus = Audio::Bus::SFX) const {
 			return m_engine ? m_engine->Play(cueId, s, bus) : Audio::PlaybackHandle{};
 		}
 
 
-		//Stop a playing instance immediately or with a fade policy
+		/**
+		 * @brief Stop an active playback instance.
+		 * @param handle Playback handle returned by Play.
+		 * @param mode Stop behavior (immediate or fade out).
+		 */
 		void Stop(const Audio::PlaybackHandle handle, Audio::StopMode mode) const { if (m_engine) m_engine->Stop(handle, mode); }
 
-		// Pause/Resume all audio
+		/**
+		 * @brief Pause all active audio output.
+		 */
 		void PauseAll() const { if (m_device) m_device->PauseAll(); }
+
+		/**
+		 * @brief Resume all previously paused audio output.
+		 */
 		void ResumeAll() const { if (m_device) m_device->ResumeAll(); }
 
-		// Mixer controls
+		/**
+		 * @brief Set bus output volume.
+		 * @param bus Target mixer bus.
+		 * @param volume Linear gain value.
+		 */
 		void SetBusVolume(Audio::Bus bus, float volume) const { if (m_engine) m_engine->SetBusVolume(bus, volume); }
+
+		/**
+		 * @brief Get current bus output volume.
+		 * @param bus Target mixer bus.
+		 * @return Linear gain value for the bus.
+		 */
 		float GetBusVolume(Audio::Bus bus) const { return m_engine ? m_engine->GetBusVolume(bus) : 1.0f; }
+
+		/**
+		 * @brief Fade bus output volume over time.
+		 * @param bus Target mixer bus.
+		 * @param targetVolume Destination linear gain.
+		 * @param duration Fade duration in seconds.
+		 */
 		void FadeBusVolume(Audio::Bus bus, float targetVolume, float duration) const { if (m_engine) m_engine->FadeBusVolume(bus, targetVolume, duration); }
+
+		/**
+		 * @brief Set low-pass gain on a bus.
+		 * @param bus Target mixer bus.
+		 * @param gain Low-pass gain factor.
+		 */
 		void SetBusLowPassGain(Audio::Bus bus, float gain) const { if (m_engine) m_engine->SetBusLowPassGain(bus, gain); }
+
+		/**
+		 * @brief Get low-pass gain on a bus.
+		 * @param bus Target mixer bus.
+		 * @return Low-pass gain factor.
+		 */
 		float GetBusLowPassGain(Audio::Bus bus) const { return m_engine ? m_engine->GetBusLowPassGain(bus) : 1.0f; }
 
 

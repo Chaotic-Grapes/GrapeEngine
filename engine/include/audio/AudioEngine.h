@@ -31,106 +31,232 @@ namespace Audio {
     // runtime audio engine facade used by systems and services
     class AudioEngine {
     public:
-        // default constructor
+        /**
+         * @brief Construct an audio engine with no attached device.
+         */
         AudioEngine() = default;
 
-        // construct with an initial device
+        /**
+         * @brief Construct an audio engine with an initial device.
+         * @param device Initial FMOD device pointer.
+         */
         explicit AudioEngine(FmodAudioDevice* device) : m_device(device) {}
 
-        // set current device pointer
+        /**
+         * @brief Set the active device used for all runtime audio calls.
+         * @param device Device pointer, or nullptr to detach.
+         */
         void SetDevice(FmodAudioDevice* device) {
             // store device pointer for runtime calls
             m_device = device;
         }
 
-        // get current device pointer
+        /**
+         * @brief Get the currently attached device pointer.
+         * @return Active device pointer, or nullptr if detached.
+         */
         FmodAudioDevice* Device() const {
             // return stored device pointer
             return m_device;
         }
 
-        // load one cue into device storage
+        /**
+         * @brief Load one cue into device storage.
+         * @param cueId Logical cue identifier.
+         * @param filePath Source audio file path.
+         * @param params Cue loading parameters.
+         * @return True when cue load succeeds.
+         */
         bool LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params);
 
-        // unload one cue from device storage
+        /**
+         * @brief Unload one cue from device storage.
+         * @param cueId Logical cue identifier.
+         */
         void UnloadCue(const std::string& cueId);
 
-        // check if one cue is loaded
+        /**
+         * @brief Check if a cue id is currently loaded.
+         * @param cueId Logical cue identifier.
+         * @return True if the cue exists in device storage.
+         */
         bool HasCue(const std::string& cueId) const;
 
-        // play one cue and return playback handle
+        /**
+         * @brief Play one cue and return a playback handle.
+         * @param cueId Logical cue identifier.
+         * @param settings Per-play invocation settings.
+         * @param bus Mixer bus route.
+         * @return Playback handle for runtime control.
+         */
         PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings, Bus bus);
 
-        // play one cue with single instance policy
+        /**
+         * @brief Play one cue with single-instance behavior policy.
+         * @param cueId Logical cue identifier.
+         * @param settings Per-play invocation settings.
+         * @param policy Single-instance policy to apply.
+         * @param bus Mixer bus route.
+         * @return Playback handle for runtime control.
+         */
         PlaybackHandle PlaySingle(const std::string& cueId, const PlaySettings& settings, PlayPolicy policy, Bus bus);
 
-        // stop one playback handle
+        /**
+         * @brief Stop one playback handle.
+         * @param handle Playback handle to stop.
+         * @param mode Stop behavior.
+         */
         void Stop(PlaybackHandle handle, StopMode mode);
 
-        // stop one cue level playback mapping
+        /**
+         * @brief Stop playback mapped to one cue id.
+         * @param cueId Logical cue identifier.
+         * @param mode Stop behavior.
+         */
         void StopCue(const std::string& cueId, StopMode mode);
 
-        // query cue playback state
+        /**
+         * @brief Query whether a cue is currently playing.
+         * @param cueId Logical cue identifier.
+         * @return True if cue playback is active.
+         */
         bool IsCuePlaying(const std::string& cueId) const;
 
-        // set cached base volume for one handle
+        /**
+         * @brief Set cached base volume for one handle.
+         * @param handle Playback handle.
+         * @param volume Linear gain value.
+         */
         void SetInstanceVolume(PlaybackHandle handle, float volume);
 
-        // set pitch for one handle
+        /**
+         * @brief Set pitch for one handle.
+         * @param handle Playback handle.
+         * @param pitch Pitch multiplier.
+         */
         void SetInstancePitch(PlaybackHandle handle, float pitch);
 
-        // set pan for one handle
+        /**
+         * @brief Set stereo pan for one handle.
+         * @param handle Playback handle.
+         * @param pan Pan value in range [-1, 1].
+         */
         void SetInstancePan(PlaybackHandle handle, float pan);
 
-        // set low pass gain for one handle
+        /**
+         * @brief Set low-pass gain for one handle.
+         * @param handle Playback handle.
+         * @param gain Low-pass gain factor.
+         */
         void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
 
-        // set 3d transform for one handle
+        /**
+         * @brief Set 3D transform for one handle.
+         * @param handle Playback handle.
+         * @param pos World position.
+         * @param vel World velocity.
+         */
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
 
-        // set listener transform on device
+        /**
+         * @brief Set listener transform on the active device.
+         * @param listener Listener position/orientation payload.
+         */
         void SetListener(const ListenerParams& listener);
 
-        // set one bus volume
+        /**
+         * @brief Set mixer bus volume.
+         * @param bus Mixer bus.
+         * @param volume Linear gain value.
+         */
         void SetBusVolume(Bus bus, float volume);
 
-        // get one bus volume
+        /**
+         * @brief Get mixer bus volume.
+         * @param bus Mixer bus.
+         * @return Current linear gain value.
+         */
         float GetBusVolume(Bus bus) const;
 
-        // fade one bus volume over time
+        /**
+         * @brief Fade one bus volume over time.
+         * @param bus Mixer bus.
+         * @param targetVolume Destination gain.
+         * @param duration Fade duration in seconds.
+         */
         void FadeBusVolume(Bus bus, float targetVolume, float duration);
 
-        // set low pass gain on one bus
+        /**
+         * @brief Set low-pass gain on one bus.
+         * @param bus Mixer bus.
+         * @param gain Low-pass gain factor.
+         */
         void SetBusLowPassGain(Bus bus, float gain);
 
-        // get low pass gain on one bus
+        /**
+         * @brief Get low-pass gain on one bus.
+         * @param bus Mixer bus.
+         * @return Low-pass gain factor.
+         */
         float GetBusLowPassGain(Bus bus) const;
 
-        // fade one instance toward target volume
+        /**
+         * @brief Fade one instance toward a target volume.
+         * @param handle Playback handle.
+         * @param targetVolume Destination gain.
+         * @param duration Fade duration in seconds.
+         * @param stopOnComplete True to stop playback when fade completes.
+         */
         void FadeInstance(PlaybackHandle handle, float targetVolume, float duration, bool stopOnComplete);
 
-        // fade all active instances to zero
+        /**
+         * @brief Fade all active instances toward silence.
+         * @param duration Fade duration in seconds.
+         */
         void FadeOutAll(float duration);
 
-        // fade all active instances on one bus
+        /**
+         * @brief Fade all active instances on one bus toward silence.
+         * @param bus Mixer bus.
+         * @param duration Fade duration in seconds.
+         */
         void FadeOutBus(Bus bus, float duration);
 
-        // check if any terminal fade out is active
+        /**
+         * @brief Check whether any terminal fade-out is active.
+         * @return True if one or more fade-outs are active.
+         */
         bool HasActiveFadeOuts() const;
 
-        // return maximum remaining fade out time
+        /**
+         * @brief Get the maximum remaining fade-out time.
+         * @return Maximum remaining fade time in seconds.
+         */
         float GetMaxFadeOutRemaining() const;
 
-        // check if one handle is fading
+        /**
+         * @brief Check if one playback handle is currently fading.
+         * @param handle Playback handle.
+         * @return True when the handle has an active fade.
+         */
         bool IsHandleFading(PlaybackHandle handle) const;
 
-        // check if one handle is tracked as active
+        /**
+         * @brief Check if one playback handle is tracked as active.
+         * @param handle Playback handle.
+         * @return True when the handle is tracked by runtime state.
+         */
         bool IsHandleActive(PlaybackHandle handle) const;
 
-        // stop all active fades immediately
+        /**
+         * @brief Cancel all active fades immediately.
+         */
         void StopAllFades();
 
-        // update fades and cleanup once per frame
+        /**
+         * @brief Advance fades and prune stale runtime entries.
+         * @param deltaTime Frame delta time in seconds.
+         */
         void Update(float deltaTime);
 
     private:
@@ -161,19 +287,35 @@ namespace Audio {
             FadeState Fade{};
         };
 
-        // compute instance volume before bus and master mix
+        /**
+         * @brief Compute per-instance volume before bus/master multipliers.
+         * @param instance Instance runtime state.
+         * @return Premix linear gain value.
+         */
         float _computePreMixVolume(const InstanceState& instance) const;
 
-        // compute combined bus and master multiplier
+        /**
+         * @brief Compute combined bus/master multiplier for one instance.
+         * @param instance Instance runtime state.
+         * @return Combined linear multiplier.
+         */
         float _computeBusVolume(const InstanceState& instance) const;
 
-        // advance active bus fades
+        /**
+         * @brief Advance active bus fades.
+         * @param deltaTime Frame delta time in seconds.
+         */
         void _updateBusFades(float deltaTime);
 
-        // advance active instance fades
+        /**
+         * @brief Advance active instance fades.
+         * @param deltaTime Frame delta time in seconds.
+         */
         void _updateInstanceFades(float deltaTime);
 
-        // remove stopped handles from cache
+        /**
+         * @brief Remove stopped handles from cached runtime state.
+         */
         void _pruneStoppedInstances();
 
         // active device pointer used for runtime calls
