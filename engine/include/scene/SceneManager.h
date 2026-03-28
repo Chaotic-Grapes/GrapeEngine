@@ -226,6 +226,10 @@ namespace Scenes {
          */
         size_t GetSceneCount() const   { return m_scenes.size(); }
 
+        /**
+         * @brief Set the audio system used for scene transition fades.
+         * @param audioSystem Audio system pointer, or nullptr to disable fade integration.
+         */
         void SetAudioSystem(ECS::AudioSystem* audioSystem) {
             m_audioSystem = audioSystem;
         }
@@ -586,6 +590,10 @@ namespace Scenes {
             m_waitingForFadeOut = false;
         }
 
+        /**
+         * @brief Execute a scene transition and publish scene-changed notification.
+         * @param toIndex Destination scene index.
+         */
         void _performTransition(const size_t toIndex) {
             if (toIndex >= m_scenes.size() || m_active == toIndex)
                 return;
@@ -616,6 +624,10 @@ namespace Scenes {
             }
         }
 
+        /**
+         * @brief Publish a scene-changing notification before the active scene changes.
+         * @param toIndex Destination scene index.
+         */
         void _notifySceneChanging(const size_t toIndex) {
             // Notify listeners of scene changing
             std::string oldName;
@@ -647,6 +659,11 @@ namespace Scenes {
             return oss.str();
         }
 
+        /**
+         * @brief Resolve a scene path to an absolute filesystem path.
+         * @param path Input scene path, potentially relative or project-prefixed.
+         * @return Absolute or canonicalized path suitable for load/save operations.
+         */
         static std::string _resolveScenePath(const std::string& path) {
             if (path.empty()) {
                 return {};
@@ -681,6 +698,11 @@ namespace Scenes {
             return normalizedStr;
         }
 
+        /**
+         * @brief Find an existing scene entry by normalized absolute path.
+         * @param normalizedAbsolutePath Normalized absolute scene path.
+         * @return Scene index when found, otherwise NPOS.
+         */
         size_t _findSceneIndexByPath(const std::string& normalizedAbsolutePath) const {
             const size_t count = m_scenes.size();
             for (size_t i = 0; i < count; ++i) {
@@ -806,6 +828,11 @@ namespace Scenes {
                 });
         }
 
+        /**
+         * @brief Rebuild runtime prefab metadata for restored entities.
+         * @param world Scene world containing restored entities.
+         * @param restoredEntities Entities created during scene deserialization.
+         */
         void _reconstructPrefabMetadata(ECS::World& world, const std::vector<ECS::Entity>& restoredEntities) {
             // Initialize PrefabManager if not already done
             if (!m_prefabManager) {

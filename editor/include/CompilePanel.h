@@ -19,7 +19,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 class CompilePanel {
 public:
+    /**
+     * @brief Initialize compile panel state and resources.
+     */
     static void Initialize();
+
+    /**
+     * @brief Shutdown compile panel state and release resources.
+     */
     static void Shutdown();
+
+    /**
+     * @brief Render compile status and diagnostics UI.
+     */
     static void Render();
 };

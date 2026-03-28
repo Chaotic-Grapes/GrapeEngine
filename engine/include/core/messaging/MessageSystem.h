@@ -296,10 +296,12 @@ namespace Messaging {
     template<typename T>
     class ScopedSubscription {
     public:
+        // Take ownership of a subscription handle for RAII-managed lifetime.
         ScopedSubscription(SubscriptionHandle handle)
             : handle_(handle) {
         }
 
+        // Automatically unsubscribe when this scoped wrapper is destroyed.
         ~ScopedSubscription() {
             MessageSystem::Unsubscribe<T>(handle_);
         }

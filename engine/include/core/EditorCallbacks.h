@@ -132,34 +132,42 @@ namespace Engine {
         // Registration Methods (Editor calls these)
         // ====================================================================
 
+        // Register the callback used for debug drawing in the editor viewport.
         void RegisterDebugDraw(DebugDrawCallback callback) {
             m_debugDrawCallback = callback;
         }
 
+        // Register the callback used to update editor entity selection state.
         void RegisterEntitySelection(EntitySelectionCallback callback) {
             m_entitySelectionCallback = callback;
         }
 
+        // Register the callback used to request inspector refreshes.
         void RegisterInspectorRefresh(InspectorRefreshCallback callback) {
             m_inspectorRefreshCallback = callback;
         }
 
+        // Register the callback used to present scene render output in editor UI.
         void RegisterSceneRender(SceneRenderCallback callback) {
             m_sceneRenderCallback = callback;
         }
 
+        // Register the callback used to show editor notifications.
         void RegisterNotification(NotificationCallback callback) {
             m_notificationCallback = callback;
         }
 
+        // Register the callback used for viewport picking queries.
         void RegisterPick(PickCallback callback) {
             m_pickCallback = callback;
         }
 
+        // Register the callback used to query editor camera matrices.
         void RegisterEditorCamera(EditorCameraCallback callback) {
             m_editorCameraCallback = callback;
         }
 
+        // Register an extra ImGui draw callback invoked each editor frame.
         void RegisterCustomImGui(CustomImGuiCallback callback) {
             m_customImGuiCallbacks.push_back(callback);
         }
@@ -174,18 +182,21 @@ namespace Engine {
             }
         }
 
+        // Notify editor that an entity selection change occurred.
         void InvokeEntitySelection(uint32_t entityId, bool addToSelection = false) {
             if (m_entitySelectionCallback) {
                 m_entitySelectionCallback(entityId, addToSelection);
             }
         }
 
+        // Notify editor to refresh inspector views for one entity or full selection.
         void InvokeInspectorRefresh(uint32_t entityId = 0) {
             if (m_inspectorRefreshCallback) {
                 m_inspectorRefreshCallback(entityId);
             }
         }
 
+        // Forward the scene texture/frame dimensions to editor rendering callback.
         void InvokeSceneRender(uint32_t textureId, int width, int height) {
             if (m_sceneRenderCallback) {
                 m_sceneRenderCallback(textureId, width, height);
@@ -199,6 +210,7 @@ namespace Engine {
             }
         }
 
+        // Execute picking callback and return picked entity id when available.
         uint32_t InvokePick(float screenX, float screenY) {
             if (m_pickCallback) {
                 return m_pickCallback(screenX, screenY);
@@ -206,6 +218,7 @@ namespace Engine {
             return 0; // Nothing picked
         }
 
+        // Query editor camera data if an editor camera callback is registered.
         bool InvokeEditorCamera(glm::vec3& outPosition, glm::mat4& outViewMatrix, 
                                glm::mat4& outProjectionMatrix) {
             if (m_editorCameraCallback) {
@@ -214,6 +227,7 @@ namespace Engine {
             return false; // No editor camera available
         }
 
+        // Invoke all registered custom ImGui draw callbacks.
         void InvokeCustomImGui() {
             for (auto& callback : m_customImGuiCallbacks) {
                 if (callback) {

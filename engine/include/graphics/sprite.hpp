@@ -57,20 +57,28 @@ struct Sprite {
 
     Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest;
 
+    // Apply debug/runtime transform input controls to this sprite instance.
     void handleInput(GLFWwindow* window, float deltaTime);
 };
 
 // Animation helper
 class SpriteAnimation {
 public:
+    // Build animation metadata for a spritesheet texture.
     SpriteAnimation(GLuint texId, int frameWidth, int frameHeight, int texWidth, int texHeight);
+    // Advance animation time and update the current frame index.
     void update(float deltaTime);
+    // Return UV rectangle for the current frame.
     glm::vec4 currentUV() const;
     Sprite currentFrame(const glm::vec2& pos, const glm::vec2& size) const;
+    // Advance by dt and return a Sprite ready to render.
     Sprite play(glm::vec2 pos, glm::vec2 size, float dt);
     void setFPS(float fps) { m_frameTime = 1.0f / fps; }
+    // Restrict playback to a sub-range of frames in the sheet.
     void setFrameWindow(int startFrame, int count);
+    // Select one row and optional sub-range for playback.
     void setRow(int rowIndex, int count = -1, int startCol = 0);
+    // Set per-row frame counts for non-uniform spritesheets.
     void setRowFrameCounts(const std::vector<int>& counts);
 
     // Emissive support

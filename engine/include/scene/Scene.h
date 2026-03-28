@@ -41,7 +41,9 @@ namespace Scenes {
     // Stores scene data only and leaves execution logic to SceneManager
     class GRAPEENGINE_API Scene {
     public:
-        // Construct a scene and bind its layer manager to the ECS world
+        /**
+         * @brief Construct a scene and bind its layer manager to the world.
+         */
         Scene() {
             // Set LayerManager pointer on World so systems can access it
             m_world.SetLayerManager(&m_layers);
@@ -94,7 +96,12 @@ namespace Scenes {
             return e;
         }
 
-        // Create an empty entity on a specific layer and optionally attach a parent
+        /**
+         * @brief Create an empty entity on a layer and optionally attach a parent.
+         * @param layerId Target layer id.
+         * @param parent Optional parent entity.
+         * @return Newly created entity.
+         */
         ECS::Entity CreateEntityOnLayer(const uint16_t layerId, const std::optional<ECS::Entity> parent = std::nullopt);
 
         // Destroy an entity and all ECS state tied to it
@@ -133,7 +140,11 @@ namespace Scenes {
             _syncCollidersToLayer(e, id);
         }
 
-        // Set an entity layer using registry hash mapping to avoid cross-module TypeId mismatch issues
+        /**
+         * @brief Set an entity layer using component registry hash lookup.
+         * @param e Entity to move.
+         * @param id Target layer id.
+         */
         void SetLayerById(const ECS::Entity e, const uint16_t id);
 
         // Update collider masks to match the layer collision mask configured in LayerManager

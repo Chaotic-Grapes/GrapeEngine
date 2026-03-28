@@ -102,32 +102,40 @@ namespace ECS {
         void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
 
+        // Render all emitters on the requested layer using current GPU buffers.
         void DrawEmittersByLayer(uint16_t layerId, Shader& shader,
             const glm::mat4& viewProj,
             Graphics::LightManager& lights, World& world);
 
+        // Register one preset and return its index for emitter references.
         uint32_t RegisterPreset(const ParticlePreset& preset) {
             m_presets.push_back(preset);
             return (uint32_t)(m_presets.size() - 1);
         }
 
+        // Retrieve a preset by index.
         const ParticlePreset& GetPreset(uint32_t id) const {
             return m_presets[id];
         }
 
         size_t GetPresetCount() const { return m_presets.size(); }
 
+        // Upload/refresh shared tile collision grid used for particle collisions.
         void UpdateCollisionGrid(const TileMap& tileMap);
 
         const std::unordered_map<uint32_t, EmitterRenderData>& GetRenderData() const {
             return m_renderData;
         }
 
+        // Queue a burst spawn request for a specific emitter entity.
         void TriggerBurst(uint32_t entityIndex, int count);
 
     private:
+        // Allocate and initialize GPU simulation/render resources for one emitter.
         void InitEmitter(uint32_t entityIndex, int maxParticles);
+        // Destroy GPU simulation/render resources for one emitter.
         void DestroyEmitter(uint32_t entityIndex);
+        // Build quad geometry and VAO bindings for an emitter render slot.
         void CreateQuadVAO(EmitterGPUData& gpu, int slot, int maxParticles);
 
         std::vector<ParticlePreset>                         m_presets;

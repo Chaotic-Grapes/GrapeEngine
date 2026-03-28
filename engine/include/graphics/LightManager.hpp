@@ -47,7 +47,9 @@ namespace Graphics {
     // uploads buffers, and binds lighting data for shaders.
     class LightManager {
     public:
+        // Construct manager with empty CPU light state and no GPU resources.
         LightManager();
+        // Destroy manager and release owned GPU buffers.
         ~LightManager();
 
         // GPU resource lifecycle
@@ -64,6 +66,7 @@ namespace Graphics {
             const glm::vec3& color,
             float intensity);
 
+        // Remove the currently configured directional light for this frame.
         void ClearDirectionalLight();
 
         void AddPointLight(const glm::vec3& position,
@@ -81,6 +84,7 @@ namespace Graphics {
         }
 
     private:
+        // Upload packed point-light data into the point-light SSBO.
         void UpdatePointLightBuffer();
 
     private:

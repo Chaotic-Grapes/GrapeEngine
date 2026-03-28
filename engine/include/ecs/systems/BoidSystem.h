@@ -62,9 +62,11 @@ namespace ECS {
         SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
+        // Render all flock instances that belong to a specific layer.
         void DrawFlocksByLayer(uint16_t layerId, Shader& shader,
             const glm::mat4& viewProj);
 
+        // Render one flock directly by owning entity index.
         void DrawFlockForEntity(uint32_t entityIndex, Shader& shader);
 
         // ----------------------------------------------------------------
@@ -98,7 +100,7 @@ namespace ECS {
             return m_renderData;
         }
 
-        // Collision grid management
+        // Upload/refresh shared tile collision grid used by boid avoidance.
         void UpdateCollisionGrid(const TileMap& tileMap);
 
     private:
@@ -140,8 +142,11 @@ namespace ECS {
         std::unordered_map<uint32_t, FlockRenderData> m_renderData;
         CollisionGridGPU                              m_collisionGrid;
 
+        // Allocate and initialize GPU buffers/state for one flock entity.
         void InitFlock(uint32_t entityIndex, int count);
+        // Destroy all GPU resources owned by one flock entity.
         void DestroyFlock(uint32_t entityIndex);
+        // Build quad geometry and VAO bindings for one render slot.
         void CreateQuadVAO(FlockGPUData& gpu, int slot);
     };
 

@@ -47,6 +47,10 @@ namespace Engine {
     class GRAPEENGINE_API Application {
     public:
         /**
+         * @brief Get SceneManager for scene lifecycle operations.
+         * @return Reference to scene manager singleton owned by application.
+         */
+        /**
          * @brief Access the SceneManager for creating/loading/unloading scenes
          */
         Scenes::SceneManager& GetSceneManager() { return m_sceneManager; }
@@ -113,8 +117,16 @@ namespace Engine {
          */
         void Close();
 
-        // Getters for services
+        /**
+         * @brief Get mutable audio service pointer.
+         * @return Pointer to audio service, or null when unavailable.
+         */
         Services::AudioService* GetAudioService() { return m_audio; }
+
+        /**
+         * @brief Get const audio service pointer.
+         * @return Const pointer to audio service, or null when unavailable.
+         */
         const Services::AudioService* GetAudioService() const { return m_audio; }
         
         /**
@@ -245,11 +257,24 @@ namespace Engine {
         // Platform abstraction (window, rendering, input)
         Platform::IPlatformContext* m_platformContext = nullptr;
 
-		// Functions to enable/disable console output
+        /**
+         * @brief Enable console output stream for runtime logging.
+         */
         static void _enableConsole();
+
+        /**
+         * @brief Disable console output stream for runtime logging.
+         */
         static void _disableConsole();
 
+        /**
+         * @brief Create and initialize required engine services.
+         */
         void _initializeServices();
+
+        /**
+         * @brief Register core runtime systems with the system manager.
+         */
         void _registerSystems();
 
         // Services
@@ -263,7 +288,10 @@ namespace Engine {
         std::string m_currentAudioDeviceID;
         size_t m_notifiedActiveSceneIndex = static_cast<size_t>(-1);
         
-        // Helper methods for cleaner game loop logic
+        /**
+         * @brief Execute fixed-step physics update segment.
+         * @param world World instance whose physics systems are updated.
+         */
         void _updatePhysics(ECS::World& world);
     };
 
