@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
 #include "services/DeviceManager.h"
+#include "services/SaveGameManager.h"
 #include "ecs/SystemManager.h"
 #include <functional>
 
@@ -138,6 +139,16 @@ namespace Engine {
          * @brief Get access to the ScriptManager service (may be null if CLR failed to initialize)
          */
         ECS::ScriptManager* GetScriptManager() { return m_scriptManager; }
+
+        /**
+         * @brief Get access to save-game manager service.
+         */
+        Services::SaveGameManager& GetSaveGameManager() { return m_saveGameManager; }
+
+        /**
+         * @brief Get const access to save-game manager service.
+         */
+        const Services::SaveGameManager& GetSaveGameManager() const { return m_saveGameManager; }
 
         /**
          * @brief Get the platform context (window, rendering, input services)
@@ -279,6 +290,7 @@ namespace Engine {
 
         // Services
         Services::AudioService* m_audio = nullptr;
+        Services::SaveGameManager m_saveGameManager;
         ECS::ScriptManager* m_scriptManager = nullptr;
 
         double m_lastFrameTime{0};
