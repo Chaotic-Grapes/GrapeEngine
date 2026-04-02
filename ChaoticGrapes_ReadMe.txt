@@ -2,35 +2,6 @@
 
 GrapeEngine is a custom game engine developed for academic projects at DigiPen.
 
-## Getting Started
-
-### Prerequisites
-
-- **Visual Studio 2022** with "Desktop development with C++" (C++23 toolset)
-- **CMake:** Version 3.13 or later
-- **.NET SDK:** Version 9.0 or later (for C# scripting support)
-- **Git:** (for cloning the repository)
-- **Doxygen:** (optional, for documentation generation)
-
-### Cloning the Repository
-
-```bash
-git clone https://github.com/Chaotic-Grapes/GrapeEngine.git
-cd GrapeEngine
-```
-
-### Building the Engine
-
-Use the root batch files for the standard workflow:
-1. Run `clean.bat` when you need a full cleanup of generated build folders.
-2. Run `run.bat` to configure and build the editor in both Debug and Release.
-
-Notes:
-- The CMake configuration requests **C++23**.
-- `run.bat` outputs editor binaries to `build\Debug\GrapeEngine.exe` and `build\Release\GrapeEngine.exe`.
-- You can pass an optional jobs argument: `run.bat 16`.
-- For custom standalone game/export workflows, use direct CMake commands.
-
 ## Project Structure
 
 ```
