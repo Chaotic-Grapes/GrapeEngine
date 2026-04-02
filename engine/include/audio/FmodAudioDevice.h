@@ -62,7 +62,10 @@ namespace Audio {
 
     class GRAPEENGINE_API FmodAudioDevice final {
     public:
-        FmodAudioDevice() { m_busLowPassGain.fill(1.0f); } // POD-like; call Initialize() before use
+        FmodAudioDevice() {
+            m_busLowPassGain.fill(1.0f);
+            m_busLowPassResonance.fill(1.0f);
+        } // POD-like; call Initialize() before use
 
         // Lifecycle
         bool Initialize();
@@ -93,11 +96,29 @@ namespace Audio {
         void SetInstancePan(PlaybackHandle handle, float pan);
         void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
+        void SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance);
+        float GetInstance3DMinDistance(PlaybackHandle handle) const;
+        float GetInstance3DMaxDistance(PlaybackHandle handle) const;
+        void SetInstance3DSpread(PlaybackHandle handle, float spread);
+        float GetInstance3DSpread(PlaybackHandle handle) const;
+        void SetInstance3DLevel(PlaybackHandle handle, float level);
+        float GetInstance3DLevel(PlaybackHandle handle) const;
         bool IsHandlePlaying(PlaybackHandle handle) const;
+
+        // Default 3D settings applied to newly played Spatial3D instances.
+        void SetDefault3DMinMaxDistance(float minDistance, float maxDistance);
+        float GetDefault3DMinDistance() const;
+        float GetDefault3DMaxDistance() const;
+        void SetDefault3DSpread(float spread);
+        float GetDefault3DSpread() const;
+        void SetDefault3DLevel(float level);
+        float GetDefault3DLevel() const;
 
         // Bus-level controls routed through FMOD channel groups and DSPs.
         void SetBusLowPassGain(Bus bus, float gain);
         float GetBusLowPassGain(Bus bus) const;
+        void SetBusLowPassResonance(Bus bus, float resonance);
+        float GetBusLowPassResonance(Bus bus) const;
 
         // Listener and master
         void SetListener(const ListenerParams& listener);
@@ -125,6 +146,11 @@ namespace Audio {
         std::array<FMOD::ChannelGroup*, kBusCount> m_busGroups{};
         std::array<FMOD::DSP*, kBusCount> m_busLowPassDsps{};
         std::array<float, kBusCount> m_busLowPassGain{};
+        std::array<float, kBusCount> m_busLowPassResonance{};
+        float m_default3DMinDistance = 1.0f;
+        float m_default3DMaxDistance = 25.0f;
+        float m_default3DSpread = 0.0f;
+        float m_default3DLevel = 1.0f;
 
         // Maps
         std::unordered_map<uint64_t, FMOD::Channel*> m_channels;  // active channels keyed by handle id
@@ -149,6 +175,7 @@ namespace Audio {
         FMOD::ChannelGroup* _channelGroupForBus(Bus bus) const;
         void _applyBusLowPassGain(Bus bus);
         static float _clampLowPassGain(float gain);
+        static float _clampLowPassResonance(float resonance);
         static float _lowPassGainToCutoffHz(float gain);
     };
 

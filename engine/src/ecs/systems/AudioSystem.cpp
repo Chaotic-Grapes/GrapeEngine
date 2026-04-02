@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageTypes.h"
 #include "services/TimeSystem.h"
 #include <algorithm>
+#include <cmath>
 #include "ecs/StringTable.h"
 #include <filesystem>
 #include <fmod_dsp_effects.h>
@@ -127,6 +128,17 @@ namespace ECS {
             return;
         }
 
+        // Spatial audio routing mode:
+        // - false: use FMOD 3D panning/attenuation (recommended; camera is the listener).
+        // - true:  use camera-centered 2D pan + custom attenuation (legacy/arcade feel).
+        constexpr bool kUseCameraCenteredPanForSpatialSources = false;
+        constexpr float kMinCameraHalfWidth = 0.001f;
+        // Full pan is reached at this fraction of the camera half-width (smaller => stronger panning).
+        constexpr float kPanFullAtHalfWidthFraction = 0.05f;
+        // Linear distance attenuation range expressed as a multiple of camera half-width.
+        constexpr float kAttenMinDistanceHalfWidthMul = 0.10f;
+        constexpr float kAttenMaxDistanceHalfWidthMul = 2.5f;
+
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
 
@@ -144,6 +156,54 @@ namespace ECS {
 
         // Track which entities we've processed this frame
         std::unordered_set<Entity, EntityHash> processedEntities;
+
+        // Resolve active camera listener and a reasonable pan width (screen half-width in world units).
+        Audio::Vec3 activeCameraPos{};
+        float activeCameraHalfWidth = 0.0f;
+        bool foundActiveCamera = false;
+        world.Each<Components::Camera3D, Components::WorldTransform>(
+            [&](Entity, Components::Camera3D& cam, Components::WorldTransform& wt)
+            {
+                if (!cam.Active || foundActiveCamera) {
+                    return;
+                }
+                const auto& m = wt.Matrix;
+                activeCameraPos = Audio::Vec3{ m.m03, m.m13, m.m23 };
+                activeCameraHalfWidth = std::max(kMinCameraHalfWidth, cam.OrthoSize * cam.AspectRatio);
+                foundActiveCamera = true;
+            });
+
+        const float panDenom = std::max(kMinCameraHalfWidth, activeCameraHalfWidth * kPanFullAtHalfWidthFraction);
+        const float attenMinDist = std::max(0.001f, activeCameraHalfWidth * kAttenMinDistanceHalfWidthMul);
+        const float attenMaxDist = std::max(attenMinDist + 0.001f, activeCameraHalfWidth * kAttenMaxDistanceHalfWidthMul);
+
+        auto computeCameraPanAndAttenuation = [&](Entity e, float& outPan, float& outAttenuation)
+        {
+            outPan = 0.0f;
+            outAttenuation = 1.0f;
+            if (!foundActiveCamera || !world.Has<Components::WorldTransform>(e)) {
+                return;
+            }
+
+            const auto& m = world.Get<Components::WorldTransform>(e).Matrix;
+            const float dx = m.m03 - activeCameraPos.x;
+            const float dy = m.m13 - activeCameraPos.y;
+
+            // Camera-centered panning: FMOD pan uses -1 = left, +1 = right.
+            outPan = std::clamp(dx / panDenom, -1.0f, 1.0f);
+
+            const float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist <= attenMinDist) {
+                outAttenuation = 1.0f;
+                return;
+            }
+            if (dist >= attenMaxDist) {
+                outAttenuation = 0.0f;
+                return;
+            }
+            const float t = (dist - attenMinDist) / (attenMaxDist - attenMinDist);
+            outAttenuation = std::clamp(1.0f - t, 0.0f, 1.0f);
+        };
 
         // Process all entities with AudioSource
         world.Each<Components::AudioSource>(
@@ -278,24 +338,34 @@ namespace ECS {
                             ? std::max(src.FadeInDuration, m_crossfadeInRemaining)
                             : (hasSourceFadeIn ? src.FadeInDuration : m_crossfadeInRemaining))
                         : 0.0f;
-                    settings.Volume = doFadeIn ? 0.0f : src.Volume;
+                    float startPan = src.Pan;
+                    float startAttenuation = 1.0f;
+                    if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
+                        computeCameraPanAndAttenuation(e, startPan, startAttenuation);
+                    }
+                    settings.Volume = doFadeIn ? 0.0f : (src.Volume * startAttenuation);
                     settings.Pitch = src.Pitch;
                     settings.Loop = src.Loop;
-                    settings.Spatial3D = src.Spatial3D;
-                    settings.Pan = src.Pan;
+                    settings.Spatial3D = (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) ? false : src.Spatial3D;
+                    settings.Pan = startPan;
 
                     Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
                     if (handle) {
                         m_activeSounds[e] = handle;
                         const float lowPassGain = src.EnableLowPass ? src.LowPassGain : 1.0f;
                         engine->SetInstanceLowPassGain(handle, lowPassGain);
+
+                        // If this source is marked Spatial3D, pan it relative to the active camera.
+                        if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
+                            engine->SetInstancePan(handle, startPan);
+                        }
                         if (src.PlayOnStart && !src.Loop) {
                             m_playOnStartPlayedCue[e] = src.CueId;
                         }
 
                         // Apply optional fade-in after the channel starts.
                         if (doFadeIn && fadeInDuration > 0.0f) {
-							_fadeInHandle(handle, fadeInDuration, src.Volume);
+							_fadeInHandle(handle, fadeInDuration, src.Volume * startAttenuation);
                             LOG_DEBUG("AudioSystem: Fade-in started (duration=" << fadeInDuration << "s)");
                         }
                         LOG_DEBUG("AudioSystem: Playback started (handle ID=" << handle.Id << ")");
@@ -319,11 +389,23 @@ namespace ECS {
                     // Only set volume directly if NOT currently fading
                     // Fading entities have their volume managed by the AudioEngine
                     if (!IsEntityFading(e)) {
-                        engine->SetInstanceVolume(handle, src.Volume);
+                        float pan = src.Pan;
+                        float attenuation = 1.0f;
+                        if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
+                            computeCameraPanAndAttenuation(e, pan, attenuation);
+                        }
+                        engine->SetInstanceVolume(handle, src.Volume * attenuation);
                     }
 
                     engine->SetInstancePitch(handle, src.Pitch);
-                    if (!src.Spatial3D) {
+                    if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
+                        // Camera-centered pan: left/right based on X offset from camera position.
+                        float pan = src.Pan;
+                        float attenuation = 1.0f;
+                        computeCameraPanAndAttenuation(e, pan, attenuation);
+                        engine->SetInstancePan(handle, pan);
+                    }
+                    else if (!src.Spatial3D) {
                         engine->SetInstancePan(handle, src.Pan);
                     }
 
@@ -331,7 +413,7 @@ namespace ECS {
                     engine->SetInstanceLowPassGain(handle, lowPassGain);
 
                     // Update 3D position if spatial audio is enabled
-                    if (src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
+                    if (!kUseCameraCenteredPanForSpatialSources && src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
                         auto& transform = world.Get<Components::WorldTransform>(e);
                         // Extract translation from Matrix4x4: translation is stored in the
                         // last column (m03, m13, m23) per Matrix4x4::Translation implementation.
@@ -342,6 +424,35 @@ namespace ECS {
                     }
                 }
             });
+
+        // Drive the listener from the active camera so any true 3D sounds remain camera-relative.
+        // (Scripts may also call Audio.SetListener; AudioSystem runs in PostUpdate so this wins.)
+        if (foundActiveCamera) {
+            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            static Audio::Vec3 s_prevListenerPos{};
+            static bool s_hasPrevListenerPos = false;
+
+            Audio::Vec3 listenerVel{};
+            if (s_hasPrevListenerPos && dt > 0.0f) {
+                listenerVel = Audio::Vec3{
+                    (activeCameraPos.x - s_prevListenerPos.x) / dt,
+                    (activeCameraPos.y - s_prevListenerPos.y) / dt,
+                    (activeCameraPos.z - s_prevListenerPos.z) / dt
+                };
+            }
+
+            s_prevListenerPos = activeCameraPos;
+            s_hasPrevListenerPos = true;
+
+            // For 2D camera-centered panning, keep listener orientation fixed.
+            // These are in engine space; the device converts to FMOD space internally.
+            Audio::ListenerParams listener{};
+            listener.Position = activeCameraPos;
+            listener.Velocity = listenerVel;
+            listener.Forward = Audio::Vec3{ 0.0f, 1.0f, 0.0f };
+            listener.Up = Audio::Vec3{ 0.0f, 0.0f, 1.0f };
+            engine->SetListener(listener);
+        }
 
         // collect stale handles for entities without audio source
         std::vector<Entity> toRemove;
