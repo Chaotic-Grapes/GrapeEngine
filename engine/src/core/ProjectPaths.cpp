@@ -47,6 +47,7 @@ namespace Engine {
         EnsureDirectoryExists(GetAssetsPath());
         EnsureDirectoryExists(GetScenesPath());
         EnsureDirectoryExists(GetLogsPath());
+        EnsureDirectoryExists(GetSavesPath());
 
         const std::filesystem::path logsPath = GetLogsPath();
         if (!logsPath.empty()) {
@@ -151,6 +152,12 @@ namespace Engine {
         std::filesystem::path logsPath = std::filesystem::path(GetProjectDocumentsRoot()) / "logs";
         EnsureDirectoryExists(logsPath.string());
         return logsPath.string();
+    }
+
+    std::string ProjectPaths::GetSavesPath() {
+        std::filesystem::path savesPath = std::filesystem::path(GetProjectDocumentsRoot()) / "saves";
+        EnsureDirectoryExists(savesPath.string());
+        return savesPath.string();
     }
     
     std::string ProjectPaths::GetCompiledScriptAssemblyPath() {

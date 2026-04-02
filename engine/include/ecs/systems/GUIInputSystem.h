@@ -12,7 +12,9 @@ Provides methods for system lifecycle management and metadata retrieval.
 
 #pragma once
 
+#include <cstdint>
 #include "ecs/ISystem.h"
+#include "math/Vector2D.h"
 
 namespace ECS {
     // Handles input processing for GUI components.
@@ -33,12 +35,33 @@ namespace ECS {
         SystemRunMode GetRunMode() const override { return SystemRunMode::Always; }
 
     private:
+        enum class InputMode : uint8_t {
+            Pointer = 0,
+            Gamepad = 1
+        };
+
         // Reset transient input/capture state for this system instance.
         void ResetState();
 
         Entity m_captureEntity = NULL_ENTITY;
         Entity m_activeSlider = NULL_ENTITY;
+        Entity m_focusedEntity = NULL_ENTITY;
         float m_sliderLastAxisCoord = 0.0f;
         bool m_sliderAxisValid = false;
+        int m_activeGamepad = -1;
+        InputMode m_inputMode = InputMode::Pointer;
+
+        float m_navInitialRepeatDelay = 0.18f;
+        float m_navRepeatInterval = 0.08f;
+        float m_navRepeatTimer = 0.0f;
+        int m_navHeldDirection = -1;
+
+        float m_sliderInitialRepeatDelay = 0.16f;
+        float m_sliderRepeatInterval = 0.06f;
+        float m_sliderRepeatTimer = 0.0f;
+        int m_sliderHeldDirection = 0;
+
+        Vector2D m_lastMousePosition{ 0.0f, 0.0f };
+        bool m_hasLastMousePosition = false;
     };
 }

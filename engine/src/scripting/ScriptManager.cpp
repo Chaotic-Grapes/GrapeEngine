@@ -858,6 +858,7 @@ namespace ECS {
         success &= loadMethod("CreateSystemInstance",             scriptHostTypeName, reinterpret_cast<void**>(&m_createSystemWrapper));
         success &= loadMethod("DestroySystemInstance",            scriptHostTypeName, reinterpret_cast<void**>(&m_destroySystemWrapper));
         success &= loadMethod("GetSystemMetadata",                scriptHostTypeName, reinterpret_cast<void**>(&m_getSystemMetadata));
+        success &= loadMethod("GetSystemRuntimeFlags",            scriptHostTypeName, reinterpret_cast<void**>(&m_getSystemRuntimeFlags));
         success &= loadMethod("GetSystemComponentAccesses",       scriptHostTypeName, reinterpret_cast<void**>(&m_getSystemComponentAccesses));
         success &= loadMethod("HashComponentTypeName",            scriptHostTypeName, reinterpret_cast<void**>(&m_hashComponentTypeName));
         success &= loadMethod("ResolveSystemGroup",               scriptHostTypeName, reinterpret_cast<void**>(&m_resolveSystemGroup));
@@ -1076,6 +1077,17 @@ namespace ECS {
     }
 
     /**
+     * @brief Indicates whether this scripted system needs per-frame ShouldRun checks.
+     * @return True when managed ShouldRun/RequireForUpdate logic is dynamic.
+     */
+    bool ScriptSystemWrapper::RequiresShouldRunCheck() const {
+        if (!m_metadata) {
+            CacheMetadata();
+        }
+        return m_requiresShouldRunCheck;
+    }
+
+    /**
      * @brief Forwards start-running transition to the managed system.
      * @param world Reference to the active world.
      */
@@ -1143,6 +1155,7 @@ namespace ECS {
         SystemGroup group = SystemGroup::Update;
         SystemRunMode runMode = SystemRunMode::PlayOnly;
         int executionOrder = 0;
+        m_requiresShouldRunCheck = true;
 
         if (m_scriptManager) {
             auto getMetadata = m_scriptManager->GetGetSystemMetadata();
@@ -1159,6 +1172,16 @@ namespace ECS {
                 }
                 group = static_cast<SystemGroup>(groupInt);
                 runMode = static_cast<SystemRunMode>(runModeInt);
+            }
+
+            auto getRuntimeFlags = m_scriptManager->GetGetSystemRuntimeFlags();
+            if (getRuntimeFlags) {
+                const int flags = getRuntimeFlags(m_managedHandle);
+                constexpr int kHasRequireForUpdate = 1 << 0;
+                constexpr int kHasCustomShouldRun = 1 << 1;
+                const bool needsRequireForUpdate = (flags & kHasRequireForUpdate) != 0;
+                const bool hasCustomShouldRun = (flags & kHasCustomShouldRun) != 0;
+                m_requiresShouldRunCheck = needsRequireForUpdate || hasCustomShouldRun;
             }
         }
 

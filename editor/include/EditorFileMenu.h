@@ -181,7 +181,9 @@ private:
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
 
-    // Trigger a full project export, launching the export thread
+    // Trigger a full project export, launching the export thread.
+    // The pipeline configures CMake with export flags (e.g. EXPORT_GAME) so
+    // shipping-only compile definitions are applied for the packaged runtime.
     void _exportProject(const std::string& destinationOverride = {},
         const std::unordered_set<std::string>& selectedAssets = {});
 

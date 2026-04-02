@@ -32,6 +32,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_set>
 #include <string>
 
+#ifndef GRAPE_ENABLE_PROFILING
+#define GRAPE_ENABLE_PROFILING 1
+#endif
+
 namespace ECS {
 
     // Forward declaration to avoid circular dependency
@@ -128,6 +132,9 @@ namespace ECS {
             // Track by name
             m_systemsByName[metadata.GetName()] = ptr;
 
+            // Cache resolved run mode to avoid per-frame RTTI/dynamic_cast work.
+            m_systemRunModeCache[ptr] = GetSystemMetadataRunMode(ptr);
+
             // Sort systems by execution order within group
             _sortSystemGroup(group);
 
@@ -158,6 +165,7 @@ namespace ECS {
 
             m_scriptedSystemGroups[group].push_back(system);
             m_systemsByName[systemName] = system;
+            m_systemRunModeCache[system] = GetSystemMetadataRunMode(system);
             
             // Cache system name to avoid expensive P/Invoke calls during updates
             m_systemNameCache[system] = systemName;
@@ -165,7 +173,7 @@ namespace ECS {
             _sortSystemGroup(group);
             
             // If world is provided and run mode is active, initialize immediately
-            if (world && IsRunModeActive(GetSystemMetadataRunMode(system))) {
+            if (world && IsRunModeActive(_getCachedRunMode(system))) {
                 system->OnCreate(*world);
                 m_createdSystems.insert(system);
             }
@@ -412,6 +420,19 @@ namespace ECS {
         }
 
         /**
+         * @brief Update systems for all active run modes in one traversal.
+         * @param modeMask Bitmask of active run modes.
+         * @param world Active scene world.
+         * @note This avoids traversing all systems once per mode when multiple
+         *       modes are active in the same frame (for example Always + PlayOnly).
+         * @complexity O(g + n), where g is group count and n is total systems.
+         */
+        void UpdateSystemsByMask(uint32_t modeMask, World& world) {
+            _applyPendingEnabledChanges();
+            _updateAllGroupsForMask(modeMask, world);
+        }
+
+        /**
          * @brief Get count of registered systems.
          * @return Total number of systems (native + scripted)
          */
@@ -481,7 +502,7 @@ namespace ECS {
                 for (auto& system : systems) {
                     if (!IsSystemCreated(system.get()))
                         continue;
-                    auto runMode = GetSystemMetadataRunMode(system.get());
+                    auto runMode = _getCachedRunMode(system.get());
                     if (runMode == SystemRunMode::EditOnly)
                         continue;
                     system->OnSceneStart();
@@ -493,7 +514,7 @@ namespace ECS {
                 for (auto* system : systems) {
                     if (!IsSystemCreated(system))
                         continue;
-                    auto runMode = GetSystemMetadataRunMode(system);
+                    auto runMode = _getCachedRunMode(system);
                     if (runMode == SystemRunMode::EditOnly)
                         continue;
                     system->OnSceneStart();
@@ -514,7 +535,7 @@ namespace ECS {
                 for (auto& system : systems) {
                     if (!IsSystemCreated(system.get()))
                         continue;
-                    auto runMode = GetSystemMetadataRunMode(system.get());
+                    auto runMode = _getCachedRunMode(system.get());
                     if (runMode == SystemRunMode::EditOnly)
                         continue;
                     system->OnSceneStop();
@@ -526,7 +547,7 @@ namespace ECS {
                 for (auto* system : systems) {
                     if (!IsSystemCreated(system))
                         continue;
-                    auto runMode = GetSystemMetadataRunMode(system);
+                    auto runMode = _getCachedRunMode(system);
                     if (runMode == SystemRunMode::EditOnly)
                         continue;
                     system->OnSceneStop();
@@ -711,6 +732,31 @@ namespace ECS {
         }
 
     private:
+        /**
+         * @brief Begin an ECS profiler scope when compile-time profiling is enabled.
+         * @param scopeName Scope name string literal or stable c-string.
+         * @note Compiles to a no-op for export builds where profiling is stripped.
+         * @complexity O(1).
+         */
+        static void _profileBegin(const char* scopeName) {
+    #if GRAPE_ENABLE_PROFILING
+            TimeSystem::Instance().ProfileBegin(scopeName);
+    #else
+            (void)scopeName;
+    #endif
+        }
+
+        /**
+         * @brief End an ECS profiler scope when compile-time profiling is enabled.
+         * @note Compiles to a no-op for export builds where profiling is stripped.
+         * @complexity O(1).
+         */
+        static void _profileEnd() {
+    #if GRAPE_ENABLE_PROFILING
+            TimeSystem::Instance().ProfileEnd();
+    #endif
+        }
+
         // Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
 
@@ -723,6 +769,9 @@ namespace ECS {
         // Cached system names to avoid expensive P/Invoke metadata calls during updates
         // Maps from ISystem* to its cached name string
         std::unordered_map<ISystem*, std::string> m_systemNameCache;
+
+        // Cached run mode for each system to avoid per-frame metadata RTTI lookups.
+        std::unordered_map<ISystem*, SystemRunMode> m_systemRunModeCache;
 
         // Dependency graphs for each system group (for parallel execution analysis)
         std::unordered_map<SystemGroup, SystemDependencyGraph> m_dependencyGraphs;
@@ -778,7 +827,11 @@ namespace ECS {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
+#if GRAPE_ENABLE_PROFILING
                     _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
                 }
             }
 
@@ -786,11 +839,15 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
+#if GRAPE_ENABLE_PROFILING
                     // Use cached name to avoid expensive P/Invoke metadata lookups.
                     auto it = m_systemNameCache.find(system);
                     const char* systemName = (it != m_systemNameCache.end()) ?
                         it->second.c_str() : "Unknown";
                     _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
                 }
             }
         }
@@ -815,8 +872,125 @@ namespace ECS {
             };
 
             for (SystemGroup group : orderedGroups) {
+                // Profile each run-mode/group bucket separately so editor tooling can
+                // pinpoint hot phases inside UpdateSystemsByMode without API changes.
+                const char* scopeName = _getModeGroupProfileScopeName(mode, group);
+                _profileBegin(scopeName);
                 _updateGroupForMode(group, mode, world);
+                _profileEnd();
             }
+        }
+
+        /**
+         * @brief Update all groups for a run-mode bitmask in a single pass.
+         * @param modeMask Active run mode bitmask.
+         * @param world Active world for updates.
+         * @complexity O(g + n), where g is group count and n is total systems.
+         */
+        void _updateAllGroupsForMask(uint32_t modeMask, World& world) {
+            const SystemGroup orderedGroups[] = {
+                SystemGroup::PreUpdate,
+                SystemGroup::Update,
+                SystemGroup::PostUpdate,
+                SystemGroup::PrePhysics,
+                SystemGroup::Physics,
+                SystemGroup::PostPhysics,
+                SystemGroup::PreRender,
+                SystemGroup::Render,
+                SystemGroup::PostRender
+            };
+
+            for (SystemGroup group : orderedGroups) {
+                _profileBegin(_getMaskGroupProfileScopeName(group));
+                _updateGroupForMask(group, modeMask, world);
+                _profileEnd();
+            }
+        }
+
+        /**
+         * @brief Resolve profiler scope name for mask-based group updates.
+         * @param group System group currently being updated.
+         * @return Stable string literal scope name.
+         * @complexity O(1).
+         */
+        static const char* _getMaskGroupProfileScopeName(SystemGroup group) {
+            switch (group) {
+            case SystemGroup::PreUpdate:  return "ECS.Mask.PreUpdate";
+            case SystemGroup::Update:     return "ECS.Mask.Update";
+            case SystemGroup::PostUpdate: return "ECS.Mask.PostUpdate";
+            case SystemGroup::PrePhysics: return "ECS.Mask.PrePhysics";
+            case SystemGroup::Physics:    return "ECS.Mask.Physics";
+            case SystemGroup::PostPhysics:return "ECS.Mask.PostPhysics";
+            case SystemGroup::PreRender:  return "ECS.Mask.PreRender";
+            case SystemGroup::Render:     return "ECS.Mask.Render";
+            case SystemGroup::PostRender: return "ECS.Mask.PostRender";
+            }
+            return "ECS.Mask.UnknownGroup";
+        }
+
+        /**
+         * @brief Check whether a run mode is enabled in a bitmask.
+         * @param mode Run mode to test.
+         * @param modeMask Active mode mask.
+         * @return True when the mode bit is set.
+         * @complexity O(1).
+         */
+        static bool _isModeEnabledInMask(SystemRunMode mode, uint32_t modeMask) {
+            const uint32_t bit = 1u << static_cast<uint32_t>(mode);
+            return (modeMask & bit) != 0u;
+        }
+
+        /**
+         * @brief Resolve a stable profiler scope name for a mode/group execution bucket.
+         * @param mode Active run mode being executed.
+         * @param group System group currently being processed.
+         * @return Interned string literal suitable for per-frame profiling.
+         * @complexity O(1).
+         */
+        static const char* _getModeGroupProfileScopeName(SystemRunMode mode, SystemGroup group) {
+            switch (mode) {
+            case SystemRunMode::Always:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.Always.PreUpdate";
+                case SystemGroup::Update:     return "ECS.Always.Update";
+                case SystemGroup::PostUpdate: return "ECS.Always.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.Always.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.Always.Physics";
+                case SystemGroup::PostPhysics:return "ECS.Always.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.Always.PreRender";
+                case SystemGroup::Render:     return "ECS.Always.Render";
+                case SystemGroup::PostRender: return "ECS.Always.PostRender";
+                }
+                break;
+            case SystemRunMode::PlayOnly:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.PlayOnly.PreUpdate";
+                case SystemGroup::Update:     return "ECS.PlayOnly.Update";
+                case SystemGroup::PostUpdate: return "ECS.PlayOnly.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.PlayOnly.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.PlayOnly.Physics";
+                case SystemGroup::PostPhysics:return "ECS.PlayOnly.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.PlayOnly.PreRender";
+                case SystemGroup::Render:     return "ECS.PlayOnly.Render";
+                case SystemGroup::PostRender: return "ECS.PlayOnly.PostRender";
+                }
+                break;
+            case SystemRunMode::EditOnly:
+                switch (group) {
+                case SystemGroup::PreUpdate:  return "ECS.EditOnly.PreUpdate";
+                case SystemGroup::Update:     return "ECS.EditOnly.Update";
+                case SystemGroup::PostUpdate: return "ECS.EditOnly.PostUpdate";
+                case SystemGroup::PrePhysics: return "ECS.EditOnly.PrePhysics";
+                case SystemGroup::Physics:    return "ECS.EditOnly.Physics";
+                case SystemGroup::PostPhysics:return "ECS.EditOnly.PostPhysics";
+                case SystemGroup::PreRender:  return "ECS.EditOnly.PreRender";
+                case SystemGroup::Render:     return "ECS.EditOnly.Render";
+                case SystemGroup::PostRender: return "ECS.EditOnly.PostRender";
+                }
+                break;
+            }
+
+            return "ECS.UnknownGroup";
         }
 
         bool IsRunModeActive(SystemRunMode mode) const {
@@ -830,6 +1004,20 @@ namespace ECS {
 
         bool IsSystemRunning(const ISystem* system) const {
             return system && (m_runningSystems.find(const_cast<ISystem*>(system)) != m_runningSystems.end());
+        }
+
+        /**
+         * @brief Resolve a system's run mode from cache with safe fallback.
+         * @param system System pointer.
+         * @return Cached run mode, or metadata-resolved mode when cache is missing.
+         * @complexity Average O(1).
+         */
+        SystemRunMode _getCachedRunMode(ISystem* system) const {
+            auto it = m_systemRunModeCache.find(system);
+            if (it != m_systemRunModeCache.end()) {
+                return it->second;
+            }
+            return GetSystemMetadataRunMode(system);
         }
 
         void _stopIfRunning(ISystem* system, World& world) {
@@ -857,6 +1045,15 @@ namespace ECS {
             m_pendingEnabledByName.clear();
         }
 
+        /**
+         * @brief Update one system while honoring creation, run-state transitions, and eligibility.
+         * @param system System instance to evaluate and potentially update.
+         * @param world Active world passed into lifecycle/update callbacks.
+         * @param profileName Profiling scope name used for update timing.
+         * @param runModeEligible True when caller has already validated run-mode eligibility.
+         * @note Start/stop transitions are emitted exactly once per state edge.
+         * @complexity O(1) excluding the system's own callback work.
+         */
         void _updateSystemWithRunState(ISystem* system, World& world, const char* profileName, bool runModeEligible) {
             if (!system) {
                 return;
@@ -870,7 +1067,7 @@ namespace ECS {
             const bool isRunning = IsSystemRunning(system);
             const bool shouldRunNow = system->IsEnabled() &&
                 runModeEligible &&
-                system->ShouldRun(world);
+                (!system->RequiresShouldRunCheck() || system->ShouldRun(world));
 
             // Handle state transitions for starting/stopping systems
             if (!isRunning && shouldRunNow) {
@@ -884,9 +1081,9 @@ namespace ECS {
                 return;
             }
 
-            TimeSystem::Instance().ProfileBegin(profileName);
+            _profileBegin(profileName);
             system->OnUpdate(world);
-            TimeSystem::Instance().ProfileEnd();
+            _profileEnd();
         }
 
         void _createAllGroupsForMode(SystemRunMode mode, World& world) {
@@ -925,11 +1122,18 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Create systems in a group that match the requested run mode.
+         * @param group System group bucket.
+         * @param mode Run mode to create.
+         * @param world Active world passed to OnCreate.
+         * @complexity O(n) for systems in the group.
+         */
         void _createGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    if (GetSystemMetadataRunMode(system.get()) != mode)
+                    if (_getCachedRunMode(system.get()) != mode)
                         continue;
                     if (IsSystemCreated(system.get()))
                         continue;
@@ -941,7 +1145,7 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    if (GetSystemMetadataRunMode(system) != mode)
+                    if (_getCachedRunMode(system) != mode)
                         continue;
                     if (IsSystemCreated(system))
                         continue;
@@ -951,11 +1155,18 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Destroy systems in a group that match the requested run mode.
+         * @param group System group bucket.
+         * @param mode Run mode to destroy.
+         * @param world Active world passed to OnDestroy.
+         * @complexity O(n) for systems in the group.
+         */
         void _destroyGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    if (GetSystemMetadataRunMode(system.get()) != mode)
+                    if (_getCachedRunMode(system.get()) != mode)
                         continue;
                     if (!IsSystemCreated(system.get()))
                         continue;
@@ -968,7 +1179,7 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
-                    if (GetSystemMetadataRunMode(system) != mode)
+                    if (_getCachedRunMode(system) != mode)
                         continue;
                     if (!IsSystemCreated(system))
                         continue;
@@ -979,13 +1190,28 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Update systems in a group for a single run mode.
+         * @param group System group bucket.
+         * @param mode Run mode filter.
+         * @param world Active world for update.
+         * @note Systems with non-matching run mode are skipped early to avoid
+         *       run-state checks and per-system overhead.
+         * @complexity O(n) for systems in the group.
+         */
         void _updateGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
             // Update owned systems
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
-                    const bool eligible = (GetSystemMetadataRunMode(system.get()) == mode);
-                    _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), eligible);
+                    if (_getCachedRunMode(system.get()) != mode) {
+                        continue;
+                    }
+#if GRAPE_ENABLE_PROFILING
+                    _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
                 }
             }
 
@@ -993,11 +1219,57 @@ namespace ECS {
             auto itScripted = m_scriptedSystemGroups.find(group);
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
+                    if (_getCachedRunMode(system) != mode) {
+                        continue;
+                    }
+#if GRAPE_ENABLE_PROFILING
                     auto it = m_systemNameCache.find(system);
                     const char* systemName = (it != m_systemNameCache.end()) ?
                         it->second.c_str() : "Unknown";
-                    const bool eligible = (GetSystemMetadataRunMode(system) == mode);
-                    _updateSystemWithRunState(system, world, systemName, eligible);
+                    _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
+                }
+            }
+        }
+
+        /**
+         * @brief Update systems in a group using a run-mode bitmask.
+         * @param group System group bucket.
+         * @param modeMask Active run-mode bitmask.
+         * @param world Active world for update.
+         * @complexity O(n) for systems in the group.
+         */
+        void _updateGroupForMask(SystemGroup group, uint32_t modeMask, World& world) {
+            auto itOwned = m_systemGroups.find(group);
+            if (itOwned != m_systemGroups.end()) {
+                for (auto& system : itOwned->second) {
+                    if (!_isModeEnabledInMask(_getCachedRunMode(system.get()), modeMask)) {
+                        continue;
+                    }
+#if GRAPE_ENABLE_PROFILING
+                    _updateSystemWithRunState(system.get(), world, system->GetMetadata().GetName().c_str(), true);
+#else
+                    _updateSystemWithRunState(system.get(), world, nullptr, true);
+#endif
+                }
+            }
+
+            auto itScripted = m_scriptedSystemGroups.find(group);
+            if (itScripted != m_scriptedSystemGroups.end()) {
+                for (auto* system : itScripted->second) {
+                    if (!_isModeEnabledInMask(_getCachedRunMode(system), modeMask)) {
+                        continue;
+                    }
+#if GRAPE_ENABLE_PROFILING
+                    auto itName = m_systemNameCache.find(system);
+                    const char* systemName = (itName != m_systemNameCache.end()) ?
+                        itName->second.c_str() : "Unknown";
+                    _updateSystemWithRunState(system, world, systemName, true);
+#else
+                    _updateSystemWithRunState(system, world, nullptr, true);
+#endif
                 }
             }
         }
@@ -1019,11 +1291,15 @@ namespace ECS {
                 if (!system) {
                     return;
                 }
+#if GRAPE_ENABLE_PROFILING
                 // Use cached name to avoid expensive P/Invoke metadata lookups.
                 auto sysIt = m_systemNameCache.find(system);
                 const char* systemName = (sysIt != m_systemNameCache.end()) ?
                     sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
-                const bool eligible = IsRunModeActive(GetSystemMetadataRunMode(system));
+#else
+                const char* systemName = nullptr;
+#endif
+                const bool eligible = IsRunModeActive(_getCachedRunMode(system));
                 _updateSystemWithRunState(system, world, systemName, eligible);
             };
 
@@ -1050,7 +1326,7 @@ namespace ECS {
             const auto& graph = it->second;
 
             // Get execution levels (all systems per level can run in parallel)
-            auto levels = graph.GetExecutionLevels();
+            const auto& levels = graph.GetExecutionLevels();
 
             for (const auto& level : levels) {
                 // Execute all systems in this level sequentially

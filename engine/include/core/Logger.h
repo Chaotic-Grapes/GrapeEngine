@@ -84,7 +84,14 @@ enum class LogLevel {
 
 class GRAPEENGINE_API Logger {
 public:
+	/**
+	 * @brief Construct logger and initialize output streams.
+	 */
 	Logger();
+
+	/**
+	 * @brief Flush and close logger resources.
+	 */
 	~Logger();
 
 	/**
@@ -124,32 +131,102 @@ public:
 	 * @param enable True to enable console logging, false to disable
 	 */
 	void SetLogConsole(bool enable);
+
+	/**
+	 * @brief Enable or disable DEBUG-level emission.
+	 * @param enable True to include debug logs.
+	 */
 	void EnableDebug(bool enable) { m_debugEnabled = enable; }
 
 	// Console callback for editor integration
 	using ConsoleCallback = std::function<void(LogLevel, LogSource, const std::string&, const std::string&)>;
+
+	/**
+	 * @brief Register callback to mirror logs to editor console UI.
+	 * @param callback Callback receiving level, source, message, and timestamp.
+	 */
 	void SetConsoleCallback(ConsoleCallback callback) { m_consoleCallback = callback; }
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
+	/**
+	 * @brief Write TRACE message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logTrace(const std::string& message);
+	/**
+	 * @brief Write INFO message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logInfo(const std::string& message);
+	/**
+	 * @brief Write DEBUG message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logDebug(const std::string& message);
+	/**
+	 * @brief Write WARNING message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logWarning(const std::string& message);
+	/**
+	 * @brief Write ERROR message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logError(const std::string& message);
+	/**
+	 * @brief Write CRITICAL message to active sinks.
+	 * @param message Text payload to write.
+	 */
 	void _logCritical(const std::string& message);
 
+	/**
+	 * @brief Write TRACE stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logTrace(const std::stringstream& oss);
+	/**
+	 * @brief Write INFO stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logInfo(const std::stringstream& oss);
+	/**
+	 * @brief Write DEBUG stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logDebug(const std::stringstream& oss);
+	/**
+	 * @brief Write WARNING stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logWarning(const std::stringstream& oss);
+	/**
+	 * @brief Write ERROR stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logError(const std::stringstream& oss);
+	/**
+	 * @brief Write CRITICAL stream payload to active sinks.
+	 * @param oss Stream containing formatted message text.
+	 */
 	void _logCritical(const std::stringstream& oss);
 
 	// Private helper functions for console color
+	/**
+	 * @brief Set console color matching a log level.
+	 * @param level Log level controlling color mapping.
+	 */
 	void _setConsoleColor(LogLevel level);
+	/**
+	 * @brief Restore default console color after logging.
+	 */
 	void _resetConsoleColor();
 
+	/**
+	 * @brief Build timestamp string for log formatting.
+	 * @param format strftime-compatible format pattern.
+	 * @return Formatted timestamp string.
+	 */
 	std::string _getCurrentTimestamp(const std::string& format = "%Y-%m-%d %H:%M:%S"); // Add timestamp to log entries
 
 	std::string m_infoFile;  // Set via ProjectPaths::Initialize

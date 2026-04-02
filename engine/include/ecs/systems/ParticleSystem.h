@@ -1,149 +1,163 @@
-/* Start Header *****************************************************************/
-/*!
-\file     ParticleSystem.h
-\author   Choi Meng Yew (100%)
-\date     28th February 2026
-\brief
-ECS system header for GPU-accelerated particles. Mirrors BoidSystem's
-CUDA-GL interop pattern. Includes a preset registry so emitter components
-stay lightweight.
+    /* Start Header *****************************************************************/
+    /*!
+    \file     ParticleSystem.h
+    \author   Choi Meng Yew (100%)
+    \date     28th February 2026
+    \brief
+    ECS system header for GPU-accelerated particles.
 
-Architecture:
-  - Simulation runs on 3 CUDA-only SoA buffers (d_posVel, d_lifeColor, d_sizeRot)
-  - After simulation, Interleave() packs the SoA data into the mapped GL VBO
-  - The VBO is interleaved: [posVel0][lifeColor0][sizeRot0][posVel1]...
-  - The VAO reads the interleaved data via instanced attributes
+    Architecture:
+      - Simulation runs on 3 CUDA-only SoA buffers (d_posVel, d_lifeColor, d_sizeRot)
+      - After simulation, Interleave() packs the SoA data into the mapped GL VBO
+      - Double-buffered VBOs: CUDA writes buffer[writeIdx], GL renders buffer[readIdx]
 
-Copyright (C) 2025 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without the
-prior written consent of DigiPen Institute of Technology is prohibited.
-*/
-/* End Header *******************************************************************/
+    Optimizations:
+      - Double-buffered VBOs (no GL/CUDA contention, eliminates unmap stalls)
+      - Single shared CUDA stream
+      - Single cudaGraphicsMapResources/UnmapResources call per frame
+      - Deferred totalAlive readback
+      - Fused update+markAlive kernel
+      - Early-out for idle emitters
 
-#pragma once
+    Copyright (C) 2025 DigiPen Institute of Technology.
+    Reproduction or disclosure of this file or its contents without the
+    prior written consent of DigiPen Institute of Technology is prohibited.
+    */
+    /* End Header *******************************************************************/
 
-#include "ecs/SystemManager.h"
-#include "graphics/ParticlePreset.hpp"
-#include "graphics/LightManager.hpp"
-#include <unordered_map>
-#include <vector>
-#include <cstdint>
-#include <glad/glad.h>
+    #pragma once
 
-#ifdef GRAPE_HAS_CUDA
-#include <cuda_runtime.h>
-struct cudaGraphicsResource;
-#endif
+    #include "ecs/SystemManager.h"
+    #include "graphics/ParticlePreset.hpp"
+    #include "graphics/LightManager.hpp"
+    #include <unordered_map>
+    #include <vector>
+    #include <cstdint>
+    #include <glad/glad.h>
 
-class TileMap;
+    #ifdef GRAPE_HAS_CUDA
+    #include <cuda_runtime.h>
+    struct cudaGraphicsResource;
+    #endif
 
-namespace Graphics {
-    class LightManager;
-}
+    class TileMap;
 
-namespace ECS {
+    namespace Graphics {
+        class LightManager;
+    }
 
-    // GPU data per emitter entity
-    struct EmitterGPUData {
-        // --- OpenGL (render only) ---
-        GLuint vao = 0;
-        GLuint quadVBO = 0;
-        GLuint instanceVBO = 0;        // interleaved output for rendering
+    namespace ECS {
 
-        // --- Simulation state ---
-        int maxParticles = 0;
-        int aliveCount = 0;
-        float emitAccum = 0.0f;
+        struct EmitterGPUData {
+            // --- OpenGL (double buffered) ---
+            GLuint vao[2] = { 0, 0 };
+            GLuint quadVBO = 0;
+            GLuint instanceVBO[2] = { 0, 0 };
 
-        bool initialized = false;
+            uint8_t bufferIndex = 0;             // CUDA writes to this index
+            uint8_t mappedWriteIdx = 0;          // which index was actually mapped
 
-#ifdef GRAPE_HAS_CUDA
-        cudaGraphicsResource* cudaVBO = nullptr;  // CUDA mapping of instanceVBO
+            // --- Simulation state ---
+            int maxParticles = 0;
+            int aliveCount = 0;
+            float emitAccum = 0.0f;
 
-        // CUDA-only work buffers (simulation runs here)
-        float4* d_posVel = nullptr;
-        float4* d_lifeColor = nullptr;
-        float4* d_sizeRot = nullptr;
+            bool initialized = false;
 
-        // ------------------------------------------------------------
-        // Persistent scratch (used by Compact every frame; no cudaMalloc)
-        // ------------------------------------------------------------
-        int* d_aliveFlags = nullptr;   // 0/1 flags (size = maxParticles)
-        int* d_offsets = nullptr;   // exclusive scan output (size = maxParticles)
-        int* d_totalAlive = nullptr;   // single int on device
+    #ifdef GRAPE_HAS_CUDA
+            cudaGraphicsResource* cudaVBO[2] = { nullptr, nullptr };
+            float4* d_mappedVBO = nullptr;       // mapped write buffer ptr
 
-        float4* d_tempPV = nullptr;       // compacted temp storage (size = maxParticles)
-        float4* d_tempLC = nullptr;
-        float4* d_tempSR = nullptr;
+            float4* d_posVel = nullptr;
+            float4* d_lifeColor = nullptr;
+            float4* d_sizeRot = nullptr;
 
-        // CUB scan temp storage
-        void* d_scanTemp = nullptr;
-        size_t  scanTempBytes = 0;
-#endif
-    };
+            int* d_aliveFlags = nullptr;
+            int* d_offsets = nullptr;
+            int* d_totalAlive = nullptr;
+            int* h_totalAlive = nullptr;
 
-    // Render data passed to RendererSystem
-    struct EmitterRenderData {
-        GLuint vao = 0;
-        int    aliveCount = 0;
-        uint32_t textureId = 0;
-        float  particleSize = 8.0f;
-        uint16_t layerId = 0;
-    };
+            float4* d_tempPV = nullptr;
+            float4* d_tempLC = nullptr;
+            float4* d_tempSR = nullptr;
 
-    class ParticleSystem : public ISystem {
-    public:
-        SystemMetadata GetMetadata() const override;
+            void* d_scanTemp = nullptr;
+            size_t  scanTempBytes = 0;
+    #endif
+        };
 
-        void OnCreate(World& world) override;
-        void OnUpdate(World& world) override;
-        void OnDestroy(World& world) override;
+        struct EmitterRenderData {
+            GLuint vao          = 0;
+            int    aliveCount   = 0;
+            uint32_t textureId  = 0;
+            float  particleSize = 8.0f;
+            uint16_t layerId    = 0;
+            int zOrder          = 0;
+        };
 
-        void DrawEmittersByLayer(uint16_t layerId, Shader& shader,
-            const glm::mat4& viewProj,
-            Graphics::LightManager& lights, World& world);
+        class ParticleSystem : public ISystem {
+        public:
+            SystemMetadata GetMetadata() const override;
 
-        // --- Preset registry ---
-        uint32_t RegisterPreset(const ParticlePreset& preset) {
-            m_presets.push_back(preset);
-            return (uint32_t)(m_presets.size() - 1);
-        }
+            void OnCreate(World& world) override;
+            void OnUpdate(World& world) override;
+            void OnDestroy(World& world) override;
 
-        const ParticlePreset& GetPreset(uint32_t id) const {
-            return m_presets[id];
-        }
+            // Render all emitters on the requested layer using current GPU buffers.
+            void DrawEmittersByLayer(uint16_t layerId, Shader& shader,
+                const glm::mat4& viewProj,
+                Graphics::LightManager& lights, World& world);
 
-        size_t GetPresetCount() const { return m_presets.size(); }
+            void DrawEmitterForEntity(uint32_t entityIndex, Shader& shader, World& world);
 
-        // --- Collision grid ---
-        void UpdateCollisionGrid(const TileMap& tileMap);
+            // Register one preset and return its index for emitter references.
+            uint32_t RegisterPreset(const ParticlePreset& preset) {
+                m_presets.push_back(preset);
+                return (uint32_t)(m_presets.size() - 1);
+            }
 
-        // --- Renderer access ---
-        const std::unordered_map<uint32_t, EmitterRenderData>& GetRenderData() const {
-            return m_renderData;
-        }
+            // Retrieve a preset by index.
+            const ParticlePreset& GetPreset(uint32_t id) const {
+                return m_presets[id];
+            }
 
-        // --- Burst API ---
-        void TriggerBurst(uint32_t entityIndex, int count);
+            size_t GetPresetCount() const { return m_presets.size(); }
 
-    private:
-        void InitEmitter(uint32_t entityIndex, int maxParticles);
-        void DestroyEmitter(uint32_t entityIndex);
-        void CreateQuadVAO(EmitterGPUData& gpu, int maxParticles);
+            // Upload/refresh shared tile collision grid used for particle collisions.
+            void UpdateCollisionGrid(const TileMap& tileMap);
 
-        std::vector<ParticlePreset>                         m_presets;
-        std::unordered_map<uint32_t, EmitterGPUData>        m_emitters;
-        std::unordered_map<uint32_t, EmitterRenderData>     m_renderData;
-        std::unordered_map<uint32_t, int>                   m_pendingBursts;
+            const std::unordered_map<uint32_t, EmitterRenderData>& GetRenderData() const {
+                return m_renderData;
+            }
 
-        struct CollisionGrid {
-            uint8_t* d_masks = nullptr;
-            int32_t  width = 0;
-            int32_t  height = 0;
-            int32_t  originX = 0;
-            int32_t  originY = 0;
-            float    tileSize = 0.0f;
-        } m_collisionGrid;
-    };
+            // Queue a burst spawn request for a specific emitter entity.
+            void TriggerBurst(uint32_t entityIndex, int count);
 
-} // namespace ECS
+        private:
+            // Allocate and initialize GPU simulation/render resources for one emitter.
+            void InitEmitter(uint32_t entityIndex, int maxParticles);
+            // Destroy GPU simulation/render resources for one emitter.
+            void DestroyEmitter(uint32_t entityIndex);
+            // Build quad geometry and VAO bindings for an emitter render slot.
+            void CreateQuadVAO(EmitterGPUData& gpu, int slot, int maxParticles);
+
+            std::vector<ParticlePreset>                         m_presets;
+            std::unordered_map<uint32_t, EmitterGPUData>        m_emitters;
+            std::unordered_map<uint32_t, EmitterRenderData>     m_renderData;
+            std::unordered_map<uint32_t, int>                   m_pendingBursts;
+
+    #ifdef GRAPE_HAS_CUDA
+            cudaStream_t m_cudaStream = nullptr;
+    #endif
+
+            struct CollisionGrid {
+                uint8_t* d_masks = nullptr;
+                int32_t  width = 0;
+                int32_t  height = 0;
+                int32_t  originX = 0;
+                int32_t  originY = 0;
+                float    tileSize = 0.0f;
+            } m_collisionGrid;
+        };
+
+    } // namespace ECS

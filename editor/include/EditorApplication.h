@@ -89,13 +89,44 @@ public:
      */
     void InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world);
 
+    /**
+     * @brief Get the current startup flow stage.
+     * @return Active startup stage enum value.
+     */
     EditorStartupStage GetStartupStage() const { return m_startupStage; }
+
+    /**
+     * @brief Check whether project initialization completed successfully.
+     * @return True when a project is loaded and ready.
+     */
     bool IsProjectInitialized() const { return m_projectInitialized; }
+
+    /**
+     * @brief Get the absolute root path of the active project.
+     * @return Project root path string.
+     */
     const std::string& GetProjectRoot() const { return m_projectRoot; }
 
+    /**
+     * @brief Return startup UI to project-selection mode.
+     */
     void RequestProjectSelection();
+
+    /**
+     * @brief Handle project selection and start project bootstrap.
+     * @param projectRoot Selected project root path.
+     */
     void HandleProjectSelected(const std::string& projectRoot);
+
+    /**
+     * @brief Handle scene selection and load the chosen scene.
+     * @param scenePath Scene asset path selected by the user.
+     */
     void HandleSceneSelected(const std::string& scenePath);
+
+    /**
+     * @brief Continue startup without loading a scene.
+     */
     void HandleContinueWithoutScene();
 
 private:
@@ -115,12 +146,41 @@ private:
     static Engine::Application* s_editorApplication;
     static ECS::World* s_editorWorld;
 
+    /**
+     * @brief Load editor settings from disk (with migration fallback).
+     */
     void _loadEditorSettings();
+
+    /**
+     * @brief Persist current editor settings to disk.
+     */
     void _saveEditorSettings();
+
+    /**
+     * @brief Create the editor main window from current settings.
+     */
     void _createMainWindow();
+
+    /**
+     * @brief Construct and initialize the editor service.
+     */
     void _initializeEditorService();
+
+    /**
+     * @brief Apply project settings to engine/editor runtime state.
+     */
     void _applyProjectSettings();
+
+    /**
+     * @brief Clear loaded scenes and reset scene-related editor state.
+     */
     void _clearScenes();
+
+    /**
+     * @brief Load a scene from path into the active scene manager.
+     * @param scenePath Scene path to load.
+     * @return True when the scene was loaded successfully.
+     */
     bool _loadSceneFromPath(const std::string& scenePath);
 };
 

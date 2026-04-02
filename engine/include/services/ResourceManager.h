@@ -72,59 +72,117 @@ struct RawData {
 // Supports textures, audio, fonts, shaders and prefabs
 class GRAPEENGINE_API ResourceManager {
 public:
-    // Default constructor
+    /**
+     * @brief Construct an empty resource manager.
+     */
     ResourceManager() = default;
 
-    // Default destructor
+    /**
+     * @brief Destroy the resource manager.
+     */
     ~ResourceManager() = default;
 
-    // Storage vector for cached string paths
+    /**
+     * @brief List cache keys for all cached audio assets.
+     * @return Vector of audio cache keys.
+     */
     std::vector<std::string> ListCachedAudioPaths() const;
 
     // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
 
-    // Load shader from vertex and fragment paths that don't have the same base name
+    /**
+     * @brief Load or fetch a shader by explicit vertex/fragment paths.
+     * @param vertexPath Vertex shader file path.
+     * @param fragmentPath Fragment shader file path.
+     * @return Shared pointer to cached or newly loaded shader.
+     */
     std::shared_ptr<Shader> GetShader(const std::string& vertexPath, const std::string& fragmentPath);
 
-    // Load font with specified size (allows same font at different sizes)
+    /**
+     * @brief Load or fetch a font by path and pixel size.
+     * @param name Font file path.
+     * @param pixelSize Requested font size in pixels.
+     * @return Shared pointer to cached or newly loaded font.
+     */
     std::shared_ptr<Font> GetFont(const std::string& name, int pixelSize = 48);
 
-    // Clear all cached assets from memory
+    /**
+     * @brief Clear all caches and release all loaded assets.
+     */
     void ClearCache();
 
-    // Remove a specific asset from the cache
+    /**
+     * @brief Remove one asset from cache maps.
+     * @param name Cache key or asset path.
+     */
     void UnloadAsset(const std::string& name);
 
-    // Get the total number of cached assets
+    /**
+     * @brief Get total number of cached entries across asset maps.
+     * @return Cache entry count.
+     */
     size_t GetCacheSize() const;
 
-    // Print detailed cache information to the log
+    /**
+     * @brief Print detailed cache statistics to the logger.
+     */
     void PrintCacheInfo() const;
 
-    // Check if a specific asset is already cached
+    /**
+     * @brief Check whether an asset key exists in any cache map.
+     * @param name Cache key or asset path.
+     * @return True when the asset is cached.
+     */
     bool IsAssetCached(const std::string& name) const;
 
     // File System Operations (Editor Support)
-    // Import/add an asset file to the project (copies to assets directory)
+    /**
+     * @brief Import an asset by copying a source file into the project.
+     * @param sourcePath Source file path.
+     * @param destPath Destination project-relative or absolute path.
+     * @return True when copy/import succeeded.
+     */
     bool AddAsset(const std::string& sourcePath, const std::string& destPath);
 
-    // Delete an asset file from the project (removes from disk and cache)
+    /**
+     * @brief Delete an asset from disk and remove it from caches.
+     * @param assetPath Asset path to remove.
+     * @return True when delete succeeded.
+     */
     bool DeleteAsset(const std::string& assetPath);
 
-    // Replace an existing asset with a new file (keeps same path)
+    /**
+     * @brief Replace an existing asset file and invalidate related cache entries.
+     * @param assetPath Existing asset path.
+     * @param newSourcePath Replacement source file path.
+     * @return True when replacement succeeded.
+     */
     bool ReplaceAsset(const std::string& assetPath, const std::string& newSourcePath);
 
-    // Create a new empty directory
+    /**
+     * @brief Create a directory for project asset organization.
+     * @param path Directory path to create.
+     * @return True when creation succeeded or directory already exists.
+     */
     bool CreateDirectory(const std::string& path);
-    // Sets the current owner tag for asset tracking (e.g., scene id)
+
+    /**
+     * @brief Set the current owner tag used for subsequent asset tracking.
+     * @param ownerTag Owner tag identifier.
+     */
     void SetOwnerTag(const std::string& ownerTag);
 
-    // Clears the current owner tag
+    /**
+     * @brief Clear the current owner tag.
+     */
     void ClearOwnerTag();
 
-    // Unload assets that are only owned by the specified tag
+    /**
+     * @brief Unload assets exclusively owned by the given owner tag.
+     * @param ownerTag Owner tag to remove from ownership maps.
+     */
     void UnloadAssetsByOwner(const std::string& ownerTag);
 
 private:

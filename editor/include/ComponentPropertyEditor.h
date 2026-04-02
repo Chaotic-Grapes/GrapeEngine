@@ -34,29 +34,60 @@ public:
     // Initialization
     // -------------------------------------------------------------------------
 
-    // Initialize fonts for component UI rendering to maintain visual consistency
+    /**
+     * @brief Initialize fonts used by inspector component widgets.
+     * @param mainFont Regular UI font.
+     * @param boldFont Emphasis font used for headings.
+     * @param symbolsFont Icon/symbol font.
+     */
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
-    // Connect the undo system to record component edits
+    /**
+     * @brief Set undo system used to record component edits.
+     * @param undo Undo system instance.
+     */
     void SetUndoSystem(Editor::UndoSystem* undo) { m_undo = undo; }
 
-    // Update the set of currently selected entities for multi-edit support
+    /**
+     * @brief Set selected entity set used for multi-edit operations.
+     * @param entities Pointer to selected entity id set.
+     */
     void SetSelectedEntities(const std::unordered_set<EntityId>* entities);
 
     // -------------------------------------------------------------------------
     // Component Rendering
     // -------------------------------------------------------------------------
 
-    // Renders entity name component for identifying entities in hierarchy
+    /**
+     * @brief Render editor controls for Name component data.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     */
     void RenderName(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders active/enabled state toggle for entity activation control
+    /**
+     * @brief Render editor controls for Active component data.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     */
     void RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders tag mask bitfield for entity tagging and filtering systems
+    /**
+     * @brief Render editor controls for TagMask component data.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     */
     void RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders transform properties including position, rotation and scale values
+    /**
+     * @brief Render editor controls for LocalTransform component data.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     */
     void RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders sprite properties including material reference and color tint values
@@ -116,11 +147,21 @@ public:
     // Renders layer index for controlling entity collision and rendering layer assignment
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders tilemap component with collision edit entry point
+    /**
+     * @brief Render editor controls for TileMap component data.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     */
     void RenderTileMapComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Generic renderer for unknown (C#) components
-    // Uses JSON field types to render simple editors for booleans, integers, floats and strings
+    /**
+     * @brief Render generic JSON fields for unknown or managed component types.
+     * @param data JSON component payload.
+     * @param entity Target entity.
+     * @param world World containing the entity.
+     * @param addSpacing True to append standard inspector spacing after render.
+     */
     void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world, bool addSpacing = true);
 
     // Renders material component for assigning materials to renderers
@@ -165,7 +206,9 @@ public:
     // Renders GUI slider properties including min, max and current value
     void RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders drag/drop validation feedback popups triggered by asset fields
+    /**
+     * @brief Render popups used for asset drag/drop validation feedback.
+     */
     void RenderAssetDropFeedbackPopup();
 
 private:

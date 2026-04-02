@@ -151,6 +151,7 @@ namespace ECS {
             Engine::Camera* Camera = nullptr;
             glm::ivec2 Size{ 1, 1 };
             bool Active = true;
+            bool BloomEnabled = true;
 
             // Per-viewport render targets
             std::unique_ptr<Framebuffer> HDR;
@@ -171,6 +172,14 @@ namespace ECS {
 
         // Swap the camera source used by a named viewport
         void SetViewportCamera(const std::string& name, Engine::Camera* camera);
+
+        /**
+         * @brief Enable or disable bloom passes for a named viewport.
+         * @param name Unique viewport name.
+         * @param enabled True to run bloom extraction and blur passes.
+         * @return void
+         */
+        void SetViewportBloomEnabled(const std::string& name, bool enabled);
 
         // Look up a viewport by name for mutation
         Viewport* GetViewport(const std::string& name);
@@ -635,8 +644,13 @@ namespace ECS {
         // Apply bloom extraction and blur passes for the viewport
         void RenderBloom(Viewport& vp, float bloomRadius);
 
-        // Run tone mapping from HDR to final LDR output
-        void ToneMap(Viewport& vp);
+        /**
+         * @brief Run tone mapping from HDR to final LDR output.
+         * @param vp Target viewport to write final LDR output.
+         * @param bloomEnabled Controls whether bloom contribution is blended in.
+         * @return void
+         */
+        void ToneMap(Viewport& vp, bool bloomEnabled);
 
         // Sync runtime tilemap cache with current world state
         // Prepare runtime data

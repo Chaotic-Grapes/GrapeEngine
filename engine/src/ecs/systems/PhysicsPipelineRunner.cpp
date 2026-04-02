@@ -559,71 +559,79 @@ namespace ECS {
             return true;
         }
 
+        /**
+         * @brief Gather candidate physics bodies for the current frame.
+         * @return void
+         * @note Primary traversal is layer-first to amortize layer enable checks.
+         * @note Entities without a Layer component are handled by a fallback pass.
+         * @complexity O(sum(enabled-layer-entities) + unlayered-local-transform-entities)
+         */
         void GatherEntities() {
             dynamicEntities.clear();
             staticEntities.clear();
+            gatheredLayerByEntity.clear();
             dynamicEntities.reserve(512);
             staticEntities.reserve(256);
-
-            world.Each<Components::Rigidbody2D, Components::LinearVelocity2D, Components::LocalTransform>(
-                [this](const Entity e, const Components::Rigidbody2D& rb, Components::LinearVelocity2D&, Components::LocalTransform&) {
-                    if (!world.IsActiveInHierarchy(e) || rb.Mass <= 0.0f) {
-                        return;
-                    }
-                    const auto* layer = world.TryGet<Components::Layer>(e);
-                    const uint16_t layerId = layer ? layer->Id : 0;
-                    if (!layerManager.Get(layerId).physicsEnabled) {
-                        return;
-                    }
-                    if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) {
-                        return;
-                    }
-                    dynamicEntities.push_back(e);
-                });
-
-            world.Each<Components::Rigidbody2D, Components::LocalTransform>(
-                [this](const Entity e, const Components::Rigidbody2D& rb, const Components::LocalTransform&) {
-                    if (!world.IsActiveInHierarchy(e) || rb.Mass > 0.0f) {
-                        return;
-                    }
-                    const auto* layer = world.TryGet<Components::Layer>(e);
-                    const uint16_t layerId = layer ? layer->Id : 0;
-                    if (!layerManager.Get(layerId).physicsEnabled) {
-                        return;
-                    }
-                    if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) {
-                        return;
-                    }
-                    staticEntities.push_back(e);
-                });
+            gatheredLayerByEntity.reserve(1024);
 
             std::unordered_set<EntityId> collectedIds;
-            collectedIds.reserve(dynamicEntities.size() + staticEntities.size());
-            for (const Entity e : dynamicEntities) {
-                collectedIds.insert(e.Index);
-            }
-            for (const Entity e : staticEntities) {
-                collectedIds.insert(e.Index);
+            collectedIds.reserve(1024);
+
+            auto classifyEntity = [this, &collectedIds](const Entity e, const uint16_t layerId) {
+                if (!world.IsAlive(e) || !world.IsActiveInHierarchy(e)) {
+                    return;
+                }
+                if (!collectedIds.insert(e.Index).second) {
+                    return;
+                }
+
+                // Keep parity with previous selection by requiring a local transform.
+                if (!world.TryGet<Components::LocalTransform>(e)) {
+                    return;
+                }
+
+                const auto* circle = world.TryGet<Components::CircleCollider2D>(e);
+                const auto* box = world.TryGet<Components::BoxCollider2D>(e);
+                if (!circle && !box) {
+                    return;
+                }
+
+                gatheredLayerByEntity[e.Index] = layerId;
+
+                if (const auto* rb = world.TryGet<Components::Rigidbody2D>(e)) {
+                    if (rb->Mass > 0.0f && world.TryGet<Components::LinearVelocity2D>(e)) {
+                        dynamicEntities.push_back(e);
+                    } else {
+                        staticEntities.push_back(e);
+                    }
+                } else {
+                    staticEntities.push_back(e);
+                }
+            };
+
+            for (const Scenes::LayerId layerId : layerManager.DrawOrder()) {
+                const auto& layerData = layerManager.Get(layerId);
+                if (!layerData.physicsEnabled) {
+                    continue;
+                }
+
+                for (const Entity e : layerManager.EntitiesIn(layerId)) {
+                    classifyEntity(e, layerId);
+                }
             }
 
-            world.Each<Components::LocalTransform>([this, &collectedIds](const Entity e, const Components::LocalTransform&) {
-                if (collectedIds.contains(e.Index)) {
-                    return;
-                }
-                if (!world.IsActiveInHierarchy(e) || world.Has<Components::Rigidbody2D>(e)) {
-                    return;
-                }
-                if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) {
-                    return;
-                }
-                const auto* layer = world.TryGet<Components::Layer>(e);
-                const uint16_t layerId = layer ? layer->Id : 0;
-                if (!layerManager.Get(layerId).physicsEnabled) {
-                    return;
-                }
-                staticEntities.push_back(e);
-                collectedIds.insert(e.Index);
-            });
+            // Fallback for entities that have no Layer component and therefore are not tracked by LayerManager.
+            if (layerManager.Get(0).physicsEnabled) {
+                world.Each<Components::LocalTransform>([this, &collectedIds, &classifyEntity](const Entity e, const Components::LocalTransform&) {
+                    if (collectedIds.contains(e.Index)) {
+                        return;
+                    }
+                    if (world.TryGet<Components::Layer>(e)) {
+                        return;
+                    }
+                    classifyEntity(e, 0);
+                });
+            }
         }
 
         void IntegrateDynamicBodies(float subDt) {
@@ -719,8 +727,12 @@ namespace ECS {
                     return;
                 }
 
-                const auto* layer = world.TryGet<Components::Layer>(e);
-                if (!layer) {
+                auto layerIt = gatheredLayerByEntity.find(e.Index);
+                if (layerIt != gatheredLayerByEntity.end()) {
+                    body.layerId = layerIt->second;
+                } else if (const auto* layer = world.TryGet<Components::Layer>(e)) {
+                    body.layerId = layer->Id;
+                } else {
                     if (!loggedMissingLayer) {
                         loggedMissingLayer = true;
                         LOG_WARNING("PhysicsSystem: Skipping collision checks (missing Layer component on one or more entities).");
@@ -728,7 +740,6 @@ namespace ECS {
                     return;
                 }
 
-                body.layerId = layer->Id;
                 body.layerMask = layerManager.GetLayerMask(body.layerId);
                 if (!layerManager.Get(body.layerId).physicsEnabled) {
                     return;
@@ -1107,6 +1118,7 @@ namespace ECS {
 
         std::vector<Entity> dynamicEntities;
         std::vector<Entity> staticEntities;
+        std::unordered_map<EntityId, uint16_t> gatheredLayerByEntity;
         std::vector<BodyCache> bodies;
         std::unordered_map<PackedEntityId, size_t> bodyByPacked;
         std::unordered_set<PackedEntityId> dynamicPacked;

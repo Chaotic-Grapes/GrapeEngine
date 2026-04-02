@@ -38,43 +38,69 @@ class InspectorPanel;
 // Asset browser panel for file navigation and asset management
 class AssetBrowserPanel {
 public:
-    // View modes for asset display; defaults to Grid
+    /**
+     * @brief Available layouts for rendering asset entries.
+     */
     enum class ViewMode : uint8_t {
         List = 0,
         Grid = 1
     };
 
-    // Callback for asset selection changes (used by other editor systems).
+    /**
+     * @brief Callback signature invoked when asset selection changes.
+     */
     using AssetSelectionCallback = std::function<void(const std::string&)>;
 
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
-    // Initialize fonts world reference and prepare the asset library
+    /**
+     * @brief Initialize panel dependencies and UI fonts.
+     * @param mainFont Primary font used for body text.
+     * @param boldFont Bold font used for highlighted labels.
+     * @param symbolsFont Icon/symbol font used for glyph rendering.
+     * @param world Active ECS world used by panel operations.
+     */
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
-    // Update world reference when switching scenes
+    /**
+     * @brief Update the world reference after scene/world changes.
+     * @param world Newly active ECS world.
+     */
     void SetWorld(ECS::World* world);
 
-    // Connect inspector so double-click can open prefabs
+    /**
+     * @brief Attach inspector integration for prefab editing workflows.
+     * @param inspector Inspector panel instance to notify.
+     */
     void SetInspector(InspectorPanel* inspector);
 
-    // Update editor settings reference for view mode and other config
+    /**
+     * @brief Provide editor settings for persisted panel preferences.
+     * @param settings Editor settings object backing UI options.
+     */
     void SetEditorSettings(EditorSettings* settings);
 
-    // Register a callback for asset selection changes
+    /**
+     * @brief Register a callback for selection-change notifications.
+     * @param callback Function invoked with the selected asset path.
+     */
     void SetSelectionChangedCallback(AssetSelectionCallback callback) { m_selectionCallback = std::move(callback); }
 
-    // Register a callback for scene file double-click opens
+    /**
+     * @brief Register a callback for scene-file open requests.
+     * @param callback Function invoked with scene path to open.
+     */
     void SetSceneOpenCallback(std::function<void(const std::string&)> callback) { m_sceneOpenCallback = std::move(callback); }
 
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
 
-    // Render the entire asset browser window
-    // Draws navigation file list file info and status bar
+    /**
+     * @brief Render the full asset browser UI for the current frame.
+     */
     void Render();
 
 private:
@@ -82,157 +108,314 @@ private:
     // UI Sections
     // -------------------------------------------------------------------------
 
-    // Render breadcrumb bar and path controls
+    /**
+     * @brief Draw the breadcrumb path bar and navigation controls.
+     */
     void _renderNavigationBar();
 
-    // Render import replace and delete buttons
+    /**
+     * @brief Draw toolbar actions such as import, replace, and delete.
+     */
     void _renderActionButtons();
 
-    // Render button for opening prefabs
+    /**
+     * @brief Draw prefab-related quick action button(s).
+     */
     void _renderPrefabButton();
 
-    // Render popup for loading and editing prefab assets
+    /**
+     * @brief Draw the prefab popup used for load/edit operations.
+     */
     void _renderPrefabPopup();
 
-    // Render the main two panel layout
+    /**
+     * @brief Render the split content layout for list and inspector panes.
+     */
     void _renderContentArea();
 
-    // Render the main file list panel
+    /**
+     * @brief Render the main file-list viewport region.
+     * @param windowWidth Current panel width used for layout decisions.
+     */
     void _renderFileListPanel(float windowWidth);
 
-    // Return directory entries for the current path sorted by type then name
+    /**
+     * @brief Collect and sort directory entries for the active folder.
+     * @return Sorted entries ordered by type and then by name.
+     */
     std::vector<std::filesystem::directory_entry> _getSortedEntriesForCurrentPath() const;
 
-    // Render all entries in the current directory as list rows
+    /**
+     * @brief Render all entries as list rows.
+     * @param entries Entries to draw for the active folder.
+     */
     void _renderFileListEntries(const std::vector<std::filesystem::directory_entry>& entries);
 
-    // Calculate the tile dimensions that fit the longest filename in the current entry set
+    /**
+     * @brief Compute a grid tile size suitable for current entry names.
+     * @param entries Entries used to estimate required label area.
+     * @param nameFont Font used to measure name labels.
+     * @param nameFontSize Pixel size of filename text.
+     * @param iconFontSize Pixel size of icon glyphs.
+     * @param textPaddingX Horizontal text padding inside each tile.
+     * @param tilePaddingY Vertical padding applied within each tile.
+     * @param contentGap Spacing between icon and filename content.
+     * @return Tile dimensions used by grid rendering.
+     */
     ImVec2 _calculateGridTileSize(const std::vector<std::filesystem::directory_entry>& entries, ImFont* nameFont,
         float nameFontSize, float iconFontSize, float textPaddingX, float tilePaddingY, float contentGap) const;
 
-    // Render a single grid tile entry at the given index using the provided tile layout dimensions
+    /**
+     * @brief Render one grid tile entry with interaction handling.
+     * @param entries Source entries for the current folder.
+     * @param index Entry index to draw.
+     * @param columns Number of grid columns currently visible.
+     * @param tileWidth Width of each grid tile.
+     * @param tileHeight Height of each grid tile.
+     * @param tileSpacing Horizontal and vertical tile spacing.
+     * @param tileRounding Corner radius used for tile background.
+     * @param iconFontSize Pixel size for icon rendering.
+     * @param nameFontSize Pixel size for filename rendering.
+     * @param textPaddingX Horizontal text padding.
+     * @param contentGap Gap between icon and text.
+     * @param nameFont Font used to draw names.
+     */
     void _renderFileGridEntry(const std::vector<std::filesystem::directory_entry>& entries, size_t index, int columns,
         float tileWidth, float tileHeight, float tileSpacing, float tileRounding, float iconFontSize, float nameFontSize,
         float textPaddingX, float contentGap, ImFont* nameFont);
 
-    // Render all entries in the current directory as a grid of tiles
+    /**
+     * @brief Render all entries in a tiled grid layout.
+     * @param entries Entries to render.
+     */
     void _renderFileGridEntries(const std::vector<std::filesystem::directory_entry>& entries);
 
-    // Render the truncated or wrapped name label below a grid tile's icon
+    /**
+     * @brief Render label text for a grid tile entry.
+     * @param entry Directory entry represented by the tile.
+     * @param entryPath Absolute or project-relative entry path.
+     * @param isRenaming True when inline rename UI is active.
+     * @param contentTop Top y-coordinate of content area.
+     * @param iconSize Rendered icon size.
+     * @param contentGap Gap between icon and text block.
+     * @param textPaddingX Horizontal text padding.
+     * @param tileWidth Width allocated to the tile.
+     * @param nameFont Font used for filename rendering.
+     * @param nameFontSize Pixel size used for filename text.
+     * @param nameSize Measured label dimensions.
+     * @param displayName Final name string displayed to user.
+     */
     void _renderGridEntryLabel(const std::filesystem::directory_entry& entry, const std::string& entryPath,
         bool isRenaming, float contentTop, const ImVec2& iconSize, float contentGap, float textPaddingX, float tileWidth,
         ImFont* nameFont, float nameFontSize, const ImVec2& nameSize, const std::string& displayName);
 
-    // Handle click, double-click, right-click and hover interactions for a grid tile
+    /**
+     * @brief Process interaction events for a grid tile.
+     * @param entries All entries in the current folder.
+     * @param entryPath Path of the interacted entry.
+     * @param isSelected True when entry is currently selected.
+     * @param isDirectory True when entry is a directory.
+     * @param extLower Lowercased file extension for type handling.
+     * @param tileLeftClick True when tile received a left click.
+     * @param tileDoubleClick True when tile received a double-click.
+     * @param tileRightClick True when tile received a right click.
+     * @param tileHovered True when cursor hovers the tile.
+     */
     void _handleGridEntryInteractions(const std::vector<std::filesystem::directory_entry>& entries,
         const std::string& entryPath, bool isSelected, bool isDirectory, const std::string& extLower, bool tileLeftClick,
         bool tileDoubleClick, bool tileRightClick, bool tileHovered);
 
-    // Render detailed info for the selected asset
+    /**
+     * @brief Render metadata/details for current selection.
+     */
     void _renderFileInfoPanel();
 
-    // Render delete button at bottom right
+    /**
+     * @brief Render contextual delete button in panel footer.
+     */
     void _renderDeleteButton();
 
-    // Render status message bar
+    /**
+     * @brief Render transient status message area.
+     */
     void _renderStatusBar();
 
-    // Render the create asset dialog popup
+    /**
+     * @brief Render modal dialog for creating new assets.
+     */
     void _renderCreateDialog();
 
     // -------------------------------------------------------------------------
     // Prefab Operations and Selection
     // -------------------------------------------------------------------------
 
-    // Load a prefab file and open it in the inspector
+    /**
+     * @brief Load selected prefab and open it in inspector.
+     */
     void _loadPrefab();
 
-    // Switch the inspector into edit mode for the selected prefab
+    /**
+     * @brief Enter inspector edit mode for selected prefab.
+     */
     void _editPrefab();
 
-    // Handle clicking empty space to clear selection
+    /**
+     * @brief Handle empty-space clicks and clear selection state.
+     */
     void _selectEmptySpace();
 
-    // Clear the current multi-selection and reset the anchor
+    /**
+     * @brief Clear multiselection and selection anchor.
+     */
     void _clearSelection();
 
-    // Set selection anchor and notify listeners when a single entry is selected
+    /**
+     * @brief Select a single entry and optionally update anchor.
+     * @param entryPath Path to the entry to select.
+     * @param updateAnchor True to update shift-selection anchor.
+     */
     void _setSingleSelection(const std::string& entryPath, bool updateAnchor);
 
-    // Notify the registered callback that the selection has changed
+    /**
+     * @brief Notify listeners that the asset selection changed.
+     */
     void _notifySelectionChanged() const;
 
-    // Handle double-click on an entry, opening folders or assets as appropriate
+    /**
+     * @brief Handle double-click navigation/open behavior for an entry.
+     * @param entryPath Path of the activated entry.
+     * @param extLower Lowercased extension for file type routing.
+     * @param isDirectory True when entry is a directory.
+     * @return True when the double-click was consumed.
+     */
     bool _handleEntryDoubleClick(const std::string& entryPath, const std::string& extLower, bool isDirectory);
 
-    // Apply selection logic for an entry, accounting for shift/ctrl modifiers and double-clicks
+    /**
+     * @brief Apply click-selection rules with keyboard modifiers.
+     * @param entries Entries visible in the current folder.
+     * @param entryPath Path of clicked entry.
+     * @param isSelected True when entry was already selected.
+     * @param isDoubleClick True when interaction was a double-click.
+     * @param isDirectory True when entry is a directory.
+     * @param extLower Lowercased extension for open behavior checks.
+     */
     void _applyEntrySelection(const std::vector<std::filesystem::directory_entry>& entries, const std::string& entryPath,
         bool isSelected, bool isDoubleClick, bool isDirectory, const std::string& extLower);
 
-    // Track hover time on a folder and auto-navigate into it when dragging an asset over it
+    /**
+     * @brief Auto-open hovered folders while dragging payloads.
+     * @param folderPath Hovered folder path.
+     * @param isHoveredWithPayload True while payload hovers target folder.
+     */
     void _handleFolderHoverAutoOpen(const std::string& folderPath, bool isHoveredWithPayload);
 
-    // Validate and apply the pending rename, updating the file on disk
+    /**
+     * @brief Commit inline rename operation to the filesystem.
+     * @param entry Directory entry currently being renamed.
+     * @param entryPath Original path of the entry.
+     * @return True when rename succeeded.
+     */
     bool _commitRename(const std::filesystem::directory_entry& entry, const std::string& entryPath);
 
     // -------------------------------------------------------------------------
     // Context Menu
     // -------------------------------------------------------------------------
 
-    // Render right-click context menu for creating assets
+    /**
+     * @brief Render context menu for creating new assets.
+     */
     void _renderContextMenu();
 
-    // Render right-click context menu for selected items
+    /**
+     * @brief Render context menu actions for selected entries.
+     */
     void _renderItemContextMenu();
 
-    // Create a new C# script file with template
+    /**
+     * @brief Create a script file from selected template.
+     */
     void _createScript();
 
-    // Create a new scene file
+    /**
+     * @brief Create a new scene asset in current directory.
+     */
     void _createScene();
 
-    // Create a new folder
+    /**
+     * @brief Create a new folder in current directory.
+     */
     void _createFolder();
 
-    // Right-click context menu for asset creation
+    /**
+     * @brief Draw create-menu entries and return whether one was chosen.
+     * @return True when a create action was selected.
+     */
     bool _renderCreateMenuItems();
 
-    // Open the generated C# project file (optionally focusing a script file).
+    /**
+     * @brief Open generated C# project and optionally focus a script.
+     * @param fileToOpen Optional script path to focus after opening.
+     */
     void _openProjectFile(const std::string& fileToOpen = std::string());
 
-    // Show the selected asset in Windows Explorer
+    /**
+     * @brief Reveal an asset in the platform file explorer.
+     * @param assetPath Path of asset to reveal.
+     */
     void _openInExplorer(const std::string& assetPath);
 
     // -------------------------------------------------------------------------
     // Copy/Paste Operations
     // -------------------------------------------------------------------------
 
-    // Copy selected assets to clipboard
+    /**
+     * @brief Copy current selection to internal clipboard.
+     */
     void _copySelectedAssets();
 
-    // Paste clipboard assets to current directory
+    /**
+     * @brief Paste clipboard assets into current directory.
+     */
     void _pasteAssets();
 
-    // Delete selected assets
+    /**
+     * @brief Delete all currently selected assets.
+     */
     void _deleteSelectedAssets();
 
-    // Rename selected asset (single selection only)
+    /**
+     * @brief Begin rename workflow for single selected asset.
+     */
     void _startRename();
 
     // -------------------------------------------------------------------------
     // Drag-Drop Operations
     // -------------------------------------------------------------------------
 
-    // Handle dragging selected assets
+    /**
+     * @brief Start drag payload for selected asset(s).
+     * @param assetPath Primary asset path initiating drag.
+     */
     void _handleAssetDragDrop(const std::string& assetPath);
 
-    // Handle dropping assets onto a folder
+    /**
+     * @brief Accept drop payload onto a folder target.
+     * @param folderPath Destination folder path.
+     */
     void _handleFolderDropTarget(const std::string& folderPath);
 
-    // Move assets to target directory
+    /**
+     * @brief Move assets to a destination directory.
+     * @param assets Asset paths to move.
+     * @param targetDir Destination folder path.
+     */
     void _moveAssetsToDirectory(const std::vector<std::string>& assets, const std::string& targetDir);
 
-    // Copy assets to target directory
+    /**
+     * @brief Copy assets to a destination directory.
+     * @param assets Asset paths to copy.
+     * @param targetDir Destination folder path.
+     */
     void _copyAssetsToDirectory(const std::vector<std::string>& assets, const std::string& targetDir);
 
     // -------------------------------------------------------------------------

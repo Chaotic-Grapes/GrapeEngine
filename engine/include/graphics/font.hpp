@@ -41,15 +41,19 @@ struct Glyph {
 
 class GRAPEENGINE_API Font {
 public:
+    // Load font bytes and build an SDF atlas at the requested pixel size.
     Font(const std::string& path, int pixelSize);
+    // Release atlas texture and CPU-side font buffers.
     ~Font();
 
     // Move only (fonts manage GPU resources)
     Font(Font const&) = delete;
     Font& operator=(Font const&) = delete;
+    // Transfer ownership of atlas texture and font state.
     Font(Font&& other) noexcept;
     Font& operator=(Font&& other) noexcept;
 
+    // Return glyph metrics/UVs for one character from the atlas cache.
     Glyph const& getGlyph(char c) const;
     GLuint getAtlasTexture() const { return m_atlasTex; }
     glm::ivec2 getAtlasSize() const { return m_atlasSize; }
@@ -59,6 +63,7 @@ public:
     float getDescent() const { return m_descent; }
 
 private:
+    // Free GPU resources and reset owned state.
     void cleanup();
     void loadAtlas();   // builds the SDF atlas + fills m_glyphs
 

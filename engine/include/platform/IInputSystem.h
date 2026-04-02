@@ -158,6 +158,27 @@ namespace Platform {
          */
         virtual float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) = 0;
 
+        /**
+         * @brief Set gamepad vibration motor intensities
+         * @param gamepad Gamepad index (0..15)
+         * @param lowFrequency Low-frequency motor intensity in [0, 1]
+         * @param highFrequency High-frequency motor intensity in [0, 1]
+         * @return True when vibration command was accepted by backend
+         */
+        virtual bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency) = 0;
+
+        /**
+         * @brief Stop vibration for a gamepad slot
+         * @param gamepad Gamepad index (0..15)
+         */
+        virtual void StopGamepadVibration(int gamepad) = 0;
+
+        /**
+         * @brief Query whether vibration is available for a gamepad slot
+         * @param gamepad Gamepad index (0..15)
+         */
+        virtual bool IsGamepadVibrationSupported(int gamepad) = 0;
+
         // ==================== Cursor Management ====================
         
         /**

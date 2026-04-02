@@ -99,6 +99,20 @@ internal static partial class InputAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_SetGamepadVibration")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_StopGamepadVibration")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void StopGamepadVibration(int gamepad);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsGamepadVibrationSupported")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsGamepadVibrationSupported(int gamepad);
+
     //[DllImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsKeyPressed", CallingConvention = CallingConvention.Cdecl)]
     //public static extern bool IsKeyPressed(int key);
 

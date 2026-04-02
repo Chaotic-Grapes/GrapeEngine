@@ -31,10 +31,32 @@ namespace UICommon {
         EDITOR_PREFAB_EDITOR
     };
 
-    // Centralized registry APIs
+    /**
+     * @brief Register or update a persisted layout rectangle for a window id.
+     * @param id Window identifier.
+     * @param x Window position x in pixels.
+     * @param y Window position y in pixels.
+     * @param w Window width in pixels.
+     * @param h Window height in pixels.
+     */
     void RegisterLayout(WindowId id, float x, float y, float w, float h);
+
+    /**
+     * @brief Apply a stored layout rectangle to the current ImGui window.
+     * @param id Window identifier.
+     * @param cond ImGui condition controlling when layout is applied.
+     * @return True when a stored layout exists for the given window id.
+     */
     bool ApplyLayout(WindowId id, ImGuiCond cond = ImGuiCond_Once);
+
+    /**
+     * @brief Remove all registered layout rectangles.
+     */
     void ClearLayouts();
+
+    /**
+     * @brief Register default layout rectangles used by editor windows.
+     */
     void InitializeDefaultLayouts();
 
 }

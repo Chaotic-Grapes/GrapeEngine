@@ -14,6 +14,7 @@ pointer capture within the GUI system.
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <vector>
 #include <glm/glm.hpp>
 #include "ecs/Components.h"
 #include "ecs/systems/GUIInputSystem.h"
@@ -21,9 +22,24 @@ pointer capture within the GUI system.
 #include "ecs/systems/RendererSystem.h"
 #include "graphics/renderer.hpp"
 #include "services/Input.h"
+#include "services/TimeSystem.h"
 
 namespace ECS {
     namespace {
+        enum class NavigationDirection : int {
+            Left = 0,
+            Right = 1,
+            Up = 2,
+            Down = 3
+        };
+
+        struct NavigationCandidate {
+            Entity Item = NULL_ENTITY;
+            int16_t ZOrder = std::numeric_limits<int16_t>::min();
+            Vector2D Center{};
+            bool IsSlider = false;
+        };
+
         struct SliderInteractionBasis {
             Vector2D Center{};
             Vector2D PrimaryAxis{};
@@ -43,6 +59,109 @@ namespace ECS {
 
         float Length2(const Vector2D& v) {
             return std::sqrt(v.X * v.X + v.Y * v.Y);
+        }
+
+        /**
+         * @brief Return the normalized axis vector used for directional navigation.
+         * @param direction Requested direction.
+         * @return Unit direction vector in screen-space coordinates.
+         * @complexity O(1).
+         */
+        Vector2D DirectionVector(const NavigationDirection direction) {
+            switch (direction) {
+            case NavigationDirection::Left:
+                return { -1.0f, 0.0f };
+            case NavigationDirection::Right:
+                return { 1.0f, 0.0f };
+            case NavigationDirection::Up:
+                return { 0.0f, -1.0f };
+            case NavigationDirection::Down:
+                return { 0.0f, 1.0f };
+            }
+            return { 0.0f, 0.0f };
+        }
+
+        /**
+         * @brief Resolve explicit GUINavigation override target for a direction.
+         * @param world ECS world used for component lookup.
+         * @param source Current focused entity.
+         * @param direction Navigation direction.
+         * @return Target entity when override exists and is alive; NULL_ENTITY otherwise.
+         * @complexity O(1).
+         */
+        Entity ResolveDirectionalOverride(const World& world, const Entity source, const NavigationDirection direction) {
+            if (!world.Has<Components::GUINavigation>(source)) {
+                return NULL_ENTITY;
+            }
+
+            const auto& nav = world.Get<Components::GUINavigation>(source);
+            if (!nav.Enabled) {
+                return NULL_ENTITY;
+            }
+
+            Entity overrideTarget = NULL_ENTITY;
+            switch (direction) {
+            case NavigationDirection::Left:
+                overrideTarget = nav.Left;
+                break;
+            case NavigationDirection::Right:
+                overrideTarget = nav.Right;
+                break;
+            case NavigationDirection::Up:
+                overrideTarget = nav.Up;
+                break;
+            case NavigationDirection::Down:
+                overrideTarget = nav.Down;
+                break;
+            }
+
+            if (overrideTarget.IsNull() || !world.IsAlive(overrideTarget)) {
+                return NULL_ENTITY;
+            }
+
+            return overrideTarget;
+        }
+
+        /**
+         * @brief Compute a directional ranking score for focus candidates.
+         * @param directionDir Unit vector for requested direction.
+         * @param from Source center.
+         * @param to Candidate center.
+         * @param outScore Receives candidate score when candidate is directionally valid.
+         * @return True when candidate lies in requested half-plane.
+         * @note Lower scores are better.
+         * @complexity O(1).
+         */
+        bool ComputeDirectionalScore(const Vector2D& directionDir,
+                                     const Vector2D& from,
+                                     const Vector2D& to,
+                                     float& outScore) {
+            const Vector2D delta = Sub2(to, from);
+            const float forward = Dot2(delta, directionDir);
+            if (forward <= 0.0001f) {
+                return false;
+            }
+
+            const Vector2D perpendicular = { -directionDir.Y, directionDir.X };
+            const float lateral = std::abs(Dot2(delta, perpendicular));
+
+            // Bias towards forward progress while penalizing large lateral jumps.
+            outScore = forward + lateral * 0.35f;
+            return true;
+        }
+
+        /**
+         * @brief Find first connected gamepad slot.
+         * @return Gamepad index in [0, MAX_GAMEPADS) or -1 when unavailable.
+         * @complexity O(MAX_GAMEPADS).
+         */
+        int FindConnectedGamepad() {
+            for (int gamepad = 0; gamepad < MAX_GAMEPADS; ++gamepad) {
+                if (Input::IsGamepadConnected(gamepad)) {
+                    return gamepad;
+                }
+            }
+            return -1;
         }
 
         Vector2D Rotate2D(const Vector2D& v, float radians) {
@@ -136,25 +255,52 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Reset all transient GUI input state for a fresh world/session.
+     * @return void
+     * @complexity O(1).
+     */
     void GUIInputSystem::ResetState() {
         m_captureEntity = NULL_ENTITY;
         m_activeSlider = NULL_ENTITY;
+        m_focusedEntity = NULL_ENTITY;
         m_sliderLastAxisCoord = 0.0f;
         m_sliderAxisValid = false;
+        m_activeGamepad = -1;
+        m_inputMode = InputMode::Pointer;
+        m_navRepeatTimer = 0.0f;
+        m_navHeldDirection = -1;
+        m_sliderRepeatTimer = 0.0f;
+        m_sliderHeldDirection = 0;
+        m_lastMousePosition = { 0.0f, 0.0f };
+        m_hasLastMousePosition = false;
     }
 
-    // Initialize GUI input system state for the world.
+    /**
+     * @brief Initialize per-world GUI input state.
+     * @param world ECS world owning this system instance.
+     * @return void
+     * @complexity O(1).
+     */
     void GUIInputSystem::OnCreate(World& world) {
         (void)world;
         ResetState();
     }
 
-    // Update GUI hover/press state from the current input.
+    /**
+     * @brief Update GUI pointer and controller interaction state for one frame.
+     * @param world ECS world containing GUI entities/components.
+     * @return void
+     * @note Mouse capture behavior remains unchanged; controller adds focus-driven interaction.
+     * @complexity O(n) where n is count of entities with GUIElement+GUIInput.
+     */
     void GUIInputSystem::OnUpdate(World& world) {
         auto* renderer = RendererSystem::GetInstance();
         if (!renderer) {
             return;
         }
+
+        const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
 
         if (!m_captureEntity.IsNull() && !world.IsAlive(m_captureEntity)) {
             m_captureEntity = NULL_ENTITY;
@@ -162,6 +308,13 @@ namespace ECS {
         if (!m_activeSlider.IsNull() && !world.IsAlive(m_activeSlider)) {
             m_activeSlider = NULL_ENTITY;
             m_sliderAxisValid = false;
+        }
+        if (!m_focusedEntity.IsNull() && !world.IsAlive(m_focusedEntity)) {
+            m_focusedEntity = NULL_ENTITY;
+        }
+
+        if (m_activeGamepad < 0 || !Input::IsGamepadConnected(m_activeGamepad)) {
+            m_activeGamepad = FindConnectedGamepad();
         }
 
         RendererSystem::GUIViewport viewport = renderer->GetGUIViewport();
@@ -294,10 +447,160 @@ namespace ECS {
             ? (rawInViewport ? mouseRaw : mouseScaled)
             : (hasDpiScale ? mouseScaled : mouseRaw);
 
+        bool mouseMoved = false;
+        if (m_hasLastMousePosition) {
+            const Vector2D mouseDelta = Sub2(mouse, m_lastMousePosition);
+            mouseMoved = std::abs(mouseDelta.X) > 0.5f || std::abs(mouseDelta.Y) > 0.5f;
+        }
+        m_lastMousePosition = mouse;
+        m_hasLastMousePosition = true;
+
         // Snapshot mouse button state for this frame.
         const bool mouseDown = Input::IsMouseDown(MOUSE_LEFT);
         const bool mousePressed = Input::IsMousePressed(MOUSE_LEFT);
         const bool mouseReleased = Input::IsMouseUp(MOUSE_LEFT);
+
+        if (mouseMoved || mousePressed || mouseReleased) {
+            m_inputMode = InputMode::Pointer;
+        }
+
+        bool navigationTriggered = false;
+        bool submitTriggered = false;
+        bool cancelTriggered = false;
+        bool sliderAdjustedByController = false;
+        int navigationDirectionInt = -1;
+        int sliderDirectionInt = 0;
+        bool sliderCoarseStep = false;
+
+        if (m_activeGamepad >= 0) {
+            const bool dpadLeftPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool dpadRightPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool dpadUpPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_UP);
+            const bool dpadDownPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_DOWN);
+
+            const bool dpadLeftDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool dpadRightDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool dpadUpDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_UP);
+            const bool dpadDownDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_DOWN);
+
+            const float leftX = Input::GetGamepadAxisWithDeadzone(m_activeGamepad, GAMEPAD_AXIS_LEFT_X, 0.35f);
+            const float leftY = Input::GetGamepadAxisWithDeadzone(m_activeGamepad, GAMEPAD_AXIS_LEFT_Y, 0.35f);
+
+            auto decodeDirectionalInput = [&](const float stickX, const float stickY) -> int {
+                if (std::abs(stickX) < 0.45f && std::abs(stickY) < 0.45f) {
+                    return -1;
+                }
+                if (std::abs(stickX) >= std::abs(stickY)) {
+                    return stickX < 0.0f ? static_cast<int>(NavigationDirection::Left)
+                                         : static_cast<int>(NavigationDirection::Right);
+                }
+                return stickY < 0.0f ? static_cast<int>(NavigationDirection::Up)
+                                     : static_cast<int>(NavigationDirection::Down);
+            };
+
+            int heldDirection = decodeDirectionalInput(leftX, leftY);
+            if (dpadLeftDown) {
+                heldDirection = static_cast<int>(NavigationDirection::Left);
+            } else if (dpadRightDown) {
+                heldDirection = static_cast<int>(NavigationDirection::Right);
+            } else if (dpadUpDown) {
+                heldDirection = static_cast<int>(NavigationDirection::Up);
+            } else if (dpadDownDown) {
+                heldDirection = static_cast<int>(NavigationDirection::Down);
+            }
+
+            const bool immediatePress = dpadLeftPressed || dpadRightPressed || dpadUpPressed || dpadDownPressed;
+
+            if (heldDirection == -1) {
+                m_navHeldDirection = -1;
+                m_navRepeatTimer = 0.0f;
+            } else if (m_navHeldDirection != heldDirection) {
+                m_navHeldDirection = heldDirection;
+                m_navRepeatTimer = m_navInitialRepeatDelay;
+                navigationTriggered = true;
+                navigationDirectionInt = heldDirection;
+            } else {
+                m_navRepeatTimer -= dt;
+                if (m_navRepeatTimer <= 0.0f) {
+                    m_navRepeatTimer = m_navRepeatInterval;
+                    navigationTriggered = true;
+                    navigationDirectionInt = heldDirection;
+                }
+            }
+
+            if (immediatePress) {
+                navigationTriggered = true;
+                if (dpadLeftPressed) {
+                    navigationDirectionInt = static_cast<int>(NavigationDirection::Left);
+                } else if (dpadRightPressed) {
+                    navigationDirectionInt = static_cast<int>(NavigationDirection::Right);
+                } else if (dpadUpPressed) {
+                    navigationDirectionInt = static_cast<int>(NavigationDirection::Up);
+                } else if (dpadDownPressed) {
+                    navigationDirectionInt = static_cast<int>(NavigationDirection::Down);
+                }
+                m_navHeldDirection = navigationDirectionInt;
+                m_navRepeatTimer = m_navInitialRepeatDelay;
+            }
+
+            submitTriggered = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_A);
+            cancelTriggered = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_B);
+
+            const bool sliderDecPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool sliderIncPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool sliderDecDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool sliderIncDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool leftBumperPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_LEFT_BUMPER);
+            const bool rightBumperPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_RIGHT_BUMPER);
+
+            int sliderHeldDirection = 0;
+            if (sliderDecDown || leftX < -0.50f) {
+                sliderHeldDirection = -1;
+            } else if (sliderIncDown || leftX > 0.50f) {
+                sliderHeldDirection = 1;
+            }
+
+            if (sliderHeldDirection == 0) {
+                m_sliderHeldDirection = 0;
+                m_sliderRepeatTimer = 0.0f;
+            } else if (m_sliderHeldDirection != sliderHeldDirection) {
+                m_sliderHeldDirection = sliderHeldDirection;
+                m_sliderRepeatTimer = m_sliderInitialRepeatDelay;
+                sliderAdjustedByController = true;
+                sliderDirectionInt = sliderHeldDirection;
+            } else {
+                m_sliderRepeatTimer -= dt;
+                if (m_sliderRepeatTimer <= 0.0f) {
+                    m_sliderRepeatTimer = m_sliderRepeatInterval;
+                    sliderAdjustedByController = true;
+                    sliderDirectionInt = sliderHeldDirection;
+                }
+            }
+
+            if (sliderDecPressed || sliderIncPressed || leftBumperPressed || rightBumperPressed) {
+                sliderAdjustedByController = true;
+                if (sliderDecPressed || leftBumperPressed) {
+                    sliderDirectionInt = -1;
+                } else if (sliderIncPressed || rightBumperPressed) {
+                    sliderDirectionInt = 1;
+                }
+                sliderCoarseStep = leftBumperPressed || rightBumperPressed;
+                m_sliderHeldDirection = sliderDirectionInt;
+                m_sliderRepeatTimer = m_sliderInitialRepeatDelay;
+            }
+
+            if (navigationTriggered || submitTriggered || cancelTriggered || sliderAdjustedByController) {
+                m_inputMode = InputMode::Gamepad;
+            }
+        } else {
+            m_navHeldDirection = -1;
+            m_navRepeatTimer = 0.0f;
+            m_sliderHeldDirection = 0;
+            m_sliderRepeatTimer = 0.0f;
+        }
+
+        std::vector<NavigationCandidate> navigationCandidates;
+        navigationCandidates.reserve(64);
 
         // Resolve top-most hovered element by z-order and stable entity tie-break.
         Entity topHovered = NULL_ENTITY;
@@ -309,11 +612,13 @@ namespace ECS {
 
             const bool isWorldSpace = (ResolveGUIRenderSpace(world, entity) == Components::GUIRenderSpace::World);
             bool hit = false;
+            Vector2D center{};
 
             if (world.Has<Components::GUISlider>(entity)) {
                 const auto& slider = world.Get<Components::GUISlider>(entity);
                 SliderInteractionBasis basis;
                 buildSliderBasis(entity, element, slider, isWorldSpace, basis);
+                center = basis.Valid ? basis.Center : Vector2D{};
 
                 float axisCoord = 0.0f;
                 float tFromCursor = 0.0f;
@@ -321,8 +626,16 @@ namespace ECS {
             } else {
                 const Vector2D pos = isWorldSpace ? element.ScreenPosition : element.ResolvedPosition;
                 const Vector2D size = isWorldSpace ? element.ScreenSize : element.ResolvedSize;
+                center = { pos.X + size.X * 0.5f, pos.Y + size.Y * 0.5f };
                 hit = PointInRect(mouse, pos, size);
             }
+
+            navigationCandidates.push_back(NavigationCandidate{
+                entity,
+                element.ZOrder,
+                center,
+                world.Has<Components::GUISlider>(entity)
+            });
 
             if (!hit) {
                 return;
@@ -334,12 +647,122 @@ namespace ECS {
             }
         });
 
+        auto findCandidate = [&](const Entity target) -> const NavigationCandidate* {
+            for (const NavigationCandidate& candidate : navigationCandidates) {
+                if (candidate.Item == target) {
+                    return &candidate;
+                }
+            }
+            return nullptr;
+        };
+
+        if (!m_focusedEntity.IsNull() && !findCandidate(m_focusedEntity)) {
+            m_focusedEntity = NULL_ENTITY;
+        }
+
+        if (m_focusedEntity.IsNull() && !topHovered.IsNull()) {
+            m_focusedEntity = topHovered;
+        }
+
+        if (m_focusedEntity.IsNull() && !navigationCandidates.empty()) {
+            const NavigationCandidate* best = &navigationCandidates.front();
+            for (const NavigationCandidate& candidate : navigationCandidates) {
+                if (IsHigherPriorityHit(candidate.Item, candidate.ZOrder, best->Item, best->ZOrder)) {
+                    best = &candidate;
+                }
+            }
+            m_focusedEntity = best->Item;
+        }
+
+        if (navigationTriggered && navigationDirectionInt >= 0 && !navigationCandidates.empty()) {
+            const NavigationDirection navDirection = static_cast<NavigationDirection>(navigationDirectionInt);
+            Entity nextFocus = NULL_ENTITY;
+
+            if (!m_focusedEntity.IsNull()) {
+                const Entity overrideEntity = ResolveDirectionalOverride(world, m_focusedEntity, navDirection);
+                if (!overrideEntity.IsNull() && findCandidate(overrideEntity)) {
+                    nextFocus = overrideEntity;
+                }
+            }
+
+            const NavigationCandidate* focusedCandidate = findCandidate(m_focusedEntity);
+            if (nextFocus.IsNull() && focusedCandidate) {
+                const Vector2D directionVector = DirectionVector(navDirection);
+
+                float bestScore = std::numeric_limits<float>::max();
+                const NavigationCandidate* bestDirectional = nullptr;
+                for (const NavigationCandidate& candidate : navigationCandidates) {
+                    if (candidate.Item == focusedCandidate->Item) {
+                        continue;
+                    }
+
+                    float score = 0.0f;
+                    if (!ComputeDirectionalScore(directionVector, focusedCandidate->Center, candidate.Center, score)) {
+                        continue;
+                    }
+
+                    const bool betterScore = score < bestScore;
+                    const bool equalScoreHigherPriority = std::abs(score - bestScore) <= 0.001f
+                        && bestDirectional
+                        && IsHigherPriorityHit(candidate.Item, candidate.ZOrder, bestDirectional->Item, bestDirectional->ZOrder);
+                    if (betterScore || equalScoreHigherPriority) {
+                        bestScore = score;
+                        bestDirectional = &candidate;
+                    }
+                }
+
+                if (bestDirectional) {
+                    nextFocus = bestDirectional->Item;
+                } else if (world.Has<Components::GUINavigation>(focusedCandidate->Item)) {
+                    const auto& nav = world.Get<Components::GUINavigation>(focusedCandidate->Item);
+                    if (nav.Enabled && nav.Wrap) {
+                        // Wrap mode picks the far-edge candidate opposite to travel direction.
+                        float edgeValue = std::numeric_limits<float>::max();
+                        float lateralValue = std::numeric_limits<float>::max();
+                        const NavigationCandidate* wrapCandidate = nullptr;
+                        const Vector2D perpendicular = { -directionVector.Y, directionVector.X };
+                        for (const NavigationCandidate& candidate : navigationCandidates) {
+                            const float projected = Dot2(candidate.Center, directionVector);
+                            const float lateral = std::abs(Dot2(Sub2(candidate.Center, focusedCandidate->Center), perpendicular));
+                            const bool betterProjected = projected < edgeValue - 0.001f;
+                            const bool equalProjectedBetterLateral = std::abs(projected - edgeValue) <= 0.001f && lateral < lateralValue;
+                            if (betterProjected || equalProjectedBetterLateral) {
+                                edgeValue = projected;
+                                lateralValue = lateral;
+                                wrapCandidate = &candidate;
+                            }
+                        }
+
+                        if (wrapCandidate) {
+                            nextFocus = wrapCandidate->Item;
+                        }
+                    }
+                }
+            }
+
+            if (!nextFocus.IsNull() && nextFocus != m_focusedEntity) {
+                m_focusedEntity = nextFocus;
+                if (m_activeGamepad >= 0 && Input::IsGamepadVibrationSupported(m_activeGamepad)) {
+                    // Tiny pulse gives tactile confirmation without sustained rumble.
+                    Input::SetGamepadVibration(m_activeGamepad, 0.08f, 0.12f);
+                    Input::StopGamepadVibration(m_activeGamepad);
+                }
+            }
+        }
+
+        if (cancelTriggered && !m_captureEntity.IsNull()) {
+            m_captureEntity = NULL_ENTITY;
+            m_activeSlider = NULL_ENTITY;
+            m_sliderAxisValid = false;
+        }
+
         // Iterate GUI elements and update per-entity input state.
         world.Each<Components::GUIElement, Components::GUIInput>([&](Entity entity, Components::GUIElement& element, Components::GUIInput& input) {
             input.Clicked = false;
             input.Released = false;
             input.Entered = false;
             input.Exited = false;
+            input.Focused = false;
 
             const bool interactable = IsEntityInteractable(world, entity, element);
             if (!interactable) {
@@ -350,6 +773,9 @@ namespace ECS {
                     m_activeSlider = NULL_ENTITY;
                     m_sliderAxisValid = false;
                 }
+                if (m_focusedEntity == entity) {
+                    m_focusedEntity = NULL_ENTITY;
+                }
                 input.Hovered = false;
                 input.Pressed = false;
                 input.Dragging = false;
@@ -359,14 +785,18 @@ namespace ECS {
                 return;
             }
 
-            const bool hovered = (entity == topHovered);
+            const bool pointerHovered = (entity == topHovered);
+            const bool focused = (entity == m_focusedEntity);
+            const bool hovered = (m_inputMode == InputMode::Gamepad) ? focused : pointerHovered;
             const bool wasHovered = input.Hovered;
             input.Hovered = hovered;
             input.Entered = (!wasHovered && hovered);
             input.Exited = (wasHovered && !hovered);
+            input.Focused = focused;
 
-            if (mousePressed && hovered) {
+            if (mousePressed && pointerHovered) {
                 m_captureEntity = entity;
+                m_focusedEntity = entity;
             }
 
             const bool captured = (m_captureEntity == entity);
@@ -377,7 +807,7 @@ namespace ECS {
                 input.Pressed = false;
                 input.Dragging = false;
                 input.Released = true;
-                if (hovered) {
+                if (pointerHovered) {
                     input.Clicked = true;
                 }
                 if (m_activeSlider == entity) {
@@ -394,6 +824,15 @@ namespace ECS {
                     m_sliderAxisValid = false;
                 }
                 m_captureEntity = NULL_ENTITY;
+            }
+
+            if (focused && submitTriggered) {
+                input.Clicked = true;
+                input.Released = true;
+                if (m_activeGamepad >= 0 && Input::IsGamepadVibrationSupported(m_activeGamepad)) {
+                    Input::SetGamepadVibration(m_activeGamepad, 0.12f, 0.18f);
+                    Input::StopGamepadVibration(m_activeGamepad);
+                }
             }
 
             if (world.Has<Components::GUIButton>(entity)) {
@@ -456,11 +895,39 @@ namespace ECS {
                         slider.ValueChanged = true;
                     }
                 }
+
+                if (focused && sliderAdjustedByController && sliderDirectionInt != 0) {
+                    float step = slider.Step;
+                    if (step <= 0.0f) {
+                        step = std::max(0.0001f, (slider.Max - slider.Min) / 100.0f);
+                    }
+
+                    if (sliderCoarseStep || Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_LEFT_BUMPER)
+                        || Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_RIGHT_BUMPER)) {
+                        step *= 10.0f;
+                    }
+
+                    const float value = QuantizeAndClampSliderValue(
+                        slider.Value + static_cast<float>(sliderDirectionInt) * step, slider);
+                    if (std::abs(value - slider.Value) > 0.0001f) {
+                        slider.Value = value;
+                        slider.ValueChanged = true;
+                        if (m_activeGamepad >= 0 && Input::IsGamepadVibrationSupported(m_activeGamepad)) {
+                            Input::SetGamepadVibration(m_activeGamepad, 0.06f, 0.10f);
+                            Input::StopGamepadVibration(m_activeGamepad);
+                        }
+                    }
+                }
             }
         });
     }
 
-    // Tear down GUI input system state.
+    /**
+     * @brief Tear down GUI input state before world shutdown.
+     * @param world ECS world owning this system instance.
+     * @return void
+     * @complexity O(1).
+     */
     void GUIInputSystem::OnDestroy(World& world) {
         (void)world;
         ResetState();
@@ -474,6 +941,7 @@ namespace ECS {
             .ReadComponent<Components::Active>()
             .ReadComponent<Components::Parent>()
             .ReadComponent<Components::GUIElement>()
+            .ReadComponent<Components::GUINavigation>()
             .WriteComponent<Components::GUIInput>()
             .WriteComponent<Components::GUIButton>()
             .WriteComponent<Components::GUISlider>()

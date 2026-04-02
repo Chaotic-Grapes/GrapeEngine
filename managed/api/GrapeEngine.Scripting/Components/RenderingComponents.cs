@@ -18,6 +18,7 @@ namespace GrapeEngine.Scripting.Components;
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteRenderer2D
 {
+    // Keep field order/layout in sync with ECS::Components::SpriteRenderer2D.
     public uint TextureId;
     public uint NormalTextureId;
     public Color Color;
@@ -30,6 +31,10 @@ public record struct SpriteRenderer2D
     public StringId TexturePath;
     public StringId NormalTexturePath;
     public StringId EmissiveTexturePath;
+    public byte TextureFilter;
+    public byte _paddingFilter0;
+    public byte _paddingFilter1;
+    public byte _paddingFilter2;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -48,6 +53,7 @@ public record struct SpriteShader2D
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteSheetAnimation2D
 {
+    // Keep field order/layout in sync with ECS::Components::SpriteSheetAnimation2D.
     public uint TextureId;
     public uint NormalTextureId;
     public int FrameWidth;
@@ -63,8 +69,47 @@ public record struct SpriteSheetAnimation2D
     public bool Loop;
     public bool Playing;
     public bool UseRow;
+    public bool UseSegments;
+    public byte SegmentCount;
+    public byte _paddingSegments0;
+    public byte _paddingSegments1;
+
+    // SegmentRows[8]
+    public int SegmentRow0;
+    public int SegmentRow1;
+    public int SegmentRow2;
+    public int SegmentRow3;
+    public int SegmentRow4;
+    public int SegmentRow5;
+    public int SegmentRow6;
+    public int SegmentRow7;
+
+    // SegmentOffsets[8]
+    public int SegmentOffset0;
+    public int SegmentOffset1;
+    public int SegmentOffset2;
+    public int SegmentOffset3;
+    public int SegmentOffset4;
+    public int SegmentOffset5;
+    public int SegmentOffset6;
+    public int SegmentOffset7;
+
+    // SegmentLengths[8]
+    public int SegmentLength0;
+    public int SegmentLength1;
+    public int SegmentLength2;
+    public int SegmentLength3;
+    public int SegmentLength4;
+    public int SegmentLength5;
+    public int SegmentLength6;
+    public int SegmentLength7;
+
     public StringId TexturePath;
     public StringId NormalTexturePath;
+    public byte TextureFilter;
+    public byte _paddingFilter0;
+    public byte _paddingFilter1;
+    public byte _paddingFilter2;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -188,6 +233,7 @@ public record struct ParticleEmitter
 [StructLayout(LayoutKind.Sequential)]
 public record struct BoidFlock
 {
+    // Keep field order/layout in sync with ECS::Components::BoidFlock.
     public int Count;
     public float SeparationWeight;
     public float AlignmentWeight;
@@ -198,8 +244,6 @@ public record struct BoidFlock
     public float MaxSpeed;
     public float MaxForce;
     public float BoidSize;
-    public uint TextureId;
-    public StringId TexturePath;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -273,11 +317,13 @@ public record struct GUIPanel
 [StructLayout(LayoutKind.Sequential)]
 public record struct GUIText
 {
+    // Keep field order/layout in sync with ECS::Components::GUIText.
     public StringId TextId;
     public StringId FontPathId;
     public Color Color;
     public float FontSize;
     public bool Wrap;
+    public GUIAlignment Alignment;
     public GUITextHAlign HAlign;
     public GUITextVAlign VAlign;
 }
@@ -306,12 +352,15 @@ public enum GUIImageScaleMode : byte
 [StructLayout(LayoutKind.Sequential)]
 public record struct GUIImage
 {
+    // Keep field order/layout in sync with ECS::Components::GUIImage.
     public uint TextureId;
     public StringId TexturePathId;
     public Color Color;
     public Vector4 UVRect;
     public GUIImageScaleMode ScaleMode;
+    public byte TextureFilter;
     public bool UseSlicing;
+    public byte _paddingFilter;
     public Vector4 SliceBorder;
 }
 
@@ -357,6 +406,7 @@ public record struct GUIButton
 [StructLayout(LayoutKind.Sequential)]
 public record struct GUISlider
 {
+    // Keep field order/layout in sync with ECS::Components::GUISlider.
     public float Value;
     public float Min;
     public float Max;
@@ -366,12 +416,15 @@ public record struct GUISlider
     public Color KnobColor;
     public uint TrackTextureId;
     public StringId TrackTexturePathId;
+    public Vector4 TrackUVRect;
     public byte TrackTextureFilter;
     public uint FillTextureId;
     public StringId FillTexturePathId;
+    public Vector4 FillUVRect;
     public byte FillTextureFilter;
     public uint KnobTextureId;
     public StringId KnobTexturePathId;
+    public Vector4 KnobUVRect;
     public byte KnobTextureFilter;
     public float CornerRadius;
     public Vector2 KnobSize;

@@ -23,9 +23,13 @@ polling system counters while the game is not running.
 #include "EditorIcons.h"
 #include "EditorStyle.h"
 #include "services/TimeSystem.h"
+#include "services/EditorService.h"
 #include "ecs/SystemManager.h"
 #include "services/MemoryManager.h"
 #include "ecs/World.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <algorithm>
@@ -159,62 +163,124 @@ void PerformancePanel::_renderOverviewStats() {
     ImGui::Text("%u", m_cachedComponentCount);
     ImGui::NextColumn();
 
+    // Pull optional GPU timings from editor service and window VSync status.
+    float sceneGpuMs = 0.0f;
+    float imguiGpuMs = 0.0f;
+    bool hasGpuTiming = false;
+    if (auto* editorService = Services::EditorService::Get()) {
+        hasGpuTiming = editorService->HasGpuTiming();
+        sceneGpuMs = editorService->GetSceneRenderGpuMs();
+        imguiGpuMs = editorService->GetImGuiRenderGpuMs();
+    }
+
+    Platform::IWindow* mainWindow = nullptr;
+    if (Engine::CORE) {
+        if (auto* platformContext = Engine::CORE->GetPlatformContext()) {
+            mainWindow = platformContext->GetMainWindow();
+        }
+    }
+
+    ImGui::Text("Scene GPU:");
+    ImGui::NextColumn();
+    if (hasGpuTiming) ImGui::Text("%.2f ms", sceneGpuMs);
+    else ImGui::TextDisabled("N/A");
+    ImGui::NextColumn();
+
+    ImGui::Text("ImGui GPU:");
+    ImGui::NextColumn();
+    if (hasGpuTiming) ImGui::Text("%.2f ms", imguiGpuMs);
+    else ImGui::TextDisabled("N/A");
+    ImGui::NextColumn();
+
+    ImGui::Text("VSync:");
+    ImGui::NextColumn();
+    if (mainWindow) {
+        bool vsyncEnabled = mainWindow->IsVSync();
+        if (ImGui::Checkbox("##PerfVSync", &vsyncEnabled)) {
+            mainWindow->SetVSync(vsyncEnabled);
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(vsyncEnabled ? "On" : "Off");
+    }
+    else {
+        ImGui::TextDisabled("N/A");
+    }
+    ImGui::NextColumn();
+
+    ImGui::Text("Scopes Last:");
+    ImGui::NextColumn();
+    ImGui::Text("%.2f ms", m_cachedTotalTime);
+    ImGui::NextColumn();
+
     ImGui::Columns(1);
 }
 
-// Draws per-system timing usage table with percentage bars and fallback engine bucket
+/**
+ * @brief Draw ECS-system and engine/frame scope timing tables separately.
+ * @return void
+ * @note Percentages are normalized against the current frame baseline so
+ *       system and engine rows can be compared directly.
+ */
 void PerformancePanel::_renderSystemsTable() {
     ImGui::PushFont(m_boldFont);
-    ImGui::Text("System Usage");
+    ImGui::Text("Profiling");
     ImGui::PopFont();
 
-    // Use cached total time
-    // Ensure it's not smaller than the frame time (some profilers report scope totals 
-    // that are smaller due to sampling or nested/overlapping scopes)
-    // Using at least the frame time prevents usage percentages from exceeding 100% unexpectedly
-    double totalTime = m_cachedTotalTime;
-    if (totalTime < 0.001)
-        totalTime = m_cachedFrameMs; // Fallback to frame time if no scopes
-    else
-        totalTime = std::max(totalTime, static_cast<double>(m_cachedFrameMs));
+    // Use frame time as the baseline and compare against same-frame scope values.
+    // This avoids mixing moving averages with last-frame totals, which can create
+    // synthetic spikes in unattributed time during transient hitches.
+    const double frameTimeMs = static_cast<double>(m_cachedFrameMs);
+    const double totalScopeLastMs = std::max(0.0, m_cachedTotalTime);
+    const double totalTime = std::max(frameTimeMs, totalScopeLastMs);
 
-    // Compute sum of scoped averages so we can show any "unattributed" time
-    double sumScopeAvgMs = 0.0;
+    // Sum last-sample values so unattributed time stays frame-consistent.
+    double sumScopeLastMs = 0.0;
+    double sumSystemLastMs = 0.0;
+    double sumEngineLastMs = 0.0;
     for (const auto& kv : m_cachedScopes) {
-        sumScopeAvgMs += static_cast<double>(kv.second.AverageTimeMs);
+        const double lastMs = static_cast<double>(kv.second.LastTimeMs);
+        sumScopeLastMs += lastMs;
+
+        if (kv.second.isKnownSystem) {
+            sumSystemLastMs += lastMs;
+        }
+        else {
+            sumEngineLastMs += lastMs;
+        }
     }
 
-    double unaccountedMs = totalTime - sumScopeAvgMs;
+    double unaccountedMs = totalTime - sumScopeLastMs;
     if (unaccountedMs < 0.0)
         unaccountedMs = 0.0; // Avoid negative due to rounding
 
-    // Render table with columns: System Name, %, Avg (ms), Max (ms)
-    if (ImGui::BeginTable("PerformanceTable", 4,
+    ImGui::Text("Systems");
+    if (ImGui::BeginTable("SystemUsageTable", 4,
         ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
 
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 150);
-        ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableSetupColumn("Last (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
         ImGui::TableSetupColumn("Max (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
         ImGui::TableHeadersRow();
 
-        // Render each system
+        // Render only known ECS systems.
         for (const auto& kv : m_cachedScopes) {
             const std::string& name = kv.first;
             const auto& data = kv.second;
 
-            // Skip disabled systems from display
-            // Even though we have [Disabled] tags, hiding them declutters the view
-            if (m_systemManager) {
-                if (!m_systemManager->IsSystemEnabled(name)) {
-                    continue;
-                }
+            if (!data.isKnownSystem) {
+                continue;
+            }
+
+            // Skip disabled systems to reduce noise in active-frame diagnosis.
+            if (!data.isEnabled) {
+                continue;
             }
 
             // Calculate usage percentage and clamp to [0, 100]
             float usagePercent = 0.0f;
             if (totalTime > 0.001) {
-                double percent = (static_cast<double>(data.AverageTimeMs) / totalTime) * 100.0;
+                double percent = (static_cast<double>(data.LastTimeMs) / totalTime) * 100.0;
                 if (percent < 0.0) percent = 0.0;
                 if (percent > 100.0) percent = 100.0;
                 usagePercent = static_cast<float>(percent);
@@ -237,14 +303,13 @@ void PerformancePanel::_renderSystemsTable() {
 
             ImGui::TableNextRow();
 
-            // Column 0: System Name with type and status indicators
+            // Column 0: System name with source and status indicators.
             ImGui::TableSetColumnIndex(0);
 
             // Get system info from cached data
             bool isScripted = data.isScripted;
             bool isEnabled = data.isEnabled;
-
-            // Display system type indicator
+            // Display system source indicator.
             if (isScripted) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.8f, 0.2f, 1.0f)); // Green for C#
                 ImGui::Text("[C#]");
@@ -257,7 +322,6 @@ void PerformancePanel::_renderSystemsTable() {
             }
             ImGui::SameLine();
 
-            // Display status indicator (based on cached data, not current check)
             if (isEnabled) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.9f, 0.2f, 1.0f)); // Green for Enabled
                 ImGui::Text("[Enabled]");
@@ -279,48 +343,106 @@ void PerformancePanel::_renderSystemsTable() {
             ImGui::SameLine();
             ImGui::Text("%.1f%%", usagePercent);
 
-            // Column 2: Average time
+            // Column 2: Last-sample time
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%.2f", data.AverageTimeMs);
+            ImGui::Text("%.2f", data.LastTimeMs);
 
             // Column 3: Max time
             ImGui::TableSetColumnIndex(3);
             ImGui::Text("%.2f", data.MaxTimeMs);
         }
 
-        // Show unattributed/render time
+        ImGui::EndTable();
+    }
+
+    ImGui::Text("Engine / Frame");
+    if (ImGui::BeginTable("EngineUsageTable", 4,
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
+
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableSetupColumn("Last (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableSetupColumn("Max (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableHeadersRow();
+
+        for (const auto& kv : m_cachedScopes) {
+            const std::string& name = kv.first;
+            const auto& data = kv.second;
+
+            if (data.isKnownSystem) {
+                continue;
+            }
+
+            float usagePercent = 0.0f;
+            if (totalTime > 0.001) {
+                double percent = (static_cast<double>(data.LastTimeMs) / totalTime) * 100.0;
+                if (percent < 0.0) percent = 0.0;
+                if (percent > 100.0) percent = 100.0;
+                usagePercent = static_cast<float>(percent);
+            }
+
+            ImVec4 barColor = ImVec4(0.55f, 0.55f, 0.55f, 1.0f);
+            if (usagePercent >= 60.0f) {
+                barColor = ImVec4(0.9f, 0.45f, 0.2f, 1.0f);
+            }
+            if (usagePercent >= 80.0f) {
+                barColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
+            }
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 1.0f));
+            ImGui::Text("[Engine]");
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", name.c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
+            ImGui::ProgressBar(usagePercent / 100.0f, ImVec2(-1.0f, 0.0f), "");
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::Text("%.1f%%", usagePercent);
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f", data.LastTimeMs);
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.2f", data.MaxTimeMs);
+        }
+
         if (unaccountedMs > 0.001) {
             double unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
             if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
             if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
 
             ImGui::TableNextRow();
-
-            // Column 0: System Name
             ImGui::TableSetColumnIndex(0);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-            ImGui::Text("Engine");
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+            ImGui::Text("[Engine] Unattributed");
             ImGui::PopStyleColor();
 
-            // Column 1: Usage % with gray bar
             ImGui::TableSetColumnIndex(1);
-            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
             ImGui::ProgressBar(static_cast<float>(unaccountedPercent / 100.0), ImVec2(-1.0f, 0.0f), "");
             ImGui::PopStyleColor();
             ImGui::SameLine();
             ImGui::Text("%.1f%%", static_cast<float>(unaccountedPercent));
 
-            // Column 2: Average time
             ImGui::TableSetColumnIndex(2);
             ImGui::Text("%.2f", unaccountedMs);
 
-            // Column 3: Max time (not tracked for render)
             ImGui::TableSetColumnIndex(3);
             ImGui::TextDisabled("-");
         }
 
         ImGui::EndTable();
     }
+
+    ImGui::Text("Frame split: Systems %.2f ms | Engine scopes %.2f ms | Unattributed %.2f ms",
+        static_cast<float>(sumSystemLastMs),
+        static_cast<float>(sumEngineLastMs),
+        static_cast<float>(unaccountedMs));
 }
 
 // Draws live memory-pool and ECS chunk metrics with quick health indicators
@@ -771,13 +893,18 @@ void PerformancePanel::_updateCachedData() {
 
         for (const auto& kv : liveScopes) {
             CachedScopeData cached;
+            cached.LastTimeMs = kv.second.LastTimeMs;
             cached.AverageTimeMs = kv.second.AverageTimeMs;
             cached.MaxTimeMs = kv.second.MaxTimeMs;
 
-            // Cache system info from SystemManager
+            // Cache system info from SystemManager. Keep non-system scopes
+            // visible as generic engine/editor frame scopes.
             if (m_systemManager) {
-                cached.isScripted = m_systemManager->IsScriptedSystem(kv.first);
-                cached.isEnabled = m_systemManager->IsSystemEnabled(kv.first);
+                if (auto* system = m_systemManager->GetSystem(kv.first)) {
+                    cached.isKnownSystem = true;
+                    cached.isScripted = m_systemManager->IsScriptedSystem(kv.first);
+                    cached.isEnabled = system->IsEnabled();
+                }
             }
 
             m_cachedScopes[kv.first] = cached;

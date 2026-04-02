@@ -141,8 +141,10 @@ namespace ECS {
             Chunk* c = m_chunks[chunkIndex].get();
             const uint32_t lastSlot = c->RemoveSwapBack(slot);
 
-            if (c->Count() == 0 && m_chunks.size() > 1) {
-                m_chunks.erase(m_chunks.begin() + chunkIndex);
+            // Only release empty tail chunks to keep chunk indices stable.
+            // Removing a middle chunk would shift indices and invalidate entity locations.
+            if (c->Count() == 0 && m_chunks.size() > 1 && chunkIndex == (m_chunks.size() - 1)) {
+                m_chunks.pop_back();
                 return lastSlot;
             }
 

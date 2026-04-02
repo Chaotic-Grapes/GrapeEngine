@@ -34,7 +34,11 @@ namespace Messaging {
         int Height;
         float AspectRatio;
 
-        // Builds resize payload and computes aspect ratio from supplied dimensions
+        /**
+         * @brief Build window resize payload and compute aspect ratio.
+         * @param w Window width in pixels.
+         * @param h Window height in pixels.
+         */
         WindowResized(int w, int h)
             : Width(w), Height(h), AspectRatio(static_cast<float>(w) / h) {
         }
@@ -60,7 +64,12 @@ namespace Messaging {
         bool Repeat;
         int Modifiers; // Ctrl, Shift, Alt flags
 
-        // Builds key pressed payload with optional repeat and modifier flag data
+        /**
+         * @brief Build key-pressed payload.
+         * @param k Key code.
+         * @param rep True when this event is key-repeat generated.
+         * @param mods Modifier bitmask snapshot.
+         */
         KeyPressed(int k, bool rep = false, int mods = 0)
             : Key(k), Repeat(rep), Modifiers(mods) {
         }
@@ -71,7 +80,11 @@ namespace Messaging {
         int Key;
         int Modifiers; // Modifier flags 
 
-        // Builds key released payload with keycode and modifier snapshot
+        /**
+         * @brief Build key-released payload.
+         * @param k Key code.
+         * @param mods Modifier bitmask snapshot.
+         */
         KeyReleased(int k, int mods = 0)
             : Key(k), Modifiers(mods) {
         }
@@ -202,7 +215,12 @@ namespace Messaging {
         int ValueB;
         int ValueC;
 
-        // Builds gameplay event payload with three integer values
+        /**
+         * @brief Build gameplay event payload with three integer values.
+         * @param a First gameplay value.
+         * @param b Second gameplay value.
+         * @param c Third gameplay value.
+         */
         GamePlayHappenEvent(int a, int b, int c)
             : ValueA(a), ValueB(b), ValueC(c) {
         }
@@ -214,7 +232,11 @@ namespace Messaging {
         std::string SoundName;
         float Volume;
 
-        // Builds play sound payload with target sound name and optional volume
+        /**
+         * @brief Build play-sound payload.
+         * @param name Sound identifier.
+         * @param vol Playback volume scalar.
+         */
         explicit PlaySoundEvent(const std::string& name, float vol = 0.5f)
             : SoundName(name), Volume(vol) {
         }
@@ -224,7 +246,10 @@ namespace Messaging {
     struct PauseSoundEvent {
         std::string SoundName;
 
-        // Builds pause sound payload for one sound id
+        /**
+         * @brief Build pause-sound payload.
+         * @param name Sound identifier.
+         */
         explicit PauseSoundEvent(const std::string& name)
             : SoundName(name) {
         }
@@ -234,7 +259,10 @@ namespace Messaging {
     struct StopSoundEvent {
         std::string SoundName;
 
-        // Builds stop sound payload for one sound id
+        /**
+         * @brief Build stop-sound payload.
+         * @param name Sound identifier.
+         */
         explicit StopSoundEvent(const std::string& name)
             : SoundName(name) {
         }
@@ -245,7 +273,11 @@ namespace Messaging {
         std::string SoundName;
         float Speed;
 
-        // Builds playback speed change payload for one sound id
+        /**
+         * @brief Build playback speed change payload.
+         * @param name Sound identifier.
+         * @param speed Playback speed scalar.
+         */
         SetSoundSpeedEvent(const std::string& name, float speed)
             : SoundName(name), Speed(speed) {
         }
@@ -256,7 +288,11 @@ namespace Messaging {
         std::string SoundName;
         float Volume;
 
-        // Builds volume change payload for one sound id
+        /**
+         * @brief Build sound-volume change payload.
+         * @param name Sound identifier.
+         * @param vol New volume scalar.
+         */
         SetSoundVolumeEvent(const std::string& name, float vol)
             : SoundName(name), Volume(vol) {
         }
@@ -273,7 +309,11 @@ namespace Messaging {
         float Height;
         float AspectRatio;
 
-        // Builds viewport resize payload and precomputes aspect ratio
+        /**
+         * @brief Build viewport resize payload and compute aspect ratio.
+         * @param w Viewport width in pixels.
+         * @param h Viewport height in pixels.
+         */
         ViewportResized(float w, float h)
             : Width(w), Height(h), AspectRatio(w / h) {
         }
@@ -283,7 +323,10 @@ namespace Messaging {
     struct EditorViewportLayoutRequested {
         int Layout = 1;
 
-        // Builds editor layout request payload with selected layout preset
+        /**
+         * @brief Build editor viewport layout request payload.
+         * @param layout Requested layout preset id.
+         */
         explicit EditorViewportLayoutRequested(int layout)
             : Layout(layout) {}
     };
@@ -302,7 +345,16 @@ namespace Messaging {
         Quaternion NewRotation;
         Vector3D NewScale;
 
-        // Builds transform delta payload with full old and new transform state
+        /**
+         * @brief Build transform-changed payload with old and new transform state.
+         * @param id Entity identifier.
+         * @param oldPos Previous position.
+         * @param oldRot Previous rotation.
+         * @param oldScale Previous scale.
+         * @param newPos New position.
+         * @param newRot New rotation.
+         * @param newScale New scale.
+         */
         EntityTransformChanged(uint32_t id, 
                              const Vector3D& oldPos, const Quaternion& oldRot, const Vector3D& oldScale,
                              const Vector3D& newPos, const Quaternion& newRot, const Vector3D& newScale)
@@ -316,7 +368,10 @@ namespace Messaging {
     struct SceneModified {
         std::string Reason; // Optional description of what changed
 
-        // Builds scene modified payload with optional reason text
+        /**
+         * @brief Build scene-modified payload.
+         * @param reason Optional description of what changed.
+         */
         SceneModified(const std::string& reason = "")
             : Reason(reason) {
         }

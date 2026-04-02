@@ -38,28 +38,54 @@ namespace Audio {
             std::string Path;
         };
 
-        // rebuild registry by scanning the audio root folder
+        /**
+         * @brief Rebuild cue registry by scanning an audio root folder.
+         * @param audioRoot Root path recursively scanned for supported audio files.
+         */
         void Refresh(const std::string& audioRoot);
 
-        // return all registered cues
+        /**
+         * @brief Get all registered cues.
+         * @return Const reference to cue metadata list.
+         */
         const std::vector<CueInfo>& GetAll() const {
             // return internal cue storage
             return m_cues;
         }
 
-        // find one cue by cue id
+        /**
+         * @brief Find cue metadata by cue id.
+         * @param id Cue identifier.
+         * @return Pointer to cue metadata, or nullptr when id is unknown.
+         */
         const CueInfo* FindById(uint32_t id) const;
 
-        // find one cue by normalized path
+        /**
+         * @brief Find cue metadata by normalized path.
+         * @param path Cue asset path.
+         * @return Pointer to cue metadata, or nullptr when path is unknown.
+         */
         const CueInfo* FindByPath(const std::string& path) const;
 
-        // register one cue path when missing
+        /**
+         * @brief Register a cue path if not present and return its metadata.
+         * @param path Cue asset path to register.
+         * @return Reference to existing or newly inserted cue metadata.
+         */
         const CueInfo& Register(const std::string& path);
 
-        // normalize path separators for stable lookup
+        /**
+         * @brief Normalize path separators for deterministic lookup/hashing.
+         * @param path Input file path.
+         * @return Normalized path string.
+         */
         static std::string NormalizePath(std::string path);
 
-        // hash path into a cue id value
+        /**
+         * @brief Hash a normalized path into a cue id.
+         * @param path Normalized cue path.
+         * @return Deterministic 32-bit cue id.
+         */
         static uint32_t HashPath(const std::string& path);
 
     private:

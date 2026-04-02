@@ -34,13 +34,48 @@ inline float UnitsToPixels(float wu) { return wu * kPixelsPerUnit; }
 
 class GRAPEENGINE_API Renderer {
 public:
+    /**
+     * @brief Construct a batched renderer with fixed quad capacity.
+     * @param maxQuads Maximum number of quads that can be batched before a flush is required.
+     */
     Renderer(size_t maxQuads = 20000);
+
+    /**
+     * @brief Destroy renderer resources and release GPU objects.
+     */
     ~Renderer();
 
+    /**
+     * @brief Begin a new CPU-side batch.
+     */
     void beginFrame();
+
+    /**
+     * @brief Upload and draw the current batch if it contains geometry.
+     */
     void endFrame();
 
-    // Submit textured quad (sprite) to the batcher
+    /**
+     * @brief Submit one textured quad with optional emissive and material maps.
+     * @param pos Quad center position in world space.
+     * @param size Quad width/height in world units.
+     * @param textureId Albedo texture id, or 0 for untextured.
+     * @param uvRect UV rectangle as (u0, v0, u1, v1).
+     * @param color Vertex tint color.
+     * @param rotation Rotation in radians.
+     * @param scale Uniform scale multiplier.
+     * @param layer Reserved render layer value.
+     * @param emissiveTextureId Emissive map texture id, or 0 to disable.
+     * @param emissiveStrength Emissive multiplier used by the shader.
+     * @param normalTextureId Normal map texture id, or 0 to disable.
+     * @param mraTextureId Metallic-roughness-AO map texture id, or 0 to disable.
+     * @param metallic Scalar metallic fallback value.
+     * @param smoothness Scalar smoothness fallback value.
+     * @param aoStrength Scalar ambient occlusion fallback value.
+     * @param normalStrength Scalar normal influence fallback value.
+     * @param materialFlags Bitfield interpreted by the material shader.
+     * @param textureFilter Sampler filter used for albedo sampling.
+     */
     void submitQuad(const glm::vec2& pos,
         const glm::vec2& size,
         GLuint textureId,
@@ -60,22 +95,46 @@ public:
         uint32_t materialFlags = 0,
         Graphics::TextureFilter textureFilter = Graphics::TextureFilter::Nearest);
 
-    // Generic triangles for helpers (polygons/circles/etc.)
+    /**
+     * @brief Submit indexed triangle geometry to the current batch.
+     * @param verts Pointer to vertex data.
+     * @param vCount Number of vertices in verts.
+     * @param indices Pointer to index data.
+     * @param iCount Number of indices in indices.
+     * @param textureId Albedo texture id to bind for this draw chunk, or 0.
+     * @param layer Reserved render layer value.
+     */
     void submitTriangles(const Vertex* verts, size_t vCount,
         const uint32_t* indices, size_t iCount,
         GLuint textureId,
         int layer = 0);
 
+    /**
+     * @brief Submit a sprite convenience struct as a quad draw.
+     * @param sprite Sprite payload containing transform, UV, tint, and material settings.
+     */
     void submitSprite(const Sprite& sprite);
 
+    /**
+     * @brief Submit text quads from a font atlas for the provided string.
+     * @param font Font atlas and glyph metrics source.
+     * @param text UTF-8 text to render.
+     * @param pos Baseline anchor position.
+     * @param color Text tint color.
+     * @param pixelSize Requested glyph height in pixels.
+     */
     void submitText(const Font& font,
         std::string_view text,
         glm::vec2 pos,
         glm::vec4 color,
         float pixelSize);
 
+    /**
+     * @brief Draw a full-screen quad using the currently bound pipeline state.
+     */
     void drawFullscreenQuad() const;
 
+    /** Number of flushes performed in the active frame. */
     int flushCountThisFrame = 0;
 
 private:

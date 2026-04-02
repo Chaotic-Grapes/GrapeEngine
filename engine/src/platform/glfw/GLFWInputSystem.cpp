@@ -101,6 +101,18 @@ namespace Platform {
         return Input::GetGamepadAxisWithDeadzone(gamepad, axis, deadzone);
     }
 
+    bool GLFWInputSystem::SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency) {
+        return Input::SetGamepadVibration(gamepad, lowFrequency, highFrequency);
+    }
+
+    void GLFWInputSystem::StopGamepadVibration(int gamepad) {
+        Input::StopGamepadVibration(gamepad);
+    }
+
+    bool GLFWInputSystem::IsGamepadVibrationSupported(int gamepad) {
+        return Input::IsGamepadVibrationSupported(gamepad);
+    }
+
     void GLFWInputSystem::SetCursorVisible(bool visible) {
         if (!m_window) return;
         

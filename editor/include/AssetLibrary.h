@@ -41,13 +41,24 @@ public:
     // Lifecycle
     // -------------------------------------------------------------------------
 
-    // Initialize fonts and prepare UI helpers for drawing labels and icons
+    /**
+     * @brief Initialize fonts and editor references for asset UI helpers.
+     * @param mainFont Primary text font.
+     * @param boldFont Bold text font.
+     * @param symbolsFont Symbol/icon font.
+     */
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
-    // Connect the inspector to enable opening prefabs from file entries
+    /**
+     * @brief Attach inspector integration for prefab open actions.
+     * @param inspector Inspector panel used for prefab workflows.
+     */
     void SetInspector(InspectorPanel* inspector) { m_inspector = inspector; }
 
-    // Update world reference when switching scenes
+    /**
+     * @brief Update world reference after scene/world changes.
+     * @param world Active ECS world.
+     */
     void SetWorld(ECS::World* world) { m_world = world; }
 
 private:
@@ -55,39 +66,85 @@ private:
     // Navigation and Display
     // -------------------------------------------------------------------------
 
-    // Render breadcrumb path bar and handle click-to-navigate
+    /**
+     * @brief Render clickable breadcrumb path UI.
+     * @param currentPath Currently visible folder path.
+     * @param selectedAsset Currently selected asset path.
+     * @param outNewPath Output path when user navigates to another folder.
+     */
     void _displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath);
 
-    // List subfolders and files inside a folder, handling selection and directory entry
+    /**
+     * @brief Render directory contents and handle selection/navigation.
+     * @param folderPath Folder to enumerate.
+     * @param selectedAsset Selected asset path, updated by interaction.
+     * @param currentPath Current folder path, updated on navigation.
+     */
     void _displayFolder(const std::filesystem::path& folderPath, std::string& selectedAsset, std::string& currentPath);
 
-    // Render a single file entry and allow selection
+    /**
+     * @brief Render one file entry and process selection input.
+     * @param filePath File to display.
+     * @param selectedAsset Selected asset path, updated on click.
+     */
     void _displayFile(const std::filesystem::path& filePath, std::string& selectedAsset);
 
-    // Display type, size, and quick actions for the currently selected file
+    /**
+     * @brief Render metadata and actions for selected asset.
+     * @param selectedAsset Path of currently selected asset.
+     */
     void _displaySelectedFileInfo(const std::string& selectedAsset);
 
     // -------------------------------------------------------------------------
     // Import Replace Delete
     // -------------------------------------------------------------------------
 
-    // Open an OS file dialog to import a new asset into the current folder
+    /**
+     * @brief Import an asset via operating-system file picker.
+     * @param currentPath Destination folder path.
+     * @param selectedAsset Selected asset output path.
+     * @param statusMessage UI status message buffer.
+     * @param statusTimer Timer controlling status visibility.
+     */
     void _importAsset(const std::string& currentPath, std::string& selectedAsset,
         std::string& statusMessage, float& statusTimer);
 
-    // Replace the selected texture with a new file, triggering hot reload
+    /**
+     * @brief Replace currently selected texture with imported file.
+     * @param selectedAsset Path to texture being replaced.
+     * @param statusMessage UI status message buffer.
+     * @param statusTimer Timer controlling status visibility.
+     */
     void _replaceTexture(const std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Handle a file dropped from the OS, copying it into the project
+    /**
+     * @brief Import file dropped from external OS drag-and-drop.
+     * @param sourcePath Source file dropped into editor.
+     * @param currentPath Destination folder path.
+     * @param selectedAsset Selected asset output path.
+     * @param statusMessage UI status message buffer.
+     * @param statusTimer Timer controlling status visibility.
+     */
     void _handleFileDrop(const std::string& sourcePath, const std::string& currentPath,
         std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Shared import path used by both file dialog import and OS drag-drop import
-    // Validates destination and resolves name conflicts before copying
+    /**
+     * @brief Shared import routine used by dialog and file-drop workflows.
+     * @param sourcePath Source file path to import.
+     * @param currentPath Destination folder path.
+     * @param selectedAsset Selected asset output path.
+     * @param statusMessage UI status message buffer.
+     * @param statusTimer Timer controlling status visibility.
+     */
     void _importFromSourcePath(const std::filesystem::path& sourcePath, const std::string& currentPath,
         std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Delete the selected file or folder and clear selection
+    /**
+     * @brief Delete selected asset (file or folder) and clear selection.
+     * @param selectedAsset Selected asset path to delete.
+     * @param statusMessage UI status message buffer.
+     * @param statusTimer Timer controlling status visibility.
+     */
     void _deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
     // -------------------------------------------------------------------------

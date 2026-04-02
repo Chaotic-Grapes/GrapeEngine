@@ -154,7 +154,7 @@ namespace ECS {
          * 
          * @return Vector of system groups, each group represents one execution level
          */
-        std::vector<std::vector<ISystem*>> GetExecutionLevels() const;
+        const std::vector<std::vector<ISystem*>>& GetExecutionLevels() const;
 
         /**
          * @brief Build execution stages for a specific system group.
@@ -250,6 +250,10 @@ namespace ECS {
 
         /// All explicit dependencies for debugging
         std::vector<SystemDependency> m_allDependencies;
+
+        // Cached topological levels to avoid rebuilding the same schedule every frame.
+        mutable std::vector<std::vector<ISystem*>> m_cachedExecutionLevels;
+        mutable bool m_executionLevelsDirty = true;
 
         /**
          * @brief Check if component access between systems conflicts.

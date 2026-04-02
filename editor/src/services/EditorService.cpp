@@ -280,6 +280,46 @@ void EditorService::Initialize() {
 
         // Mark cursor support so ImGui can request cursor shape changes when needed
         io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+
+        // Enable GPU timing only when timer queries are supported by this GLAD build/runtime.
+        const bool hasGl33 =
+    #ifdef GLAD_GL_VERSION_3_3
+            (GLAD_GL_VERSION_3_3 != 0);
+    #else
+            false;
+    #endif
+
+        const bool hasArbTimerQuery =
+    #ifdef GLAD_GL_ARB_timer_query
+            (GLAD_GL_ARB_timer_query != 0);
+    #else
+            false;
+    #endif
+
+        m_gpuTimingSupported = hasGl33 || hasArbTimerQuery;
+        m_sceneGpuQuery = 0u;
+        m_imguiGpuQuery = 0u;
+        m_sceneGpuQueryPending = false;
+        m_imguiGpuQueryPending = false;
+        m_sceneGpuMs = 0.0f;
+        m_imguiGpuMs = 0.0f;
+        if (m_gpuTimingSupported) {
+            glGenQueries(1, &m_sceneGpuQuery);
+            glGenQueries(1, &m_imguiGpuQuery);
+            m_gpuTimingSupported = (m_sceneGpuQuery != 0u) && (m_imguiGpuQuery != 0u);
+
+            if (!m_gpuTimingSupported) {
+                if (m_sceneGpuQuery != 0u) {
+                    glDeleteQueries(1, &m_sceneGpuQuery);
+                    m_sceneGpuQuery = 0u;
+                }
+                if (m_imguiGpuQuery != 0u) {
+                    glDeleteQueries(1, &m_imguiGpuQuery);
+                    m_imguiGpuQuery = 0u;
+                }
+            }
+        }
+
         m_backendInitialized = true;
 
         if (!m_initialized) {
@@ -333,6 +373,30 @@ void EditorService::ClearStepRequest() const { if (m_levelEditor) m_levelEditor-
 // Returns current playback state or Edit when level editor is unavailable
 EditorState EditorService::GetPlaybackState() const { 
     return (m_levelEditor) ? m_levelEditor->GetEditorState() : EditorState::Edit; 
+}
+
+/**
+ * @brief Returns whether GPU timer query instrumentation is active.
+ * @return True when scene and ImGui GPU timings are available.
+ */
+bool EditorService::HasGpuTiming() const {
+    return m_gpuTimingSupported;
+}
+
+/**
+ * @brief Get the latest scene-render GPU elapsed time.
+ * @return Scene GPU time in milliseconds.
+ */
+float EditorService::GetSceneRenderGpuMs() const {
+    return m_sceneGpuMs;
+}
+
+/**
+ * @brief Get the latest ImGui-render GPU elapsed time.
+ * @return ImGui GPU time in milliseconds.
+ */
+float EditorService::GetImGuiRenderGpuMs() const {
+    return m_imguiGpuMs;
 }
 
 // Updates active world reference and propagates scene target into level editor
@@ -453,6 +517,29 @@ void EditorService::Update() {
 void EditorService::Render() {
     if (!m_initialized || !m_backendInitialized) {
         return;
+    }
+
+    // Consume completed query results from prior frames without stalling CPU.
+    if (m_gpuTimingSupported) {
+        auto tryConsumeGpuQuery = [](const unsigned int queryId, bool& pending, float& outputMs) {
+            if (!pending || queryId == 0u) {
+                return;
+            }
+
+            GLuint available = 0u;
+            glGetQueryObjectuiv(queryId, GL_QUERY_RESULT_AVAILABLE, &available);
+            if (available == 0u) {
+                return;
+            }
+
+            GLuint64 elapsedNs = 0u;
+            glGetQueryObjectui64v(queryId, GL_QUERY_RESULT, &elapsedNs);
+            outputMs = static_cast<float>(static_cast<double>(elapsedNs) / 1000000.0);
+            pending = false;
+        };
+
+        tryConsumeGpuQuery(m_sceneGpuQuery, m_sceneGpuQueryPending, m_sceneGpuMs);
+        tryConsumeGpuQuery(m_imguiGpuQuery, m_imguiGpuQueryPending, m_imguiGpuMs);
     }
 
     auto* activeScene = m_sceneManager.GetActive();
@@ -606,7 +693,17 @@ void EditorService::Render() {
         // Normal editor update/render path while startup screens are not in exclusive mode
         if (m_levelEditor && shouldShowLevelEditor) {
             m_levelEditor->Update();
+
+            // Track GPU cost of scene/editor world rendering independent of ImGui pass.
+            const bool canProfileSceneGpu = m_gpuTimingSupported && !m_sceneGpuQueryPending && (m_sceneGpuQuery != 0u);
+            if (canProfileSceneGpu) {
+                glBeginQuery(GL_TIME_ELAPSED, m_sceneGpuQuery);
+            }
             m_levelEditor->Render();
+            if (canProfileSceneGpu) {
+                glEndQuery(GL_TIME_ELAPSED);
+                m_sceneGpuQueryPending = true;
+            }
         }
 
         // When startup controller exists but no overlay mode is active, allow it to render contextual UI panels
@@ -639,7 +736,16 @@ void EditorService::Render() {
 
     auto* drawData = ImGui::GetDrawData();
     if (drawData) {
+        // Track GPU cost for pure ImGui rendering pass.
+        const bool canProfileImGuiGpu = m_gpuTimingSupported && !m_imguiGpuQueryPending && (m_imguiGpuQuery != 0u);
+        if (canProfileImGuiGpu) {
+            glBeginQuery(GL_TIME_ELAPSED, m_imguiGpuQuery);
+        }
         ImGui_ImplOpenGL3_RenderDrawData(drawData);
+        if (canProfileImGuiGpu) {
+            glEndQuery(GL_TIME_ELAPSED);
+            m_imguiGpuQueryPending = true;
+        }
     }
 }
 
@@ -701,6 +807,20 @@ void EditorService::Terminate() {
         }
         ImGui::DestroyContext();
     }
+
+    if (m_sceneGpuQuery != 0u) {
+        glDeleteQueries(1, &m_sceneGpuQuery);
+        m_sceneGpuQuery = 0u;
+    }
+    if (m_imguiGpuQuery != 0u) {
+        glDeleteQueries(1, &m_imguiGpuQuery);
+        m_imguiGpuQuery = 0u;
+    }
+    m_gpuTimingSupported = false;
+    m_sceneGpuQueryPending = false;
+    m_imguiGpuQueryPending = false;
+    m_sceneGpuMs = 0.0f;
+    m_imguiGpuMs = 0.0f;
     
     m_initialized = false;
 }
@@ -736,5 +856,8 @@ bool EditorService::IsGamePlaying() const { return false; }
 bool EditorService::IsStepRequested() const { return false; }
 void EditorService::ClearStepRequest() const {}
 EditorState EditorService::GetPlaybackState() const { return EditorState::Edit; }
+bool EditorService::HasGpuTiming() const { return false; }
+float EditorService::GetSceneRenderGpuMs() const { return 0.0f; }
+float EditorService::GetImGuiRenderGpuMs() const { return 0.0f; }
 void EditorService::SetWorld(ECS::World* world) { (void)world; }
 #endif

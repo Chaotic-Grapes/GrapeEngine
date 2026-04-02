@@ -60,6 +60,7 @@ private:
     bool m_showColliders = true;
     bool m_showLights = true;
     bool m_showSelectionOutline = true;
+    bool m_bloomEnabled = true;
 
     // Active debug view index for render graph output
     int m_debugViewIndex = 0;

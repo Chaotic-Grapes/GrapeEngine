@@ -22,7 +22,9 @@ variables of various types (bool, int, float, vectors, and matrices).
 class GRAPEENGINE_API Shader {
 public:
     Shader() = default;
+    // Load, compile, and link a shader program from vertex/fragment source files.
     Shader(const std::string& vertexPath, const std::string& fragmentPath);
+    // Release the owned OpenGL program.
     ~Shader();
 
     Shader(const Shader&) = delete;
@@ -31,6 +33,7 @@ public:
     Shader(Shader&& other) noexcept;
     Shader& operator=(Shader&& other) noexcept;
 
+    // Bind this shader program as the current OpenGL program.
     void use() const;
 
     // Uniform setters
@@ -50,6 +53,8 @@ public:
 private:
     GLuint m_program = 0;
 
+    // Read a shader source file into memory.
     std::string loadFile(const std::string& path) const;
+    // Compile one shader stage and return its OpenGL handle.
     GLuint compileShader(GLenum type, const std::string& src) const;
 };

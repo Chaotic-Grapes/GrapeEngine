@@ -35,7 +35,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 class TileLayer
 {
 public:
-    // Construct a layer with fixed width and height, initialized to EMPTY_TILE
+    /**
+     * @brief Construct a layer with fixed dimensions initialized to EMPTY_TILE.
+     * @param width Layer width in tiles.
+     * @param height Layer height in tiles.
+     */
     TileLayer(uint32_t width, uint32_t height)
         : m_width(width),
         m_height(height),
@@ -44,8 +48,12 @@ public:
         assert(width > 0 && height > 0);
     }
 
-    // Safe read access
-    // Returns EMPTY_TILE if out of bounds
+    /**
+     * @brief Read one tile by unsigned coordinates.
+     * @param x Tile x coordinate.
+     * @param y Tile y coordinate.
+     * @return Tile ID at the requested position, or EMPTY_TILE when out of bounds.
+     */
     TileID Get(uint32_t x, uint32_t y) const
     {
         if (!InBounds(x, y))
@@ -54,8 +62,12 @@ public:
         return m_tiles[Index(x, y)];
     }
 
-    // Safe write access
-    // Ignores writes that are out of bounds
+    /**
+     * @brief Write one tile by unsigned coordinates.
+     * @param x Tile x coordinate.
+     * @param y Tile y coordinate.
+     * @param id Tile ID to store.
+     */
     void Set(uint32_t x, uint32_t y, TileID id)
     {
         if (!InBounds(x, y))
@@ -64,7 +76,16 @@ public:
         m_tiles[Index(x, y)] = id;
     }
 
+    /**
+     * @brief Get layer width.
+     * @return Width in tiles.
+     */
     uint32_t Width() const { return m_width; }
+
+    /**
+     * @brief Get layer height.
+     * @return Height in tiles.
+     */
     uint32_t Height() const { return m_height; }
 
 private:
@@ -74,11 +95,23 @@ private:
     // Linear row-major storage: index = y * width + x
     std::vector<TileID> m_tiles;
 
+    /**
+     * @brief Check whether coordinates are inside layer bounds.
+     * @param x Tile x coordinate.
+     * @param y Tile y coordinate.
+     * @return True when coordinates are valid for this layer.
+     */
     bool InBounds(uint32_t x, uint32_t y) const
     {
         return x < m_width && y < m_height;
     }
 
+    /**
+     * @brief Convert tile coordinates into a linear row-major index.
+     * @param x Tile x coordinate.
+     * @param y Tile y coordinate.
+     * @return Row-major linear index.
+     */
     uint32_t Index(uint32_t x, uint32_t y) const
     {
         return y * m_width + x;

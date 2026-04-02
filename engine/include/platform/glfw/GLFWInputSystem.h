@@ -65,6 +65,9 @@ namespace Platform {
 
         float GetGamepadAxis(int gamepad, int axis) override;
         float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) override;
+        bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency) override;
+        void StopGamepadVibration(int gamepad) override;
+        bool IsGamepadVibrationSupported(int gamepad) override;
 
         void SetCursorVisible(bool visible) override;
         bool IsCursorVisible() const override;

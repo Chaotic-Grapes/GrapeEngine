@@ -393,15 +393,8 @@ namespace Engine {
         // This allows editor to implement play/pause/step/edit state transitions
         m_systemManager.SetActiveRunModeMask(modes);
 
-        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world);
-        }
-        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::PlayOnly))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
-        }
-        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world);
-        }
+        // Execute all active modes in one traversal to reduce per-frame overhead.
+        m_systemManager.UpdateSystemsByMask(modes, world);
     }
 
     void Application::_initializeServices() {

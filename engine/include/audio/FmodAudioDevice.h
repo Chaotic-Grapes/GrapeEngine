@@ -67,34 +67,128 @@ namespace Audio {
             m_busLowPassResonance.fill(1.0f);
         } // POD-like; call Initialize() before use
 
-        // Lifecycle
+        /**
+         * @brief Initialize FMOD system using default output device.
+         * @return True when initialization succeeds.
+         */
         bool Initialize();
+
+        /**
+         * @brief Initialize FMOD system using a specific output device id.
+         * @param deviceID Device identifier string.
+         * @return True when initialization succeeds.
+         */
         bool InitializeWithDevice(const std::string& deviceID);  // Initialize with specific device
+
+        /**
+         * @brief Pump FMOD and prune stale single-instance references.
+         */
         void Update();    // pumps FMOD and prunes stale singletons
+
+        /**
+         * @brief Shutdown FMOD and release runtime resources.
+         */
         void Shutdown();
 
-        // Cues
+        /**
+         * @brief Load a cue into FMOD cache.
+         * @param cueId Logical cue identifier.
+         * @param filePath Source audio path.
+         * @param params Sound loading parameters.
+         * @return True when loading succeeds.
+         */
         bool LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params);
+
+        /**
+         * @brief Unload one cue from cache.
+         * @param cueId Logical cue identifier.
+         */
         void UnloadCue(const std::string& cueId);
+
+        /**
+         * @brief Check whether cue id is currently loaded.
+         * @param cueId Logical cue identifier.
+         * @return True when cue exists.
+         */
         bool HasCue(const std::string& cueId) const;
 
-        // Playback
+        /**
+         * @brief Play one cue and return a handle for runtime control.
+         * @param cueId Logical cue identifier.
+         * @param settings Per-play settings.
+         * @param bus Mixer bus route.
+         * @return Playback handle for the started instance.
+         */
         PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings, Bus bus = Bus::SFX);
+
+        /**
+         * @brief Stop one playback handle.
+         * @param handle Handle to stop.
+         * @param mode Stop behavior.
+         */
         void Stop(PlaybackHandle handle, StopMode mode);
 
-        // Single-instance helpers (stop stacking, make Stop reliable by cue)
+        /**
+         * @brief Play cue with single-instance policy control.
+         * @param cueId Logical cue identifier.
+         * @param settings Per-play settings.
+         * @param policy Single-instance policy.
+         * @param bus Mixer bus route.
+         * @return Playback handle for active/started instance.
+         */
         PlaybackHandle PlaySingle(const std::string& cueId,
             const PlaySettings& settings,
             PlayPolicy policy = PlayPolicy::SingleInstanceRestart,
             Bus bus = Bus::SFX);
+
+        /**
+         * @brief Stop cue playback via cue id mapping.
+         * @param cueId Logical cue identifier.
+         * @param mode Stop behavior.
+         */
         void StopCue(const std::string& cueId, StopMode mode);
+
+        /**
+         * @brief Check if cue is actively playing.
+         * @param cueId Logical cue identifier.
+         * @return True when cue has active playback.
+         */
         bool IsCuePlaying(const std::string& cueId) const;
 
-        // Per-instance controls
+        /**
+         * @brief Set instance volume.
+         * @param handle Playback handle.
+         * @param volume Linear gain.
+         */
         void SetInstanceVolume(PlaybackHandle handle, float volume);
+
+        /**
+         * @brief Set instance pitch.
+         * @param handle Playback handle.
+         * @param pitch Pitch multiplier.
+         */
         void SetInstancePitch(PlaybackHandle handle, float pitch);
+
+        /**
+         * @brief Set instance stereo pan.
+         * @param handle Playback handle.
+         * @param pan Pan value in [-1, 1].
+         */
         void SetInstancePan(PlaybackHandle handle, float pan);
+
+        /**
+         * @brief Set instance low-pass gain.
+         * @param handle Playback handle.
+         * @param gain Low-pass gain factor.
+         */
         void SetInstanceLowPassGain(PlaybackHandle handle, float gain);
+
+        /**
+         * @brief Set instance 3D transform.
+         * @param handle Playback handle.
+         * @param pos World position.
+         * @param vel World velocity.
+         */
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
         void SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance);
         float GetInstance3DMinDistance(PlaybackHandle handle) const;
@@ -116,23 +210,61 @@ namespace Audio {
 
         // Bus-level controls routed through FMOD channel groups and DSPs.
         void SetBusLowPassGain(Bus bus, float gain);
+
+        /**
+         * @brief Get bus low-pass gain.
+         * @param bus Mixer bus.
+         * @return Low-pass gain factor.
+         */
         float GetBusLowPassGain(Bus bus) const;
         void SetBusLowPassResonance(Bus bus, float resonance);
         float GetBusLowPassResonance(Bus bus) const;
 
-        // Listener and master
+        /**
+         * @brief Set listener transform attributes.
+         * @param listener Listener payload.
+         */
         void SetListener(const ListenerParams& listener);
+
+        /**
+         * @brief Set master volume.
+         * @param volume Linear gain.
+         */
         void SetMasterVolume(float volume);
+
+        /**
+         * @brief Get master volume.
+         * @return Current master linear gain.
+         */
         float GetMasterVolume() const;
 
-        // Pause/Resume all audio
+        /**
+         * @brief Pause all active playback.
+         */
         void PauseAll();
+
+        /**
+         * @brief Resume all paused playback.
+         */
         void ResumeAll();
 
-        // Introspection / low-level FMOD access for systems that need graph setup.
+        /**
+         * @brief Get currently loaded cue id/path pairs.
+         * @param out Output vector receiving cue id/path pairs.
+         */
         void GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const;
+
+        /**
+         * @brief Access raw FMOD system pointer.
+         * @return Non-owning FMOD system pointer, valid while initialized.
+         */
         // Raw FMOD System pointer. Non-owning; valid only while device is initialized.
         FMOD::System* GetSystem() const { return m_system; }
+
+        /**
+         * @brief Access raw master channel group pointer.
+         * @return Non-owning master group pointer, valid while initialized.
+         */
         // Raw FMOD master channel group pointer. Non-owning; valid only while initialized.
         FMOD::ChannelGroup* GetMasterChannelGroup() const { return m_master; }
 
@@ -162,20 +294,72 @@ namespace Audio {
         // Handle ids
         uint64_t m_nextId = 1;
 
-        // Helpers
+        /**
+         * @brief Fetch cached sound or create it on demand.
+         * @param cueId Logical cue identifier.
+         * @param path Source audio path.
+         * @param params Sound loading parameters.
+         * @return FMOD sound pointer, or nullptr on failure.
+         */
         FMOD::Sound* _getOrCreateSound(const std::string& cueId,
             const std::string& path,
             const SoundParams& params);
+
+        /**
+         * @brief Resolve a playback handle to FMOD channel.
+         * @param h Playback handle.
+         * @return Channel pointer, or nullptr when invalid/stale.
+         */
         FMOD::Channel* _channelFromHandle(PlaybackHandle h);
+
+        /**
+         * @brief Create an FMOD sound object from input path.
+         * @param cueId Logical cue identifier.
+         * @param path Source audio path.
+         * @param params Sound loading parameters.
+         * @return Newly created sound pointer, or nullptr on failure.
+         */
         FMOD::Sound* _createSoundFromMemory(const std::string& cueId,
             const std::string& path,
             const SoundParams& params);
+
+        /**
+         * @brief Initialize channel-group routing and bus DSP chain.
+         * @return True when setup succeeds.
+         */
         bool _initializeBusRouting();
+
+        /**
+         * @brief Tear down bus routing objects.
+         */
         void _shutdownBusRouting();
+
+        /**
+         * @brief Resolve channel group pointer for a bus.
+         * @param bus Mixer bus.
+         * @return Channel group pointer, or nullptr when unavailable.
+         */
         FMOD::ChannelGroup* _channelGroupForBus(Bus bus) const;
+
+        /**
+         * @brief Apply current low-pass gain value to a bus DSP.
+         * @param bus Mixer bus.
+         */
         void _applyBusLowPassGain(Bus bus);
+
+        /**
+         * @brief Clamp low-pass gain into valid device-supported range.
+         * @param gain Requested gain value.
+         * @return Clamped gain value.
+         */
         static float _clampLowPassGain(float gain);
         static float _clampLowPassResonance(float resonance);
+
+        /**
+         * @brief Convert normalized low-pass gain to cutoff frequency.
+         * @param gain Normalized gain value.
+         * @return Cutoff frequency in Hz.
+         */
         static float _lowPassGainToCutoffHz(float gain);
     };
 

@@ -15,13 +15,12 @@ Out-of-line implementations for LayerManager methods that depend on ECS::World.
 namespace Scenes {
     void LayerManager::PruneDeadEntities(ECS::World& world) {
         for (auto& layer : m_layers) {
-            // Remove dead entities from layer's entity list
+            // Erase-while-iterating is linear for unordered_set and does not require assignable keys.
             for (auto it = layer.entities.begin(); it != layer.entities.end(); ) {
                 if (!world.IsAlive(*it)) {
-                    // Erase the dead entity and advance iterator
                     it = layer.entities.erase(it);
                 } else {
-                    ++it; // Advance iterator if entity is alive
+                    ++it;
                 }
             }
         }
@@ -42,15 +41,13 @@ namespace Scenes {
             // Update colliders' LayerMask
 
             // CircleCollider2D
-            if (world->Has<ECS::Components::CircleCollider2D>(entity)) {
-                auto& circle = world->Get<ECS::Components::CircleCollider2D>(entity);
-                circle.LayerMask = layerMask;
+            if (auto* circle = world->TryGet<ECS::Components::CircleCollider2D>(entity)) {
+                circle->LayerMask = layerMask;
             }
 
             // BoxCollider2D
-            if (world->Has<ECS::Components::BoxCollider2D>(entity)) {
-                auto& box = world->Get<ECS::Components::BoxCollider2D>(entity);
-                box.LayerMask = layerMask;
+            if (auto* box = world->TryGet<ECS::Components::BoxCollider2D>(entity)) {
+                box->LayerMask = layerMask;
             }
         }
     }

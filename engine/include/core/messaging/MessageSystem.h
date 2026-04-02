@@ -290,17 +290,18 @@ namespace Messaging {
     };
 
     /**
-     * @brief
+     * @brief Scoped RAII handle that unsubscribes automatically on destruction.
      * RAII wrapper for automatic unsubscription upon destruction.
      */
-    // RAII wrapper for automatic unsubscription
     template<typename T>
     class ScopedSubscription {
     public:
+        // Take ownership of a subscription handle for RAII-managed lifetime.
         ScopedSubscription(SubscriptionHandle handle)
             : handle_(handle) {
         }
 
+        // Automatically unsubscribe when this scoped wrapper is destroyed.
         ~ScopedSubscription() {
             MessageSystem::Unsubscribe<T>(handle_);
         }

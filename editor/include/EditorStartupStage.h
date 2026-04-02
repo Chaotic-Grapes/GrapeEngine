@@ -17,7 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define EDITOR_STARTUP_STAGE_H
 
 /**
- * @brief 
+ * @brief Enumerates the editor startup workflow stages.
  * The different stages of the editor's startup process.
  * This is used to control the flow of the startup sequence and determine which UI to show.
  * - SelectProject: The user is prompted to select a project to open or create a new one.

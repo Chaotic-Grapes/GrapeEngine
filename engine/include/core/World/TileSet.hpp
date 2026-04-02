@@ -63,24 +63,58 @@ class GRAPEENGINE_API Tileset
 {
 public:
     // Texture atlas handle (engine-level ID, not a graphics object)
+    /**
+     * @brief Construct a tileset bound to a texture atlas id.
+     * @param textureId Engine texture identifier for the atlas.
+     */
     explicit Tileset(uint32_t textureId);
 
+    /**
+     * @brief Get texture atlas id backing this tileset.
+     * @return Engine texture id.
+     */
     uint32_t GetTextureId() const;
 
     // Define a tile's UVs and Collision in the atlas
+    /**
+     * @brief Define UV and collision metadata for a tile id.
+     * @param id Tile id to define or overwrite.
+     * @param uv Normalized atlas UV rectangle.
+     * @param collision Collision classification for this tile.
+     */
     void DefineTile(TileID id, const TileUV& uv, CollisionType collision = CollisionType::NONE);
 
     // Query UVs for a tile
     // Returns false if tile is not defined
+    /**
+     * @brief Look up UV coordinates for a tile id.
+     * @param id Tile id to query.
+     * @param outUV Output UV rectangle when tile exists.
+     * @return True when tile was defined.
+     */
     bool GetTileUV(TileID id, TileUV& outUV) const;
 
     // Query Collision for a tile
+    /**
+     * @brief Get collision type assigned to a tile id.
+     * @param id Tile id to query.
+     * @return Collision type, or default behavior for undefined tiles.
+     */
     CollisionType GetCollisionType(TileID id) const;
 
     // Get all defined tiles (for editor iteration)
+    /**
+     * @brief Access internal tile definition map.
+     * @return Const reference to tile definitions keyed by TileID.
+     */
     const std::unordered_map<TileID, TileDef>& GetTiles() const { return m_tiles; }
 
     // Convenience: check if tile exists
+    /**
+     * @brief Check whether a tile id has been defined.
+     * @param id Tile id to check.
+     * @return True when tile exists in definition map.
+     */
     bool HasTile(TileID id) const;
 
 private:

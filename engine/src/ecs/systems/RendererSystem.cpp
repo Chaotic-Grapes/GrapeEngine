@@ -74,6 +74,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/TransformUtils.h"
 #include "core/World/TileTypes.hpp"
 #include "ecs/StringTable.h"
+#include "physics2d/internal/ParallelFor.h"
 
 // ============================================================================
 // Standard Library
@@ -96,6 +97,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3.h>
 
 namespace {
+    constexpr uint32_t kRendererPrepMaxWorkers = 8u;
+    constexpr size_t kRendererLightParallelThreshold = 128u;
+    constexpr size_t kRendererBucketParallelThreshold = 512u;
+
     // Resolve a project-relative path to an absolute path for loading assets (for existing maps)
     std::string ResolveProjectPathForLoad(const std::string& path) {
         if (path.empty() || !Engine::ProjectPaths::IsInitialized()) {
@@ -165,6 +170,7 @@ namespace {
         // Return the constructed tileset
         return tileset;
     }
+
 }
 
 namespace ECS {
@@ -651,8 +657,16 @@ namespace ECS {
                     * (vp.Size.y / 2.0f) * zoomScale;
 
                 RenderSceneToHDR(world, vp, viewProj, buckets, maxLayerId);
-                RenderBloom(vp, bloomRadius);
-                ToneMap(vp);
+                if (vp.BloomEnabled) {
+                    RenderBloom(vp, bloomRadius);
+                }
+                else {
+                    // Keep the bloom buffer black so tone mapping and debug views remain deterministic.
+                    vp.BloomExtract->BindAndClear(0, 0, 0, 1);
+                    glViewport(0, 0, vp.BloomExtract->Width(), vp.BloomExtract->Height());
+                    Framebuffer::Unbind();
+                }
+                ToneMap(vp, vp.BloomEnabled);
                 RenderOverlayQuads(vp, viewProj);
                 RenderWireframes(vp, viewProj);
                 RenderGUI(vp);
@@ -696,6 +710,7 @@ namespace ECS {
         // already-populated `buckets` and `maxLayerId` variables
         // Reusable temporary buffers to avoid per-entity allocations
         std::vector<glm::vec2> transformedCorners;
+        std::vector<Entity> sortedLayerEntities;
         std::vector<glm::vec2> polyPoints;
 
         // ============================================================
@@ -705,7 +720,7 @@ namespace ECS {
 
         // Pass 1: Render scene to HDR framebuffer
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
-            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &win](ResourceAccessor& res)
+            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &sortedLayerEntities, &win](ResourceAccessor& res)
             {
                 (void)res;
                 // Get HDR framebuffer from render graph
@@ -747,14 +762,16 @@ namespace ECS {
 
                     int layer = static_cast<int>(layerId);
                     if (layer >= static_cast<int>(buckets.size())) continue;
-                    // Make a local copy of the bucket so we can sort by ZIndex2D
-                    auto list = buckets[layer];
+                    const auto& sourceList = buckets[layer];
+                    sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
+                    auto& list = sortedLayerEntities;
                     // Sort by ZIndex2D.ZOrder ascending (smaller drawn first). Entities
                     // without ZIndex2D are treated as ZOrder = 0
                     std::sort(list.begin(), list.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
-                        int za = 0, zb = 0;
-                        if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
-                        if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                        const auto* zA = world.TryGet<Components::ZIndex2D>(A);
+                        const auto* zB = world.TryGet<Components::ZIndex2D>(B);
+                        const int za = zA ? zA->ZOrder : 0;
+                        const int zb = zB ? zB->ZOrder : 0;
                         if (za != zb) return za < zb;
                         // Stable tie-breaker: entity index
                         return A.Index < B.Index;
@@ -773,21 +790,22 @@ namespace ECS {
                         // Skip inactive
                         if (!world.IsActiveInHierarchy(entity)) continue;
 
-                        if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+                        const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
+                        if (!sc) continue;
+                        const auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                        if (!lt) continue;
 
                         // Transform
-                        const auto& lt = world.Get<Components::LocalTransform>(entity);
                         Vector3D position, scale; Quaternion rotation;
-                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+                        GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                         // Draw SDF circle
-                        const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
                         DebugDraw2D::Circle(
                             *m_renderer,
-                            ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
-                            sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                            ToGlm(sc.Color),
-                            sc.Filled ? 0.0f : sc.Thickness,
+                            ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc->Offset),
+                            sc->Radius * ((scale.X + scale.Y) * 0.5f),
+                            ToGlm(sc->Color),
+                            sc->Filled ? 0.0f : sc->Thickness,
                             /*textureId*/ 0
                         );
                     }
@@ -858,14 +876,14 @@ namespace ECS {
                         if (!world.IsActiveInHierarchy(entity)) continue;
 
                         // Skip circles here (already drawn by SDF pass)
-                        if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+                        if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
 
                         // Keep tilemap draw order aligned with Z-sorted entity order
                         SubmitRuntimeTileMapEntity(entity);
                         SubmitDebugTileMapEntity(world, entity);
 
                         // Boid flock entity  flush batch, draw instanced at correct Z
-                        if (world.Has<Components::BoidFlock>(entity)) {
+                        if (world.TryGet<Components::BoidFlock>(entity)) {
                             m_renderer->endFrame();
 
                             if (m_boidSystem && m_boidShader) {
@@ -884,10 +902,35 @@ namespace ECS {
                             continue;
                         }
 
+                        // Particle emitter — flush batch, draw instanced at correct Z
+                        if (world.TryGet<Components::ParticleEmitter>(entity)) {
+                            m_renderer->endFrame();
+
+                            if (m_particleSystem && m_particleShader) {
+                                m_particleShader->use();
+                                m_particleShader->setMat4("uViewProj", viewProj);
+                                m_lightManager.Bind(*m_particleShader);
+                                glEnable(GL_BLEND);
+                                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                                m_particleSystem->DrawEmitterForEntity(entity.Index, *m_particleShader, world);
+                            }
+
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 1);
+                            m_lightManager.Bind(*m_shader);
+                            m_renderer->beginFrame();
+                            continue;
+                        }
+
                         // Fetch transform
-                        auto& lt = world.Get<Components::LocalTransform>(entity);
+                        auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                        if (!lt) {
+                            continue;
+                        }
                         Vector3D position, scale; Quaternion rotation;
-                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+                        GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                         // Boxes
                         if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -968,15 +1011,14 @@ namespace ECS {
                             float normalStrength = 1.0f;
                             uint32_t flags = 0;
 
-                            if (world.Has<Components::Material2D>(entity)) {
-                                const auto& mat = world.Get<Components::Material2D>(entity);
-                                normalTexId = mat.NormalTextureId;
-                                mraTexId = mat.MRA_TextureId;
-                                metallic = mat.Metallic;
-                                smoothness = mat.Smoothness;
-                                aoStrength = mat.AOStrength;
-                                normalStrength = mat.NormalStrength;
-                                flags = mat.Flags;
+                            if (const auto* mat = world.TryGet<Components::Material2D>(entity)) {
+                                normalTexId = mat->NormalTextureId;
+                                mraTexId = mat->MRA_TextureId;
+                                metallic = mat->Metallic;
+                                smoothness = mat->Smoothness;
+                                aoStrength = mat->AOStrength;
+                                normalStrength = mat->NormalStrength;
+                                flags = mat->Flags;
                                 if (normalTexId == 0) {
                                     normalTexId = sr.NormalTextureId;
                                 }
@@ -1007,16 +1049,6 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-
-                    // Particles on this layer
-                    if (m_particleSystem && m_particleShader) {
-                        m_particleShader->use();
-                        m_particleShader->setMat4("uViewProj", viewProj);
-                        m_lightManager.Bind(*m_particleShader);
-                        glEnable(GL_BLEND);
-                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                        m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
-                    }
                 }
 
                 // Unbind the current render target
@@ -1911,6 +1943,19 @@ namespace ECS {
             vp->Camera = camera;
     }
 
+    /**
+     * @brief Toggle bloom extraction/blur execution for a named viewport.
+     * @param name Viewport name key.
+     * @param enabled True to execute bloom passes; false to bypass bloom.
+     * @return void
+     * @complexity O(V) where V is the number of registered viewports.
+     */
+    void RendererSystem::SetViewportBloomEnabled(const std::string& name, const bool enabled) {
+        if (Viewport* vp = GetViewport(name)) {
+            vp->BloomEnabled = enabled;
+        }
+    }
+
     // Return viewport
     RendererSystem::Viewport* RendererSystem::GetViewport(const std::string& name) {
         for (auto& vp : m_viewports)
@@ -2233,32 +2278,83 @@ namespace ECS {
     void RendererSystem::CollectLights(World& world) {
         m_lightManager.BeginFrame();
 
+        struct LightInput {
+            ECS::Entity Entity{};
+            const Components::LocalTransform* Transform = nullptr;
+            const Components::Light2D* Light = nullptr;
+        };
+
+        struct LightOutput {
+            bool Valid = false;
+            bool Directional = false;
+            glm::vec3 Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+            glm::vec3 Position = glm::vec3(0.0f);
+            glm::vec3 Color = glm::vec3(1.0f);
+            float Intensity = 1.0f;
+            float Range = 1.0f;
+        };
+
+        std::vector<LightInput> inputs;
         world.Each<Components::LocalTransform, Components::Light2D>(
             [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l) {
-                if (!world.IsActiveInHierarchy(e)) return;
+                inputs.push_back(LightInput{ e, &lt, &l });
+            });
+
+        std::vector<LightOutput> outputs(inputs.size());
+        auto evaluateLightRange = [&](size_t begin, size_t end, uint32_t) {
+            for (size_t i = begin; i < end; ++i) {
+                const LightInput& in = inputs[i];
+                LightOutput& out = outputs[i];
+
+                if (!world.IsActiveInHierarchy(in.Entity) || !in.Transform || !in.Light) {
+                    continue;
+                }
 
                 Vector3D position, scale;
                 Quaternion rotation;
-                GetRenderTransform(world, e, lt, position, rotation, scale);
+                GetRenderTransform(world, in.Entity, *in.Transform, position, rotation, scale);
 
-                // Convert component color once so both light paths use the same normalized RGB value
-                glm::vec3 color = glm::vec3(ToGlm(l.Color));
+                out.Valid = true;
+                out.Color = glm::vec3(ToGlm(in.Light->Color));
+                out.Intensity = in.Light->Intensity;
 
-                if (l.LightType == Components::Light2D::Type::Directional) {
-                    // Directional lights need only a unit direction vector because position is ignored
-                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
-                    // Prevent NaNs from normalizing a zero-length direction vector
-                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
-                    dir = glm::normalize(dir);
-                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
+                if (in.Light->LightType == Components::Light2D::Type::Directional) {
+                    out.Directional = true;
+                    glm::vec3 dir(in.Light->Direction.X, in.Light->Direction.Y, in.Light->Direction.Z);
+                    if (glm::dot(dir, dir) < 1e-8f) {
+                        dir = glm::vec3(0.0f, -1.0f, 0.0f);
+                    }
+                    out.Direction = glm::normalize(dir);
                 }
                 else {
-                    // Point lights are authored in local space so convert them into world space first
-                    glm::vec3 worldPos(position.X, position.Y, position.Z);
-                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
-                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
+                    out.Directional = false;
+                    out.Position = glm::vec3(position.X, position.Y, position.Z) +
+                        glm::vec3(in.Light->Position.X, in.Light->Position.Y, in.Light->Position.Z);
+                    out.Range = in.Light->Range;
                 }
-            });
+            }
+        };
+
+        if (inputs.size() < kRendererLightParallelThreshold) {
+            evaluateLightRange(0u, inputs.size(), 0u);
+        }
+        else {
+            Engine::Physics2D::Internal::ParallelForStatic(inputs.size(), kRendererPrepMaxWorkers, evaluateLightRange);
+        }
+
+        // Commit in deterministic input order so directional-light overwrite behavior stays stable.
+        for (const LightOutput& out : outputs) {
+            if (!out.Valid) {
+                continue;
+            }
+
+            if (out.Directional) {
+                m_lightManager.SetDirectionalLight(out.Direction, out.Color, out.Intensity);
+            }
+            else {
+                m_lightManager.AddPointLight(out.Position, out.Range, out.Color, out.Intensity);
+            }
+        }
 
         m_lightManager.Upload();
     }
@@ -2276,11 +2372,39 @@ namespace ECS {
         buckets.clear();
         buckets.resize(std::max(1, maxLayerId + 1));
 
+        std::vector<std::pair<uint16_t, Entity>> entries;
         world.Each<Components::LocalTransform, Components::Layer>(
             [&](Entity entity, Components::LocalTransform&, const Components::Layer& ly) {
-                if (ly.Id < buckets.size())
-                    buckets[ly.Id].push_back(entity);
+                entries.emplace_back(ly.Id, entity);
             });
+
+        if (entries.size() < kRendererBucketParallelThreshold) {
+            for (const auto& entry : entries) {
+                if (entry.first < buckets.size()) {
+                    buckets[entry.first].push_back(entry.second);
+                }
+            }
+            return;
+        }
+
+        std::vector<std::vector<std::pair<uint16_t, Entity>>> perWorker(kRendererPrepMaxWorkers);
+        Engine::Physics2D::Internal::ParallelForStatic(entries.size(), kRendererPrepMaxWorkers,
+            [&entries, &perWorker](size_t begin, size_t end, uint32_t workerIdx) {
+                auto& local = perWorker[workerIdx];
+                local.reserve(local.size() + (end - begin));
+                for (size_t i = begin; i < end; ++i) {
+                    local.push_back(entries[i]);
+                }
+            });
+
+        // Merge by worker index to preserve static-partition global order.
+        for (const auto& local : perWorker) {
+            for (const auto& entry : local) {
+                if (entry.first < buckets.size()) {
+                    buckets[entry.first].push_back(entry.second);
+                }
+            }
+        }
     }
 
     // Render bloom
@@ -2316,8 +2440,14 @@ namespace ECS {
         Framebuffer::Unbind();
     }
 
-    // Tone map
-    void RendererSystem::ToneMap(Viewport& vp) {
+    /**
+     * @brief Tone-map HDR scene into LDR and optionally blend bloom.
+     * @param vp Viewport containing HDR/LDR/bloom framebuffers.
+     * @param bloomEnabled True to blend bloom contribution; false to render HDR-only tone mapping.
+     * @return void
+     * @note Bloom texture is still bound when disabled, but strength is forced to 0.
+     */
+    void RendererSystem::ToneMap(Viewport& vp, const bool bloomEnabled) {
         vp.LDR->BindAndClear(0, 0, 0, 1);
         glViewport(0, 0, vp.Size.x, vp.Size.y);
 
@@ -2325,7 +2455,7 @@ namespace ECS {
         m_bloomCombineShader->setUniform("uScene", 0);
         m_bloomCombineShader->setUniform("uBloomBlur", 1);
         m_bloomCombineShader->setUniform("uExposure", 1.3f);
-        m_bloomCombineShader->setUniform("uBloomStrength", 5.2f);
+        m_bloomCombineShader->setUniform("uBloomStrength", bloomEnabled ? 5.2f : 0.0f);
         m_bloomCombineShader->setUniform("uGamma", 1.5f);
 
         vp.HDR->BindColorTexture(0, 0);
@@ -2354,6 +2484,7 @@ namespace ECS {
         }
 
         std::vector<glm::vec2> transformedCorners;
+        std::vector<Entity> sortedLayerEntities;
 
         for (uint16_t layerId : renderOrder) {
             if (layerManager) {
@@ -2364,12 +2495,15 @@ namespace ECS {
             int layer = static_cast<int>(layerId);
             if (layer >= static_cast<int>(buckets.size())) continue;
 
-            auto list = buckets[layer];
+            const auto& sourceList = buckets[layer];
+            sortedLayerEntities.assign(sourceList.begin(), sourceList.end());
+            auto& list = sortedLayerEntities;
             // Finalize rendering pass state
             std::sort(list.begin(), list.end(), [&](const Entity& A, const Entity& B) {
-                int za = 0, zb = 0;
-                if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
-                if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                const auto* zA = world.TryGet<Components::ZIndex2D>(A);
+                const auto* zB = world.TryGet<Components::ZIndex2D>(B);
+                const int za = zA ? zA->ZOrder : 0;
+                const int zb = zB ? zB->ZOrder : 0;
                 if (za != zb) return za < zb;
                 return A.Index < B.Index;
                 });
@@ -2383,19 +2517,20 @@ namespace ECS {
 
             for (Entity entity : list) {
                 if (!world.IsActiveInHierarchy(entity)) continue;
-                if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+                const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity);
+                if (!sc) continue;
+                const auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                if (!lt) continue;
 
-                const auto& lt = world.Get<Components::LocalTransform>(entity);
                 Vector3D position, scale; Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
-                const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
                 // Submit circle geometry
                 DebugDraw2D::Circle(*m_renderer,
-                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
-                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                    ToGlm(sc.Color),
-                    sc.Filled ? 0.0f : sc.Thickness, 0);
+                    ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc->Offset),
+                    sc->Radius * ((scale.X + scale.Y) * 0.5f),
+                    ToGlm(sc->Color),
+                    sc->Filled ? 0.0f : sc->Thickness, 0);
             }
             m_renderer->endFrame();
 
@@ -2441,14 +2576,14 @@ namespace ECS {
 
             for (Entity entity : list) {
                 if (!world.IsActiveInHierarchy(entity)) continue;
-                if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+                if (world.TryGet<Components::ShapeCircle2D>(entity)) continue;
 
                 // Keep tilemap draw order aligned with Z-sorted entity order
                 SubmitRuntimeTileMapEntity(entity);
                 SubmitDebugTileMapEntity(world, entity);
 
                 // Boid flock entity  flush batch, draw instanced at correct Z
-                if (world.Has<Components::BoidFlock>(entity)) {
+                if (world.TryGet<Components::BoidFlock>(entity)) {
                     m_renderer->endFrame();
 
                     if (m_boidSystem && m_boidShader) {
@@ -2467,9 +2602,34 @@ namespace ECS {
                     continue;
                 }
 
-                auto& lt = world.Get<Components::LocalTransform>(entity);
+                // Particle emitter — flush batch, draw instanced at correct Z
+                if (world.TryGet<Components::ParticleEmitter>(entity)) {
+                    m_renderer->endFrame();
+
+                    if (m_particleSystem && m_particleShader) {
+                        m_particleShader->use();
+                        m_particleShader->setMat4("uViewProj", viewProj);
+                        m_lightManager.Bind(*m_particleShader);
+                        glEnable(GL_BLEND);
+                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                        m_particleSystem->DrawEmitterForEntity(entity.Index, *m_particleShader, world);
+                    }
+
+                    m_shader->use();
+                    m_shader->setMat4("uViewProj", viewProj);
+                    m_shader->setUniform("uPicking", 0);
+                    m_shader->setUniform("uLightingEnabled", 1);
+                    m_lightManager.Bind(*m_shader);
+                    m_renderer->beginFrame();
+                    continue;
+                }
+
+                auto* lt = world.TryGet<Components::LocalTransform>(entity);
+                if (!lt) {
+                    continue;
+                }
                 Vector3D position, scale; Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                GetRenderTransform(world, entity, *lt, position, rotation, scale);
 
                 // Boxes
                 if (world.Has<Components::ShapeBox2D>(entity)) {
@@ -2519,18 +2679,17 @@ namespace ECS {
                         1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z));
 
                     GLuint normalTexId = 0, mraTexId = 0;
-                      float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
-                      uint32_t flags = 0;
+                    float metallic = 0.0f, smoothness = 0.5f, aoStrength = 1.0f, normalStrength = 1.0f;
+                    uint32_t flags = 0;
 
-                    if (world.Has<Components::Material2D>(entity)) {
-                        const auto& mat = world.Get<Components::Material2D>(entity);
-                        normalTexId = mat.NormalTextureId;
-                        mraTexId = mat.MRA_TextureId;
-                        metallic = mat.Metallic;
-                        smoothness = mat.Smoothness;
-                        aoStrength = mat.AOStrength;
-                        normalStrength = mat.NormalStrength;
-                          flags = mat.Flags;
+                    if (const auto* mat = world.TryGet<Components::Material2D>(entity)) {
+                        normalTexId = mat->NormalTextureId;
+                        mraTexId = mat->MRA_TextureId;
+                        metallic = mat->Metallic;
+                        smoothness = mat->Smoothness;
+                        aoStrength = mat->AOStrength;
+                        normalStrength = mat->NormalStrength;
+                        flags = mat->Flags;
                         if (normalTexId == 0) normalTexId = sr.NormalTextureId;
                     }
 
@@ -2547,16 +2706,6 @@ namespace ECS {
                 }
             }
               m_renderer->endFrame();
-
-              // Particles on this layer
-              if (m_particleSystem && m_particleShader) {
-                  m_particleShader->use();
-                  m_particleShader->setMat4("uViewProj", viewProj);
-                  m_lightManager.Bind(*m_particleShader);
-                  glEnable(GL_BLEND);
-                  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                  m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
-              }
           }
         RenderWorldGUI(viewProj);
 

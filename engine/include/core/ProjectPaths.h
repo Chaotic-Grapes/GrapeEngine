@@ -94,6 +94,12 @@ namespace Engine {
          * @return Full path to Documents/Grape Engine/<project-name>/logs/
          */
         static std::string GetLogsPath();
+
+        /**
+         * @brief Get per-project save-game folder
+         * @return Full path to Documents/Grape Engine/<project-name>/saves/
+         */
+        static std::string GetSavesPath();
         
         /**
          * @brief Get the build output directory for compiled scripts
