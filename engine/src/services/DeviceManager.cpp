@@ -79,6 +79,13 @@ namespace Engine {
 
     // ==================== DeviceManager - Display Implementation ====================
     
+    /**
+     * @brief Enumerates all connected monitors and their display modes.
+     * @return A vector containing one MonitorInfo entry per connected monitor.
+     * @note GLFW can return partial monitor metadata on some driver/OS combinations,
+     *       so this function applies safe defaults when metadata is unavailable.
+     * @complexity O(M + K) where M is monitor count and K is total mode count.
+     */
     std::vector<MonitorInfo> DeviceManager::EnumerateMonitors() {
         std::vector<MonitorInfo> monitors;
 
@@ -90,13 +97,16 @@ namespace Engine {
             return monitors;
         }
 
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+
         for (int i = 0; i < monitorCount; ++i) {
             GLFWmonitor* glfwMonitor = glfwMonitors[i];
-            MonitorInfo info;
+            MonitorInfo info{};
 
             // Get basic info
-            info.Name = glfwGetMonitorName(glfwMonitor);
-            info.IsPrimary = (i == 0);  // GLFW returns primary monitor first
+            const char* monitorName = glfwGetMonitorName(glfwMonitor);
+            info.Name = (monitorName != nullptr) ? monitorName : "Unknown Monitor";
+            info.IsPrimary = (primaryMonitor != nullptr) ? (glfwMonitor == primaryMonitor) : (i == 0);
 
             // Get position
             glfwGetMonitorPos(glfwMonitor, &info.PositionX, &info.PositionY);
@@ -113,6 +123,8 @@ namespace Engine {
                 info.CurrentMode.BitsPerPixel = static_cast<uint8_t>(
                     currentMode->redBits + currentMode->greenBits + currentMode->blueBits
                 );
+            } else {
+                LOG_WARNING("[DeviceManager] Failed to read current mode for monitor: " << info.Name);
             }
 
             // Get available modes
