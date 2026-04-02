@@ -132,6 +132,12 @@ namespace ECS {
                 const uint32_t id = entity.Index;
                 alive[id] = true;
 
+                // Read zOrder once, in scope for both render data assignments
+                int zOrder = 0;
+                if (const auto* z = world.TryGet<Components::ZIndex2D>(entity)) {
+                    zOrder = z->ZOrder;
+                }
+
                 auto it = m_emitters.find(id);
                 if (it == m_emitters.end()) {
                     InitEmitter(id, emitter.maxParticles);
@@ -213,7 +219,7 @@ namespace ECS {
                 if (gpu.aliveCount == 0 && emitCount == 0 && burstCount == 0) {
                     uint8_t readIdx = 1 - gpu.bufferIndex;
                     m_renderData[id] = EmitterRenderData{
-                        gpu.vao[readIdx], 0, emitter.textureId, emitter.particleSize, resolvedLayerId
+                        gpu.vao[readIdx], 0, emitter.textureId, emitter.particleSize, resolvedLayerId, zOrder
                     };
                     return;
                 }
@@ -306,7 +312,8 @@ namespace ECS {
                     gpu.aliveCount,
                     emitter.textureId,
                     emitter.particleSize,
-                    resolvedLayerId
+                    resolvedLayerId,
+                    zOrder
                 };
 
                 // Flip for next frame
@@ -661,5 +668,65 @@ namespace ECS {
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
             glBindVertexArray(0);
         }
+    }
+
+    void ParticleSystem::DrawEmitterForEntity(uint32_t entityIndex, Shader& shader, World& world) {
+        auto it = m_renderData.find(entityIndex);
+        if (it == m_renderData.end()) return;
+        const EmitterRenderData& emitter = it->second;
+        if (emitter.aliveCount <= 0 || emitter.vao == 0) return;
+
+        shader.setUniform("uParticleSize", emitter.particleSize);
+
+        ECS::Entity e{ entityIndex };
+        const bool hasMaterial = world.Has<Components::Material2D>(e);
+
+        if (hasMaterial) {
+            const auto& mat = world.Get<Components::Material2D>(e);
+            shader.setUniform("uLightingEnabled", 1);
+            shader.setUniform("uMaterialFlags", static_cast<int>(mat.Flags));
+            shader.setUniform("uMetallic", mat.Metallic);
+            shader.setUniform("uSmoothness", mat.Smoothness);
+            shader.setUniform("uAOStrength", mat.AOStrength);
+            shader.setUniform("uNormalStrength", mat.NormalStrength);
+            if (mat.NormalTextureId != 0) {
+                shader.setUniform("uHasNormalMap", 1);
+                shader.setUniform("uNormalMap", 1);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, mat.NormalTextureId);
+            }
+            else {
+                shader.setUniform("uHasNormalMap", 0);
+            }
+            if (mat.MRA_TextureId != 0) {
+                shader.setUniform("uHasMRAMap", 1);
+                shader.setUniform("uMRAMap", 2);
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, mat.MRA_TextureId);
+            }
+            else {
+                shader.setUniform("uHasMRAMap", 0);
+            }
+        }
+        else {
+            shader.setUniform("uLightingEnabled", 0);
+            shader.setUniform("uMaterialFlags", 0);
+            shader.setUniform("uHasNormalMap", 0);
+            shader.setUniform("uHasMRAMap", 0);
+        }
+
+        if (emitter.textureId != 0) {
+            shader.setUniform("uHasTexture", 1);
+            shader.setUniform("uTexture", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, emitter.textureId);
+        }
+        else {
+            shader.setUniform("uHasTexture", 0);
+        }
+
+        glBindVertexArray(emitter.vao);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, emitter.aliveCount);
+        glBindVertexArray(0);
     }
 } // namespace ECS

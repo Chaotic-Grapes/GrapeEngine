@@ -902,6 +902,28 @@ namespace ECS {
                             continue;
                         }
 
+                        // Particle emitter — flush batch, draw instanced at correct Z
+                        if (world.TryGet<Components::ParticleEmitter>(entity)) {
+                            m_renderer->endFrame();
+
+                            if (m_particleSystem && m_particleShader) {
+                                m_particleShader->use();
+                                m_particleShader->setMat4("uViewProj", viewProj);
+                                m_lightManager.Bind(*m_particleShader);
+                                glEnable(GL_BLEND);
+                                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                                m_particleSystem->DrawEmitterForEntity(entity.Index, *m_particleShader, world);
+                            }
+
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 1);
+                            m_lightManager.Bind(*m_shader);
+                            m_renderer->beginFrame();
+                            continue;
+                        }
+
                         // Fetch transform
                         auto* lt = world.TryGet<Components::LocalTransform>(entity);
                         if (!lt) {
@@ -1027,16 +1049,6 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-
-                    // Particles on this layer
-                    if (m_particleSystem && m_particleShader) {
-                        m_particleShader->use();
-                        m_particleShader->setMat4("uViewProj", viewProj);
-                        m_lightManager.Bind(*m_particleShader);
-                        glEnable(GL_BLEND);
-                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                        m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
-                    }
                 }
 
                 // Unbind the current render target
@@ -2590,6 +2602,28 @@ namespace ECS {
                     continue;
                 }
 
+                // Particle emitter — flush batch, draw instanced at correct Z
+                if (world.TryGet<Components::ParticleEmitter>(entity)) {
+                    m_renderer->endFrame();
+
+                    if (m_particleSystem && m_particleShader) {
+                        m_particleShader->use();
+                        m_particleShader->setMat4("uViewProj", viewProj);
+                        m_lightManager.Bind(*m_particleShader);
+                        glEnable(GL_BLEND);
+                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                        m_particleSystem->DrawEmitterForEntity(entity.Index, *m_particleShader, world);
+                    }
+
+                    m_shader->use();
+                    m_shader->setMat4("uViewProj", viewProj);
+                    m_shader->setUniform("uPicking", 0);
+                    m_shader->setUniform("uLightingEnabled", 1);
+                    m_lightManager.Bind(*m_shader);
+                    m_renderer->beginFrame();
+                    continue;
+                }
+
                 auto* lt = world.TryGet<Components::LocalTransform>(entity);
                 if (!lt) {
                     continue;
@@ -2672,16 +2706,6 @@ namespace ECS {
                 }
             }
               m_renderer->endFrame();
-
-              // Particles on this layer
-              if (m_particleSystem && m_particleShader) {
-                  m_particleShader->use();
-                  m_particleShader->setMat4("uViewProj", viewProj);
-                  m_lightManager.Bind(*m_particleShader);
-                  glEnable(GL_BLEND);
-                  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                  m_particleSystem->DrawEmittersByLayer(layerId, *m_particleShader, viewProj, m_lightManager, world);
-              }
           }
         RenderWorldGUI(viewProj);
 
