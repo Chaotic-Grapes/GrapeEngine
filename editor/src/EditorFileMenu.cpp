@@ -753,6 +753,12 @@ void EditorFileMenu::_renderBuildSizeAnalyzerWindow() {
     }
 }
 
+/**
+ * @brief Exports the active project by configuring, building, and packaging a runtime build.
+ * @param destinationOverride Absolute or relative destination folder chosen by the user.
+ * @param selectedAssets Set of project-relative asset paths that should be copied into the export.
+ * @return None.
+ */
 void EditorFileMenu::_exportProject(const std::string& destinationOverride,
     const std::unordered_set<std::string>& selectedAssets) {
     // Prevent concurrent exports from overlapping.
@@ -851,8 +857,9 @@ void EditorFileMenu::_exportProject(const std::string& destinationOverride,
         return;
     }
 
+    const std::string exportConfiguration = "Release";
     const std::filesystem::path buildRoot = repoRoot / "build_game";
-    const std::filesystem::path exportRoot = buildRoot / "export" / projectName / "Release";
+    const std::filesystem::path exportRoot = buildRoot / "export" / projectName / exportConfiguration;
     // Export always lands in a project-named child folder.
     destinationRoot /= projectName;
 
@@ -875,7 +882,15 @@ void EditorFileMenu::_exportProject(const std::string& destinationOverride,
     m_openExportSummary = true;
 
     // Launch long-running export work off the UI thread.
-    m_exportThread = std::thread([this, projectRoot, repoRoot, projectName, buildRoot, exportRoot, destinationRoot, selectedAssets]() {
+    m_exportThread = std::thread([this,
+        projectRoot = projectRoot,
+        repoRoot = repoRoot,
+        projectName = projectName,
+        exportConfiguration = exportConfiguration,
+        buildRoot = buildRoot,
+        exportRoot = exportRoot,
+        destinationRoot = destinationRoot,
+        selectedAssets = selectedAssets]() {
         auto pushResult = [&](const ExportStepResult& result) {
             // Record step result in a thread-safe way for summary UI.
             std::lock_guard<std::mutex> lock(m_exportMutex);
@@ -1028,7 +1043,7 @@ void EditorFileMenu::_exportProject(const std::string& destinationOverride,
             // Build export target with machine concurrency.
             const unsigned int jobs = (std::max)(1u, std::thread::hardware_concurrency());
             const std::string buildCmd =
-                "cmake --build \"" + buildRoot.string() + "\" --config Release --target ExportGame --parallel " + std::to_string(jobs);
+                "cmake --build \"" + buildRoot.string() + "\" --config " + exportConfiguration + " --target ExportGame --parallel " + std::to_string(jobs);
 
             if (!runCommand(buildCmd, "Build & export game")) {
                 m_exportDone = true;
@@ -1081,7 +1096,7 @@ void EditorFileMenu::_exportProject(const std::string& destinationOverride,
                 const std::filesystem::path scriptsOutput = exportRoot / "GameScripts.dll";
                 const std::filesystem::path scriptProject = repoRoot / "managed" / "tools" / "ScriptCompiler" / "ScriptCompiler.csproj";
                 const std::string scriptCmd =
-                    "dotnet run --project \"" + scriptProject.string() + "\" --configuration Release -- "
+                    "dotnet run --project \"" + scriptProject.string() + "\" --configuration " + exportConfiguration + " -- "
                     "\"" + projectRoot.string() + "\" \"" + scriptsOutput.string() + "\"";
 
                 if (!runCommand(scriptCmd, "Compile scripts")) {

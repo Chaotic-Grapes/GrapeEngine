@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/EntityUtils.h"
 #include "ecs/events/EventComponents.h"
 #include "core/Logger.h"
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <combaseapi.h>
@@ -960,7 +961,14 @@ namespace {
 }
 
 /**
- * @brief Register a component type for scripting.
+ * @brief Register a managed component type with the native registry.
+ * @param typeNameHash Stable hash of the managed component type name.
+ * @param size Managed-side sizeof(T) in bytes.
+ * @param alignment Managed-side alignment hint.
+ * @param typeName Optional managed type name for diagnostics.
+ * @return True when registration/update succeeds, false when an existing native type is incompatible.
+ * @note Native component alignments may differ from managed estimates; size parity is treated as authoritative.
+ * @complexity O(1) average-case hash lookups.
  */
 INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size, int alignment, const char* typeName) {
     LOG_INFO("[WorldInterop_RegisterComponent] CALLED with hash=0x" << std::hex << typeNameHash << std::dec << ", size=" << size << ", alignment=" << alignment << ", name=" << (typeName ? typeName : "null"));
@@ -985,7 +993,24 @@ INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size,
             return true;
         }
 
-        LOG_INFO("[WorldInterop_RegisterComponent] Already registered with native component ID " << id << ", keeping existing metadata");
+        const std::size_t managedSize = (size > 0) ? static_cast<std::size_t>(size) : 0u;
+        if (existingMeta.Size != managedSize) {
+            LOG_ERROR("[WorldInterop_RegisterComponent] Native/managed size mismatch for hash=0x"
+                << std::hex << typeNameHash << std::dec
+                << " (native=" << existingMeta.Size << ", managed=" << size << ")"
+                << ". Refusing registration to avoid memory corruption.");
+            return false;
+        }
+
+        const std::size_t managedAlignment = (alignment > 0) ? static_cast<std::size_t>(alignment) : 0u;
+        if (existingMeta.Align != managedAlignment) {
+            LOG_WARNING("[WorldInterop_RegisterComponent] Alignment differs for existing native component ID " << id
+                << " (native=" << existingMeta.Align << ", managed=" << alignment
+                << "). Continuing because size parity is valid.");
+        }
+
+        LOG_INFO("[WorldInterop_RegisterComponent] Already registered with native component ID " << id
+            << ", size parity verified");
         return true;
     }
     
