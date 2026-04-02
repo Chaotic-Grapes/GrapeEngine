@@ -37,6 +37,9 @@ Features:
 #endif
 #include <Windows.h>
 #include <Xinput.h>
+#ifdef ERROR
+#undef ERROR
+#endif
 #endif
 
 namespace {
