@@ -48,6 +48,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
 // Forward declarations for managed serialization interop (defined in Interop_World.cpp)
 extern "C" const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash);
 extern "C" void WorldInterop_DeserializeComponentFromJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, const char* jsonStr);
@@ -1091,7 +1095,8 @@ namespace ECS {
             {"Released", input.Released},
             {"Dragging", input.Dragging},
             {"Entered", input.Entered},
-            {"Exited", input.Exited}
+            {"Exited", input.Exited},
+            {"Focused", input.Focused}
         };
     }
 
@@ -1108,6 +1113,55 @@ namespace ECS {
         input.Dragging = j.value("Dragging", false);
         input.Entered = j.value("Entered", false);
         input.Exited = j.value("Exited", false);
+        input.Focused = j.value("Focused", false);
+    }
+
+    /**
+     * @brief Serializes GUINavigation directional links.
+     * @param j Destination JSON object.
+     * @param nav GUINavigation component to serialize.
+     */
+    inline void to_json(nlohmann::json& j, const GUINavigation& nav) {
+        auto packEntity = [](const Entity entity) {
+            return nlohmann::json{
+                {"Index", entity.Index},
+                {"Generation", entity.Generation}
+            };
+        };
+
+        j = nlohmann::json{
+            {"Up", packEntity(nav.Up)},
+            {"Down", packEntity(nav.Down)},
+            {"Left", packEntity(nav.Left)},
+            {"Right", packEntity(nav.Right)},
+            {"Wrap", nav.Wrap},
+            {"Enabled", nav.Enabled}
+        };
+    }
+
+    /**
+     * @brief Deserializes GUINavigation directional links.
+     * @param j Source JSON object.
+     * @param nav GUINavigation component to populate.
+     */
+    inline void from_json(const nlohmann::json& j, GUINavigation& nav) {
+        auto unpackEntity = [](const nlohmann::json& value) -> Entity {
+            if (!value.is_object()) {
+                return NULL_ENTITY;
+            }
+
+            Entity entity{};
+            entity.Index = value.value("Index", Entity::NPOS32);
+            entity.Generation = value.value("Generation", 0u);
+            return entity;
+        };
+
+        nav.Up = j.contains("Up") ? unpackEntity(j.at("Up")) : NULL_ENTITY;
+        nav.Down = j.contains("Down") ? unpackEntity(j.at("Down")) : NULL_ENTITY;
+        nav.Left = j.contains("Left") ? unpackEntity(j.at("Left")) : NULL_ENTITY;
+        nav.Right = j.contains("Right") ? unpackEntity(j.at("Right")) : NULL_ENTITY;
+        nav.Wrap = j.value("Wrap", false);
+        nav.Enabled = j.value("Enabled", true);
     }
 
     /**
@@ -1697,6 +1751,7 @@ namespace Serialization {
     REGISTER_COMPONENT_SERIALIZER(GUIText, ECS::Components::GUIText, "GUIText");
     REGISTER_COMPONENT_SERIALIZER(GUIImage, ECS::Components::GUIImage, "GUIImage");
     REGISTER_COMPONENT_SERIALIZER(GUIInput, ECS::Components::GUIInput, "GUIInput");
+    REGISTER_COMPONENT_SERIALIZER(GUINavigation, ECS::Components::GUINavigation, "GUINavigation");
     REGISTER_COMPONENT_SERIALIZER(GUIStateStyle, ECS::Components::GUIStateStyle, "GUIStateStyle");
     REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton");
     REGISTER_COMPONENT_SERIALIZER(GUISlider, ECS::Components::GUISlider, "GUISlider");

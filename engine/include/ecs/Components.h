@@ -974,8 +974,22 @@ namespace ECS {
             bool Dragging = false; // pointer moving while captured
             bool Entered = false;  // pointer entered this frame
             bool Exited = false;   // pointer exited this frame
+            bool Focused = false;  // controller/keyboard focus state
         };
         static_assert(std::is_trivially_copyable_v<GUIInput>, "GUIInput must be trivially copyable");
+
+        /**
+         * @brief Data structure: GUINavigation.
+         */
+        struct GUINavigation {
+            Entity Up = NULL_ENTITY;     // explicit focus target when navigating up
+            Entity Down = NULL_ENTITY;   // explicit focus target when navigating down
+            Entity Left = NULL_ENTITY;   // explicit focus target when navigating left
+            Entity Right = NULL_ENTITY;  // explicit focus target when navigating right
+            bool Wrap = false;           // allow wrap-around when no directional candidate exists
+            bool Enabled = true;         // opt in/out of controller navigation
+        };
+        static_assert(std::is_trivially_copyable_v<GUINavigation>, "GUINavigation must be trivially copyable");
 
         /**
          * @brief Data structure: GUIStateStyle.
