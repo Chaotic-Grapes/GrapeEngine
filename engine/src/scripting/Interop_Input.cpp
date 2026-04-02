@@ -194,3 +194,35 @@ INTEROP_API float EngineInterop_Input_GetGamepadAxis(int gamepad, int axis) {
 INTEROP_API float EngineInterop_Input_GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) {
     return Input::GetGamepadAxisWithDeadzone(gamepad, axis, deadzone);
 }
+
+/**
+ * @brief Set gamepad vibration motor intensities.
+ *
+ * @param gamepad The gamepad index (0..15)
+ * @param lowFrequency Low-frequency motor intensity in [0, 1]
+ * @param highFrequency High-frequency motor intensity in [0, 1]
+ * @return true if vibration command was accepted, false otherwise
+ */
+INTEROP_API bool EngineInterop_Input_SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency) {
+    return Input::SetGamepadVibration(gamepad, lowFrequency, highFrequency);
+}
+
+/**
+ * @brief Stop gamepad vibration immediately.
+ *
+ * @param gamepad The gamepad index (0..15)
+ * @return void
+ */
+INTEROP_API void EngineInterop_Input_StopGamepadVibration(int gamepad) {
+    Input::StopGamepadVibration(gamepad);
+}
+
+/**
+ * @brief Check if vibration is supported for a gamepad slot.
+ *
+ * @param gamepad The gamepad index (0..15)
+ * @return true if vibration is available for this slot on current platform
+ */
+INTEROP_API bool EngineInterop_Input_IsGamepadVibrationSupported(int gamepad) {
+    return Input::IsGamepadVibrationSupported(gamepad);
+}

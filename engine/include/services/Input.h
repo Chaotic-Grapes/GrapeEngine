@@ -104,6 +104,15 @@ public:
     // Get gamepad axis after applying deadzone and response scaling
     static float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone);
 
+    // Set gamepad vibration motor intensities in range [0, 1]
+    static bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency);
+
+    // Stop gamepad vibration immediately
+    static void StopGamepadVibration(int gamepad);
+
+    // Check whether vibration is supported for this gamepad slot on the current platform
+    static bool IsGamepadVibrationSupported(int gamepad);
+
     // Set up all GLFW event callbacks for input handling
     static void SetupEventCallbacks();
 

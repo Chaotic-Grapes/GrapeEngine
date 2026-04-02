@@ -198,6 +198,37 @@ public static class Input
     {
         return InputAPI.GetGamepadAxisWithDeadzone(gamepad, axis, deadzone);
     }
+
+    /// <summary>
+    /// Set gamepad vibration motor intensities.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <param name="lowFrequency">Low-frequency motor intensity in [0, 1].</param>
+    /// <param name="highFrequency">High-frequency motor intensity in [0, 1].</param>
+    /// <returns>True if the vibration command was accepted.</returns>
+    public static bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency)
+    {
+        return InputAPI.SetGamepadVibration(gamepad, lowFrequency, highFrequency);
+    }
+
+    /// <summary>
+    /// Stop gamepad vibration immediately.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    public static void StopGamepadVibration(int gamepad)
+    {
+        InputAPI.StopGamepadVibration(gamepad);
+    }
+
+    /// <summary>
+    /// Query whether vibration is supported for a gamepad slot.
+    /// </summary>
+    /// <param name="gamepad">Gamepad index (0..15).</param>
+    /// <returns>True if vibration is supported for this slot.</returns>
+    public static bool IsGamepadVibrationSupported(int gamepad)
+    {
+        return InputAPI.IsGamepadVibrationSupported(gamepad);
+    }
 }
 
 // ============================================================================

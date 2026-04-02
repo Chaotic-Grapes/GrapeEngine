@@ -23,12 +23,131 @@ Features:
 
 #include "services/Input.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <sstream>
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "core/Logger.h"
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#include <Xinput.h>
+#endif
+
+namespace {
+
+#if defined(_WIN32)
+
+using XInputGetStateFn = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
+using XInputSetStateFn = DWORD(WINAPI*)(DWORD, XINPUT_VIBRATION*);
+
+struct XInputRuntime {
+    HMODULE module = nullptr;
+    XInputGetStateFn getState = nullptr;
+    XInputSetStateFn setState = nullptr;
+    bool initialized = false;
+};
+
+/**
+ * @brief Resolve XInput symbols once and cache the result for process lifetime.
+ * @return Reference to cached runtime dispatch table.
+ * @note Dynamic loading avoids hard link dependencies on specific XInput DLL variants.
+ * @complexity O(1) after first call, O(k) DLL probes on first call where k is candidate DLL count.
+ */
+XInputRuntime& GetXInputRuntime() {
+    static XInputRuntime runtime{};
+    if (runtime.initialized) {
+        return runtime;
+    }
+
+    runtime.initialized = true;
+
+    constexpr std::array<const char*, 4> kCandidates{
+        "xinput1_4.dll",
+        "xinput1_3.dll",
+        "xinput9_1_0.dll",
+        "xinput1_2.dll"
+    };
+
+    for (const char* dllName : kCandidates) {
+        HMODULE module = ::LoadLibraryA(dllName);
+        if (!module) {
+            continue;
+        }
+
+        auto getState = reinterpret_cast<XInputGetStateFn>(::GetProcAddress(module, "XInputGetState"));
+        auto setState = reinterpret_cast<XInputSetStateFn>(::GetProcAddress(module, "XInputSetState"));
+        if (getState && setState) {
+            runtime.module = module;
+            runtime.getState = getState;
+            runtime.setState = setState;
+            break;
+        }
+
+        ::FreeLibrary(module);
+    }
+
+    return runtime;
+}
+
+/**
+ * @brief Check whether XInput backend is available.
+ * @return True when XInput function pointers were resolved.
+ * @complexity O(1).
+ */
+bool IsXInputAvailable() {
+    const XInputRuntime& runtime = GetXInputRuntime();
+    return runtime.module != nullptr && runtime.getState != nullptr && runtime.setState != nullptr;
+}
+
+/**
+ * @brief Check if a specific XInput user index currently has a connected controller.
+ * @param userIndex XInput user index in [0, XUSER_MAX_COUNT).
+ * @return True if controller state can be queried successfully.
+ * @complexity O(1).
+ */
+bool IsXInputUserPresent(const DWORD userIndex) {
+    if (!IsXInputAvailable() || userIndex >= XUSER_MAX_COUNT) {
+        return false;
+    }
+
+    XINPUT_STATE state{};
+    const XInputRuntime& runtime = GetXInputRuntime();
+    return runtime.getState(userIndex, &state) == ERROR_SUCCESS;
+}
+
+/**
+ * @brief Send vibration command to XInput controller.
+ * @param userIndex XInput user index in [0, XUSER_MAX_COUNT).
+ * @param lowFrequency Low-frequency motor intensity in [0, 1].
+ * @param highFrequency High-frequency motor intensity in [0, 1].
+ * @return True if command was accepted by XInput.
+ * @complexity O(1).
+ */
+bool SetXInputVibration(const DWORD userIndex, const float lowFrequency, const float highFrequency) {
+    if (!IsXInputAvailable() || userIndex >= XUSER_MAX_COUNT) {
+        return false;
+    }
+
+    const float clampedLow = std::clamp(lowFrequency, 0.0f, 1.0f);
+    const float clampedHigh = std::clamp(highFrequency, 0.0f, 1.0f);
+
+    XINPUT_VIBRATION vibration{};
+    vibration.wLeftMotorSpeed = static_cast<WORD>(clampedLow * 65535.0f + 0.5f);
+    vibration.wRightMotorSpeed = static_cast<WORD>(clampedHigh * 65535.0f + 0.5f);
+
+    const XInputRuntime& runtime = GetXInputRuntime();
+    return runtime.setState(userIndex, &vibration) == ERROR_SUCCESS;
+}
+
+#endif
+
+}
 
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
@@ -158,6 +277,70 @@ float Input::GetGamepadAxis(const int gamepad, const int axis) {
 
 float Input::GetGamepadAxisWithDeadzone(const int gamepad, const int axis, const float deadzone) {
     return _applyAxisDeadzone(GetGamepadAxis(gamepad, axis), deadzone);
+}
+
+/**
+ * @brief Set controller vibration for a gamepad slot.
+ * @param gamepad Gamepad slot index in [0, MAX_GAMEPADS).
+ * @param lowFrequency Low-frequency motor intensity in [0, 1].
+ * @param highFrequency High-frequency motor intensity in [0, 1].
+ * @return True when vibration was sent successfully.
+ * @note Current implementation uses XInput on Windows and supports slots 0..3.
+ * @complexity O(1).
+ */
+bool Input::SetGamepadVibration(const int gamepad, const float lowFrequency, const float highFrequency) {
+    if (!_isGamepadIndexValid(gamepad) || !IsGamepadConnected(gamepad)) {
+        return false;
+    }
+
+#if defined(_WIN32)
+    if (gamepad < 0 || gamepad >= static_cast<int>(XUSER_MAX_COUNT)) {
+        return false;
+    }
+
+    const DWORD userIndex = static_cast<DWORD>(gamepad);
+    if (!IsXInputUserPresent(userIndex)) {
+        return false;
+    }
+
+    return SetXInputVibration(userIndex, lowFrequency, highFrequency);
+#else
+    (void)lowFrequency;
+    (void)highFrequency;
+    return false;
+#endif
+}
+
+/**
+ * @brief Stop controller vibration for a gamepad slot.
+ * @param gamepad Gamepad slot index in [0, MAX_GAMEPADS).
+ * @return void
+ * @complexity O(1).
+ */
+void Input::StopGamepadVibration(const int gamepad) {
+    (void)SetGamepadVibration(gamepad, 0.0f, 0.0f);
+}
+
+/**
+ * @brief Check whether vibration is supported for a gamepad slot.
+ * @param gamepad Gamepad slot index in [0, MAX_GAMEPADS).
+ * @return True if vibration can be sent for the given slot.
+ * @complexity O(1).
+ */
+bool Input::IsGamepadVibrationSupported(const int gamepad) {
+    if (!_isGamepadIndexValid(gamepad) || !IsGamepadConnected(gamepad)) {
+        return false;
+    }
+
+#if defined(_WIN32)
+    if (gamepad < 0 || gamepad >= static_cast<int>(XUSER_MAX_COUNT)) {
+        return false;
+    }
+
+    return IsXInputUserPresent(static_cast<DWORD>(gamepad));
+#else
+    return false;
+#endif
 }
 
 // Register all GLFW callbacks so input state and message broadcasts stay synchronized
