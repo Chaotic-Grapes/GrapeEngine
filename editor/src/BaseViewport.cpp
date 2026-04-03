@@ -57,11 +57,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
+
+// Unsubscribe from all message system subscriptions
 BaseViewport::~BaseViewport() {
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityTransformChanged>(m_transformChangedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
 }
 
+// Store fonts, create the editor camera, and subscribe to engine events
 void BaseViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
     ECS::World* world, Scenes::SceneManager* sceneManager) {
     (void)sceneManager;
@@ -97,6 +100,7 @@ void BaseViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
     }
 }
 
+// Replace the active ECS world and clear any stale entity selection
 void BaseViewport::SetWorld(ECS::World* world) {
     if (m_world == world) {
         return;
@@ -117,10 +121,13 @@ void BaseViewport::SetWorld(ECS::World* world) {
 // -------------------------------------------------------------------------
 // Event Registration
 // -------------------------------------------------------------------------
+
+// Register the callback to be invoked whenever the selected entity changes
 void BaseViewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
     m_onSelectionChanged = callback;
 }
 
+// Store the file menu reference and subscribe to scene modification events
 void BaseViewport::SetFileMenu(EditorFileMenu* fileMenu) {
     m_fileMenu = fileMenu;
 
@@ -140,14 +147,18 @@ void BaseViewport::SetFileMenu(EditorFileMenu* fileMenu) {
 // -------------------------------------------------------------------------
 // Accessors
 // -------------------------------------------------------------------------
+
+// Return the index portion of the currently selected entity
 EntityId BaseViewport::GetSelectedEntityId() const {
     return m_selectedEntity.Index;
 }
 
+// Return whether the cursor is currently over the viewport window
 bool BaseViewport::IsViewportHovered() const {
     return m_isViewportHovered;
 }
 
+// Resolve the entity from the world, update internal state, and fire selection callbacks
 void BaseViewport::SetSelectedEntity(const EntityId id) {
     // Convert EntityId to full Entity by looking it up in the world
     // This ensures we have the correct generation for IsAlive() validation
@@ -169,6 +180,7 @@ void BaseViewport::SetSelectedEntity(const EntityId id) {
     }
 }
 
+// Move the editor camera to frame the given entity in the viewport
 void BaseViewport::FocusOnEntity(const EntityId entityId) {
     auto* rendererSystem = _getRendererSystem();
     if (!m_world || !rendererSystem) return;
@@ -214,6 +226,8 @@ void BaseViewport::FocusOnEntity(const EntityId entityId) {
 // -------------------------------------------------------------------------
 // Protected Helper Methods
 // -------------------------------------------------------------------------
+
+// Draw world-space frustum lines for all scene cameras using the renderer system
 void BaseViewport::_renderCameraFrustum() {
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem || !m_world || !m_editorCamera) {
@@ -239,6 +253,7 @@ void BaseViewport::_renderCameraFrustum() {
     );
 }
 
+// Render a semi-transparent FPS/frame-time overlay in the top-left corner of the viewport
 void BaseViewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
     (void)viewportSize;
     
@@ -297,6 +312,7 @@ void BaseViewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& view
     ImGui::End();
 }
 
+// Retrieve the global RendererSystem from the Application's SystemManager
 ECS::RendererSystem* BaseViewport::_getRendererSystem() {
     // Get the global RendererSystem from Application's SystemManager
     if (Engine::CORE) {

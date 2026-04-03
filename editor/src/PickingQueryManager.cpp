@@ -32,6 +32,7 @@ namespace Editor {
         ClearCache();
     }
 
+    // Submit a pick request at the given screen position; returns a request ID to poll with TryGetPickResult, or 0 on failure
     uint32_t PickingQueryManager::RequestPick(
         float screenX,
         float screenY,
@@ -83,6 +84,7 @@ namespace Editor {
         return ourRequestId;
     }
 
+    // Check the cache or poll the renderer for a completed pick result; returns true when ready
     bool PickingQueryManager::TryGetPickResult(uint32_t requestId, uint32_t& outEntityId) {
         // Check cache first
         auto cacheIt = m_resultCache.find(requestId);
@@ -117,11 +119,13 @@ namespace Editor {
         return true;
     }
 
+    // Discard all cached results and pending pick requests
     void PickingQueryManager::ClearCache() {
         m_resultCache.clear();
         m_pendingRequests.clear();
     }
 
+    // Update the viewport rectangle used for position validation; clears the cache if bounds changed significantly
     void PickingQueryManager::SetViewportBounds(const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
         // Check if bounds changed significantly (more than 1 pixel)
         glm::vec2 posDiff = glm::abs(viewportPos - m_lastValidatedViewportPos);
@@ -138,10 +142,12 @@ namespace Editor {
         m_lastValidatedViewportSize = viewportSize;
     }
 
+    // Return the number of pick requests that have been submitted but not yet resolved
     size_t PickingQueryManager::GetPendingRequestCount() const {
         return m_pendingRequests.size();
     }
 
+    // Return true if the given screen position falls within the current viewport bounds
     bool PickingQueryManager::_isScreenPositionValid(float screenX, float screenY) const {
         // Check if position is within viewport bounds
         if (screenX < m_viewportPos.x || screenX > m_viewportPos.x + m_viewportSize.x) {
@@ -153,6 +159,7 @@ namespace Editor {
         return true;
     }
 
+    // Convert absolute screen coordinates to coordinates relative to the viewport's top-left corner
     glm::vec2 PickingQueryManager::_screenToViewportSpace(float screenX, float screenY) const {
         // Convert absolute screen position to viewport-relative position
         float viewportX = screenX - m_viewportPos.x;

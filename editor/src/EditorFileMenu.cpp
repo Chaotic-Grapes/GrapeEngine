@@ -70,14 +70,14 @@ namespace {
             return true;
         }
 #ifdef _WIN32
-        // Windows hidden attribute check.
+        // Windows hidden attribute check
         const DWORD attrs = GetFileAttributesA(path.string().c_str());
-        // Only trust attributes when the query succeeded.
+        // Only trust attributes when the query succeeded
         if (attrs != INVALID_FILE_ATTRIBUTES) {
             return (attrs & FILE_ATTRIBUTE_HIDDEN) != 0;
         }
 #endif
-        // Default to visible if no hidden signal is found.
+        // Default to visible if no hidden signal is found
         return false;
     }
 }
@@ -247,6 +247,7 @@ void EditorFileMenu::RenderFileMenu() {
     _renderExportSummaryPopup();
 }
 
+// Convert a raw byte count to a human-readable string with the appropriate unit (B, KB, MB, etc.)
 std::string EditorFileMenu::_formatBytes(std::uintmax_t bytes) const {
     // Human-readable unit table.
     static const char* units[] = { "B", "KB", "MB", "GB", "TB" };
@@ -260,7 +261,7 @@ std::string EditorFileMenu::_formatBytes(std::uintmax_t bytes) const {
         ++unitIndex;
     }
 
-    // Output formatter used for the UI text.
+    // Output formatter used for the UI text
     std::ostringstream out;
     // Keep bytes as integer text.
     if (unitIndex == 0) {
@@ -276,6 +277,7 @@ std::string EditorFileMenu::_formatBytes(std::uintmax_t bytes) const {
     return out.str();
 }
 
+// Recalculate the total byte count and file count for all currently selected assets
 void EditorFileMenu::_recomputeBuildSizeSelectionTotals() {
     // Reset aggregate counters before accumulation.
     m_buildSizeSelectedBytes = 0;
@@ -293,6 +295,7 @@ void EditorFileMenu::_recomputeBuildSizeSelectionTotals() {
     }
 }
 
+// Set every asset's include/exclude selection to the given state and refresh the totals
 void EditorFileMenu::_setAllBuildSizeSelections(bool selected) {
     // Apply one state to the entire selection set.
     for (auto& asset : m_buildSizeAssets) {
@@ -304,6 +307,7 @@ void EditorFileMenu::_setAllBuildSizeSelections(bool selected) {
     _saveBuildSizeSelectionCache();
 }
 
+// Load previously saved asset include/exclude selections from the JSON cache file into memory
 void EditorFileMenu::_loadBuildSizeSelectionCache() {
     // Start from an empty in-memory cache.
     m_buildSizeSelectionCache.clear();
@@ -355,6 +359,7 @@ void EditorFileMenu::_loadBuildSizeSelectionCache() {
     }
 }
 
+// Persist the current asset include/exclude selections to a JSON cache file in the project root
 void EditorFileMenu::_saveBuildSizeSelectionCache() const {
     if (!Engine::ProjectPaths::IsInitialized()) {
         return;
@@ -392,6 +397,7 @@ void EditorFileMenu::_saveBuildSizeSelectionCache() const {
     }
 }
 
+// Rebuild the build-size asset list by scanning the project's assets directory
 void EditorFileMenu::_refreshBuildSizeAnalyzerAssets() {
     // Rebuild analyzer data from scratch.
     m_buildSizeAssets.clear();
@@ -486,6 +492,7 @@ void EditorFileMenu::_refreshBuildSizeAnalyzerAssets() {
     m_buildSizeStatusMessage = "Found " + std::to_string(m_buildSizeAssets.size()) + " assets.";
 }
 
+// Render the build-size analyzer window showing asset file sizes and export selection controls
 void EditorFileMenu::_renderBuildSizeAnalyzerWindow() {
     // Skip work when the export window is closed.
     if (!m_showBuildSizeAnalyzer) {
@@ -753,12 +760,7 @@ void EditorFileMenu::_renderBuildSizeAnalyzerWindow() {
     }
 }
 
-/**
- * @brief Exports the active project by configuring, building, and packaging a runtime build.
- * @param destinationOverride Absolute or relative destination folder chosen by the user.
- * @param selectedAssets Set of project-relative asset paths that should be copied into the export.
- * @return None.
- */
+// Export the active project by copying runtime binaries, selected assets, and scene files to destinationOverride
 void EditorFileMenu::_exportProject(const std::string& destinationOverride,
     const std::unordered_set<std::string>& selectedAssets) {
     // Prevent concurrent exports from overlapping.
@@ -1417,6 +1419,7 @@ void EditorFileMenu::RenderViewMenu(float& uiScale) {
 // Project Settings
 // -------------------------------------------------------------------------
 
+// Render the modal dialog for editing project-wide settings (physics, build, etc.)
 void EditorFileMenu::_renderProjectSettingsModal() {
     if (!Engine::CORE) return;
     
@@ -2401,6 +2404,7 @@ void EditorFileMenu::_renderExportSummaryPopup() {
     }
 }
 
+// Join the background export thread and show the result popup if the export has completed
 void EditorFileMenu::_finalizeExportIfDone() {
     if (!m_exportDone.load()) {
         return;
@@ -2413,6 +2417,7 @@ void EditorFileMenu::_finalizeExportIfDone() {
 }
 
 #ifdef _WIN32
+// Open the Windows folder-picker dialog and return the selected path, or an empty string if cancelled
 std::string EditorFileMenu::_pickExportFolder() {
     BROWSEINFOA bi = {};
     bi.lpszTitle = "Select Export Destination";
@@ -2522,6 +2527,7 @@ void EditorFileMenu::OpenSceneDialog() {
 #endif
 }
 
+// Load and activate the scene at the given path without showing an open-file dialog
 void EditorFileMenu::OpenSceneFromPath(const std::string& path) {
     if (path.empty()) {
         return;

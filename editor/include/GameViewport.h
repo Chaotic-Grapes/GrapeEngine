@@ -20,18 +20,50 @@ selection. Separate from the editor camera and scene editing controls.
 
 class GameViewport : public BaseViewport {
 public:
+    /**
+     * @brief Initialize the game viewport with fonts, ECS world, and scene manager.
+     * @param mainFont Primary UI font.
+     * @param boldFont Bold UI font.
+     * @param symbolsFont Icon/symbol font.
+     * @param world Active ECS world.
+     * @param sceneManager Scene manager used for scene operations.
+     */
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
         ECS::World* world, Scenes::SceneManager* sceneManager) override;
+
     ~GameViewport() override;
+
+    /** @brief Per-frame hook called before game viewport work (no-op). */
     void BeginFrame() override {}
+
+    /** @brief Sync the game camera and prepare the render target for this frame. */
     void PrepareFrame();
+
+    /** @brief Handle in-world input interactions for the game view. */
     void HandleInWorldInteraction() override;
+
+    /** @brief Render game viewport UI windows (aspect ratio selector, immersive toggle). */
     void ShowEditorWindows() override;
+
+    /** @brief Per-frame hook called after game viewport work (no-op). */
     void EndFrame() override {}
+
+    /**
+     * @brief Check whether immersive (game-only fullscreen) mode is active.
+     * @return True while the game viewport is displayed fullscreen.
+     */
     bool IsImmersiveModeEnabled() const { return m_immersiveMode; }
 
 private:
+    /** @brief Render the game scene texture into the ImGui viewport window. */
     void _renderViewport();
+    /**
+     * @brief Sync the editor game camera to an ECS Camera3D component.
+     * @param entity Entity that owns the Camera3D component.
+     * @param camera Camera3D component data to apply.
+     * @param targetAspect Desired output aspect ratio.
+     * @return True if the camera was successfully synced.
+     */
     bool _syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect);
 
     // Game window aspect ratio settings

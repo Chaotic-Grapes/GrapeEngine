@@ -38,6 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace {
     constexpr const char* kGameViewportName = "Game";
 
+    // Return the target aspect ratio for the given selection index, or the viewport's actual ratio if freeAspect is set
     float ResolveSelectedAspectRatio(int selectedAspectRatio, bool freeAspect, int width, int height) {
         if (freeAspect) {
             return (height > 0) ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
@@ -55,6 +56,7 @@ namespace {
     }
 }
 
+// Initialize the game viewport, create its named renderer viewport, and set viewport type to Game
 void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
     ECS::World* world, Scenes::SceneManager* sceneManager) {
     BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
@@ -70,12 +72,15 @@ GameViewport::~GameViewport() {
 // -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
+
+// Handle immersive mode toggle (F12/Escape) and clear viewport hover state
 void GameViewport::HandleInWorldInteraction() {
     if (Input::IsKeyPressed(KEY_F12)) {
         if (m_immersiveMode) {
             m_immersiveMode = false;
             m_requestRestore = true;
-        } else {
+        } 
+        else {
             m_immersiveMode = true;
             m_requestRestore = false;
         }
@@ -94,6 +99,8 @@ void GameViewport::HandleInWorldInteraction() {
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
+
+// Render the game viewport window
 void GameViewport::ShowEditorWindows() {
     _renderViewport();
 }
@@ -101,6 +108,8 @@ void GameViewport::ShowEditorWindows() {
 // -------------------------------------------------------------------------
 // Private Rendering Implementation
 // -------------------------------------------------------------------------
+
+// Sync the active Camera3D to the game viewport and configure the GUI viewport for input mapping
 void GameViewport::PrepareFrame() {
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem) {
@@ -179,6 +188,7 @@ void GameViewport::PrepareFrame() {
     );
 }
 
+// Copy Camera3D and WorldTransform/LocalTransform data into the runtime game camera used for rendering
 bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect) {
     if (!m_world || entity.IsNull()) {
         return false;
@@ -238,6 +248,7 @@ bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Ca
     return false;
 }
 
+// Draw the Game ImGui window, handle immersive fullscreen, aspect ratio letterboxing, and the camera texture
 void GameViewport::_renderViewport() {
     ImGuiWindowFlags windowFlags = 0;
     const bool renderImmersive = m_immersiveMode;

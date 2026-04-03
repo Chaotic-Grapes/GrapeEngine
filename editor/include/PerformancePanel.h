@@ -32,10 +32,22 @@ namespace ECS {
 
 class PerformancePanel {
 public:
+
+    /**
+     * @brief Initialize fonts and mark the panel as ready to render.
+     * @param mainFont Primary UI font.
+     * @param boldFont Bold UI font.
+     * @param symbolsFont Icon/symbol font.
+     */
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+
+    /** @brief Release panel resources and reset initialization state. */
     void Shutdown();
 
-    // Render accepts whether the editor is currently playing; monitoring is paused when not playing
+    /**
+     * @brief Render the performance panel UI.
+     * @param isPlaying True when the editor is in play mode; stats are frozen when false.
+     */
     void Render(bool isPlaying);
 
     /**
@@ -44,7 +56,7 @@ public:
      */
     void SetWorld(ECS::World* world);
 
-    // Reset the panel to show the paused message (call when loading a new scene)
+    /** @brief Reset cached data so the panel shows the paused state on next render (call when loading a new scene). */
     void ResetForNewScene();
 
     /**
@@ -91,12 +103,29 @@ private:
     bool m_statsValidated = false;
 
     // Private rendering methods
+
+    /** @brief Snapshot current FPS, frame time, entity count, and system scope timings into the cache. */
     void _updateCachedData();
+
+    /** @brief Render the panel title and play-state indicator header. */
     void _renderHeader();
+
+    /** @brief Render the FPS, frame time, and entity/component count overview rows. */
     void _renderOverviewStats();
+
+    /** @brief Render the per-system timing table with enable/disable state. */
     void _renderSystemsTable();
+
+    /** @brief Render the memory usage statistics section. */
     void _renderMemoryStats();
+
+    /** @brief Render the interactive memory allocator benchmark section. */
     void _renderMemoryBenchmark();
+
+    /**
+     * @brief Run a one-time sanity check on memory manager statistics.
+     * @return True if all stats are internally consistent.
+     */
     bool _validateMemoryStats();
 };
 

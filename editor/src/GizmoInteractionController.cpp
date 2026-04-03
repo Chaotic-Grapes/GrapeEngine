@@ -19,10 +19,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    // Compute the transform delta between the drag start and end states
     TransformDelta GizmoInteractionController::ComputeDelta() const {
         return m_initialTransform.ComputeDelta(m_finalTransform);
     }
 
+    // Advance the gizmo interaction state machine and fire drag start/end events as transitions occur
     void GizmoInteractionController::Update(const GizmoRenderer& gizmo, uint32_t activeEntityId, const CachedTransformState& currentTransform) {
         // Store previous state to detect transitions
         m_previousState = m_state;
@@ -74,6 +76,7 @@ namespace Editor {
         }
     }
 
+    // Reset the controller to Idle state and clear all cached transform data
     void GizmoInteractionController::Reset() {
         m_state = State::Idle;
         m_previousState = State::Idle;
@@ -82,6 +85,7 @@ namespace Editor {
         m_finalTransform = CachedTransformState();
     }
 
+    // Invoke the OnDragStart callback with a zero delta when dragging begins
     void GizmoInteractionController::_fireOnDragStart() {
         if (OnDragStart) {
             // At drag start, delta is zero (no change yet)
@@ -90,6 +94,7 @@ namespace Editor {
         }
     }
 
+    // Invoke the OnDragEnd callback with the computed start-to-end transform delta
     void GizmoInteractionController::_fireOnDragEnd() {
         if (OnDragEnd) {
             TransformDelta delta = ComputeDelta();

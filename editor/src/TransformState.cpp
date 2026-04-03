@@ -17,6 +17,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    /**
+     * @brief Return true if this transform state is within epsilon of the other in position, rotation, and scale.
+     * @param other Transform state to compare against.
+     * @param epsilon Maximum allowable difference to still be considered equal.
+     * @return True if all components are within epsilon, false otherwise.
+     */
     bool CachedTransformState::Equals(const CachedTransformState& other, float epsilon) const {
         // Compare position component-wise
         Vector3D posDiff = Position - other.Position;
@@ -38,6 +44,11 @@ namespace Editor {
         return true;
     }
 
+    /**
+     * @brief Compute the positional, rotational, and scale delta from this state to the given final state.
+     * @param final The target transform state.
+     * @return TransformDelta representing the change from this state to final.
+     */
     TransformDelta CachedTransformState::ComputeDelta(const CachedTransformState& final) const {
         // Compute position delta
         Vector3D posDelta = final.Position - this->Position;
@@ -51,10 +62,20 @@ namespace Editor {
         return TransformDelta(posDelta, rotDelta, scaleDelta);
     }
 
+    /**
+     * @brief Return a new transform state with the given delta applied to this one.
+     * @param delta The delta to apply.
+     * @return New CachedTransformState with the delta applied.
+     */
     CachedTransformState CachedTransformState::ApplyDelta(const TransformDelta& delta) const {
         return delta.ApplyTo(*this);
     }
 
+    /**
+     * @brief Return true if position, rotation, and scale deltas are all within epsilon of zero/identity.
+     * @param epsilon Maximum allowable magnitude to still be considered zero.
+     * @return True if all deltas are effectively zero, false otherwise.
+     */
     bool TransformDelta::IsZero(float epsilon) const {
         // Check position delta
         float posDistance = std::sqrt(PositionDelta.X * PositionDelta.X +
@@ -75,6 +96,10 @@ namespace Editor {
         return true;
     }
 
+    /**
+     * @brief Return a new delta that is the inverse of this one, suitable for undoing a transform change.
+     * @return Inverted TransformDelta with negated position, scale, and conjugated rotation.
+     */
     TransformDelta TransformDelta::Inverted() const {
         // Negate position and scale deltas
         Vector3D invertedPosDelta(PositionDelta.X * -1.0f,
@@ -94,6 +119,11 @@ namespace Editor {
         return TransformDelta(invertedPosDelta, invertedRotDelta, invertedScaleDelta);
     }
 
+    /**
+     * @brief Add this delta's position and scale offsets and compose its rotation onto the given state.
+     * @param state The base transform state to apply this delta to.
+     * @return New CachedTransformState with this delta applied.
+     */
     CachedTransformState TransformDelta::ApplyTo(const CachedTransformState& state) const {
         // Apply position delta
         Vector3D newPosition(state.Position.X + this->PositionDelta.X,

@@ -1,14 +1,17 @@
-/**
- * @Name: Samantha Leong, 2403088
- * @email: s.leong@digipen.edu
- * @file AABBGennerator.cpp
- * @brief Panel for importing 2D sprites with automatic pixel-perfect BoxCollider2D.
- *
- * 
- * 
- * 
- *  Note: in progress but halfway was displaced by "Generate AABB" button in property editor
- */
+/* Start Header *****************************************************************/
+/*!
+\file   AABBGenerator.cpp
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\brief
+Panel for importing 2D sprites with automatic pixel-perfect BoxCollider2D.
+Note: in progress but halfway was displaced by "Generate AABB" button in property editor.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 #if 0
 #include "../editor/AABBGenerator.h"
@@ -18,16 +21,21 @@
 #include "services/ResourceManager.h"           
 #include "core/Logger.h"
 #include "graphics/Texture.hpp" 
-
 #include <cstdio>
 #include <filesystem>
 #include <cstring>
 #include <stb_image.h>
 
-
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
+
+/**
+ * @brief Store font references and create the sprites output directory if it does not exist.
+ * @param mainFont Primary UI font.
+ * @param boldFont Bold UI font.
+ * @param symbolsFont Icon/symbol font.
+ */
 void SpriteImportPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont)
 {
     m_mainFont = mainFont;
@@ -37,6 +45,10 @@ void SpriteImportPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* s
     std::filesystem::create_directories("assets/sprites");
 }
 
+/**
+ * @brief Set the ECS world used when creating sprite entities from imported assets.
+ * @param world Pointer to the ECS world (may be nullptr).
+ */
 void SpriteImportPanel::SetWorld(ECS::World* world)
 {
     m_world = world;
@@ -45,6 +57,8 @@ void SpriteImportPanel::SetWorld(ECS::World* world)
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
+
+/** @brief Render the sprite importer panel UI with file path input and import controls. */
 void SpriteImportPanel::Render()
 {
     ImGui::Begin("Sprite Importer", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
@@ -77,11 +91,17 @@ void SpriteImportPanel::Render()
     ImGui::End();
 }
 
-
-
 // -------------------------------------------------------------------------
 // Entity Creation (uses your real components)
 // -------------------------------------------------------------------------
+
+/**
+ * @brief Create a new entity with a sprite renderer and a pixel-perfect BoxCollider2D from the given image.
+ * @param imagePath Path to the source image file.
+ * @param pixelWidth Width of the image in pixels.
+ * @param pixelHeight Height of the image in pixels.
+ * @return True if the entity was created successfully, false otherwise.
+ */
 bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pixelWidth, int pixelHeight)
 {
     using namespace ECS::Components;
@@ -133,16 +153,23 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
     return true;
 }
 
-
 // -------------------------------------------------------------------------
 // Entity Creation (for this test case)
 // -------------------------------------------------------------------------
+
+/**
+ * @brief Create a new entity with a sprite renderer and a pixel-perfect BoxCollider2D from the given image.
+ * @param imagePath Path to the source image file.
+ * @param pixelWidth Width of the image in pixels.
+ * @param pixelHeight Height of the image in pixels.
+ * @return True if the entity was created successfully, false otherwise.
+ */
 bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pixelWidth, int pixelHeight)
 {
     using namespace ECS::Components;
 
     // Create Entity
-    ECS::Entity entity;// = HierarchyPanel::m_selectedEntityId;
+    ECS::Entity entity;
 
     m_world->Add<LocalTransform>(entity);
     m_world->Add<SpriteRenderer2D>(entity);

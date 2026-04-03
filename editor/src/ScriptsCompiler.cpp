@@ -41,6 +41,10 @@ ScriptsCompiler::~ScriptsCompiler() {
     Shutdown();
 }
 
+/**
+ * @brief Store the script manager reference and register hot-reload and change-detection callbacks.
+ * @param scriptManager The engine's script manager to bind to this compiler instance.
+ */
 void ScriptsCompiler::Initialize(ECS::ScriptManager* scriptManager) {
     m_scriptManager = scriptManager;
     m_shutdownRequested.store(false);
@@ -49,6 +53,7 @@ void ScriptsCompiler::Initialize(ECS::ScriptManager* scriptManager) {
     }
 }
 
+/** @brief Generate the C# project file, kick off the initial compilation on a background thread, and start the script file watcher. */
 void ScriptsCompiler::Start() {
     if (!m_scriptManager || !m_scriptManager->IsInitialized()) return;
 
@@ -126,6 +131,7 @@ void ScriptsCompiler::Start() {
     });
 }
 
+/** @brief Register hot-reload, script-changed, and component-deserialize callbacks with the script manager. */
 void ScriptsCompiler::_registerCallbacks() {
     if (!m_scriptManager) return;
 
@@ -156,6 +162,7 @@ void ScriptsCompiler::_registerCallbacks() {
     }
 }
 
+/** @brief Drive the hot-reload state machine from the main thread each frame. */
 void ScriptsCompiler::Update() {
     if (!m_scriptManager) return;
 
@@ -212,11 +219,22 @@ void ScriptsCompiler::Update() {
 }
 
 
+/**
+ * @brief Delegate to the script manager to compile all scripts in scriptsDir and write the assembly to outputPath.
+ * @param scriptsDir Directory containing the C# source files to compile.
+ * @param outputPath Destination path for the compiled assembly (.dll).
+ * @param diagnostics Receives compiler error/warning output on failure.
+ * @return True if compilation succeeded, false otherwise.
+ */
 bool ScriptsCompiler::_doCompileScripts(const std::string& scriptsDir, const std::string& outputPath, std::string& diagnostics) {
     if (!m_scriptManager) return false;
     return m_scriptManager->CompileScriptsWithDiagnostics(scriptsDir, outputPath, diagnostics);
 }
 
+/**
+ * @brief Return the active scene world, falling back to the empty world if no scene is loaded.
+ * @return Pointer to the current target ECS world; never null.
+ */
 ECS::World* ScriptsCompiler::_getTargetWorld() {
     ECS::World* targetWorld = m_emptyWorld;
     auto* activeScene = m_engine->GetSceneManager().GetActive();
@@ -224,6 +242,10 @@ ECS::World* ScriptsCompiler::_getTargetWorld() {
     return targetWorld;
 }
 
+/**
+ * @brief Load the compiled assembly, clear stale managed components, unregister old systems, and register new ones.
+ * @param assemblyPath Path to the compiled .dll to load.
+ */
 void ScriptsCompiler::_doLoadAndRegisterSystems(const std::string& assemblyPath) {
     if (!m_scriptManager->LoadAssembly(assemblyPath)) {
         LOG_ERROR("[ScriptsCompiler] Failed to load compiled script assembly");
@@ -253,6 +275,14 @@ void ScriptsCompiler::_doLoadAndRegisterSystems(const std::string& assemblyPath)
     m_registryRebuildPending.store(true);
 }
 
+/**
+ * @brief Atomically replace the live assembly with the freshly compiled one, retrying with exponential backoff if the file is locked.
+ * @param tempPath Path to the newly compiled temporary assembly.
+ * @param finalPath Destination path where the live assembly should reside.
+ * @param maxRetries Maximum number of retry attempts before giving up.
+ * @param baseDelayMs Base delay in milliseconds for the exponential backoff.
+ * @return True if the file was moved successfully, false if all retries failed.
+ */
 bool ScriptsCompiler::_doMoveCompiledAssemblyWithRetry(const std::string& tempPath, const std::string& finalPath, int maxRetries, int baseDelayMs) {
     try {
         std::filesystem::path tempDllPath = tempPath;
@@ -330,6 +360,7 @@ bool ScriptsCompiler::_doMoveCompiledAssemblyWithRetry(const std::string& tempPa
     }
 }
 
+/** @brief Background thread: compile changed scripts to a temp path, then signal the main thread to unload and reload the assembly. */
 void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
     if (!m_scriptManager) {
         LOG_ERROR("[ScriptsCompiler] ScriptManager is null, aborting hot reload");
@@ -408,6 +439,7 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
     }
 }
 
+/** @brief Main-thread hot-reload step: clear managed components and unload the current assembly. */
 void ScriptsCompiler::_mainThreadUnload() {
     LOG_INFO("[ScriptsCompiler] Unloading old assembly");
 
@@ -456,6 +488,7 @@ void ScriptsCompiler::_mainThreadUnload() {
     m_stateChanged.notify_one();
 }
 
+/** @brief Main-thread hot-reload step: move the compiled assembly into place and reload all scripted systems. */
 void ScriptsCompiler::_mainThreadLoad() {
     LOG_INFO("[ScriptsCompiler] Main thread: loading new assembly for hot reload");
 
@@ -495,6 +528,7 @@ void ScriptsCompiler::_mainThreadLoad() {
     m_stateChanged.notify_one();
 }
 
+/** @brief Signal shutdown, join all background threads, and release compiler resources. */
 void ScriptsCompiler::Shutdown() {
     m_shutdownRequested.store(true);
     m_stateChanged.notify_all();

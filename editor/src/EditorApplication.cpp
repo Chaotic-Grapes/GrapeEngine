@@ -40,6 +40,7 @@ EditorApplication::~EditorApplication() {
     }
 }
 
+// Load editor settings, create the main window, and initialize the editor service
 void EditorApplication::Initialize() {
     if (m_initialized) {
         LOG_WARNING("EditorApplication already initialized");
@@ -61,6 +62,7 @@ void EditorApplication::Initialize() {
     LOG_INFO("Editor Application initialized successfully");
 }
 
+// Forward begin-frame tick to the editor service
 void EditorApplication::BeginFrame() {
     if (!m_initialized) return;
 
@@ -70,6 +72,7 @@ void EditorApplication::BeginFrame() {
     }
 }
 
+// Poll script compile status during startup, then tick the editor service each frame
 void EditorApplication::Update() {
     if (!m_initialized) return;
 
@@ -130,6 +133,7 @@ void EditorApplication::Update() {
     }
 }
 
+// Forward the render call to the editor service to draw all editor UI
 void EditorApplication::Render() {
     if (!m_initialized) return;
 
@@ -139,6 +143,7 @@ void EditorApplication::Render() {
     }
 }
 
+// Forward end-frame tick to the editor service
 void EditorApplication::EndFrame() {
     if (!m_initialized) return;
 
@@ -149,10 +154,10 @@ void EditorApplication::EndFrame() {
 }
 
 // Callback bridge design note:
-// - Managed code receives a plain function pointer, so captureless static storage is required.
-// - The callback resolves the active scene world at call time to stay valid across scene switches.
-// - Global pointers are refreshed when callbacks are re-registered (startup/hot reload).
-// - Calls are expected from the main editor thread where engine/editor services are owned.
+// - Managed code receives a plain function pointer, so captureless static storage is required
+// - The callback resolves the active scene world at call time to stay valid across scene switches
+// - Global pointers are refreshed when callbacks are re-registered (startup/hot reload)
+// - Calls are expected from the main editor thread where engine/editor services are owned
 void EditorApplication::InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world) {
     if (!scriptManager) {
         LOG_WARNING("[EditorApplication] Cannot initialize script callbacks: scriptManager is null");
@@ -214,6 +219,7 @@ void EditorApplication::InitializeScriptCallbacks(ECS::ScriptManager* scriptMana
     }
 }
 
+// Terminate the editor service, save settings, and release all editor resources
 void EditorApplication::Shutdown() {
     if (!m_initialized) return;
 
@@ -235,6 +241,7 @@ void EditorApplication::Shutdown() {
     LOG_INFO("Editor Application shutdown complete");
 }
 
+// Load editor settings from the documents path, falling back to legacy config.json locations
 void EditorApplication::_loadEditorSettings() {
     const std::string settingsPath = (std::filesystem::path(Engine::ProjectPaths::GetEditorDocumentsRoot())
         / "EditorSettings.json").string();
@@ -253,11 +260,13 @@ void EditorApplication::_loadEditorSettings() {
         if (migrated) {
             Editor::EditorConfiguration::SaveConfig(settingsPath, m_editorSettings);
         }
-    } else {
+    } 
+    else {
         LOG_INFO("Loaded editor configuration: " << settingsPath);
     }
 }
 
+// Capture current window state into settings and write them to the documents path
 void EditorApplication::_saveEditorSettings() {
     // Update settings from current window state
     auto* platformContext = m_engine->GetPlatformContext();
@@ -292,6 +301,7 @@ void EditorApplication::_saveEditorSettings() {
     LOG_INFO("Saved editor configuration: " << settingsPath);
 }
 
+// Create the main platform window using dimensions and mode from the loaded editor settings
 void EditorApplication::_createMainWindow() {
     LOG_INFO("Creating main window from EditorSettings");
 
@@ -328,6 +338,7 @@ void EditorApplication::_createMainWindow() {
     LOG_INFO("Main window created successfully via platform abstraction");
 }
 
+// Allocate and initialize the EditorService, wire up startup callbacks, and defer level editor activation
 void EditorApplication::_initializeEditorService() {
     if (m_editorService) {
         LOG_WARNING("EditorService already initialized");
@@ -371,7 +382,8 @@ void EditorApplication::_initializeEditorService() {
         // Enable the editor service after initialization and callback setup is complete
         m_editorService->SetEnabled(true);
         LOG_INFO("EditorService created and initialized");
-    } else {
+    } 
+    else {
         LOG_ERROR("EditorService pointer is null after allocation");
     }
 
@@ -488,6 +500,7 @@ void EditorApplication::HandleContinueWithoutScene() {
     m_projectLoadInProgress = false;
 }
 
+// Apply loaded project settings (gravity, fixed timestep) to the physics and time systems
 void EditorApplication::_applyProjectSettings() {
     if (!m_engine->HasProjectSettings()) {
         return;
@@ -500,6 +513,7 @@ void EditorApplication::_applyProjectSettings() {
         << " TimeStep=" << projectSettings.Physics.TimeStep);
 }
 
+// Remove all scenes from the scene manager to prepare for a fresh project or scene load
 void EditorApplication::_clearScenes() {
     auto& sceneManager = m_engine->GetSceneManager();
     const size_t count = sceneManager.GetSceneCount();
@@ -509,13 +523,14 @@ void EditorApplication::_clearScenes() {
     }
 }
 
+// Create a new scene, attempt to load the file at scenePath into it, and set it as active on success
 bool EditorApplication::_loadSceneFromPath(const std::string& scenePath) {
     if (scenePath.empty()) {
         return false;
     }
 
-    // Create a new scene and attempt to load the selected scene file into it.
-    // If loading fails, we clean up the new scene and return false to indicate failure.
+    // Create a new scene and attempt to load the selected scene file into it
+    // If loading fails, we clean up the new scene and return false to indicate failure
     auto& sceneManager = m_engine->GetSceneManager();
     auto newScene = std::make_unique<Scenes::Scene>();
     size_t idx = sceneManager.AddScene(newScene.release());

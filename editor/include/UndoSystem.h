@@ -120,7 +120,10 @@ namespace Editor {
             const Vector3D& newScale
         );
 
+        // Apply the new transform values to the entity
         void Execute() override;
+
+        // Restore the entity's transform to its state before the change
         void Undo() override;
 
     private:
@@ -149,8 +152,11 @@ namespace Editor {
             std::function<void()> onEntityDeleted = nullptr
         );
 
-        void Execute() override;    // Mark entity as active
-        void Undo() override;       // Delete entity
+        // Mark the created entity as active in the world
+        void Execute() override;
+
+        // Delete the entity, reversing the creation
+        void Undo() override;
 
     private:
         ECS::World* m_world;                            // ECS world containing the entity
@@ -172,8 +178,11 @@ namespace Editor {
             std::function<void()> onEntityRestored = nullptr
         );
 
-        void Execute() override;    // Delete entity
-        void Undo() override;       // Restore entity
+        // Delete the entity from the world
+        void Execute() override;
+
+        // Restore the entity and its components from the stored snapshot
+        void Undo() override;
 
     private:
         ECS::World* m_world;                            // ECS world containing the entity
@@ -196,8 +205,11 @@ namespace Editor {
             std::vector<ECS::SerializedComponent> after
         );
 
-        void Execute() override;    // Apply the after-state components
-        void Undo() override;       // Restore the before-state components
+        // Apply the after-state component data to the entity
+        void Execute() override;
+
+        // Restore the before-state component data to the entity
+        void Undo() override;
 
     private:
         ECS::World* m_world;                                    // ECS world containing the entity
@@ -220,8 +232,11 @@ namespace Editor {
             std::vector<EntityId> after
         );
 
-        void Execute() override;    // Apply the new order
-        void Undo() override;       // Restore the original order
+        // Apply the new child order under the parent entity
+        void Execute() override;
+
+        // Restore the original child order under the parent entity
+        void Undo() override;
 
         // Coalesce a subsequent reorder into this command by updating the after-state
         // Returns true if the parent matches and the update was applied
@@ -248,11 +263,15 @@ namespace Editor {
             EntityId newParentId
         );
 
-        void Execute() override;    // Detach from old parent and attach under new parent
-        void Undo() override;       // Detach from new parent and reattach under old parent
+        // Detach the entity from its old parent and attach it under the new parent
+        void Execute() override;
+
+        // Detach the entity from the new parent and reattach it under the old parent
+        void Undo() override;
 
     private:
         // Shared logic used by both Execute and Undo to apply a parent assignment
+        // parentId = NPOS32 detaches the child to root
         void ApplyParent(EntityId parentId);
 
         ECS::World* m_world = nullptr;
@@ -280,9 +299,14 @@ namespace Editor {
             ApplyFn applyFn
         );
 
-        void Execute() override;                 // Apply the new property value
-        void Undo() override;                    // Restore the old property value
-        bool Coalesce(ICommand* other) override; // Merge with a newer edit on the same property
+        // Apply the new property value to the live component
+        void Execute() override;
+
+        // Restore the old property value to the live component
+        void Undo() override;
+
+        // Merge a newer edit on the same property into this command; returns true if merged
+        bool Coalesce(ICommand* other) override;
 
     private:
         ECS::World* m_world = nullptr;
@@ -318,9 +342,14 @@ namespace Editor {
             ApplyFn applyFn
         );
 
-        void Execute() override;                 // Apply new values to all entities
-        void Undo() override;                    // Restore old values to all entities
-        bool Coalesce(ICommand* other) override; // Merge with a newer batch edit on the same property
+        // Apply the new property value to all entities in the batch
+        void Execute() override;
+
+        // Restore the old property value to all entities in the batch
+        void Undo() override;
+
+        // Merge a newer batch edit on the same property into this command; returns true if merged
+        bool Coalesce(ICommand* other) override;
 
     private:
         ECS::World* m_world = nullptr;
@@ -345,8 +374,11 @@ namespace Editor {
             std::function<void(int32_t, int32_t, uint32_t)> onTileChanged
         );
 
-        void Execute() override;    // Apply the new tile (redo)
-        void Undo() override;       // Restore the old tile
+        // Write the new tile ID at the target cell (redo)
+        void Execute() override;
+
+        // Restore the old tile ID at the target cell
+        void Undo() override;
 
     private:
         std::shared_ptr<TileMap> m_map;                                         // Target tilemap
@@ -373,8 +405,11 @@ namespace Editor {
             std::function<void(int32_t, int32_t, uint8_t)> onCollisionChanged
         );
 
-        void Execute() override;    // Apply the new collision mask (redo)
-        void Undo() override;       // Restore the old collision mask
+        // Write the new collision mask at the target cell (redo)
+        void Execute() override;
+
+        // Restore the old collision mask at the target cell
+        void Undo() override;
 
     private:
         std::shared_ptr<TileMap> m_map;                                               // Target tilemap
@@ -399,7 +434,7 @@ namespace Editor {
         // Initialize the undo system with the given world and maximum stack size
         void Initialize(ECS::World* world, size_t maxStackSize = 50);
 
-        // Process keyboard input for undo/redo (Ctrl+Z / Ctrl+Y) — call every frame
+        // Process keyboard input for undo/redo (Ctrl+Z / Ctrl+Y) ï¿½ call every frame
         void Update();
 
         // -------------------------------------------------------------------------
