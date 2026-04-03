@@ -77,6 +77,62 @@ internal partial class AudioAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetInstancePosition(ulong handleId, float posX, float posY, float posZ, float velX, float velY, float velZ);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstance3DMinMaxDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetInstance3DMinMaxDistance(ulong handleId, float minDistance, float maxDistance);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetInstance3DMinDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetInstance3DMinDistance(ulong handleId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetInstance3DMaxDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetInstance3DMaxDistance(ulong handleId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstance3DSpread")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetInstance3DSpread(ulong handleId, float spread);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetInstance3DSpread")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetInstance3DSpread(ulong handleId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetInstance3DLevel")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetInstance3DLevel(ulong handleId, float level);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetInstance3DLevel")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetInstance3DLevel(ulong handleId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetDefault3DMinMaxDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetDefault3DMinMaxDistance(float minDistance, float maxDistance);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetDefault3DMinDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetDefault3DMinDistance();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetDefault3DMaxDistance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetDefault3DMaxDistance();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetDefault3DSpread")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetDefault3DSpread(float spread);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetDefault3DSpread")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetDefault3DSpread();
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetDefault3DLevel")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetDefault3DLevel(float level);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetDefault3DLevel")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetDefault3DLevel();
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetMasterVolume")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetMasterVolume(float volume);
@@ -108,6 +164,14 @@ internal partial class AudioAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetBusLowPassGain")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetBusLowPassGain(int bus);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_SetBusLowPassResonance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void SetBusLowPassResonance(int bus, float resonance);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Audio_GetBusLowPassResonance")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial float GetBusLowPassResonance(int bus);
 }
 
 

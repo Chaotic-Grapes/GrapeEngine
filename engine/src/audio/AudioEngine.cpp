@@ -184,6 +184,104 @@ namespace Audio {
         m_device->SetInstancePosition(handle, pos, vel);
     }
 
+    void AudioEngine::SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetInstance3DMinMaxDistance(handle, minDistance, maxDistance);
+    }
+
+    float AudioEngine::GetInstance3DMinDistance(PlaybackHandle handle) const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetInstance3DMinDistance(handle);
+    }
+
+    float AudioEngine::GetInstance3DMaxDistance(PlaybackHandle handle) const {
+        if (!m_device) {
+            return 25.0f;
+        }
+        return m_device->GetInstance3DMaxDistance(handle);
+    }
+
+    void AudioEngine::SetInstance3DSpread(PlaybackHandle handle, float spread) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetInstance3DSpread(handle, spread);
+    }
+
+    float AudioEngine::GetInstance3DSpread(PlaybackHandle handle) const {
+        if (!m_device) {
+            return 0.0f;
+        }
+        return m_device->GetInstance3DSpread(handle);
+    }
+
+    void AudioEngine::SetInstance3DLevel(PlaybackHandle handle, float level) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetInstance3DLevel(handle, level);
+    }
+
+    float AudioEngine::GetInstance3DLevel(PlaybackHandle handle) const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetInstance3DLevel(handle);
+    }
+
+    void AudioEngine::SetDefault3DMinMaxDistance(float minDistance, float maxDistance) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetDefault3DMinMaxDistance(minDistance, maxDistance);
+    }
+
+    float AudioEngine::GetDefault3DMinDistance() const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetDefault3DMinDistance();
+    }
+
+    float AudioEngine::GetDefault3DMaxDistance() const {
+        if (!m_device) {
+            return 25.0f;
+        }
+        return m_device->GetDefault3DMaxDistance();
+    }
+
+    void AudioEngine::SetDefault3DSpread(float spread) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetDefault3DSpread(spread);
+    }
+
+    float AudioEngine::GetDefault3DSpread() const {
+        if (!m_device) {
+            return 0.0f;
+        }
+        return m_device->GetDefault3DSpread();
+    }
+
+    void AudioEngine::SetDefault3DLevel(float level) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetDefault3DLevel(level);
+    }
+
+    float AudioEngine::GetDefault3DLevel() const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetDefault3DLevel();
+    }
+
     // set current listener data on device
     void AudioEngine::SetListener(const ListenerParams& listener) {
         // ignore when no device exists
@@ -249,6 +347,20 @@ namespace Audio {
             return 1.0f;
         }
         return m_device->GetBusLowPassGain(bus);
+    }
+
+    void AudioEngine::SetBusLowPassResonance(Bus bus, float resonance) {
+        if (!m_device) {
+            return;
+        }
+        m_device->SetBusLowPassResonance(bus, resonance);
+    }
+
+    float AudioEngine::GetBusLowPassResonance(Bus bus) const {
+        if (!m_device) {
+            return 1.0f;
+        }
+        return m_device->GetBusLowPassResonance(bus);
     }
 
     // start fade for one instance

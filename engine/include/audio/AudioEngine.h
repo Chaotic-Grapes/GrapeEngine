@@ -157,6 +157,22 @@ namespace Audio {
          * @param vel World velocity.
          */
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
+        void SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance);
+        float GetInstance3DMinDistance(PlaybackHandle handle) const;
+        float GetInstance3DMaxDistance(PlaybackHandle handle) const;
+        void SetInstance3DSpread(PlaybackHandle handle, float spread);
+        float GetInstance3DSpread(PlaybackHandle handle) const;
+        void SetInstance3DLevel(PlaybackHandle handle, float level);
+        float GetInstance3DLevel(PlaybackHandle handle) const;
+
+        // Global defaults for Spatial3D playback.
+        void SetDefault3DMinMaxDistance(float minDistance, float maxDistance);
+        float GetDefault3DMinDistance() const;
+        float GetDefault3DMaxDistance() const;
+        void SetDefault3DSpread(float spread);
+        float GetDefault3DSpread() const;
+        void SetDefault3DLevel(float level);
+        float GetDefault3DLevel() const;
 
         /**
          * @brief Set listener transform on the active device.
@@ -200,6 +216,13 @@ namespace Audio {
          */
         float GetBusLowPassGain(Bus bus) const;
 
+        // set low pass resonance (Q) on one bus
+        void SetBusLowPassResonance(Bus bus, float resonance);
+
+        // get low pass resonance (Q) on one bus
+        float GetBusLowPassResonance(Bus bus) const;
+
+        // fade one instance toward target volume
         /**
          * @brief Fade one instance toward a target volume.
          * @param handle Playback handle.

@@ -265,6 +265,139 @@ INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, floa
     Audio::gAudioEngine->SetInstancePosition(handle, position, velocity);
 }
 
+INTEROP_API void EngineInterop_Audio_SetInstance3DMinMaxDistance(uint64_t handleId, float minDistance, float maxDistance) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    Audio::gAudioEngine->SetInstance3DMinMaxDistance(handle, minDistance, maxDistance);
+}
+
+INTEROP_API float EngineInterop_Audio_GetInstance3DMinDistance(uint64_t handleId) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    return Audio::gAudioEngine->GetInstance3DMinDistance(handle);
+}
+
+INTEROP_API float EngineInterop_Audio_GetInstance3DMaxDistance(uint64_t handleId) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 25.0f;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    return Audio::gAudioEngine->GetInstance3DMaxDistance(handle);
+}
+
+INTEROP_API void EngineInterop_Audio_SetInstance3DSpread(uint64_t handleId, float spread) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    Audio::gAudioEngine->SetInstance3DSpread(handle, spread);
+}
+
+INTEROP_API float EngineInterop_Audio_GetInstance3DSpread(uint64_t handleId) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 0.0f;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    return Audio::gAudioEngine->GetInstance3DSpread(handle);
+}
+
+INTEROP_API void EngineInterop_Audio_SetInstance3DLevel(uint64_t handleId, float level) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    Audio::gAudioEngine->SetInstance3DLevel(handle, level);
+}
+
+INTEROP_API float EngineInterop_Audio_GetInstance3DLevel(uint64_t handleId) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+
+    Audio::PlaybackHandle handle;
+    handle.Id = handleId;
+    return Audio::gAudioEngine->GetInstance3DLevel(handle);
+}
+
+INTEROP_API void EngineInterop_Audio_SetDefault3DMinMaxDistance(float minDistance, float maxDistance) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetDefault3DMinMaxDistance(minDistance, maxDistance);
+}
+
+INTEROP_API float EngineInterop_Audio_GetDefault3DMinDistance() {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+    return Audio::gAudioEngine->GetDefault3DMinDistance();
+}
+
+INTEROP_API float EngineInterop_Audio_GetDefault3DMaxDistance() {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 25.0f;
+    }
+    return Audio::gAudioEngine->GetDefault3DMaxDistance();
+}
+
+INTEROP_API void EngineInterop_Audio_SetDefault3DSpread(float spread) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetDefault3DSpread(spread);
+}
+
+INTEROP_API float EngineInterop_Audio_GetDefault3DSpread() {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 0.0f;
+    }
+    return Audio::gAudioEngine->GetDefault3DSpread();
+}
+
+INTEROP_API void EngineInterop_Audio_SetDefault3DLevel(float level) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetDefault3DLevel(level);
+}
+
+INTEROP_API float EngineInterop_Audio_GetDefault3DLevel() {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+    return Audio::gAudioEngine->GetDefault3DLevel();
+}
+
 // ============================================================================
 // Audio API - Master Controls
 // ============================================================================
@@ -396,4 +529,20 @@ INTEROP_API float EngineInterop_Audio_GetBusLowPassGain(int bus) {
         return 1.0f;
     }
     return Audio::gAudioEngine->GetBusLowPassGain(static_cast<Audio::Bus>(bus));
+}
+
+INTEROP_API void EngineInterop_Audio_SetBusLowPassResonance(int bus, float resonance) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return;
+    }
+    Audio::gAudioEngine->SetBusLowPassResonance(static_cast<Audio::Bus>(bus), resonance);
+}
+
+INTEROP_API float EngineInterop_Audio_GetBusLowPassResonance(int bus) {
+    if (!Audio::gAudioEngine) {
+        LOG_ERROR("[ScriptAPI] Audio device not initialized");
+        return 1.0f;
+    }
+    return Audio::gAudioEngine->GetBusLowPassResonance(static_cast<Audio::Bus>(bus));
 }

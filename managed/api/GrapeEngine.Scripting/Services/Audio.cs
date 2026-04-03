@@ -32,6 +32,13 @@ public struct AudioHandle(ulong id)
     public void SetLowPassFilter(float gain) => Audio.SetLowPassFilter(this, gain);
     public void ClearLowPassFilter() => Audio.ClearLowPassFilter(this);
     public void SetPosition(Vector3 position, Vector3 velocity) => Audio.SetInstancePosition(this, position, velocity);
+    public void Set3DMinMaxDistance(float minDistance, float maxDistance) => Audio.SetInstance3DMinMaxDistance(this, minDistance, maxDistance);
+    public float Get3DMinDistance() => Audio.GetInstance3DMinDistance(this);
+    public float Get3DMaxDistance() => Audio.GetInstance3DMaxDistance(this);
+    public void Set3DSpread(float spread) => Audio.SetInstance3DSpread(this, spread);
+    public float Get3DSpread() => Audio.GetInstance3DSpread(this);
+    public void Set3DLevel(float level) => Audio.SetInstance3DLevel(this, level);
+    public float Get3DLevel() => Audio.GetInstance3DLevel(this);
     public void Stop(StopMode mode = StopMode.Immediate) => Audio.Stop(this, mode);
 }
 
@@ -206,6 +213,115 @@ public static class Audio
         AudioAPI.SetInstancePosition(handle.Id, position.X, position.Y, position.Z, velocity.X, velocity.Y, velocity.Z);
     }
 
+    /// <summary>
+    /// Set 3D min/max distance attenuation range for a playing sound instance.
+    /// </summary>
+    public static void SetInstance3DMinMaxDistance(AudioHandle handle, float minDistance, float maxDistance)
+    {
+        float minD = minDistance < 0.0f ? 0.0f : minDistance;
+        float maxD = maxDistance < minD ? minD : maxDistance;
+        AudioAPI.SetInstance3DMinMaxDistance(handle.Id, minD, maxD);
+    }
+
+    /// <summary>
+    /// Get the current 3D minimum attenuation distance for a playing sound instance.
+    /// </summary>
+    public static float GetInstance3DMinDistance(AudioHandle handle)
+    {
+        return AudioAPI.GetInstance3DMinDistance(handle.Id);
+    }
+
+    /// <summary>
+    /// Get the current 3D maximum attenuation distance for a playing sound instance.
+    /// </summary>
+    public static float GetInstance3DMaxDistance(AudioHandle handle)
+    {
+        return AudioAPI.GetInstance3DMaxDistance(handle.Id);
+    }
+
+    /// <summary>
+    /// Set the 3D spread (0 to 360 degrees) for a playing sound instance.
+    /// Lower values sound more point-like and directionally focused.
+    /// </summary>
+    public static void SetInstance3DSpread(AudioHandle handle, float spread)
+    {
+        float clamped = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
+        AudioAPI.SetInstance3DSpread(handle.Id, clamped);
+    }
+
+    /// <summary>
+    /// Get the current 3D spread for a playing sound instance.
+    /// </summary>
+    public static float GetInstance3DSpread(AudioHandle handle)
+    {
+        return AudioAPI.GetInstance3DSpread(handle.Id);
+    }
+
+    /// <summary>
+    /// Set the 3D level (0 = fully 2D, 1 = fully 3D) for a playing sound instance.
+    /// </summary>
+    public static void SetInstance3DLevel(AudioHandle handle, float level)
+    {
+        float clamped = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
+        AudioAPI.SetInstance3DLevel(handle.Id, clamped);
+    }
+
+    /// <summary>
+    /// Get the current 3D level for a playing sound instance.
+    /// </summary>
+    public static float GetInstance3DLevel(AudioHandle handle)
+    {
+        return AudioAPI.GetInstance3DLevel(handle.Id);
+    }
+
+    /// <summary>
+    /// Set default 3D distance attenuation for newly played Spatial3D sounds.
+    /// </summary>
+    public static void SetDefault3DMinMaxDistance(float minDistance, float maxDistance)
+    {
+        float minD = minDistance < 0.0f ? 0.0f : minDistance;
+        float maxD = maxDistance < minD ? minD : maxDistance;
+        AudioAPI.SetDefault3DMinMaxDistance(minD, maxD);
+    }
+
+    /// <summary>
+    /// Get default 3D minimum attenuation distance used for new Spatial3D sounds.
+    /// </summary>
+    public static float GetDefault3DMinDistance() => AudioAPI.GetDefault3DMinDistance();
+
+    /// <summary>
+    /// Get default 3D maximum attenuation distance used for new Spatial3D sounds.
+    /// </summary>
+    public static float GetDefault3DMaxDistance() => AudioAPI.GetDefault3DMaxDistance();
+
+    /// <summary>
+    /// Set default 3D spread (0..360) for newly played Spatial3D sounds.
+    /// </summary>
+    public static void SetDefault3DSpread(float spread)
+    {
+        float clamped = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
+        AudioAPI.SetDefault3DSpread(clamped);
+    }
+
+    /// <summary>
+    /// Get default 3D spread used for new Spatial3D sounds.
+    /// </summary>
+    public static float GetDefault3DSpread() => AudioAPI.GetDefault3DSpread();
+
+    /// <summary>
+    /// Set default 3D level (0..1) for newly played Spatial3D sounds.
+    /// </summary>
+    public static void SetDefault3DLevel(float level)
+    {
+        float clamped = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
+        AudioAPI.SetDefault3DLevel(clamped);
+    }
+
+    /// <summary>
+    /// Get default 3D level used for new Spatial3D sounds.
+    /// </summary>
+    public static float GetDefault3DLevel() => AudioAPI.GetDefault3DLevel();
+
     // ============================================================================
     // Master Controls
     // ============================================================================
@@ -267,6 +383,32 @@ public static class Audio
     public static float GetBusLowPassFilter(AudioBus bus)
     {
         return AudioAPI.GetBusLowPassGain((int)bus);
+    }
+
+    /// <summary>
+    /// Set low-pass resonance (Q) for a specific mixer bus.
+    /// Typical useful range is around 1.0 to 4.0.
+    /// </summary>
+    public static void SetBusLowPassResonance(AudioBus bus, float resonance)
+    {
+        float clamped = resonance < 1.0f ? 1.0f : (resonance > 10.0f ? 10.0f : resonance);
+        AudioAPI.SetBusLowPassResonance((int)bus, clamped);
+    }
+
+    /// <summary>
+    /// Clear low-pass resonance boost for a mixer bus.
+    /// </summary>
+    public static void ClearBusLowPassResonance(AudioBus bus)
+    {
+        AudioAPI.SetBusLowPassResonance((int)bus, 1.0f);
+    }
+
+    /// <summary>
+    /// Get the current low-pass resonance (Q) for a mixer bus.
+    /// </summary>
+    public static float GetBusLowPassResonance(AudioBus bus)
+    {
+        return AudioAPI.GetBusLowPassResonance((int)bus);
     }
 
     /// <summary>

@@ -27,15 +27,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace {
     // keep low pass cutoff range for bus filters
-    constexpr float kMinBusLowPassCutoffHz = 20.0f;
+    constexpr float kMinBusLowPassCutoffHz = 100.0f;
     constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
+    constexpr float kMinBusLowPassResonance = 1.0f;
+    constexpr float kMaxBusLowPassResonance = 10.0f;
 
     // The game layer often treats X/Y as the "world plane" and Z as "up"
     // (out of the screen). FMOD uses Y as up. Convert engine vectors into
-    // FMOD space by swapping Y/Z. We also flip X to match handedness so
-    // left/right panning lines up with world-space +X.
+    // FMOD space by swapping Y/Z while preserving X so left/right panning
+    // stays intuitive (world +X -> right ear).
     inline FMOD_VECTOR ToFmodVec(const Audio::Vec3& v) {
-        return FMOD_VECTOR{ -v.x, v.z, v.y };
+        return FMOD_VECTOR{ v.x, v.z, v.y };
     }
 
     inline FMOD_VECTOR NormalizeOrDefault(FMOD_VECTOR v, FMOD_VECTOR fallback) {
@@ -71,6 +73,14 @@ namespace {
         bool playing = false;
         if (ch->isPlaying(&playing) != FMOD_OK) return false;
         return playing;
+    }
+
+    inline FMOD_MODE SpatialChannelMode(bool spatial3D) {
+        if (!spatial3D) {
+            return FMOD_2D;
+        }
+        // Linear rolloff gives predictable attenuation from min -> max distance.
+        return static_cast<FMOD_MODE>(FMOD_3D | FMOD_3D_LINEARROLLOFF);
     }
 }
 
@@ -277,26 +287,30 @@ namespace Audio {
             targetGroup = m_master;
         }
 
-        // Configure looping on the sound.
-        snd->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
-        snd->setLoopCount(s.Loop ? -1 : 0);
+        // Configure sound defaults for this play request.
+        const FMOD_MODE playbackMode = static_cast<FMOD_MODE>(
+            (s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF) | SpatialChannelMode(s.Spatial3D));
+        FMOD_OK_OR_LOG(snd->setMode(playbackMode), "Sound::setMode");
+        FMOD_OK_OR_LOG(snd->setLoopCount(s.Loop ? -1 : 0), "Sound::setLoopCount");
 
         FMOD::Channel* ch = nullptr;
         if (!FMOD_OK_OR_LOG(m_system->playSound(snd, targetGroup, true, &ch), "playSound") || !ch)
             return {};
 
         // Apply channel settings.
-        ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+        FMOD_OK_OR_LOG(ch->setMode(SpatialChannelMode(s.Spatial3D)), "Channel::setMode");
         if (s.Spatial3D) {
             // Default falloff tuned for small scenes; adjust if needed.
-            ch->set3DMinMaxDistance(1.0f, 25.0f);
+            FMOD_OK_OR_LOG(ch->set3DMinMaxDistance(m_default3DMinDistance, m_default3DMaxDistance), "Channel::set3DMinMaxDistance");
+            FMOD_OK_OR_LOG(ch->set3DSpread(m_default3DSpread), "Channel::set3DSpread");
+            FMOD_OK_OR_LOG(ch->set3DLevel(m_default3DLevel), "Channel::set3DLevel");
         }
-        ch->setVolume(s.Volume);
-        ch->setPitch(s.Pitch);
+        FMOD_OK_OR_LOG(ch->setVolume(s.Volume), "Channel::setVolume");
+        FMOD_OK_OR_LOG(ch->setPitch(s.Pitch), "Channel::setPitch");
         if (!s.Spatial3D) {
-            ch->setPan(s.Pan);
+            FMOD_OK_OR_LOG(ch->setPan(s.Pan), "Channel::setPan");
         }
-        ch->setPaused(s.StartPaused);
+        FMOD_OK_OR_LOG(ch->setPaused(s.StartPaused), "Channel::setPaused");
 
         // store channel by generated handle id
         PlaybackHandle h{ m_nextId++ };
@@ -334,36 +348,40 @@ namespace Audio {
                 // Policy decides whether to restart, resume, ignore, or spawn a new instance.
                 switch (policy) {
                 case PlayPolicy::SingleInstanceRestart:
-                    ch->setPosition(0, FMOD_TIMEUNIT_MS);
-                    ch->setChannelGroup(targetGroup);
-                    ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    FMOD_OK_OR_LOG(ch->setPosition(0, FMOD_TIMEUNIT_MS), "Channel::setPosition");
+                    FMOD_OK_OR_LOG(ch->setChannelGroup(targetGroup), "Channel::setChannelGroup");
+                    FMOD_OK_OR_LOG(ch->setMode(SpatialChannelMode(s.Spatial3D)), "Channel::setMode");
                     if (s.Spatial3D) {
                         // Default falloff tuned for small scenes; adjust if needed.
-                        ch->set3DMinMaxDistance(1.0f, 25.0f);
+                        FMOD_OK_OR_LOG(ch->set3DMinMaxDistance(m_default3DMinDistance, m_default3DMaxDistance), "Channel::set3DMinMaxDistance");
+                        FMOD_OK_OR_LOG(ch->set3DSpread(m_default3DSpread), "Channel::set3DSpread");
+                        FMOD_OK_OR_LOG(ch->set3DLevel(m_default3DLevel), "Channel::set3DLevel");
                     }
                     if (!s.Spatial3D) {
-                        ch->setPan(s.Pan);
+                        FMOD_OK_OR_LOG(ch->setPan(s.Pan), "Channel::setPan");
                     }
-                    ch->setPaused(s.StartPaused ? true : false);
-                    ch->setVolume(s.Volume);
-                    ch->setPitch(s.Pitch);
+                    FMOD_OK_OR_LOG(ch->setPaused(s.StartPaused ? true : false), "Channel::setPaused");
+                    FMOD_OK_OR_LOG(ch->setVolume(s.Volume), "Channel::setVolume");
+                    FMOD_OK_OR_LOG(ch->setPitch(s.Pitch), "Channel::setPitch");
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceResume:
                     // Resume only affects paused/stopped state; we still reapply routing
                     // and current play settings so behavior stays consistent with fresh Play().
-                    if (!playing && !s.StartPaused) ch->setPaused(false);
-                    if (s.StartPaused) ch->setPaused(true);
-                    ch->setChannelGroup(targetGroup);
-                    ch->setMode(s.Spatial3D ? FMOD_3D : FMOD_2D);
+                    if (!playing && !s.StartPaused) FMOD_OK_OR_LOG(ch->setPaused(false), "Channel::setPaused");
+                    if (s.StartPaused) FMOD_OK_OR_LOG(ch->setPaused(true), "Channel::setPaused");
+                    FMOD_OK_OR_LOG(ch->setChannelGroup(targetGroup), "Channel::setChannelGroup");
+                    FMOD_OK_OR_LOG(ch->setMode(SpatialChannelMode(s.Spatial3D)), "Channel::setMode");
                     if (s.Spatial3D) {
                         // Default falloff tuned for small scenes; adjust if needed.
-                        ch->set3DMinMaxDistance(1.0f, 25.0f);
+                        FMOD_OK_OR_LOG(ch->set3DMinMaxDistance(m_default3DMinDistance, m_default3DMaxDistance), "Channel::set3DMinMaxDistance");
+                        FMOD_OK_OR_LOG(ch->set3DSpread(m_default3DSpread), "Channel::set3DSpread");
+                        FMOD_OK_OR_LOG(ch->set3DLevel(m_default3DLevel), "Channel::set3DLevel");
                     }
                     if (!s.Spatial3D) {
-                        ch->setPan(s.Pan);
+                        FMOD_OK_OR_LOG(ch->setPan(s.Pan), "Channel::setPan");
                     }
-                    ch->setVolume(s.Volume);
-                    ch->setPitch(s.Pitch);
+                    FMOD_OK_OR_LOG(ch->setVolume(s.Volume), "Channel::setVolume");
+                    FMOD_OK_OR_LOG(ch->setPitch(s.Pitch), "Channel::setPitch");
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceIgnore:
                     // Keep current playback untouched while active.
@@ -423,7 +441,12 @@ namespace Audio {
     // set runtime pan for one handle
     void FmodAudioDevice::SetInstancePan(PlaybackHandle handle, float pan) {
         // write channel pan if handle resolves
-        if (auto* ch = _channelFromHandle(handle)) ch->setPan(pan);
+        if (auto* ch = _channelFromHandle(handle)) {
+            // Pan only applies reliably to 2D channels; force 2D mode here since some cues may have
+            // been created with 3D defaults even when the gameplay layer wants camera-centered panning.
+            ch->setMode(FMOD_2D);
+            ch->setPan(pan);
+        }
     }
 
     // set low pass gain for one handle
@@ -443,6 +466,105 @@ namespace Audio {
             const FMOD_VECTOR v = ToFmodVec(vel);
             ch->set3DAttributes(&p, &v);
         }
+    }
+
+    void FmodAudioDevice::SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance) {
+        if (auto* ch = _channelFromHandle(handle)) {
+            const float minD = minDistance < 0.0f ? 0.0f : minDistance;
+            const float maxD = maxDistance < minD ? minD : maxDistance;
+            FMOD_OK_OR_LOG(ch->set3DMinMaxDistance(minD, maxD), "Channel::set3DMinMaxDistance");
+        }
+    }
+
+    float FmodAudioDevice::GetInstance3DMinDistance(PlaybackHandle handle) const {
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
+            float minD = m_default3DMinDistance;
+            float maxD = m_default3DMaxDistance;
+            if (FMOD_OK_OR_LOG(ch->get3DMinMaxDistance(&minD, &maxD), "Channel::get3DMinMaxDistance")) {
+                return minD;
+            }
+        }
+        return m_default3DMinDistance;
+    }
+
+    float FmodAudioDevice::GetInstance3DMaxDistance(PlaybackHandle handle) const {
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
+            float minD = m_default3DMinDistance;
+            float maxD = m_default3DMaxDistance;
+            if (FMOD_OK_OR_LOG(ch->get3DMinMaxDistance(&minD, &maxD), "Channel::get3DMinMaxDistance")) {
+                return maxD;
+            }
+        }
+        return m_default3DMaxDistance;
+    }
+
+    void FmodAudioDevice::SetInstance3DSpread(PlaybackHandle handle, float spread) {
+        if (auto* ch = _channelFromHandle(handle)) {
+            const float clamped = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
+            FMOD_OK_OR_LOG(ch->set3DSpread(clamped), "Channel::set3DSpread");
+        }
+    }
+
+    float FmodAudioDevice::GetInstance3DSpread(PlaybackHandle handle) const {
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
+            float spread = m_default3DSpread;
+            if (FMOD_OK_OR_LOG(ch->get3DSpread(&spread), "Channel::get3DSpread")) {
+                return spread;
+            }
+        }
+        return m_default3DSpread;
+    }
+
+    void FmodAudioDevice::SetInstance3DLevel(PlaybackHandle handle, float level) {
+        if (auto* ch = _channelFromHandle(handle)) {
+            const float clamped = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
+            FMOD_OK_OR_LOG(ch->set3DLevel(clamped), "Channel::set3DLevel");
+        }
+    }
+
+    float FmodAudioDevice::GetInstance3DLevel(PlaybackHandle handle) const {
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
+            float level = m_default3DLevel;
+            if (FMOD_OK_OR_LOG(ch->get3DLevel(&level), "Channel::get3DLevel")) {
+                return level;
+            }
+        }
+        return m_default3DLevel;
+    }
+
+    void FmodAudioDevice::SetDefault3DMinMaxDistance(float minDistance, float maxDistance) {
+        const float minD = minDistance < 0.0f ? 0.0f : minDistance;
+        const float maxD = maxDistance < minD ? minD : maxDistance;
+        m_default3DMinDistance = minD;
+        m_default3DMaxDistance = maxD;
+    }
+
+    float FmodAudioDevice::GetDefault3DMinDistance() const {
+        return m_default3DMinDistance;
+    }
+
+    float FmodAudioDevice::GetDefault3DMaxDistance() const {
+        return m_default3DMaxDistance;
+    }
+
+    void FmodAudioDevice::SetDefault3DSpread(float spread) {
+        m_default3DSpread = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
+    }
+
+    float FmodAudioDevice::GetDefault3DSpread() const {
+        return m_default3DSpread;
+    }
+
+    void FmodAudioDevice::SetDefault3DLevel(float level) {
+        m_default3DLevel = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
+    }
+
+    float FmodAudioDevice::GetDefault3DLevel() const {
+        return m_default3DLevel;
     }
 
     // check if one handle is currently playing
@@ -475,6 +597,24 @@ namespace Audio {
             return 1.0f;
         }
         return m_busLowPassGain[index];
+    }
+
+    void FmodAudioDevice::SetBusLowPassResonance(Bus bus, float resonance) {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return;
+        }
+
+        m_busLowPassResonance[index] = _clampLowPassResonance(resonance);
+        _applyBusLowPassGain(bus);
+    }
+
+    float FmodAudioDevice::GetBusLowPassResonance(Bus bus) const {
+        const size_t index = static_cast<size_t>(bus);
+        if (index >= kBusCount) {
+            return 1.0f;
+        }
+        return m_busLowPassResonance[index];
     }
 
     // set listener transform for spatial audio
@@ -653,9 +793,9 @@ namespace Audio {
         for (size_t index = 0; index < kBusCount; ++index) {
             if (FMOD::DSP* dsp = m_busLowPassDsps[index]) {
                 if (FMOD::ChannelGroup* group = m_busGroups[index]) {
-                    group->removeDSP(dsp);
+                    FMOD_OK_OR_LOG(group->removeDSP(dsp), "ChannelGroup::removeDSP");
                 }
-                dsp->release();
+                FMOD_OK_OR_LOG(dsp->release(), "DSP::release");
                 m_busLowPassDsps[index] = nullptr;
             }
         }
@@ -700,15 +840,28 @@ namespace Audio {
 
         const float gain = m_busLowPassGain[index];
         const float cutoffHz = _lowPassGainToCutoffHz(gain);
+        const float resonance = m_busLowPassResonance[index];
         // Bypass DSP near unity gain to avoid unnecessary filter work on the bus.
-        dsp->setBypass(gain >= 0.999f);
+        FMOD_OK_OR_LOG(dsp->setBypass(gain >= 0.999f), "DSP::setBypass");
         FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_CUTOFF, cutoffHz), "DSP::setParameterFloat LOWPASS_CUTOFF");
+        FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_RESONANCE, resonance), "DSP::setParameterFloat LOWPASS_RESONANCE");
     }
 
     // clamp low pass gain to range zero to one
     float FmodAudioDevice::_clampLowPassGain(float gain) {
+        if (!std::isfinite(gain)) {
+            return 1.0f;
+        }
         // return clamped value
         return (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+    }
+
+    float FmodAudioDevice::_clampLowPassResonance(float resonance) {
+        if (!std::isfinite(resonance)) {
+            return 1.0f;
+        }
+        return (resonance < kMinBusLowPassResonance) ? kMinBusLowPassResonance
+            : (resonance > kMaxBusLowPassResonance ? kMaxBusLowPassResonance : resonance);
     }
 
     // map low pass gain to cutoff frequency
