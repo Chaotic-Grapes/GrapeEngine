@@ -129,22 +129,32 @@ namespace ECS {
         }
 
         // Spatial audio routing mode:
-        // - false: use FMOD 3D panning/attenuation (recommended; camera is the listener).
-        // - true:  use camera-centered 2D pan + custom attenuation (legacy/arcade feel).
+        // - false: use FMOD 3D panning/attenuation (friend implementation style).
+        // - true:  use camera-centered 2D pan + custom attenuation.
         constexpr bool kUseCameraCenteredPanForSpatialSources = false;
         constexpr float kMinCameraHalfWidth = 0.001f;
         // Full pan is reached at this fraction of the camera half-width (smaller => stronger panning).
-        constexpr float kPanFullAtHalfWidthFraction = 0.05f;
-        // Linear distance attenuation range expressed as a multiple of camera half-width.
-        constexpr float kAttenMinDistanceHalfWidthMul = 0.10f;
-        constexpr float kAttenMaxDistanceHalfWidthMul = 2.5f;
+        constexpr float kPanFullAtHalfWidthFraction = 0.01f;
+        // Exponent < 1 amplifies near-center pan changes so left/right is more obvious.
+        constexpr float kPanResponseExponent = 0.15f;
+        // Defaults used only by optional camera-centered attenuation mode.
+        constexpr float kCameraPanSpatialMinDistance = 0.5f;
+        constexpr float kCameraPanSpatialMaxDistance = 15.0f;
 
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
+        const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+
+        // Temporary spatial debug telemetry: print defaults/instance values at low rate.
+        static float s_spatialDebugLogCooldown = 0.0f;
+        s_spatialDebugLogCooldown -= dt;
+        const bool logSpatialDebugThisFrame = (s_spatialDebugLogCooldown <= 0.0f);
+        if (logSpatialDebugThisFrame) {
+            s_spatialDebugLogCooldown = 1.0f;
+        }
 
         // update pending crossfade in timer
         if (m_crossfadeFadeInActive) {
-            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
             if (dt > 0.0f) {
                 m_crossfadeInRemaining = std::max(0.0f, m_crossfadeInRemaining - dt);
                 if (m_crossfadeInRemaining <= 0.0f) {
@@ -174,8 +184,8 @@ namespace ECS {
             });
 
         const float panDenom = std::max(kMinCameraHalfWidth, activeCameraHalfWidth * kPanFullAtHalfWidthFraction);
-        const float attenMinDist = std::max(0.001f, activeCameraHalfWidth * kAttenMinDistanceHalfWidthMul);
-        const float attenMaxDist = std::max(attenMinDist + 0.001f, activeCameraHalfWidth * kAttenMaxDistanceHalfWidthMul);
+        const float attenMinDist = kCameraPanSpatialMinDistance;
+        const float attenMaxDist = kCameraPanSpatialMaxDistance;
 
         auto computeCameraPanAndAttenuation = [&](Entity e, float& outPan, float& outAttenuation)
         {
@@ -190,7 +200,10 @@ namespace ECS {
             const float dy = m.m13 - activeCameraPos.y;
 
             // Camera-centered panning: FMOD pan uses -1 = left, +1 = right.
-            outPan = std::clamp(dx / panDenom, -1.0f, 1.0f);
+            // Use an exponent curve to make near-center offsets pan more aggressively.
+            const float normalizedPan = std::clamp(dx / panDenom, -1.0f, 1.0f);
+            const float panMagnitude = std::pow(std::abs(normalizedPan), kPanResponseExponent);
+            outPan = std::copysign(panMagnitude, normalizedPan);
 
             const float dist = std::sqrt(dx * dx + dy * dy);
             if (dist <= attenMinDist) {
@@ -385,6 +398,10 @@ namespace ECS {
                 // update runtime parameters for active playback
                 if (hasInstance) {
                     Audio::PlaybackHandle handle = it->second;
+                    const float default3DMinDistance = engine->GetDefault3DMinDistance();
+                    const float default3DMaxDistance = engine->GetDefault3DMaxDistance();
+                    const float default3DSpread = engine->GetDefault3DSpread();
+                    const float default3DLevel = engine->GetDefault3DLevel();
 
                     // Only set volume directly if NOT currently fading
                     // Fading entities have their volume managed by the AudioEngine
@@ -414,6 +431,23 @@ namespace ECS {
 
                     // Update 3D position if spatial audio is enabled
                     if (!kUseCameraCenteredPanForSpatialSources && src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
+                        // Re-assert per-instance 3D settings every frame so distance/pan behavior
+                        // remains deterministic even if channel state was reset externally.
+                        engine->SetInstance3DMinMaxDistance(handle, default3DMinDistance, default3DMaxDistance);
+                        engine->SetInstance3DSpread(handle, default3DSpread);
+                        engine->SetInstance3DLevel(handle, default3DLevel);
+
+                        if (logSpatialDebugThisFrame) {
+                            const float appliedMin = engine->GetInstance3DMinDistance(handle);
+                            const float appliedMax = engine->GetInstance3DMaxDistance(handle);
+                            LOG_INFO("AudioSystem Spatial3D: entity=" << e.Index
+                                << " cueId=" << src.CueId
+                                << " defaultMinMax=(" << default3DMinDistance << ", " << default3DMaxDistance << ")"
+                                << " instanceMinMax=(" << appliedMin << ", " << appliedMax << ")"
+                                << " spread=" << default3DSpread
+                                << " level=" << default3DLevel);
+                        }
+
                         auto& transform = world.Get<Components::WorldTransform>(e);
                         // Extract translation from Matrix4x4: translation is stored in the
                         // last column (m03, m13, m23) per Matrix4x4::Translation implementation.

@@ -27,16 +27,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace {
     // keep low pass cutoff range for bus filters
-    constexpr float kMinBusLowPassCutoffHz = 20.0f;
+    constexpr float kMinBusLowPassCutoffHz = 100.0f;
     constexpr float kMaxBusLowPassCutoffHz = 22000.0f;
     constexpr float kMinBusLowPassResonance = 1.0f;
     constexpr float kMaxBusLowPassResonance = 10.0f;
 
     // The game layer often treats X/Y as the "world plane" and Z as "up"
     // (out of the screen). FMOD uses Y as up. Convert engine vectors into
-    // FMOD space by swapping Y/Z and flipping X to match engine handedness.
+    // FMOD space by swapping Y/Z while preserving X so left/right panning
+    // stays intuitive (world +X -> right ear).
     inline FMOD_VECTOR ToFmodVec(const Audio::Vec3& v) {
-        return FMOD_VECTOR{ -v.x, v.z, v.y };
+        return FMOD_VECTOR{ v.x, v.z, v.y };
     }
 
     inline FMOD_VECTOR NormalizeOrDefault(FMOD_VECTOR v, FMOD_VECTOR fallback) {

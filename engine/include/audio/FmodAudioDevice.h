@@ -279,8 +279,9 @@ namespace Audio {
         std::array<FMOD::DSP*, kBusCount> m_busLowPassDsps{};
         std::array<float, kBusCount> m_busLowPassGain{};
         std::array<float, kBusCount> m_busLowPassResonance{};
-        float m_default3DMinDistance = 1.0f;
-        float m_default3DMaxDistance = 25.0f;
+        // Engine defaults for FMOD 3D linear rolloff (Unity-like min/max tuning flow).
+        float m_default3DMinDistance = 0.5f;
+        float m_default3DMaxDistance = 12.0f;
         float m_default3DSpread = 0.0f;
         float m_default3DLevel = 1.0f;
 
