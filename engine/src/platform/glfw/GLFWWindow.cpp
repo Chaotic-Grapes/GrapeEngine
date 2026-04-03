@@ -36,6 +36,20 @@ namespace Platform {
         return nullptr;
     }
 
+    /**
+     * @brief Initializes the GLFW window and graphics context.
+     * @param title Window title text.
+     * @param width Requested window width in pixels.
+     * @param height Requested window height in pixels.
+     * @param vsync True to enable swap interval synchronization.
+     * @param mode Requested window mode flags.
+     * @param resizable True if the user should be able to resize the window.
+     * @param decorated True to create a standard decorated window frame.
+     * @return True on successful window/context creation; false otherwise.
+     * @note Some systems can report no primary monitor during startup (for example,
+     *       remote sessions or transient display driver states). In that case,
+     *       fullscreen requests are downgraded to a safe non-exclusive mode.
+     */
     bool GLFWWindow::Initialize(const std::string& title, int width, int height,
                                 bool vsync, WindowMode mode, bool resizable, bool decorated) {
         constexpr int kDefaultWindowWidth = 1600;
@@ -74,16 +88,26 @@ namespace Platform {
         GLFWmonitor* monitor = nullptr;
         const int requestedWidth = width;
         const int requestedHeight = height;
+        WindowMode effectiveMode = mode;
         if (wantsFullscreen) {
             GLFWmonitor* primary = glfwGetPrimaryMonitor();
-            const GLFWvidmode* videoMode = glfwGetVideoMode(primary);
-            if (videoMode) {
-                width = videoMode->width;
-                height = videoMode->height;
-            }
+            if (!primary) {
+                LOG_WARNING("[GLFWWindow] Fullscreen requested but no primary monitor is available; "
+                            "falling back to " << (wantsBorderless ? "borderless" : "windowed") << " mode");
+                effectiveMode = wantsBorderless ? WindowMode::Borderless : WindowMode::Windowed;
+            } else {
+                const GLFWvidmode* videoMode = glfwGetVideoMode(primary);
+                if (videoMode) {
+                    width = videoMode->width;
+                    height = videoMode->height;
+                } else {
+                    LOG_WARNING("[GLFWWindow] Primary monitor has no active video mode; using requested size "
+                                << requestedWidth << "x" << requestedHeight);
+                }
 
-            if (!wantsBorderless) {
-                monitor = primary;
+                if (!wantsBorderless) {
+                    monitor = primary;
+                }
             }
         }
 
@@ -99,8 +123,8 @@ namespace Platform {
         m_vsync = vsync;
         m_resizable = resizable;
         m_decorated = decorated;
-        m_mode = mode;
-        if (HasFlag(mode, WindowMode::Fullscreen)) {
+        m_mode = effectiveMode;
+        if (HasFlag(m_mode, WindowMode::Fullscreen)) {
             m_currentMonitorIndex = 0;
         }
         m_windowedWidth = requestedWidth;
