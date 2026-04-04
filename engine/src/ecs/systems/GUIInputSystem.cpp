@@ -486,16 +486,6 @@ namespace ECS {
         }
 
         if (m_activeGamepad >= 0) {
-            const bool dpadLeftPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
-            const bool dpadRightPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
-            const bool dpadUpPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_UP);
-            const bool dpadDownPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_DPAD_DOWN);
-
-            const bool dpadLeftDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_LEFT);
-            const bool dpadRightDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_RIGHT);
-            const bool dpadUpDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_UP);
-            const bool dpadDownDown = Input::IsGamepadButtonDown(m_activeGamepad, GAMEPAD_BUTTON_DPAD_DOWN);
-
             const float leftX = Input::GetGamepadAxisWithDeadzone(m_activeGamepad, GAMEPAD_AXIS_LEFT_X, 0.35f);
             const float leftY = Input::GetGamepadAxisWithDeadzone(m_activeGamepad, GAMEPAD_AXIS_LEFT_Y, 0.35f);
 
@@ -512,15 +502,6 @@ namespace ECS {
             };
 
             int heldDirection = decodeDirectionalInput(leftX, leftY);
-            if (dpadLeftDown) {
-                heldDirection = static_cast<int>(NavigationDirection::Left);
-            } else if (dpadRightDown) {
-                heldDirection = static_cast<int>(NavigationDirection::Right);
-            } else if (dpadUpDown) {
-                heldDirection = static_cast<int>(NavigationDirection::Up);
-            } else if (dpadDownDown) {
-                heldDirection = static_cast<int>(NavigationDirection::Down);
-            }
 
             const bool horizontalNavigationHeld = heldDirection == static_cast<int>(NavigationDirection::Left)
                 || heldDirection == static_cast<int>(NavigationDirection::Right);
@@ -530,12 +511,6 @@ namespace ECS {
                 || (focusedSliderConsumesVertical && verticalNavigationHeld)) {
                 heldDirection = -1;
             }
-
-            const bool navLeftPressed = dpadLeftPressed && !focusedSliderConsumesHorizontal;
-            const bool navRightPressed = dpadRightPressed && !focusedSliderConsumesHorizontal;
-            const bool navUpPressed = dpadUpPressed && !focusedSliderConsumesVertical;
-            const bool navDownPressed = dpadDownPressed && !focusedSliderConsumesVertical;
-            const bool immediatePress = navLeftPressed || navRightPressed || navUpPressed || navDownPressed;
 
             if (heldDirection == -1) {
                 m_navHeldDirection = -1;
@@ -554,30 +529,15 @@ namespace ECS {
                 }
             }
 
-            if (immediatePress) {
-                navigationTriggered = true;
-                if (navLeftPressed) {
-                    navigationDirectionInt = static_cast<int>(NavigationDirection::Left);
-                } else if (navRightPressed) {
-                    navigationDirectionInt = static_cast<int>(NavigationDirection::Right);
-                } else if (navUpPressed) {
-                    navigationDirectionInt = static_cast<int>(NavigationDirection::Up);
-                } else if (navDownPressed) {
-                    navigationDirectionInt = static_cast<int>(NavigationDirection::Down);
-                }
-                m_navHeldDirection = navigationDirectionInt;
-                m_navRepeatTimer = m_navInitialRepeatDelay;
-            }
-
             submitTriggered = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_A);
             cancelTriggered = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_B);
 
             const bool sliderHorizontal = focusedSliderConsumesHorizontal;
             const bool sliderVertical = focusedSliderConsumesVertical;
-            const bool sliderDecPressed = (sliderHorizontal && dpadLeftPressed) || (sliderVertical && dpadDownPressed);
-            const bool sliderIncPressed = (sliderHorizontal && dpadRightPressed) || (sliderVertical && dpadUpPressed);
-            const bool sliderDecDown = (sliderHorizontal && dpadLeftDown) || (sliderVertical && dpadDownDown);
-            const bool sliderIncDown = (sliderHorizontal && dpadRightDown) || (sliderVertical && dpadUpDown);
+            const bool sliderDecPressed = false;
+            const bool sliderIncPressed = false;
+            const bool sliderDecDown = false;
+            const bool sliderIncDown = false;
             const bool leftBumperPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_LEFT_BUMPER);
             const bool rightBumperPressed = Input::IsGamepadButtonPressed(m_activeGamepad, GAMEPAD_BUTTON_RIGHT_BUMPER);
 
