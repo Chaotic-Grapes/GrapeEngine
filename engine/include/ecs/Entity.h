@@ -53,18 +53,42 @@ namespace ECS {
          */
         constexpr bool IsNull() const noexcept { return Index == NPOS32; }
 
+        /**
+         * @brief Test whether two entities refer to the same live instance.
+         * @param a First entity.
+         * @param b Second entity.
+         * @return True if both index and generation match.
+         */
         friend constexpr bool operator==(const Entity a, const Entity b) noexcept {
             return a.Index == b.Index && a.Generation == b.Generation;
         }
 
+        /**
+         * @brief Test whether two entities are different.
+         * @param a First entity.
+         * @param b Second entity.
+         * @return True if index or generation differs.
+         */
         friend constexpr bool operator!=(const Entity a, const Entity b) noexcept {
             return !(a == b);
         }
 
+        /**
+         * @brief Provide a total order for entities (for sorted containers).
+         * @param a First entity.
+         * @param b Second entity.
+         * @return True if a sorts before b.
+         */
         friend bool operator<(const Entity a, const Entity b) noexcept {
             return a.Index < b.Index || (a.Index == b.Index && a.Generation < b.Generation);
         }
 
+        /**
+         * @brief Provide a total order for entities (for sorted containers).
+         * @param a First entity.
+         * @param b Second entity.
+         * @return True if a sorts after b.
+         */
         friend bool operator>(const Entity a, const Entity b) noexcept {
             return b < a;
         }
@@ -75,6 +99,11 @@ namespace ECS {
 
     // Hash function for Entity to be used in unordered containers
     struct EntityHash {
+        /**
+         * @brief Compute hash for an entity using index and generation.
+         * @param e Entity to hash.
+         * @return Combined hash of entity index and generation.
+         */
         size_t operator()(const Entity& e) const noexcept {
             // Combine index and generation into a single size_t hash
             // This assumes size_t is at least 64 bits; adjust as needed for other architectures

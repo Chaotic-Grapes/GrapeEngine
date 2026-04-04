@@ -54,19 +54,56 @@ namespace ECS {
         BoidSystem() = default;
         ~BoidSystem() override = default;
 
+        /**
+         * @brief Initialize GPU buffers and resources for all existing flock entities.
+         * @param world ECS world containing entities with BoidFlock components.
+         */
         void OnCreate(World& world) override;
+
+        /**
+         * @brief Simulate boid steering and update GPU buffers for this frame.
+         * @param world ECS world containing entities with BoidFlock components.
+         */
         void OnUpdate(World& world) override;
+
+        /**
+         * @brief Release all GPU resources owned by flock entities.
+         * @param world ECS world passed by the scheduler.
+         */
         void OnDestroy(World& world) override;
 
+        /**
+         * @brief Return system metadata for scheduler registration.
+         * @return SystemMetadata describing component access and execution order.
+         */
         SystemMetadata GetMetadata() const override;
+
+        /**
+         * @brief Run in the Update group alongside game logic systems.
+         * @return SystemGroup::Update.
+         */
         SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
+
+        /**
+         * @brief Only run during play mode; boid simulation is inactive in edit mode.
+         * @return SystemRunMode::PlayOnly.
+         */
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
-        // Render all flock instances that belong to a specific layer.
+        /**
+         * @brief Render all flock instances that belong to a specific layer.
+         * @param layerId Layer identifier to filter flocks for rendering.
+         * @param shader Shader program used to render the boid instances.
+         * @param viewProj Combined view-projection matrix for the current camera.
+         */
         void DrawFlocksByLayer(uint16_t layerId, Shader& shader,
             const glm::mat4& viewProj);
 
-        // Render one flock directly by owning entity index.
+        /**
+         * @brief Render one flock directly by owning entity index.
+         * @param entityIndex ECS entity index of the flock owner.
+         * @param shader Shader program used to render the boid instances.
+         */
         void DrawFlockForEntity(uint32_t entityIndex, Shader& shader);
 
         // ----------------------------------------------------------------
@@ -96,11 +133,18 @@ namespace ECS {
             bool     hasMaterial = false;
         };
 
+        /**
+         * @brief Return the per-flock render data map for read-only use by the renderer.
+         * @return Reference to the map from entity index to FlockRenderData.
+         */
         const std::unordered_map<uint32_t, FlockRenderData>& GetFlockRenderData() const {
             return m_renderData;
         }
 
-        // Upload/refresh shared tile collision grid used by boid avoidance.
+        /**
+         * @brief Upload and refresh the shared tile collision grid used by boid avoidance.
+         * @param tileMap Tile map whose solid-cell data will be copied to the GPU.
+         */
         void UpdateCollisionGrid(const TileMap& tileMap);
 
     private:
@@ -142,11 +186,24 @@ namespace ECS {
         std::unordered_map<uint32_t, FlockRenderData> m_renderData;
         CollisionGridGPU                              m_collisionGrid;
 
-        // Allocate and initialize GPU buffers/state for one flock entity.
+        /**
+         * @brief Allocate and initialize GPU buffers and state for one flock entity.
+         * @param entityIndex ECS entity index of the flock owner.
+         * @param count Number of boids to allocate GPU memory for.
+         */
         void InitFlock(uint32_t entityIndex, int count);
-        // Destroy all GPU resources owned by one flock entity.
+
+        /**
+         * @brief Destroy all GPU resources owned by one flock entity.
+         * @param entityIndex ECS entity index of the flock owner.
+         */
         void DestroyFlock(uint32_t entityIndex);
-        // Build quad geometry and VAO bindings for one render slot.
+
+        /**
+         * @brief Build quad geometry and VAO bindings for one render slot.
+         * @param gpu GPU state struct to populate with the new VAO and VBO.
+         * @param slot Double-buffer slot index (0 or 1) to initialize.
+         */
         void CreateQuadVAO(FlockGPUData& gpu, int slot);
     };
 

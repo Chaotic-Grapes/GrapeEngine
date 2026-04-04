@@ -35,13 +35,40 @@ namespace ECS {
         AnimationSystem() = default;
         ~AnimationSystem() override = default;
 
-        // ISystem interface
+        /**
+         * @brief No-op; animation system requires no per-world initialization.
+         * @param world ECS world passed by the scheduler (unused).
+         */
         void OnCreate(World& world) override { (void)world; }
+
+        /**
+         * @brief Advance sprite sheet animations for all active entities this frame.
+         * @param world ECS world containing entities with animation components.
+         */
         void OnUpdate(World& world) override;
+
+        /**
+         * @brief No-op; animation system holds no per-world resources to release.
+         * @param world ECS world passed by the scheduler (unused).
+         */
         void OnDestroy(World& world) override { (void)world; }
-        
+
+        /**
+         * @brief Return system metadata for scheduler registration.
+         * @return SystemMetadata describing component access and execution order.
+         */
         SystemMetadata GetMetadata() const override;
+
+        /**
+         * @brief Run in the Update group after game logic.
+         * @return SystemGroup::Update.
+         */
         SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
+
+        /**
+         * @brief Only run during play mode; animations do not advance in edit mode.
+         * @return SystemRunMode::PlayOnly.
+         */
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
     };
 }

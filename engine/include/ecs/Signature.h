@@ -111,7 +111,18 @@ namespace ECS {
             return out;
         }
 
+        /**
+         * @brief Test whether two signatures contain the same component types.
+         * @param o The signature to compare against.
+         * @return True if both signatures contain identical component types.
+         */
         bool operator==(const Signature& o) const { return m_types == o.m_types; }
+
+        /**
+         * @brief Test whether two signatures differ in component types.
+         * @param o The signature to compare against.
+         * @return True if the signatures contain different component types.
+         */
         bool operator!=(const Signature& o) const { return !(*this == o); }
 
         /**

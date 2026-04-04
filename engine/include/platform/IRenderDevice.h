@@ -47,21 +47,25 @@ namespace Platform {
         
         /**
          * @brief Get the graphics API type
+         * @return GraphicsAPI enum identifying the active API.
          */
         virtual GraphicsAPI GetAPI() const = 0;
 
         /**
          * @brief Get GPU vendor name
+         * @return String identifying the GPU vendor (e.g., "NVIDIA Corporation").
          */
         virtual std::string GetVendor() const = 0;
 
         /**
          * @brief Get GPU renderer name
+         * @return String identifying the GPU renderer model.
          */
         virtual std::string GetRenderer() const = 0;
 
         /**
          * @brief Get graphics API version string
+         * @return Version string for the active graphics API (e.g., "4.6.0 NVIDIA ...").
          */
         virtual std::string GetVersion() const = 0;
 
@@ -74,6 +78,7 @@ namespace Platform {
 
         /**
          * @brief Check if this device's context is current
+         * @return True if this device's context is bound on the calling thread.
          */
         virtual bool IsCurrent() const = 0;
 
@@ -84,6 +89,10 @@ namespace Platform {
 
         /**
          * @brief Set clear color (RGBA, 0-1 range)
+         * @param r Red component in [0, 1].
+         * @param g Green component in [0, 1].
+         * @param b Blue component in [0, 1].
+         * @param a Alpha component in [0, 1].
          */
         virtual void SetClearColor(float r, float g, float b, float a) = 0;
 
@@ -91,16 +100,22 @@ namespace Platform {
         
         /**
          * @brief Set viewport dimensions
+         * @param x Left edge of the viewport in pixels.
+         * @param y Bottom edge of the viewport in pixels.
+         * @param width Viewport width in pixels.
+         * @param height Viewport height in pixels.
          */
         virtual void SetViewport(int x, int y, int width, int height) = 0;
 
         /**
          * @brief Get current viewport width
+         * @return Viewport width in pixels.
          */
         virtual int GetViewportWidth() const = 0;
 
         /**
          * @brief Get current viewport height
+         * @return Viewport height in pixels.
          */
         virtual int GetViewportHeight() const = 0;
 
@@ -108,11 +123,13 @@ namespace Platform {
         
         /**
          * @brief Enable or disable wireframe rendering
+         * @param enabled True to render geometry as wireframe, false for solid fill.
          */
         virtual void SetWireframeMode(bool enabled) = 0;
 
         /**
          * @brief Check if wireframe mode is enabled
+         * @return True if the device is currently rendering in wireframe mode.
          */
         virtual bool IsWireframeMode() const = 0;
     };

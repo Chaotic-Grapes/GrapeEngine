@@ -21,6 +21,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 class TransformUtils {
 public:
+    /**
+     * @brief Build a 4x4 rotation matrix from a quaternion.
+     * @param qIn Source quaternion (will be normalized internally).
+     * @return Homogeneous rotation-only matrix.
+     */
     static Matrix4x4 MakeRotation(const Quaternion& qIn) {
         Quaternion q = qIn;
         _safeNormalize(q);
@@ -45,7 +50,13 @@ public:
         );
     }
 
-    // Compose Translation * Rotation * Scale (TRS)
+    /**
+     * @brief Compose a Translation * Rotation * Scale (TRS) matrix.
+     * @param position Translation component.
+     * @param rotation Rotation component as a quaternion.
+     * @param scale Per-axis scale factors.
+     * @return Combined TRS matrix.
+     */
     static Matrix4x4 MakeTRS(const Vector3D& position, const Quaternion& rotation, const Vector3D& scale) {
         Matrix4x4 t = Matrix4x4::Translation(position.X, position.Y, position.Z);
 
@@ -63,7 +74,13 @@ public:
         return t * (r * s);
     }
 
-    // Decompose TRS (assumes no shear, uniform basis)
+    /**
+     * @brief Decompose a TRS matrix into its position, rotation, and scale components.
+     * @param m Matrix to decompose (assumed to be a TRS with no shear).
+     * @param outPosition Receives the translation component.
+     * @param outRotation Receives the rotation as a normalized quaternion.
+     * @param outScale Receives the per-axis scale factors.
+     */
     static void DecomposeTRS(const Matrix4x4& m, Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) {
         // Matrix4x4::Translation stores translation in the last column (m03/m13/m23).
         outPosition = Vector3D(m.m03, m.m13, m.m23);
@@ -129,6 +146,10 @@ public:
     }
 
 private:
+    /**
+     * @brief Normalize a quaternion; replace with identity if it is degenerate (near-zero length).
+     * @param q Quaternion to normalize in place.
+     */
     static inline void _safeNormalize(Quaternion& q) {
         float len2 = q.X*q.X + q.Y*q.Y + q.Z*q.Z + q.W*q.W;
         

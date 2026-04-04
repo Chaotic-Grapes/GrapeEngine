@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioEngine.h
-\author Dalton Koh
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Declares the audio engine runtime layer used for playback control and mixing.
@@ -157,21 +157,97 @@ namespace Audio {
          * @param vel World velocity.
          */
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
+        /**
+         * @brief Set minimum and maximum 3D attenuation distances for one handle.
+         * @param handle Playback handle.
+         * @param minDistance Distance at which full volume is heard.
+         * @param maxDistance Distance at which minimum volume is heard.
+         */
         void SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance);
+
+        /**
+         * @brief Get the 3D minimum attenuation distance for one handle.
+         * @param handle Playback handle.
+         * @return Minimum attenuation distance.
+         */
         float GetInstance3DMinDistance(PlaybackHandle handle) const;
+
+        /**
+         * @brief Get the 3D maximum attenuation distance for one handle.
+         * @param handle Playback handle.
+         * @return Maximum attenuation distance.
+         */
         float GetInstance3DMaxDistance(PlaybackHandle handle) const;
+
+        /**
+         * @brief Set the 3D spread angle for one handle.
+         * @param handle Playback handle.
+         * @param spread Spread angle in degrees.
+         */
         void SetInstance3DSpread(PlaybackHandle handle, float spread);
+
+        /**
+         * @brief Get the 3D spread angle for one handle.
+         * @param handle Playback handle.
+         * @return Spread angle in degrees.
+         */
         float GetInstance3DSpread(PlaybackHandle handle) const;
+
+        /**
+         * @brief Set the 3D level mix for one handle.
+         * @param handle Playback handle.
+         * @param level 3D mix level in [0, 1].
+         */
         void SetInstance3DLevel(PlaybackHandle handle, float level);
+
+        /**
+         * @brief Get the 3D level mix for one handle.
+         * @param handle Playback handle.
+         * @return 3D mix level in [0, 1].
+         */
         float GetInstance3DLevel(PlaybackHandle handle) const;
 
-        // Global defaults for Spatial3D playback.
+        /**
+         * @brief Set global default minimum and maximum 3D attenuation distances.
+         * @param minDistance Distance at which full volume is heard.
+         * @param maxDistance Distance at which minimum volume is heard.
+         */
         void SetDefault3DMinMaxDistance(float minDistance, float maxDistance);
+
+        /**
+         * @brief Get the global default 3D minimum attenuation distance.
+         * @return Default minimum attenuation distance.
+         */
         float GetDefault3DMinDistance() const;
+
+        /**
+         * @brief Get the global default 3D maximum attenuation distance.
+         * @return Default maximum attenuation distance.
+         */
         float GetDefault3DMaxDistance() const;
+
+        /**
+         * @brief Set the global default 3D spread angle.
+         * @param spread Spread angle in degrees.
+         */
         void SetDefault3DSpread(float spread);
+
+        /**
+         * @brief Get the global default 3D spread angle.
+         * @return Spread angle in degrees.
+         */
         float GetDefault3DSpread() const;
+
+        /**
+         * @brief Set the global default 3D level mix.
+         * @param level 3D mix level in [0, 1].
+         */
         void SetDefault3DLevel(float level);
+
+        /**
+         * @brief Get the global default 3D level mix.
+         * @return 3D mix level in [0, 1].
+         */
         float GetDefault3DLevel() const;
 
         /**
@@ -216,10 +292,18 @@ namespace Audio {
          */
         float GetBusLowPassGain(Bus bus) const;
 
-        // set low pass resonance (Q) on one bus
+        /**
+         * @brief Set low-pass resonance (Q) on one bus.
+         * @param bus Mixer bus.
+         * @param resonance Resonance factor.
+         */
         void SetBusLowPassResonance(Bus bus, float resonance);
 
-        // get low pass resonance (Q) on one bus
+        /**
+         * @brief Get low-pass resonance (Q) on one bus.
+         * @param bus Mixer bus.
+         * @return Resonance factor.
+         */
         float GetBusLowPassResonance(Bus bus) const;
 
         // fade one instance toward target volume

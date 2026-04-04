@@ -2,8 +2,8 @@
 /*!
 \file   ParallelFor.h
 \author Dalton Koh Shi Hao (100%)
-\par d.koh@digipen.edu
-\brief Deterministic static-partition parallel-for helper for physics stages.
+\par    d.koh@digipen.edu
+\brief  Deterministic static-partition parallel-for helper for physics stages.
 */
 /* End Header *******************************************************************/
 

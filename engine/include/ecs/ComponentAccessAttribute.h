@@ -57,10 +57,20 @@ namespace ECS {
         ComponentAccess(ComponentTypeId id, ComponentAccessMode mode)
             : ComponentId(id), Mode(mode) {}
 
+        /**
+         * @brief Test whether two component accesses refer to the same component and mode.
+         * @param other The access to compare against.
+         * @return True if both component id and access mode match.
+         */
         bool operator==(const ComponentAccess& other) const {
             return ComponentId == other.ComponentId && Mode == other.Mode;
         }
 
+        /**
+         * @brief Test whether two component accesses differ in component or mode.
+         * @param other The access to compare against.
+         * @return True if component id or access mode differs.
+         */
         bool operator!=(const ComponentAccess& other) const {
             return !(*this == other);
         }

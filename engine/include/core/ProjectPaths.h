@@ -37,12 +37,14 @@ namespace Engine {
         static void Initialize(const std::string& projectRoot);
         
         /**
-         * @brief Check if project paths have been initialized
+         * @brief Check if project paths have been initialized.
+         * @return True if Initialize() has been called successfully.
          */
         static bool IsInitialized();
-        
+
         /**
-         * @brief Get the root directory of the game project
+         * @brief Get the root directory of the game project.
+         * @return Full path to the project root directory.
          */
         static std::string GetProjectRoot();
         
@@ -128,15 +130,20 @@ namespace Engine {
         static std::string ToRelativePath(const std::string& absolutePath);
         
         /**
-         * @brief Check if a path is within the project directory
+         * @brief Check if a path is within the project directory.
+         * @param path Path to test.
+         * @return True if path is inside the project root.
          */
         static bool IsInProject(const std::string& path);
-        
+
     private:
         static std::string s_projectRoot;
         static bool s_initialized;
-        
-        // Helper to ensure path exists
+
+        /**
+         * @brief Create directory at path if it does not already exist.
+         * @param path Directory path to create.
+         */
         static void EnsureDirectoryExists(const std::string& path);
     };
     

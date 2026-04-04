@@ -132,42 +132,66 @@ namespace Engine {
         // Registration Methods (Editor calls these)
         // ====================================================================
 
-        // Register the callback used for debug drawing in the editor viewport.
+        /**
+         * @brief Register the callback used for debug drawing in the editor viewport.
+         * @param callback Callback receiving the current ECS world.
+         */
         void RegisterDebugDraw(DebugDrawCallback callback) {
             m_debugDrawCallback = callback;
         }
 
-        // Register the callback used to update editor entity selection state.
+        /**
+         * @brief Register the callback used to update editor entity selection state.
+         * @param callback Callback receiving entity id and multi-select flag.
+         */
         void RegisterEntitySelection(EntitySelectionCallback callback) {
             m_entitySelectionCallback = callback;
         }
 
-        // Register the callback used to request inspector refreshes.
+        /**
+         * @brief Register the callback used to request inspector refreshes.
+         * @param callback Callback receiving entity id to inspect.
+         */
         void RegisterInspectorRefresh(InspectorRefreshCallback callback) {
             m_inspectorRefreshCallback = callback;
         }
 
-        // Register the callback used to present scene render output in editor UI.
+        /**
+         * @brief Register the callback used to present scene render output in editor UI.
+         * @param callback Callback receiving texture id, width, and height.
+         */
         void RegisterSceneRender(SceneRenderCallback callback) {
             m_sceneRenderCallback = callback;
         }
 
-        // Register the callback used to show editor notifications.
+        /**
+         * @brief Register the callback used to show editor notifications.
+         * @param callback Callback receiving severity, title, message, and duration.
+         */
         void RegisterNotification(NotificationCallback callback) {
             m_notificationCallback = callback;
         }
 
-        // Register the callback used for viewport picking queries.
+        /**
+         * @brief Register the callback used for viewport picking queries.
+         * @param callback Callback receiving screen coordinates and returning entity id.
+         */
         void RegisterPick(PickCallback callback) {
             m_pickCallback = callback;
         }
 
-        // Register the callback used to query editor camera matrices.
+        /**
+         * @brief Register the callback used to query editor camera matrices.
+         * @param callback Callback populating position, view, and projection matrices.
+         */
         void RegisterEditorCamera(EditorCameraCallback callback) {
             m_editorCameraCallback = callback;
         }
 
-        // Register an extra ImGui draw callback invoked each editor frame.
+        /**
+         * @brief Register an extra ImGui draw callback invoked each editor frame.
+         * @param callback Callback that renders additional ImGui content.
+         */
         void RegisterCustomImGui(CustomImGuiCallback callback) {
             m_customImGuiCallbacks.push_back(callback);
         }
@@ -176,41 +200,69 @@ namespace Engine {
         // Invocation Methods (Engine calls these)
         // ====================================================================
 
+        /**
+         * @brief Invoke the debug draw callback with the current ECS world.
+         * @param world Current ECS world passed to the registered callback.
+         */
         void InvokeDebugDraw(ECS::World* world) {
             if (m_debugDrawCallback) {
                 m_debugDrawCallback(world);
             }
         }
 
-        // Notify editor that an entity selection change occurred.
+        /**
+         * @brief Notify editor that an entity selection change occurred.
+         * @param entityId Entity to select (0 = clear selection).
+         * @param addToSelection If true, add to existing selection (multi-select).
+         */
         void InvokeEntitySelection(uint32_t entityId, bool addToSelection = false) {
             if (m_entitySelectionCallback) {
                 m_entitySelectionCallback(entityId, addToSelection);
             }
         }
 
-        // Notify editor to refresh inspector views for one entity or full selection.
+        /**
+         * @brief Notify editor to refresh inspector views for one entity or full selection.
+         * @param entityId Entity to inspect (0 = refresh current selection).
+         */
         void InvokeInspectorRefresh(uint32_t entityId = 0) {
             if (m_inspectorRefreshCallback) {
                 m_inspectorRefreshCallback(entityId);
             }
         }
 
-        // Forward the scene texture/frame dimensions to editor rendering callback.
+        /**
+         * @brief Forward the scene texture and frame dimensions to the editor rendering callback.
+         * @param textureId OpenGL texture id of the rendered scene.
+         * @param width Width of the rendered texture in pixels.
+         * @param height Height of the rendered texture in pixels.
+         */
         void InvokeSceneRender(uint32_t textureId, int width, int height) {
             if (m_sceneRenderCallback) {
                 m_sceneRenderCallback(textureId, width, height);
             }
         }
 
-        void InvokeNotification(int severity, const std::string& title, 
+        /**
+         * @brief Notify the editor to display a notification message.
+         * @param severity Severity level (0=Info, 1=Warning, 2=Error, 3=Success).
+         * @param title Notification title string.
+         * @param message Notification body text.
+         * @param duration Display duration in seconds (0 = persistent).
+         */
+        void InvokeNotification(int severity, const std::string& title,
                                const std::string& message, float duration = 3.0f) {
             if (m_notificationCallback) {
                 m_notificationCallback(severity, title, message, duration);
             }
         }
 
-        // Execute picking callback and return picked entity id when available.
+        /**
+         * @brief Execute the picking callback and return the picked entity id.
+         * @param screenX Mouse X position in screen coordinates.
+         * @param screenY Mouse Y position in screen coordinates.
+         * @return Entity id of the picked entity, or 0 when nothing is picked.
+         */
         uint32_t InvokePick(float screenX, float screenY) {
             if (m_pickCallback) {
                 return m_pickCallback(screenX, screenY);
@@ -218,8 +270,14 @@ namespace Engine {
             return 0; // Nothing picked
         }
 
-        // Query editor camera data if an editor camera callback is registered.
-        bool InvokeEditorCamera(glm::vec3& outPosition, glm::mat4& outViewMatrix, 
+        /**
+         * @brief Query editor camera data if an editor camera callback is registered.
+         * @param outPosition Receives the editor camera world position.
+         * @param outViewMatrix Receives the editor camera view matrix.
+         * @param outProjectionMatrix Receives the editor camera projection matrix.
+         * @return True if an editor camera callback was registered and succeeded.
+         */
+        bool InvokeEditorCamera(glm::vec3& outPosition, glm::mat4& outViewMatrix,
                                glm::mat4& outProjectionMatrix) {
             if (m_editorCameraCallback) {
                 return m_editorCameraCallback(outPosition, outViewMatrix, outProjectionMatrix);
@@ -227,7 +285,9 @@ namespace Engine {
             return false; // No editor camera available
         }
 
-        // Invoke all registered custom ImGui draw callbacks.
+        /**
+         * @brief Invoke all registered custom ImGui draw callbacks.
+         */
         void InvokeCustomImGui() {
             for (auto& callback : m_customImGuiCallbacks) {
                 if (callback) {
@@ -241,7 +301,8 @@ namespace Engine {
         // ====================================================================
 
         /**
-         * @brief Check if editor callbacks are registered (i.e., editor is active)
+         * @brief Check if editor callbacks are registered (i.e., editor is active).
+         * @return True when at least the entity selection callback is registered.
          */
         bool IsEditorActive() const {
             return m_entitySelectionCallback != nullptr;

@@ -35,6 +35,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #pragma once
 
 #ifdef GRAPE_HAS_CUDA
-// Returns true if CUDA is working
+/**
+ * @brief Run a lightweight CUDA self-test to verify device availability and kernel execution.
+ * @return True if CUDA is functional; false if initialization or execution failed.
+ */
 bool CudaTestRun();
 #endif

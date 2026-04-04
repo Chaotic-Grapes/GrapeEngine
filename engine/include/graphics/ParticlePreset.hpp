@@ -67,9 +67,34 @@ struct ParticlePreset {
     float bounciness = 0.0f;
 
     // --- Factory presets ---
+
+    /**
+     * @brief Create a bubble particle preset with upward drift and wobble.
+     * @return Pre-configured bubble emitter preset.
+     */
     static ParticlePreset Bubbles();
+
+    /**
+     * @brief Create a geyser particle preset with high upward velocity.
+     * @return Pre-configured geyser emitter preset.
+     */
     static ParticlePreset Geyser();
+
+    /**
+     * @brief Create a smoke particle preset with slow rise and fade.
+     * @return Pre-configured smoke emitter preset.
+     */
     static ParticlePreset Smoke();
+
+    /**
+     * @brief Create an explosion particle preset with outward burst.
+     * @return Pre-configured explosion emitter preset.
+     */
     static ParticlePreset Explosion();
+
+    /**
+     * @brief Create a sediment particle preset with downward drift.
+     * @return Pre-configured sediment emitter preset.
+     */
     static ParticlePreset Sediment();
 };

@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Collision.h
-\author Dalton Koh
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Declares collision data types and query functions used by the physics runtime.

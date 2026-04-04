@@ -95,6 +95,12 @@ namespace ECS {
         }
 
   private:
+        /**
+         * @brief Register metadata (size, alignment, ctor, dtor) for component type T.
+         *        Called exactly once per type via std::call_once; no mutex needed.
+         * @tparam T Component type whose metadata to register.
+         * @param id ComponentTypeId already assigned to this type.
+         */
         template<typename T>
         static void _detailRegister(const ComponentTypeId id) {
             // Called exactly once per component type via std::call_once, so no mutex needed here
@@ -132,17 +138,43 @@ namespace ECS {
             }
       }
 
+      /**
+       * @brief Atomically allocate the next available ComponentTypeId.
+       * @return Unique ComponentTypeId for a newly registered component type.
+       */
       static ComponentTypeId _nextId() {
-          // Call the implementation in ComponentRegistry.cpp
           return _nextIdCounter().fetch_add(1, std::memory_order_relaxed);
       }
 
-      // These are defined in ComponentRegistry.cpp to ensure single instance across all compilation units
-      // If they were defined here as inline statics, each .cpp file would get its own instance!
+      // Defined in ComponentRegistry.cpp to guarantee a single instance across all translation units.
+      /**
+       * @brief Get the global component metadata map.
+       * @return Reference to the map from ComponentTypeId to ComponentMeta.
+       */
       static std::unordered_map<ComponentTypeId, ComponentMeta>& _metas();
+
+      /**
+       * @brief Get the global atomic id counter used for ComponentTypeId allocation.
+       * @return Reference to the atomic counter.
+       */
       static std::atomic<ComponentTypeId>& _nextIdCounter();
+
+      /**
+       * @brief Get the global map from type name hash to ComponentTypeId.
+       * @return Reference to the hash-to-id map.
+       */
       static std::unordered_map<uint32_t, ComponentTypeId>& _hashToId();
+
+      /**
+       * @brief Get the global map from ComponentTypeId to type name hash.
+       * @return Reference to the id-to-hash map.
+       */
       static std::unordered_map<ComponentTypeId, uint32_t>& _idToHash();
+
+      /**
+       * @brief Get the global map from type name hash to component name string.
+       * @return Reference to the hash-to-name map.
+       */
       static std::unordered_map<uint32_t, std::string>& _hashToName();
 
   public:
@@ -279,12 +311,12 @@ namespace ECS {
       }
 
       /**
-       * @brief Register a component type with only its type name hash (for C# runtime components)
-       * This creates a synthetic entry for C# components that don't have C++ type equivalents.
-       * @param typeHash FNV-1a hash of the component type name
-       * @param size Size of the component in bytes
-       * @param alignment Alignment requirement of the component
-       * @return ComponentTypeId of the registered component
+       * @brief Register a C# runtime component type using only its type name hash.
+       *        Creates a synthetic metadata entry for components without a C++ equivalent.
+       * @param typeHash FNV-1a hash of the component type name.
+       * @param size Size of the component in bytes.
+       * @param alignment Alignment requirement of the component.
+       * @return ComponentTypeId of the registered or updated component.
        */
       static ComponentTypeId RegisterCSharpComponent(uint32_t typeHash, size_t size, size_t alignment) {
           auto& metas = _metas();
@@ -341,7 +373,12 @@ namespace ECS {
       }
 
       /**
-       * @brief Register a C# component with its name
+       * @brief Register a C# runtime component type with its type name hash and name.
+       * @param typeHash FNV-1a hash of the component type name.
+       * @param size Size of the component in bytes.
+       * @param alignment Alignment requirement of the component.
+       * @param typeName Human-readable component type name (no namespace).
+       * @return ComponentTypeId of the registered or updated component.
        */
       static ComponentTypeId RegisterCSharpComponentWithName(uint32_t typeHash, size_t size, size_t alignment, const std::string& typeName) {
           ComponentTypeId id = RegisterCSharpComponent(typeHash, size, alignment);
@@ -365,9 +402,19 @@ namespace ECS {
       }
   };
 
+  /**
+   * @brief Convenience wrapper returning the ComponentTypeId for type T.
+   * @tparam T Component type to look up.
+   * @return ComponentTypeId assigned to T.
+   */
   template<typename T>
   inline ComponentTypeId _typeId() { return ComponentRegistry::Type<T>(); }
 
+  /**
+   * @brief Convenience wrapper returning the ComponentMeta for a given id.
+   * @param id ComponentTypeId to look up.
+   * @return Reference to the ComponentMeta for that id.
+   */
   inline const ComponentMeta& _componentMeta(const ComponentTypeId id) { return ComponentRegistry::Meta(id); }
 }
 

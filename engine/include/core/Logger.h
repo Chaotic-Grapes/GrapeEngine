@@ -148,32 +148,37 @@ public:
 	void SetConsoleCallback(ConsoleCallback callback) { m_consoleCallback = callback; }
 
 private:
-	// void _writeCrashLog(LogLevel level, const std::string& message);
+
 	/**
 	 * @brief Write TRACE message to active sinks.
 	 * @param message Text payload to write.
 	 */
 	void _logTrace(const std::string& message);
+
 	/**
 	 * @brief Write INFO message to active sinks.
 	 * @param message Text payload to write.
 	 */
 	void _logInfo(const std::string& message);
+
 	/**
 	 * @brief Write DEBUG message to active sinks.
 	 * @param message Text payload to write.
 	 */
 	void _logDebug(const std::string& message);
+
 	/**
 	 * @brief Write WARNING message to active sinks.
 	 * @param message Text payload to write.
 	 */
 	void _logWarning(const std::string& message);
+
 	/**
 	 * @brief Write ERROR message to active sinks.
 	 * @param message Text payload to write.
 	 */
 	void _logError(const std::string& message);
+
 	/**
 	 * @brief Write CRITICAL message to active sinks.
 	 * @param message Text payload to write.
@@ -185,26 +190,31 @@ private:
 	 * @param oss Stream containing formatted message text.
 	 */
 	void _logTrace(const std::stringstream& oss);
+
 	/**
 	 * @brief Write INFO stream payload to active sinks.
 	 * @param oss Stream containing formatted message text.
 	 */
 	void _logInfo(const std::stringstream& oss);
+
 	/**
 	 * @brief Write DEBUG stream payload to active sinks.
 	 * @param oss Stream containing formatted message text.
 	 */
 	void _logDebug(const std::stringstream& oss);
+
 	/**
 	 * @brief Write WARNING stream payload to active sinks.
 	 * @param oss Stream containing formatted message text.
 	 */
 	void _logWarning(const std::stringstream& oss);
+
 	/**
 	 * @brief Write ERROR stream payload to active sinks.
 	 * @param oss Stream containing formatted message text.
 	 */
 	void _logError(const std::stringstream& oss);
+
 	/**
 	 * @brief Write CRITICAL stream payload to active sinks.
 	 * @param oss Stream containing formatted message text.
@@ -217,6 +227,7 @@ private:
 	 * @param level Log level controlling color mapping.
 	 */
 	void _setConsoleColor(LogLevel level);
+	
 	/**
 	 * @brief Restore default console color after logging.
 	 */

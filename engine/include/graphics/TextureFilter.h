@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TextureFilter.h
-\author Muhammad Nur Fadzly Bin Zulkifli
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   5th January 2026
 \brief

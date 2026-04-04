@@ -537,6 +537,7 @@ namespace Scenes {
         }
 
     private:
+        /** @brief Process any pending scene transition queued by SetActive(). */
         void _processPending() {
             if (m_pendingActive == NPOS)
                 return;
@@ -645,7 +646,11 @@ namespace Scenes {
             Messaging::MessageSystem::Notify(Messaging::SceneChanging{std::move(oldName), std::move(newName)});
         }
 
-        // Generate a unique owner tag for a scene based on its pointer
+        /**
+         * @brief Generate a unique resource owner tag for a scene based on its pointer.
+         * @param scene Scene whose address is used to form the tag.
+         * @return Unique owner tag string, or empty string if scene is null.
+         */
         static std::string _makeOwnerTag(const Scene* scene) {
             if (!scene) {
                 return {};
@@ -681,6 +686,11 @@ namespace Scenes {
                 : Engine::ProjectPaths::ToAbsolutePath(pathFs.string());
         }
 
+        /**
+         * @brief Convert an absolute path to a project-relative storage path if possible.
+         * @param resolvedPath Absolute filesystem path to convert.
+         * @return Project-relative path if inside the project, otherwise the original path.
+         */
         static std::string _toSceneStoragePath(const std::string& resolvedPath) {
             if (!resolvedPath.empty()
                 && Engine::ProjectPaths::IsInitialized()
@@ -691,6 +701,11 @@ namespace Scenes {
             return resolvedPath;
         }
 
+        /**
+         * @brief Normalize a filesystem path using lexical normalization and forward slashes.
+         * @param path Input path string.
+         * @return Normalized path with forward slash separators.
+         */
         static std::string _normalizePath(const std::string& path) {
             std::filesystem::path normalized = std::filesystem::path(path).lexically_normal();
             std::string normalizedStr = normalized.string();
@@ -725,7 +740,10 @@ namespace Scenes {
             return NPOS;
         }
 
-        // Initialize runtime prefab metadata post-load
+        /**
+         * @brief Recompute WorldTransform for all entities that have LocalTransform post-load.
+         * @param world ECS world whose entity hierarchy transforms will be rebuilt.
+         */
         static void _recomputeWorldTransforms(ECS::World& world) {
             std::vector<ECS::Entity> roots;
             std::vector<ECS::Entity> needsWorldTransform;

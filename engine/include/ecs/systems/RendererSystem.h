@@ -211,14 +211,20 @@ namespace ECS {
         // -----------------------
         /**
          * @brief Request an async GPU pick at the given screen position (absolute coordinates).
-         * @returns Request id which can be polled via TryGetPickResult()
+         * @param screenX Absolute screen X coordinate of the pick position.
+         * @param screenY Absolute screen Y coordinate of the pick position.
+         * @param viewportPos Top-left corner of the viewport in screen space.
+         * @param viewportSize Width and height of the viewport in pixels.
+         * @return Request id which can be polled via TryGetPickResult().
          * @note The result will become available one frame later when the renderer's PBO readback completes.
          */
         uint32_t RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize);
 
         /**
          * @brief Try to retrieve a completed pick result for a previously requested pick.
-         * @returns true and sets outEntityId when ready; otherwise returns false.
+         * @param requestId Request id returned by RequestPick().
+         * @param outEntityId Set to the picked entity id when the result is ready.
+         * @return True and sets outEntityId when ready; otherwise returns false.
          */
         bool TryGetPickResult(uint32_t requestId, uint32_t& outEntityId);
 
@@ -252,7 +258,12 @@ namespace ECS {
          */
         void SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max, 
                                  const glm::vec4& color, float thickness);
-        // Submit a filled quad (editor overlays like tile previews).
+        /**
+         * @brief Submit a filled quad (editor overlays like tile previews).
+         * @param min Bottom-left corner in world space.
+         * @param max Top-right corner in world space.
+         * @param color RGBA fill color.
+         */
         void SubmitFilledQuad(const glm::vec2& min, const glm::vec2& max,
                               const glm::vec4& color);
 
@@ -309,11 +320,10 @@ namespace ECS {
                                float rotation);
 
         /**
-         * @brief Submit collider debug visualizations for an entity
-         * @param world ECS world containing the entity
-         * @param entityID ID of entity with colliders to render
-         * @param color RGBA color for collider wireframes
-         * @param thickness Line thickness in world units
+         * @brief Submit collider debug visualizations for an entity.
+         * @param world ECS world containing the entity.
+         * @param entityID ID of entity with colliders to render.
+         * @param color RGBA color for collider wireframes.
          */
         void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
                                      const glm::vec4& color);
@@ -378,7 +388,8 @@ namespace ECS {
         // ====================================================================
 
         /**
-         * @brief Convert engine Vector2D to GLM vec2. 
+         * @brief Convert engine Vector2D to GLM vec2.
+         * @param v Source Vector2D.
          * @return glm::vec2 representation of the Vector2D.
          */
         glm::vec2 ToGlm(const Vector2D& v) {

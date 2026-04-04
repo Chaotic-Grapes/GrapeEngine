@@ -35,14 +35,49 @@ namespace ECS {
         TransformSystem() = default;
         ~TransformSystem() override = default;
 
+        /**
+         * @brief No-op; transform system requires no per-world initialization.
+         * @param world ECS world passed by the scheduler (unused).
+         */
         void OnCreate(World& world) override { (void)world; }
+
+        /**
+         * @brief Propagate LocalTransform changes through the entity hierarchy to update WorldTransform.
+         * @param world ECS world containing entities with transform components.
+         */
         void OnUpdate(World& world) override;
+
+        /**
+         * @brief No-op; transform system holds no per-world resources to release.
+         * @param world ECS world passed by the scheduler (unused).
+         */
         void OnDestroy(World& world) override { (void)world; }
 
+        /**
+         * @brief Return system metadata for scheduler registration.
+         * @return SystemMetadata describing component access and execution order.
+         */
         SystemMetadata GetMetadata() const override;
+
+        /**
+         * @brief Run in PrePhysics so world transforms are valid before physics and rendering.
+         * @return SystemGroup::PrePhysics.
+         */
         SystemGroup GetSystemGroup() const override { return SystemGroup::PrePhysics; }
+
+        /**
+         * @brief Always run in both play and edit modes.
+         * @return SystemRunMode::Always.
+         */
         SystemRunMode GetRunMode() const override { return SystemRunMode::Always; }
+
     private:
+        /**
+         * @brief Recursively update the WorldTransform for an entity and all its children.
+         * @param world ECS world containing the entity hierarchy.
+         * @param e Entity whose subtree to update.
+         * @param parentWorld Parent's world matrix, or nullopt for root entities.
+         */
         void _updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld);
     };
 }

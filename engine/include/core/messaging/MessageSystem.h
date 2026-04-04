@@ -71,11 +71,21 @@ namespace Messaging {
         SubscriptionHandle() : id_(0), valid_(false) {}
         SubscriptionHandle(size_t id) : id_(id), valid_(true) {}
 
-        /// @return The unique ID associated with this subscription.
+        /**
+         * @brief Get the unique ID associated with this subscription.
+         * @return Unique subscription identifier.
+         */
         size_t GetId() const { return id_; }
-        /// @return True if the handle currently represents a valid subscription.
+
+        /**
+         * @brief Check whether the handle currently represents a valid subscription.
+         * @return True if the handle has not been invalidated.
+         */
         bool IsValid() const { return valid_; }
-        /// @brief Invalidates the handle (usually after unsubscription).
+
+        /**
+         * @brief Invalidate the handle (called after unsubscription).
+         */
         void Invalidate() { valid_ = false; }
 
     private:
@@ -89,11 +99,23 @@ namespace Messaging {
     class IObserver {
     public:
         virtual ~IObserver() = default;
-        // Handle incoming message of type T.
+        /**
+         * @brief Handle an incoming message of type T.
+         * @param message Message to process.
+         */
         virtual void OnNotify(const T& message) = 0;
-        // Observer priority (higher value notified earlier).
+
+        /**
+         * @brief Get the observer's notification priority.
+         * @return Priority value; higher values are notified first.
+         */
         virtual int GetPriority() const { return 0; }
-        // Whether this observer should receive the given message.
+
+        /**
+         * @brief Check whether this observer should receive the given message.
+         * @param message Message to evaluate.
+         * @return True if the observer wants to receive this message.
+         */
         virtual bool ShouldReceive(const T& message) const { (void)message; return true; }
     };
 
@@ -104,7 +126,12 @@ namespace Messaging {
     public:
         using Handler = std::function<void(const T&)>;
         using Filter = std::function<bool(const T&)>;
-        // Construct with handler; higher priority is notified first; optional filter.
+        /**
+         * @brief Construct with a handler function; higher priority is notified first.
+         * @param handler Callable invoked when a matching message is received.
+         * @param priority Notification priority; higher values fire first.
+         * @param filter Optional predicate; observer only receives messages that pass.
+         */
         FunctionObserver(Handler handler, int priority = 0, Filter filter = nullptr)
             : handler_(handler), priority_(priority), filter_(filter) {
         }
@@ -142,7 +169,13 @@ namespace Messaging {
             }
         };
 
-        // Subscribe handler; returns a subscription handle (higher priority first)
+        /**
+         * @brief Subscribe a handler function; higher priority observers are notified first.
+         * @param handler Callable invoked when a matching message is broadcast.
+         * @param priority Notification priority; higher values fire first.
+         * @param filter Optional predicate; handler only fires for messages that pass.
+         * @return SubscriptionHandle that can be used to unsubscribe or toggle the subscription.
+         */
         SubscriptionHandle Subscribe(
             std::function<void(const T&)> handler,
             int priority = 0,
@@ -162,8 +195,10 @@ namespace Messaging {
             return SubscriptionHandle(id);
         }
 
-        // Unsubscribe an observer using its handle (handle invalidated after removal).
-        // Unsubscribe using handle
+        /**
+         * @brief Unsubscribe an observer; the handle is invalidated after removal.
+         * @param handle Handle of the subscription to remove.
+         */
         void Unsubscribe(SubscriptionHandle& handle) {
             if (!handle.IsValid()) return;
 
@@ -178,8 +213,11 @@ namespace Messaging {
             }
         }
 
-        // Enable or disable a subscription without removing it.
-        // Temporarily disable/enable a subscription
+        /**
+         * @brief Enable or disable a subscription without removing it.
+         * @param handle Handle of the subscription to toggle.
+         * @param enabled True to enable the subscription, false to suppress it.
+         */
         void SetEnabled(const SubscriptionHandle& handle, bool enabled) {
             auto it = std::find_if(observers_.begin(), observers_.end(),
                 [&handle](const ObserverEntry& entry) {
@@ -191,8 +229,10 @@ namespace Messaging {
             }
         }
 
-        // Notify all enabled observers of a message.
-        // Notify all observers
+        /**
+         * @brief Notify all enabled observers of a message.
+         * @param message Message to broadcast to all subscribed observers.
+         */
         void Notify(const T& message) {
             // Copy vector to allow modifications during iteration
             // Make a copy to allow modifications (e.g., unsubscribe) during iteration
@@ -205,15 +245,16 @@ namespace Messaging {
             }
         }
 
-        /// @return The number of currently enabled observers.
-        // Get number of active observers
+        /**
+         * @brief Get the number of currently enabled observers.
+         * @return Count of enabled observer entries.
+         */
         size_t GetObserverCount() const {
             return std::count_if(observers_.begin(), observers_.end(),
                 [](const ObserverEntry& entry) { return entry.enabled; });
         }
 
-        /// @brief Clears all observers from this observable.
-        // Clear all observers
+        /** @brief Clear all observers from this observable. */
         void Clear() {
             observers_.clear();
         }
@@ -227,8 +268,14 @@ namespace Messaging {
     // Global MessageSystem using Observer pattern
     class MessageSystem {
     public:
-        // Subscribe to messages of type T (supports priority and optional filter).
-        // Subscribe to a message type with priority and filter
+        /**
+         * @brief Subscribe to messages of type T with optional priority and filter.
+         * @tparam T Message type to subscribe to.
+         * @param handler Callable invoked when a message of type T is broadcast.
+         * @param priority Notification priority; higher values fire first.
+         * @param filter Optional predicate; handler only fires for messages that pass.
+         * @return SubscriptionHandle for managing the subscription lifetime.
+         */
         template<typename T>
         static SubscriptionHandle Subscribe(
             std::function<void(const T&)> handler,
@@ -238,51 +285,72 @@ namespace Messaging {
             return GetObservable<T>().Subscribe(handler, priority, filter);
         }
 
-        /// @brief Unsubscribes a previously registered observer.
-        // Unsubscribe using handle
+        /**
+         * @brief Unsubscribe a previously registered observer.
+         * @tparam T Message type the handle was subscribed to.
+         * @param handle Handle to unsubscribe (invalidated after removal).
+         */
         template<typename T>
         static void Unsubscribe(SubscriptionHandle& handle) {
             GetObservable<T>().Unsubscribe(handle);
         }
 
-        /// @brief Enables or disables an existing subscription.
-        // Enable/disable subscription
+        /**
+         * @brief Enable or disable an existing subscription without removing it.
+         * @tparam T Message type the handle was subscribed to.
+         * @param handle Handle of the subscription to toggle.
+         * @param enabled True to enable, false to suppress.
+         */
         template<typename T>
         static void SetEnabled(const SubscriptionHandle& handle, bool enabled) {
             GetObservable<T>().SetEnabled(handle, enabled);
         }
 
-        /// @brief Broadcasts a message to all subscribed observers.
-        // Notify all observers (formerly Broadcast)
+        /**
+         * @brief Broadcast a message to all subscribed observers of type T.
+         * @tparam T Message type to broadcast.
+         * @param message Message instance to deliver.
+         */
         template<typename T>
         static void Notify(const T& message) {
             GetObservable<T>().Notify(message);
         }
 
-        /// @brief Legacy alias for Notify()
-        // Legacy support - Broadcast calls Notify
+        /**
+         * @brief Legacy alias for Notify().
+         * @tparam T Message type to broadcast.
+         * @param message Message instance to deliver.
+         */
         template<typename T>
         static void Broadcast(const T& message) {
             Notify(message);
         }
 
-        /// @brief Provides direct access to the Observable for advanced control.
-        // Get observable for direct manipulation
+        /**
+         * @brief Get direct access to the Observable for type T for advanced control.
+         * @tparam T Message type whose Observable to retrieve.
+         * @return Reference to the static Observable<T> instance.
+         */
         template<typename T>
         static Observable<T>& GetObservable() {
             static Observable<T> observable;
             return observable;
         }
 
-        /// @brief Clears all subscriptions for message type T.
-        // Clear all subscriptions for type T
+        /**
+         * @brief Clear all subscriptions for message type T.
+         * @tparam T Message type whose subscriptions to clear.
+         */
         template<typename T>
         static void Clear() {
             GetObservable<T>().Clear();
         }
 
-        /// @return The number of active observers for type T.
-        // Get observer count
+        /**
+         * @brief Get the number of active observers for message type T.
+         * @tparam T Message type to query.
+         * @return Count of enabled observers for T.
+         */
         template<typename T>
         static size_t GetObserverCount() {
             return GetObservable<T>().GetObserverCount();
@@ -296,12 +364,14 @@ namespace Messaging {
     template<typename T>
     class ScopedSubscription {
     public:
-        // Take ownership of a subscription handle for RAII-managed lifetime.
+        /**
+         * @brief Take ownership of a subscription handle for RAII-managed lifetime.
+         * @param handle Subscription handle to manage.
+         */
         ScopedSubscription(SubscriptionHandle handle)
             : handle_(handle) {
         }
 
-        // Automatically unsubscribe when this scoped wrapper is destroyed.
         ~ScopedSubscription() {
             MessageSystem::Unsubscribe<T>(handle_);
         }
@@ -316,7 +386,10 @@ namespace Messaging {
             other.handle_.Invalidate();
         }
         
-        /// @return Reference to the underlying handle.
+        /**
+         * @brief Get a reference to the underlying subscription handle.
+         * @return Reference to the managed SubscriptionHandle.
+         */
         const SubscriptionHandle& GetHandle() const { return handle_; }
 
     private:

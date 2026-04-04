@@ -44,13 +44,34 @@ namespace ECS {
         AudioSystem(Services::AudioService& audioService);
         ~AudioSystem() override = default;
 
-        // ISystem interface
+        /**
+         * @brief Initialize the master low-pass DSP and prepare audio playback state.
+         * @param world ECS world used to locate AudioSource components.
+         */
         void OnCreate(World& world) override;
+
+        /**
+         * @brief Process AudioSource components and manage playback lifecycle for this frame.
+         * @param world ECS world containing entities with AudioSource components.
+         */
         void OnUpdate(World& world) override;
+
+        /**
+         * @brief Stop all sounds and release the master DSP and internal state.
+         * @param world ECS world passed by the scheduler.
+         */
         void OnDestroy(World& world) override;
         
+        /**
+         * @brief Return system metadata for scheduler registration.
+         * @return SystemMetadata describing component access and execution order.
+         */
         SystemMetadata GetMetadata() const override;
+
+        /** @brief Run in the PostUpdate group after game logic completes. */
         SystemGroup GetSystemGroup() const override { return SystemGroup::PostUpdate; }
+
+        /** @brief Only run during play mode; audio is silent in edit mode. */
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
         /**
@@ -126,18 +147,44 @@ namespace ECS {
         // Tracks whether the DSP has been inserted into the master chain.
         bool m_masterLowPassAttached = false;
 
-        // Generic helpers
+        /**
+         * @brief Stop the sound associated with an entity.
+         * @param entity Entity whose audio playback to stop.
+         * @param world ECS world containing the entity's AudioSource component.
+         * @param allowFade True to use the configured fade-out duration; false for immediate stop.
+         */
         void _stopSound(Entity entity, World& world, bool allowFade = true);
+
+        /**
+         * @brief Check whether the engine is currently in play mode.
+         * @return True if the game simulation is active.
+         */
         bool _isGamePlaying() const;
 
-        // DSP lifecycle helpers (called from OnCreate / OnDestroy)
-        // Creates low-pass DSP and adds it to FMOD master group.
+        /**
+         * @brief Create the master low-pass DSP and insert it into the FMOD master channel group.
+         * @return True if the DSP was created and attached successfully.
+         */
         bool _initializeMasterDsp();
-        // Removes low-pass DSP from FMOD graph and releases it.
+
+        /**
+         * @brief Remove the master low-pass DSP from the FMOD graph and release its resources.
+         */
         void _shutdownMasterDsp();
 
-        // Fade helper methods (delegated to AudioEngine)
+        /**
+         * @brief Begin a fade-in on a playback handle toward a target volume.
+         * @param handle Playback handle to fade in.
+         * @param duration Fade duration in seconds.
+         * @param targetVolume Destination linear gain value.
+         */
         void _fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume);
+
+        /**
+         * @brief Begin a fade-out on a playback handle toward silence.
+         * @param handle Playback handle to fade out.
+         * @param duration Fade duration in seconds.
+         */
         void _fadeOutHandle(Audio::PlaybackHandle handle, float duration);
     };
 }

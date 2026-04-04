@@ -78,6 +78,7 @@ namespace Platform {
 
         /**
          * @brief Check if platform is initialized
+         * @return True if the platform subsystem has been successfully initialized.
          */
         virtual bool IsInitialized() const = 0;
 
@@ -112,11 +113,13 @@ namespace Platform {
         
         /**
          * @brief Get the render device interface
+         * @return Pointer to the active render device, or nullptr if not initialized.
          */
         virtual IRenderDevice* GetRenderDevice() const = 0;
 
         /**
          * @brief Get the input system interface
+         * @return Pointer to the active input system, or nullptr if not initialized.
          */
         virtual IInputSystem* GetInputSystem() const = 0;
 
@@ -124,11 +127,13 @@ namespace Platform {
         
         /**
          * @brief Get platform name (e.g., "GLFW", "Win32")
+         * @return String identifying the underlying platform implementation.
          */
         virtual std::string GetPlatformName() const = 0;
 
         /**
          * @brief Get platform version string
+         * @return Version string for the underlying platform library.
          */
         virtual std::string GetPlatformVersion() const = 0;
     };

@@ -88,7 +88,12 @@ public:
      */
     std::vector<std::string> ListCachedAudioPaths() const;
 
-    // Template function to retrieve assets with automatic caching
+    /**
+     * @brief Load or fetch a cached asset by path.
+     * @tparam T Asset type (Texture, AudioData, Font, Shader, PrefabData, or RawData).
+     * @param name Asset file path used as the cache key.
+     * @return Shared pointer to the loaded asset, or nullptr on failure.
+     */
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
 
@@ -186,15 +191,28 @@ public:
     void UnloadAssetsByOwner(const std::string& ownerTag);
 
 private:
-    // Returns reference to the appropriate cache map for type T
+    /**
+     * @brief Return the cache map for asset type T.
+     * @tparam T Asset type.
+     * @return Mutable reference to the type-specific cache map.
+     */
     template <typename T>
     std::unordered_map<std::string, std::shared_ptr<T>>& GetCacheMap();
 
-    // Loads an asset from disk with validation and error handling
+    /**
+     * @brief Load an asset from disk with validation and error handling.
+     * @tparam T Asset type.
+     * @param filePath Absolute or project-relative path to the asset file.
+     * @return Shared pointer to the loaded asset, or nullptr on failure.
+     */
     template <typename T>
     std::shared_ptr<T> Load(const std::string& filePath);
 
-    // Returns reference to the appropriate owner map for type T
+    /**
+     * @brief Return the owner tracking map for asset type T.
+     * @tparam T Asset type.
+     * @return Mutable reference to the type-specific owner map.
+     */
     template <typename T>
     std::unordered_map<std::string, std::unordered_set<std::string>>& GetOwnerMap();
 

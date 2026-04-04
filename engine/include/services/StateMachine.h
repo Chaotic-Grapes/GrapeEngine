@@ -1,10 +1,12 @@
-/**
- * @Name: Dalton koh, 2403250
- * @email: d.koh@digipen.edu
- * @file    StateMachine.h
- * 
- * @brief   contain's defintiions of structs and function declarations used
- * in StateMachine.cpp
+/* Start Header *****************************************************************/
+/*!
+\file   StateMachine.h
+\author Dalton Koh (100%)
+\par    d.koh@digipen.edu
+\brief
+Declares the Transition, State, FiniteStateMachine, and Brain classes used
+to implement finite state machine behaviour for AI-controlled entities.
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
@@ -26,85 +28,139 @@ namespace Engine::Gameplay {
 	// class Brain;
 	// class FiniteStateMachine;
 		
-	// Transition class to help with the engagement of C# and C++ 
+	// Transition class to help with the engagement of C# and C++
 	// Communication and container state transitions
 	class Transition {
 	public:
-		// Destructor 
 		virtual ~Transition() = default;
 
-		// Get target state to transition to 
+		/**
+		 * @brief Get the target state this transition leads to.
+		 * @return Pointer to the target State.
+		 */
 		virtual State* GetTargetState() = 0;
 
-		// Evaluate if condition is met and ret true if transition should 
-		// Happen, false otherwise.
+		/**
+		 * @brief Evaluate whether the transition condition is satisfied.
+		 * @return True if the transition should fire, false otherwise.
+		 */
 		virtual bool Condition() = 0;
 	};
 
 	// State class to represent states in FSM
 	class State {
     public:
-
-		// Dtor
         virtual ~State() = default;
 
-		// On enter/exit/update functionalities
+        /** @brief Called when the FSM enters this state. */
         virtual void OnEnter() {}
+
+        /**
+         * @brief Called each frame while this state is active.
+         * @param deltaTime Time elapsed since the last frame in seconds.
+         */
         virtual void OnUpdate(float /*deltaTime*/) {}
+
+        /** @brief Called when the FSM exits this state. */
         virtual void OnExit() {}
     };
 
-	// Class for FSM 
+	// Class for FSM
 	// List states, active state, update in a loop
 	class FiniteStateMachine {
 	public:
-		// Default ctr
 		FiniteStateMachine();
-		// Dtor
 		~FiniteStateMachine();
 
-		// Function runners 
+		/** @brief Set the initial state and prepare the FSM for running. */
 		void Initialize(/*States root state*/);
+
+		/** @brief Evaluate transitions and invoke the current state's update. */
 		void Update(/*States current state*/);
+
+		/**
+		 * @brief Transition to a new state by pointer.
+		 * @param newState State to transition to.
+		 */
 		void TransitionTo(/*States new state*/);
 
-		// Get Specific states 
+		/**
+		 * @brief Get the currently active state.
+		 * @return Pointer to the current State.
+		 */
 		State* GetCurrentState() const;
+
+		/**
+		 * @brief Get the pre-defined idle state.
+		 * @return Pointer to the idle State.
+		 */
 		State* GetIdleState() const;
+
+		/**
+		 * @brief Get the pre-defined chase state.
+		 * @return Pointer to the chase State.
+		 */
 		State* GetChaseState() const;
+
+		/**
+		 * @brief Get the pre-defined attack state.
+		 * @return Pointer to the attack State.
+		 */
 		State* GetAttackState() const;
 
 	private:
-		
-		// predefined states we can use to cordinate with
 		State* m_idleState();
 		State* m_attackState();
 		State* m_chaseState();
 		State* m_currentState();
-		
-		// Transition to a new state
+
+		/**
+		 * @brief Internal transition: exit the current state and enter the new one.
+		 * @param newState State to activate.
+		 */
 		void TransitionTo(State* newState);
 	};
 
-	// Image this as a top layer wrapper that will function as the 
-	// main brain that controls each state change for each AI-entity
+	// Top-level wrapper controlling AI-entity state changes.
 	class Brain {
     public:
         Brain();
         ~Brain();
 
-        // C# calls this to make transitions
+        /**
+         * @brief Transition the AI to a new state (callable from C#).
+         * @param newState State to activate.
+         */
         void TransitionTo(State* newState);
 
-        // C# queries this to check current state
+        /**
+         * @brief Get the currently active AI state (queryable from C#).
+         * @return Pointer to the current State.
+         */
         State* GetCurrentState() const;
 
-        // Get specific states
+        /**
+         * @brief Get the pre-defined patrol state.
+         * @return Pointer to the patrol State.
+         */
         State* GetPatrolState() const;
+
+        /**
+         * @brief Get the pre-defined chase state.
+         * @return Pointer to the chase State.
+         */
         State* GetChaseState() const;
+
+        /**
+         * @brief Get the pre-defined attack state.
+         * @return Pointer to the attack State.
+         */
         State* GetAttackState() const;
 
-        // update for cycle for states
+        /**
+         * @brief Advance the current state's update logic.
+         * @param deltaTime Time elapsed since the last frame in seconds.
+         */
         void Update(float deltaTime);
 
     private:

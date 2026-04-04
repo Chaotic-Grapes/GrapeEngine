@@ -1,10 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Tileset.hpp
-\author Choi Meng Yew (100%)
-\date   31st January 2026
-\co-author Samantha Leong
-\par    s.leong@digipen.edu
+\author Choi Meng Yew (90%)
+        Samantha Leong (10%)
+\par    choi.m@digipen.edu
+        s.leong@digipen.edu
 \date   3rd February 2026
 \brief
 Defines the Tileset class, which maps tile identifiers to texture atlas UVs

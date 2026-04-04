@@ -50,8 +50,21 @@ struct SpriteMetadata {
     ColliderMetadata collider;
 };
 
-// Function declarations
+/**
+ * @brief Parse sprite metadata from a single JSON rect entry.
+ * @param rect JSON object containing x, y, w, h, pivot, and optional collider fields.
+ * @param texWidth Full texture width in pixels (used to compute UVs).
+ * @param texHeight Full texture height in pixels (used to compute UVs).
+ * @return Populated SpriteMetadata struct.
+ */
 SpriteMetadata loadSingleSpriteMetadata(const nlohmann::json& rect, int texWidth, int texHeight);
 
+/**
+ * @brief Parse all sprite metadata entries from a JSON file.
+ * @param jsonPath Path to the JSON metadata file.
+ * @param texWidth Full texture width in pixels.
+ * @param texHeight Full texture height in pixels.
+ * @return Map from sprite name to its parsed SpriteMetadata.
+ */
 std::unordered_map<std::string, SpriteMetadata>
 loadSpriteMetadataFile(const std::string& jsonPath, int texWidth, int texHeight);

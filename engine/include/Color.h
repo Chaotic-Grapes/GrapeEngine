@@ -41,10 +41,16 @@ struct Color {
     Color(float red, float green, float blue, float alpha = 1.f)
         : R(red), G(green), B(blue), A(alpha) { /* EMPTY BY DESIGN */ }
 
-    // Convert to byte representation when needed for APIs that require it
+    /**
+     * @brief Convert this color to a glm::vec4 for use in rendering APIs.
+     * @return vec4 with (R, G, B, A) as float components.
+     */
     glm::vec4 ToVec4() const { return glm::vec4(R, G, B, A); }
 
-    // Only clamp when converting to LDR byte format
+    /**
+     * @brief Convert to LDR byte representation, clamping float values to [0, 1].
+     * @return Array of four byte values {R, G, B, A} in the range [0, 255].
+     */
     std::array<HexValue, 4> ToBytes() const {
         return {
             static_cast<HexValue>(std::clamp(R, 0.f, 1.f) * 255.f),

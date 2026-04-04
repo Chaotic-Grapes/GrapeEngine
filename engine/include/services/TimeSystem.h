@@ -60,16 +60,37 @@ public:
 
     using ScopeDataMap = std::map<std::string, ScopeData>;
 
-    /** @brief Get FPS (frames per second) computed from unscaled delta. */
+    /**
+     * @brief Get FPS (frames per second) computed from unscaled delta.
+     * @return Current frames per second.
+     */
     float GetFPS() const;
-    /** @brief Get frame time in milliseconds (unscaled). */
+
+    /**
+     * @brief Get frame time in milliseconds (unscaled).
+     * @return Frame duration in milliseconds.
+     */
     float GetFrameTimeMs() const;
-    /** @brief Get aggregated scope data map for profiler UI. Returns a copy. */
+
+    /**
+     * @brief Get aggregated scope data map for profiler UI.
+     * @return Copy of the current scope data map.
+     */
     ScopeDataMap GetAllScopeData() const;
-    /** @brief Get interned scope name for id. Returns empty string for invalid id. */
+
+    /**
+     * @brief Get interned scope name for id.
+     * @param id Scope identifier returned by profiler.
+     * @return Scope name string, or empty string for an invalid id.
+     */
     std::string GetScopeName(uint32_t id) const;
-    /** @brief Get total of all scope last times (ms). */
+
+    /**
+     * @brief Get total of all scope last times.
+     * @return Sum of all scope last-frame times in milliseconds.
+     */
     double GetTotalScopeTimes() const;
+
     /** @brief Clear profiler history. */
     void ClearProfilerHistory();
 
@@ -154,24 +175,52 @@ public:
      * @name Time scaling and queries
      */
     /** @{ */
-    /** @brief Set global time scale (1.0 = realtime).
-     *  @param s Time scale multiplier.
+    /**
+     * @brief Set global time scale (1.0 = realtime).
+     * @param s Time scale multiplier.
      */
     void SetTimeScale(double s);
-    /** @brief Get current time scale. */
+
+    /**
+     * @brief Get current time scale.
+     * @return Current time scale multiplier.
+     */
     double GetTimeScale() const;
 
-    /** @brief Get scaled delta time (seconds) used for update steps. */
+    /**
+     * @brief Get scaled delta time (seconds) used for update steps.
+     * @return Scaled delta time in seconds.
+     */
     double GetDeltaTime() const;
-    /** @brief Get raw (unscaled) delta time (seconds). */
+
+    /**
+     * @brief Get raw (unscaled) delta time (seconds).
+     * @return Unscaled delta time in seconds.
+     */
     double GetUnscaledDeltaTime() const;
-    /** @brief Get smoothed (moving average) unscaled delta time. */
+
+    /**
+     * @brief Get smoothed (moving average) unscaled delta time.
+     * @return Smoothed unscaled delta time in seconds.
+     */
     double GetSmoothedDeltaTime() const;
-    /** @brief Get total scaled time since start (seconds). */
+
+    /**
+     * @brief Get total scaled time since start (seconds).
+     * @return Total elapsed scaled time in seconds.
+     */
     double GetTotalTime() const;
-    /** @brief Get total unscaled time since start (seconds). */
+
+    /**
+     * @brief Get total unscaled time since start (seconds).
+     * @return Total elapsed real time in seconds.
+     */
     double GetRealTimeSinceStart() const;
-    /** @brief Get number of frames advanced since start. */
+
+    /**
+     * @brief Get number of frames advanced since start.
+     * @return Total frame count since TimeSystem::Start() was called.
+     */
     int    GetFrameCount() const;
     /** @} */
 
@@ -179,11 +228,16 @@ public:
      * @name Delta clamping
      */
     /** @{ */
-    /** @brief Set the maximum allowed unscaled delta time (seconds).
-     *  @param seconds Maximum allowed delta; values larger than this will be clamped.
+    /**
+     * @brief Set the maximum allowed unscaled delta time (seconds).
+     * @param seconds Maximum allowed delta; values larger than this will be clamped.
      */
     void SetMaximumDeltaTime(double seconds);
-    /** @brief Get the currently configured maximum unscaled delta time (seconds). */
+
+    /**
+     * @brief Get the currently configured maximum unscaled delta time (seconds).
+     * @return Maximum delta time clamp in seconds.
+     */
     double GetMaximumDeltaTime() const;
     /** @} */
 
@@ -191,9 +245,15 @@ public:
      * @name FPS capping
      */
     /** @{ */
-    /** @brief Set the maximum FPS cap (frames per second). 0 = disabled (no cap). */
+    /** @brief Set the maximum FPS cap (frames per second). 0 = disabled (no cap).
+     *  @param fps Maximum frames per second; pass 0 to disable the cap.
+     */
     void SetMaximumFPS(double fps);
-    /** @brief Get the currently configured maximum FPS cap. */
+
+    /**
+     * @brief Get the currently configured maximum FPS cap.
+     * @return Maximum FPS cap, or 0 if disabled.
+     */
     double GetMaximumFPS() const;
     /** @} */
 
@@ -201,11 +261,22 @@ public:
      * @name Fixed timestep controls
      */
     /** @{ */
-    /** @brief Set fixed timestep duration in seconds. */
+    /**
+     * @brief Set fixed timestep duration in seconds.
+     * @param seconds New fixed timestep duration.
+     */
     void SetFixedTimeStep(double seconds);
-    /** @brief Get fixed timestep duration in seconds. */
+
+    /**
+     * @brief Get fixed timestep duration in seconds.
+     * @return Fixed timestep duration in seconds.
+     */
     double GetFixedTimeStep() const;
-    /** @brief Set maximum fixed steps allowed per frame to avoid spiral of death. */
+
+    /**
+     * @brief Set maximum fixed steps allowed per frame to avoid spiral of death.
+     * @param maxSteps Maximum number of fixed steps per frame.
+     */
     void SetMaxFixedStepsPerFrame(int maxSteps);
     /** @} */
 
@@ -213,9 +284,16 @@ public:
      * @name Smoothing (moving average)
      */
     /** @{ */
-    /** @brief Set smoothing window size (number of frames). */
+    /**
+     * @brief Set smoothing window size (number of frames).
+     * @param frames Number of frames to average for the smoothed delta.
+     */
     void SetSmoothingWindowSize(size_t frames);
-    /** @brief Get current smoothing window size. */
+
+    /**
+     * @brief Get current smoothing window size.
+     * @return Number of frames used in the smoothing window.
+     */
     size_t GetSmoothingWindowSize() const;
     /** @} */
 
@@ -239,7 +317,11 @@ public:
     void Start();
     /** @brief Stop the time system. */
     void Stop();
-    /** @brief Returns true if the system has been started. */
+
+    /**
+     * @brief Check if the time system has been started.
+     * @return True if the system is currently running.
+     */
     bool IsRunning() const;
     /** @} */
 
@@ -298,10 +380,20 @@ private:
     size_t m_scopeHistorySize = 120;
     mutable std::mutex m_scopeMutex;
 
-    // helpers
+    /** @brief Return the current platform time as absolute seconds. */
     double _platformNowSeconds() const;
+
+    /** @brief Return (or create) per-thread profiler sample storage. */
     ThreadSamples* _getOrCreateThreadSamples();
+
+    /** @brief Merge all thread sample buffers into the aggregated scope data. */
     void _collectThreadSamples();
+
+    /**
+     * @brief Intern a scope name string and return its numeric id.
+     * @param name Null-terminated scope name.
+     * @return Stable scope id for the given name.
+     */
     uint32_t _internScopeName(const char* name);
 };
 

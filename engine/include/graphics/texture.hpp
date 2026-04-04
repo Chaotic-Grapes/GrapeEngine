@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   texture.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
 \date   24th September 2025
 \brief
@@ -41,24 +41,61 @@ class GRAPEENGINE_API Texture {
 public:
     Texture() : m_id(0), m_width(0), m_height(0), m_channels(0) {}
 
-    // Constructor & Destructor
+    /**
+     * @brief Load a texture from disk and create a GPU texture object.
+     * @param path File path to the image asset.
+     */
     Texture(const std::string& path);
     ~Texture();
 
-    // Be wary of copy operations (cannot duplicate GPU handles safely; implement deep copy)
+    /**
+     * @brief Deep-copy constructor; reloads the image from disk and creates a new GPU texture.
+     * @param other Source texture to copy from.
+     */
     Texture(const Texture& other);
+
+    /**
+     * @brief Deep-copy assignment; reloads the image from disk and creates a new GPU texture.
+     * @param other Source texture to copy from.
+     * @return Reference to this texture after assignment.
+     */
     Texture& operator=(const Texture& other);
 
-    // Move semantics (safe transfer of GPU ownership)
+    /**
+     * @brief Move constructor; transfers GPU texture ownership without reloading.
+     * @param other Source texture to move from (left in a null state).
+     */
     Texture(Texture&& other) noexcept;
+
+    /**
+     * @brief Move assignment; transfers GPU texture ownership without reloading.
+     * @param other Source texture to move from (left in a null state).
+     * @return Reference to this texture after assignment.
+     */
     Texture& operator=(Texture&& other) noexcept;
 
-    // API
+    /**
+     * @brief Bind this texture to the given texture unit slot.
+     * @param slot Texture unit index (0-based) to bind to.
+     */
     void Bind(unsigned int slot = 0) const;
 
-    // Getters
+    /**
+     * @brief Return the underlying OpenGL texture handle.
+     * @return OpenGL texture object ID.
+     */
     GLuint ID() const { return m_id; }
+
+    /**
+     * @brief Return the texture width in pixels.
+     * @return Texture width in pixels.
+     */
     int Width() const { return m_width; }
+
+    /**
+     * @brief Return the texture height in pixels.
+     * @return Texture height in pixels.
+     */
     int Height() const { return m_height; }
 
 private:
@@ -70,7 +107,14 @@ private:
     int m_height = 0;
     int m_channels = 0;
 
-    // Helper for both ctor and copy assignment
+    /**
+     * @brief Load an image from disk, create a GPU texture, and populate member fields.
+     * @param path File path to the image asset.
+     */
     void loadFromFile(const std::string& path);
+
+    /**
+     * @brief Delete the owned OpenGL texture and reset GPU state to zero.
+     */
     void cleanup();
 };

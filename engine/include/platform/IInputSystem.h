@@ -38,40 +38,46 @@ namespace Platform {
         // ==================== Keyboard Input ====================
         
         /**
-         * @brief Check if a key was just pressed this frame
-         * @param key Key code (platform-specific, but typically matches GLFW)
+         * @brief Check if a key was just pressed this frame.
+         * @param key Key code (platform-specific, but typically matches GLFW).
+         * @return True when the key transitioned from up to down this frame.
          */
         virtual bool IsKeyPressed(int key) = 0;
 
         /**
-         * @brief Check if a key is currently held down
-         * @param key Key code
+         * @brief Check if a key is currently held down.
+         * @param key Key code.
+         * @return True while the key is held.
          */
         virtual bool IsKeyDown(int key) = 0;
 
         /**
-         * @brief Check if a key was just released this frame
-         * @param key Key code
+         * @brief Check if a key was just released this frame.
+         * @param key Key code.
+         * @return True when the key transitioned from down to up this frame.
          */
         virtual bool IsKeyUp(int key) = 0;
 
         // ==================== Mouse Input ====================
         
         /**
-         * @brief Check if a mouse button was just pressed this frame
-         * @param button Mouse button code (0=left, 1=right, 2=middle)
+         * @brief Check if a mouse button was just pressed this frame.
+         * @param button Mouse button code (0=left, 1=right, 2=middle).
+         * @return True when the button transitioned from up to down this frame.
          */
         virtual bool IsMousePressed(int button) = 0;
 
         /**
-         * @brief Check if a mouse button is currently held down
-         * @param button Mouse button code
+         * @brief Check if a mouse button is currently held down.
+         * @param button Mouse button code.
+         * @return True while the button is held.
          */
         virtual bool IsMouseDown(int button) = 0;
 
         /**
-         * @brief Check if a mouse button was just released this frame
-         * @param button Mouse button code
+         * @brief Check if a mouse button was just released this frame.
+         * @param button Mouse button code.
+         * @return True when the button transitioned from down to up this frame.
          */
         virtual bool IsMouseUp(int button) = 0;
 
@@ -83,78 +89,90 @@ namespace Platform {
         virtual void GetMousePosition(double& xPos, double& yPos) = 0;
 
         /**
-         * @brief Get mouse X coordinate
+         * @brief Get mouse X coordinate.
+         * @return Current cursor X position in window space.
          */
         virtual double GetMouseX() = 0;
 
         /**
-         * @brief Get mouse Y coordinate
+         * @brief Get mouse Y coordinate.
+         * @return Current cursor Y position in window space.
          */
         virtual double GetMouseY() = 0;
 
         /**
-         * @brief Get horizontal scroll offset this frame
+         * @brief Get horizontal scroll offset this frame.
+         * @return Horizontal scroll delta for the current frame.
          */
         virtual double GetScrollX() = 0;
 
         /**
-         * @brief Get vertical scroll offset this frame
+         * @brief Get vertical scroll offset this frame.
+         * @return Vertical scroll delta for the current frame.
          */
         virtual double GetScrollY() = 0;
 
         // ==================== Gamepad Input ====================
 
         /**
-         * @brief Check whether a gamepad slot is currently connected
-         * @param gamepad Gamepad index (0..15, maps to GLFW joystick ids)
+         * @brief Check whether a gamepad slot is currently connected.
+         * @param gamepad Gamepad index (0..15, maps to GLFW joystick ids).
+         * @return True when a gamepad is present at the given slot.
          */
         virtual bool IsGamepadConnected(int gamepad) = 0;
 
         /**
-         * @brief Check if a gamepad was connected this frame
-         * @param gamepad Gamepad index (0..15)
+         * @brief Check if a gamepad was connected this frame.
+         * @param gamepad Gamepad index (0..15).
+         * @return True when the gamepad was just connected this frame.
          */
         virtual bool IsGamepadJustConnected(int gamepad) = 0;
 
         /**
-         * @brief Check if a gamepad was disconnected this frame
-         * @param gamepad Gamepad index (0..15)
+         * @brief Check if a gamepad was disconnected this frame.
+         * @param gamepad Gamepad index (0..15).
+         * @return True when the gamepad was just disconnected this frame.
          */
         virtual bool IsGamepadJustDisconnected(int gamepad) = 0;
 
         /**
-         * @brief Check if a gamepad button transitioned from up to down this frame
-         * @param gamepad Gamepad index (0..15)
-         * @param button Gamepad button index (GLFW gamepad button enum)
+         * @brief Check if a gamepad button transitioned from up to down this frame.
+         * @param gamepad Gamepad index (0..15).
+         * @param button Gamepad button index (GLFW gamepad button enum).
+         * @return True when the button was pressed this frame.
          */
         virtual bool IsGamepadButtonPressed(int gamepad, int button) = 0;
 
         /**
-         * @brief Check if a gamepad button is currently held
-         * @param gamepad Gamepad index (0..15)
-         * @param button Gamepad button index (GLFW gamepad button enum)
+         * @brief Check if a gamepad button is currently held.
+         * @param gamepad Gamepad index (0..15).
+         * @param button Gamepad button index (GLFW gamepad button enum).
+         * @return True while the button is held.
          */
         virtual bool IsGamepadButtonDown(int gamepad, int button) = 0;
 
         /**
-         * @brief Check if a gamepad button transitioned from down to up this frame
-         * @param gamepad Gamepad index (0..15)
-         * @param button Gamepad button index (GLFW gamepad button enum)
+         * @brief Check if a gamepad button transitioned from down to up this frame.
+         * @param gamepad Gamepad index (0..15).
+         * @param button Gamepad button index (GLFW gamepad button enum).
+         * @return True when the button was released this frame.
          */
         virtual bool IsGamepadButtonUp(int gamepad, int button) = 0;
 
         /**
-         * @brief Get raw gamepad axis value in range [-1, 1]
-         * @param gamepad Gamepad index (0..15)
-         * @param axis Gamepad axis index (GLFW gamepad axis enum)
+         * @brief Get raw gamepad axis value in range [-1, 1].
+         * @param gamepad Gamepad index (0..15).
+         * @param axis Gamepad axis index (GLFW gamepad axis enum).
+         * @return Raw axis value in [-1, 1].
          */
         virtual float GetGamepadAxis(int gamepad, int axis) = 0;
 
         /**
-         * @brief Get gamepad axis value after radial deadzone filtering
-         * @param gamepad Gamepad index (0..15)
-         * @param axis Gamepad axis index (GLFW gamepad axis enum)
-         * @param deadzone Deadzone in [0, 1)
+         * @brief Get gamepad axis value after radial deadzone filtering.
+         * @param gamepad Gamepad index (0..15).
+         * @param axis Gamepad axis index (GLFW gamepad axis enum).
+         * @param deadzone Deadzone threshold in [0, 1).
+         * @return Filtered axis value in [-1, 1], or 0 when within the deadzone.
          */
         virtual float GetGamepadAxisWithDeadzone(int gamepad, int axis, float deadzone) = 0;
 
@@ -168,26 +186,29 @@ namespace Platform {
         virtual bool SetGamepadVibration(int gamepad, float lowFrequency, float highFrequency) = 0;
 
         /**
-         * @brief Stop vibration for a gamepad slot
-         * @param gamepad Gamepad index (0..15)
+         * @brief Stop vibration for a gamepad slot.
+         * @param gamepad Gamepad index (0..15).
          */
         virtual void StopGamepadVibration(int gamepad) = 0;
 
         /**
-         * @brief Query whether vibration is available for a gamepad slot
-         * @param gamepad Gamepad index (0..15)
+         * @brief Query whether vibration is available for a gamepad slot.
+         * @param gamepad Gamepad index (0..15).
+         * @return True when the gamepad backend supports vibration commands.
          */
         virtual bool IsGamepadVibrationSupported(int gamepad) = 0;
 
         // ==================== Cursor Management ====================
-        
+
         /**
-         * @brief Set cursor visibility
+         * @brief Set cursor visibility.
+         * @param visible True to show the cursor, false to hide it.
          */
         virtual void SetCursorVisible(bool visible) = 0;
 
         /**
-         * @brief Check if cursor is visible
+         * @brief Check if cursor is visible.
+         * @return True when the cursor is currently shown.
          */
         virtual bool IsCursorVisible() const = 0;
     };
