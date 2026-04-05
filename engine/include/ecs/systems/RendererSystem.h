@@ -38,6 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+#include "graphics/WaterDistortionPass.hpp"
 #include "graphics/LightManager.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -578,6 +579,8 @@ namespace ECS {
         std::shared_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
         std::shared_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
         std::shared_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+
+        std::unique_ptr<WaterDistortionPass> m_waterPass; ///< Water distortion effect pass
 
         // Compute shaders
         std::shared_ptr<Shader> m_boidShader;

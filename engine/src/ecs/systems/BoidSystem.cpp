@@ -68,7 +68,9 @@ namespace ECS {
      * @complexity O(sum(layer entities) + unlayered flocks + GPU simulation work)
      */
     void BoidSystem::OnUpdate(World& world) {
+#ifdef GRAPE_HAS_CUDA
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+#endif
         auto* layerManager = world.GetLayerManager();
 
         // ----------------------------------------------------------
@@ -402,10 +404,9 @@ namespace ECS {
             glGenBuffers(1, &gpu.instanceVBO[i]);
             glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO[i]);
             glBufferData(GL_ARRAY_BUFFER,
-                sizeof(float4) * count,
+                sizeof(float) * 4 * count,
                 nullptr,
                 GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 #ifdef GRAPE_HAS_CUDA
             gpu.cudaVBO[i] = CudaGL::RegisterBuffer(gpu.instanceVBO[i]);
@@ -527,6 +528,9 @@ namespace ECS {
 
     void BoidSystem::UpdateCollisionGrid(const TileMap& tileMap)
     {
+#ifndef GRAPE_HAS_CUDA
+        (void)tileMap;
+#endif
 #ifdef GRAPE_HAS_CUDA
         const auto& masks = tileMap.GetCollisionMasks();
 

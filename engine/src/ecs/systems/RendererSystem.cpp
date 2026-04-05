@@ -55,6 +55,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/PixelBufferObject.hpp"
 #include "graphics/font.hpp"
 #include "graphics/LightManager.hpp"
+#include "graphics/WaterDistortionPass.hpp"
 
 // ============================================================================
 // ECS Components
@@ -402,6 +403,11 @@ namespace ECS {
 
         m_blitShader = RM.Get<Shader>("assets/shaders/blit");
 
+        m_waterPass = std::make_unique<WaterDistortionPass>();
+        m_waterPass->Init("assets/textures/Noise.png",
+            "assets/shaders/fullscreen.vert",
+            "assets/shaders/underwater.frag");
+
         // Compute-related shaders
         m_boidShader = RM.Get<Shader>("assets/shaders/boid");
         m_boidSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::BoidSystem>();
@@ -667,6 +673,9 @@ namespace ECS {
                     Framebuffer::Unbind();
                 }
                 ToneMap(vp, vp.BloomEnabled);
+                if (m_waterPass && m_waterPass->IsEnabled())
+                    m_waterPass->Execute(vp.LDR->GetColorTexture(0), *vp.LDR,
+                        vp.Size.x, vp.Size.y);
                 RenderOverlayQuads(vp, viewProj);
                 RenderWireframes(vp, viewProj);
                 RenderGUI(vp);
@@ -1467,6 +1476,15 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
+        m_renderGraph->AddPass("WaterDistort", { "LDR" }, { "LDR" },
+            [this](ResourceAccessor& res)
+            {
+                auto* ldr = res.GetFramebuffer("LDR");
+                if (!ldr || !m_waterPass->IsEnabled()) return;
+                m_waterPass->Execute(ldr->GetColorTexture(0), *ldr,
+                    ldr->Width(), ldr->Height());
+            });
+
         // Wireframe Pass - Render debug/editor wireframes on top of tone-mapped scene
         m_renderGraph->AddPass("Wireframe", { "LDR" }, { "LDR" },
             [this, &viewProj](ResourceAccessor& res)
@@ -1854,6 +1872,7 @@ namespace ECS {
         m_bloomExtractShader.reset();
         m_bloomCombineShader.reset();
         m_pickingFBO.Destroy();
+        m_waterPass.reset();
         m_runtimeTileMaps.clear();
         g_rendererSystemInstance = nullptr;
         m_lightManager.Shutdown();
