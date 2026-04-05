@@ -614,3 +614,38 @@ void Input::PrintSpecs() {
         << "Maximum generic vertex attributes: " << maxVertexAttribs << "\n"
         << "Maximum vertex buffer bindings: " << maxBufferBindings);
 }
+
+/**
+ * @brief Clear all cached input states to avoid stale pressed buttons after focus transitions.
+ * @return void
+ * @note Also stops active gamepad vibration so disconnected focus states cannot leave motors running.
+ * @complexity O(MAX_KEYS + MAX_MOUSE + MAX_GAMEPADS * (MAX_GAMEPAD_BUTTONS + MAX_GAMEPAD_AXES)).
+ */
+void Input::ResetAllStates() {
+    std::memset(s_keyCurrent, 0, sizeof(s_keyCurrent));
+    std::memset(s_keyPrevious, 0, sizeof(s_keyPrevious));
+    std::memset(s_mouseCurrent, 0, sizeof(s_mouseCurrent));
+    std::memset(s_mousePrevious, 0, sizeof(s_mousePrevious));
+
+    std::memset(s_gamepadConnectedCurrent, 0, sizeof(s_gamepadConnectedCurrent));
+    std::memset(s_gamepadConnectedPrevious, 0, sizeof(s_gamepadConnectedPrevious));
+    std::memset(s_gamepadButtonCurrent, 0, sizeof(s_gamepadButtonCurrent));
+    std::memset(s_gamepadButtonPrevious, 0, sizeof(s_gamepadButtonPrevious));
+    std::memset(s_gamepadAxisCurrent, 0, sizeof(s_gamepadAxisCurrent));
+
+    m_scrollX = 0.0;
+    m_scrollY = 0.0;
+    m_charInput.clear();
+
+    // Reset cursor delta baseline so the first movement event after resume has zero artificial jump.
+    if (m_window) {
+        glfwGetCursorPos(m_window, &lastMouseX, &lastMouseY);
+    } else {
+        lastMouseX = 0.0;
+        lastMouseY = 0.0;
+    }
+
+    for (int gamepad = 0; gamepad < MAX_GAMEPADS; ++gamepad) {
+        StopGamepadVibration(gamepad);
+    }
+}

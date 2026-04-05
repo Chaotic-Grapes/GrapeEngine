@@ -363,13 +363,20 @@ namespace ECS {
                         : 0.0f;
                     float startPan = src.Pan;
                     float startAttenuation = 1.0f;
-                    if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
-                        computeCameraPanAndAttenuation(e, startPan, startAttenuation);
+                    if constexpr (kUseCameraCenteredPanForSpatialSources) {
+                        if (src.Spatial3D) {
+                            computeCameraPanAndAttenuation(e, startPan, startAttenuation);
+                        }
                     }
                     settings.Volume = doFadeIn ? 0.0f : (src.Volume * startAttenuation);
                     settings.Pitch = src.Pitch;
                     settings.Loop = src.Loop;
-                    settings.Spatial3D = (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) ? false : src.Spatial3D;
+                    if constexpr (kUseCameraCenteredPanForSpatialSources) {
+                        settings.Spatial3D = src.Spatial3D ? false : src.Spatial3D;
+                    }
+                    else {
+                        settings.Spatial3D = src.Spatial3D;
+                    }
                     settings.Pan = startPan;
 
                     Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
@@ -379,8 +386,10 @@ namespace ECS {
                         engine->SetInstanceLowPassGain(handle, lowPassGain);
 
                         // If this source is marked Spatial3D, pan it relative to the active camera.
-                        if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
-                            engine->SetInstancePan(handle, startPan);
+                        if constexpr (kUseCameraCenteredPanForSpatialSources) {
+                            if (src.Spatial3D) {
+                                engine->SetInstancePan(handle, startPan);
+                            }
                         }
                         if (src.PlayOnStart && !src.Loop) {
                             m_playOnStartPlayedCue[e] = src.CueId;
@@ -418,19 +427,26 @@ namespace ECS {
                     if (!IsEntityFading(e)) {
                         float pan = src.Pan;
                         float attenuation = 1.0f;
-                        if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
-                            computeCameraPanAndAttenuation(e, pan, attenuation);
+                        if constexpr (kUseCameraCenteredPanForSpatialSources) {
+                            if (src.Spatial3D) {
+                                computeCameraPanAndAttenuation(e, pan, attenuation);
+                            }
                         }
                         engine->SetInstanceVolume(handle, src.Volume * attenuation);
                     }
 
                     engine->SetInstancePitch(handle, src.Pitch);
-                    if (kUseCameraCenteredPanForSpatialSources && src.Spatial3D) {
-                        // Camera-centered pan: left/right based on X offset from camera position.
-                        float pan = src.Pan;
-                        float attenuation = 1.0f;
-                        computeCameraPanAndAttenuation(e, pan, attenuation);
-                        engine->SetInstancePan(handle, pan);
+                    if constexpr (kUseCameraCenteredPanForSpatialSources) {
+                        if (src.Spatial3D) {
+                            // Camera-centered pan: left/right based on X offset from camera position.
+                            float pan = src.Pan;
+                            float attenuation = 1.0f;
+                            computeCameraPanAndAttenuation(e, pan, attenuation);
+                            engine->SetInstancePan(handle, pan);
+                        }
+                        else {
+                            engine->SetInstancePan(handle, src.Pan);
+                        }
                     }
                     else if (!src.Spatial3D) {
                         engine->SetInstancePan(handle, src.Pan);
@@ -440,31 +456,33 @@ namespace ECS {
                     engine->SetInstanceLowPassGain(handle, lowPassGain);
 
                     // Update 3D position if spatial audio is enabled
-                    if (!kUseCameraCenteredPanForSpatialSources && src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
-                        // Re-assert per-instance 3D settings every frame so distance/pan behavior
-                        // remains deterministic even if channel state was reset externally.
-                        engine->SetInstance3DMinMaxDistance(handle, default3DMinDistance, default3DMaxDistance);
-                        engine->SetInstance3DSpread(handle, default3DSpread);
-                        engine->SetInstance3DLevel(handle, default3DLevel);
+                    if constexpr (!kUseCameraCenteredPanForSpatialSources) {
+                        if (src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
+                            // Re-assert per-instance 3D settings every frame so distance/pan behavior
+                            // remains deterministic even if channel state was reset externally.
+                            engine->SetInstance3DMinMaxDistance(handle, default3DMinDistance, default3DMaxDistance);
+                            engine->SetInstance3DSpread(handle, default3DSpread);
+                            engine->SetInstance3DLevel(handle, default3DLevel);
 
-                        if (logSpatialDebugThisFrame) {
-                            const float appliedMin = engine->GetInstance3DMinDistance(handle);
-                            const float appliedMax = engine->GetInstance3DMaxDistance(handle);
-                            LOG_INFO("AudioSystem Spatial3D: entity=" << e.Index
-                                << " cueId=" << src.CueId
-                                << " defaultMinMax=(" << default3DMinDistance << ", " << default3DMaxDistance << ")"
-                                << " instanceMinMax=(" << appliedMin << ", " << appliedMax << ")"
-                                << " spread=" << default3DSpread
-                                << " level=" << default3DLevel);
+                            if (logSpatialDebugThisFrame) {
+                                const float appliedMin = engine->GetInstance3DMinDistance(handle);
+                                const float appliedMax = engine->GetInstance3DMaxDistance(handle);
+                                LOG_INFO("AudioSystem Spatial3D: entity=" << e.Index
+                                    << " cueId=" << src.CueId
+                                    << " defaultMinMax=(" << default3DMinDistance << ", " << default3DMaxDistance << ")"
+                                    << " instanceMinMax=(" << appliedMin << ", " << appliedMax << ")"
+                                    << " spread=" << default3DSpread
+                                    << " level=" << default3DLevel);
+                            }
+
+                            auto& transform = world.Get<Components::WorldTransform>(e);
+                            // Extract translation from Matrix4x4: translation is stored in the
+                            // last column (m03, m13, m23) per Matrix4x4::Translation implementation.
+                            const auto& m = transform.Matrix;
+                            Audio::Vec3 pos{ m.m03, m.m13, m.m23 };
+                            Audio::Vec3 vel{ 0, 0, 0 };
+                            engine->SetInstancePosition(handle, pos, vel);
                         }
-
-                        auto& transform = world.Get<Components::WorldTransform>(e);
-                        // Extract translation from Matrix4x4: translation is stored in the
-                        // last column (m03, m13, m23) per Matrix4x4::Translation implementation.
-                        const auto& m = transform.Matrix;
-                        Audio::Vec3 pos{ m.m03, m.m13, m.m23 };
-                        Audio::Vec3 vel{ 0, 0, 0 };
-                        engine->SetInstancePosition(handle, pos, vel);
                     }
                 }
             });
@@ -472,16 +490,16 @@ namespace ECS {
         // Drive the listener from the active camera so any true 3D sounds remain camera-relative.
         // (Scripts may also call Audio.SetListener; AudioSystem runs in PostUpdate so this wins.)
         if (foundActiveCamera) {
-            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            const float listenerDt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
             static Audio::Vec3 s_prevListenerPos{};
             static bool s_hasPrevListenerPos = false;
 
             Audio::Vec3 listenerVel{};
-            if (s_hasPrevListenerPos && dt > 0.0f) {
+            if (s_hasPrevListenerPos && listenerDt > 0.0f) {
                 listenerVel = Audio::Vec3{
-                    (activeCameraPos.x - s_prevListenerPos.x) / dt,
-                    (activeCameraPos.y - s_prevListenerPos.y) / dt,
-                    (activeCameraPos.z - s_prevListenerPos.z) / dt
+                    (activeCameraPos.x - s_prevListenerPos.x) / listenerDt,
+                    (activeCameraPos.y - s_prevListenerPos.y) / listenerDt,
+                    (activeCameraPos.z - s_prevListenerPos.z) / listenerDt
                 };
             }
 

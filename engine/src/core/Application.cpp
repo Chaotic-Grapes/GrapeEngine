@@ -288,6 +288,16 @@ namespace Engine {
         }
     }
 
+    /** @brief Resynchronize internal frame timestamp to the current steady clock.
+     *  @return void
+     *  @note Use this after long runtime interruptions so the next Update() sees a near-zero delta.
+     */
+    void Application::ResyncFrameTime() {
+        using Clock = TimeSystem::Clock;
+        using Duration = TimeSystem::Duration;
+        m_lastFrameTime = std::chrono::duration_cast<Duration>(Clock::now().time_since_epoch()).count();
+    }
+
     /** @brief Tears down all engine subsystems and releases all resources.
      *
      *  Broadcasts the ApplicationExit event, destroys ECS systems, clears the resource cache,

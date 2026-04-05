@@ -91,6 +91,13 @@ namespace Engine {
         void Update();
 
         /**
+         * @brief Resynchronize frame timing without advancing simulation state.
+         * @return void
+         * @note Call this after long OS interruptions (e.g., ALT+TAB/CTRL+ALT+DEL) to avoid a large first-frame delta.
+         */
+        void ResyncFrameTime();
+
+        /**
          * @brief Check if engine is still running.
          * @return True if the engine should continue its main loop.
          */

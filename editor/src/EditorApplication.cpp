@@ -301,7 +301,11 @@ void EditorApplication::_saveEditorSettings() {
     LOG_INFO("Saved editor configuration: " << settingsPath);
 }
 
-// Create the main platform window using dimensions and mode from the loaded editor settings
+/**
+ * @brief Create the editor main window in windowed mode.
+ * @note Editor boot now explicitly avoids fullscreen and borderless to keep
+ *       the startup UX predictable and prevent immersive carry-over state.
+ */
 void EditorApplication::_createMainWindow() {
     LOG_INFO("Creating main window from EditorSettings");
 
@@ -321,12 +325,6 @@ void EditorApplication::_createMainWindow() {
     windowInfo.Mode = Platform::WindowMode::Windowed;
     windowInfo.Resizable = true;
     windowInfo.Decorated = true;
-
-    if (m_editorSettings.WindowSettings.Mode == "Fullscreen") {
-        windowInfo.Mode = Platform::WindowMode::Fullscreen;
-    } else if (m_editorSettings.WindowSettings.Mode == "Borderless") {
-        windowInfo.Mode = Platform::WindowMode::Borderless;
-    }
 
     auto* window = platformContext->CreatePlatformWindow(windowInfo);
     if (!window) {

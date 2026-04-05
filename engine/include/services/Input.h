@@ -131,6 +131,13 @@ public:
     // Print OpenGL system specifications to the log
     static void PrintSpecs();
 
+    /**
+     * @brief Reset all cached keyboard, mouse, and gamepad states.
+     * @return void
+     * @note Use this when OS focus is lost/restored so stale pressed states do not stick.
+     */
+    static void ResetAllStates();
+
 private:
     friend class Engine::Application;
 

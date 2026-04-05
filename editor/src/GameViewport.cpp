@@ -33,6 +33,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/Viewport.hpp"
 #include "helpers/TransformUtils.h"
 #include "services/Input.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include <algorithm>
 
 namespace {
@@ -66,6 +68,8 @@ void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 }
 
 GameViewport::~GameViewport() {
+    m_immersiveMode = false;
+    (void)_syncImmersiveWindowState();
     Graphics::ViewportManager::Destroy(kGameViewportName);
 }
 
@@ -73,7 +77,12 @@ GameViewport::~GameViewport() {
 // Update
 // -------------------------------------------------------------------------
 
-// Handle immersive mode toggle (F12/Escape) and clear viewport hover state
+/**
+ * @brief Handle immersive input toggles and synchronize window mode transitions.
+ * @note F12 toggles immersive mode and Escape exits immersive mode.
+ *       Immersive mode forces the main window to borderless and restores the
+ *       exact previous mode when disabled.
+ */
 void GameViewport::HandleInWorldInteraction() {
     if (Input::IsKeyPressed(KEY_F12)) {
         if (m_immersiveMode) {
@@ -90,10 +99,99 @@ void GameViewport::HandleInWorldInteraction() {
         m_requestRestore = true;
     }
 
+    (void)_syncImmersiveWindowState();
+
     if (!HasValidWorld()) return;
 
     // Game viewport doesn't handle entity dragging or editor camera input
     m_isViewportHovered = false;
+}
+
+/**
+ * @brief Synchronize platform window mode with immersive viewport state.
+ * @return True when the required transition was applied or not needed.
+ * @complexity O(1).
+ */
+bool GameViewport::_syncImmersiveWindowState() {
+    auto* context = Engine::CORE ? Engine::CORE->GetPlatformContext() : nullptr;
+    auto* window = context ? context->GetMainWindow() : nullptr;
+    if (!window) {
+        return false;
+    }
+
+    if (m_immersiveMode) {
+        if (m_immersiveWindowModeApplied) {
+            return true;
+        }
+
+        if (!_capturePreImmersiveWindowState(*window)) {
+            return false;
+        }
+
+        window->SetMode(Platform::WindowMode::Borderless);
+        m_immersiveWindowModeApplied = true;
+        return true;
+    }
+
+    if (!m_immersiveWindowModeApplied) {
+        return true;
+    }
+
+    const bool restored = _restorePreImmersiveWindowState(*window);
+    m_immersiveWindowModeApplied = false;
+    return restored;
+}
+
+/**
+ * @brief Capture the editor window mode and maximized state before immersive mode.
+ * @param window Main platform window used by the editor.
+ * @return True if state capture completed.
+ * @complexity O(1).
+ */
+bool GameViewport::_capturePreImmersiveWindowState(Platform::IWindow& window) {
+    if (window.HasMode(Platform::WindowMode::Fullscreen)) {
+        m_preImmersiveWindowMode = Platform::WindowMode::Fullscreen;
+    }
+    else if (window.HasMode(Platform::WindowMode::Borderless)) {
+        m_preImmersiveWindowMode = Platform::WindowMode::Borderless;
+    }
+    else {
+        m_preImmersiveWindowMode = Platform::WindowMode::Windowed;
+    }
+
+    m_preImmersiveWindowMaximized = window.IsMaximized();
+    m_preImmersiveWindowStateValid = true;
+    return true;
+}
+
+/**
+ * @brief Restore the editor window mode captured before immersive mode.
+ * @param window Main platform window used by the editor.
+ * @return True if restore completed or there was no captured state.
+ * @complexity O(1).
+ */
+bool GameViewport::_restorePreImmersiveWindowState(Platform::IWindow& window) {
+    if (!m_preImmersiveWindowStateValid) {
+        return true;
+    }
+
+    if (m_preImmersiveWindowMode == Platform::WindowMode::Fullscreen) {
+        window.SetMode(Platform::WindowMode::Fullscreen);
+        m_preImmersiveWindowStateValid = false;
+        return true;
+    }
+
+    if (m_preImmersiveWindowMode == Platform::WindowMode::Borderless) {
+        window.SetMode(Platform::WindowMode::Borderless);
+        m_preImmersiveWindowStateValid = false;
+        return true;
+    }
+
+    // Windowed restore must preserve prior maximized layout explicitly.
+    window.SetMode(Platform::WindowMode::Windowed);
+    window.SetMaximized(m_preImmersiveWindowMaximized);
+    m_preImmersiveWindowStateValid = false;
+    return true;
 }
 
 // -------------------------------------------------------------------------
