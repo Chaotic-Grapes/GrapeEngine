@@ -225,13 +225,21 @@ namespace Engine {
             // CRITICAL TODO: reinitialize audio service
         }
         
-        // Add fullscreen toggle (F11 key)
-        if (Input::IsKeyPressed(GLFW_KEY_F11)) {
-            auto* mainWindow = m_platformContext->GetMainWindow();
-            if (mainWindow) {
-                // Toggle fullscreen via platform abstraction
-                // Note: IWindow doesn't expose mode switching yet - keeping legacy for now
-                LOG_WARNING("Fullscreen toggle not yet implemented in platform abstraction");
+        // Runtime fullscreen toggle hotkeys:
+        // - Alt+Enter (requested game-style shortcut)
+        // - F11 (kept for convenience/debug parity)
+        const bool altHeld = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
+        const bool enterPressed = Input::IsKeyPressed(KEY_ENTER) || Input::IsKeyPressed(GLFW_KEY_KP_ENTER);
+        const bool altEnterPressed = altHeld && enterPressed;
+        const bool f11Pressed = Input::IsKeyPressed(KEY_F11);
+        if (altEnterPressed || f11Pressed) {
+            if (auto* mainWindow = m_platformContext->GetMainWindow()) {
+                const bool currentlyFullscreen = mainWindow->HasMode(Platform::WindowMode::Fullscreen);
+                const bool targetFullscreen = !currentlyFullscreen;
+                if (SetFullscreenMode(targetFullscreen)) {
+                    m_projectSettings.WindowSettings.Fullscreen = targetFullscreen;
+                    m_projectSettings.WindowSettings.Mode = targetFullscreen ? "Fullscreen" : "Windowed";
+                }
             }
         }
 
