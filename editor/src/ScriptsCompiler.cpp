@@ -36,6 +36,11 @@ extern "C" {
 using namespace std::chrono_literals;
 
 namespace {
+    /**
+     * @brief Trim whitespace from both ends of a string and return a copy.
+     * @param text The input string to trim.
+     * @return A new string with leading and trailing whitespace removed.
+     */
     std::string TrimCopy(const std::string& text) {
         const size_t start = text.find_first_not_of(" \t\r\n");
         if (start == std::string::npos) {
@@ -45,6 +50,12 @@ namespace {
         return text.substr(start, end - start + 1);
     }
 
+    /**
+     * @brief Determine if a line of compiler output likely represents an error message.
+     * Uses simple heuristics to identify lines that start with "error" or contain ": error".
+     * @param line The line of text to analyze.
+     * @return true if the line appears to be a compiler error message, false otherwise.
+     */
     bool IsCompilerErrorLine(const std::string& line) {
         std::string lower = line;
         std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -55,6 +66,10 @@ namespace {
                lower.find(" error cs") != std::string::npos;
     }
 
+    /**
+     * @brief Log script compilation errors to the console.
+     * @param diagnostics The compiler output containing potential error messages.
+     */
     void LogScriptCompileErrorsToConsole(const std::string& diagnostics) {
         std::vector<std::string> allLines;
         std::vector<std::string> errorLines;
