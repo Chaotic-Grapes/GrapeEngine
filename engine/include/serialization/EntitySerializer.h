@@ -1257,7 +1257,6 @@ namespace ECS {
             {"CornerRadius", slider.CornerRadius},
             {"KnobSize", slider.KnobSize},
             {"Padding", slider.Padding},
-            {"RotationDegrees", slider.RotationDegrees},
             {"Horizontal", slider.Horizontal},
             {"Disabled", slider.Disabled}
         };
@@ -1294,7 +1293,6 @@ namespace ECS {
         slider.CornerRadius = j.value("CornerRadius", 0.0f);
         if (j.contains("KnobSize")) slider.KnobSize = j.at("KnobSize").get<Vector2D>();
         if (j.contains("Padding")) slider.Padding = j.at("Padding").get<Vector4D>();
-        slider.RotationDegrees = j.value("RotationDegrees", 0.0f);
         slider.Horizontal = j.value("Horizontal", true);
         slider.Disabled = j.value("Disabled", false);
         slider.ValueChanged = false;

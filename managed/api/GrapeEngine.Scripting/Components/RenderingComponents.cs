@@ -429,7 +429,6 @@ public record struct GUISlider
     public float CornerRadius;
     public Vector2 KnobSize;
     public Vector4 Padding;
-    public float RotationDegrees;
     public bool Horizontal;
     public bool Disabled;
     public bool ValueChanged;

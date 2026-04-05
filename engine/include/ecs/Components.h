@@ -1048,7 +1048,6 @@ namespace ECS {
             float CornerRadius = 0.0f;  // rounded rect radius
             Vector2D KnobSize{ 16.0f, 16.0f }; // knob size
             Vector4D Padding{ 6.0f, 6.0f, 6.0f, 6.0f }; // track padding
-            float RotationDegrees = 0.0f; // optional slider rotation around track center
             bool Horizontal = true; // horizontal vs vertical slider
             bool Disabled = false;  // ignores input
             bool ValueChanged = false; // set when value updated this frame

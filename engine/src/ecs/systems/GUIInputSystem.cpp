@@ -362,7 +362,7 @@ namespace ECS {
                 return;
             }
 
-            const float rotationRadians = slider.RotationDegrees * (3.14159265358979323846f / 180.0f);
+            const float rotationRadians = ResolveGUIRotationRadians(world, entity);
             const Vector2D basePrimary = slider.Horizontal
                 ? Vector2D{ trackSize.X, 0.0f }
                 : Vector2D{ 0.0f, trackSize.Y };
