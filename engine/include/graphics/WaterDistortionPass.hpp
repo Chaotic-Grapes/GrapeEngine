@@ -200,7 +200,7 @@ private:
     void UploadUniforms(int w, int h, bool /*useMask*/) const
     {
         const auto& s = m_settings;
-        const float t = TimeSystem::Instance().GetTotalTime();
+        const float t = static_cast<float>(TimeSystem::Instance().GetTotalTime());
 
         m_shader->setUniform("uTime", t);
         m_shader->setUniform("uResolution", glm::vec2(static_cast<float>(w), static_cast<float>(h)));
