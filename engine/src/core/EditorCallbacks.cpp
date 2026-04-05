@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Engine {
 
+    // Function-local static keeps singleton initialization thread-safe in modern C++.
     EditorCallbackRegistry& EditorCallbackRegistry::Get() {
         static EditorCallbackRegistry instance;
         return instance;

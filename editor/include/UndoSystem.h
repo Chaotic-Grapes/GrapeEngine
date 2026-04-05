@@ -553,6 +553,11 @@ namespace Editor {
 
         // Hash functor for PropertyKey used in unordered_map
         struct PropertyKeyHasher {
+            /**
+             * @brief Compute hash for PropertyKey combining entity, component, and property name.
+             * @param k Composite property key.
+             * @return Hash value suitable for unordered_map bucketing.
+             */
             size_t operator()(const PropertyKey& k) const {
                 size_t h1 = std::hash<uint32_t>{}(k.Entity);
                 size_t h2 = std::hash<uint32_t>{}(k.Component);

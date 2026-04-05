@@ -29,6 +29,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/renderer.hpp"
 
 namespace ECS {
+    /**
+     * @brief Initialize layout system state.
+     * @param world ECS world context (currently unused).
+     */
     void GUILayoutSystem::OnCreate(World& world) {
         (void)world;
     }
@@ -100,6 +104,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Clamp anchor range to normalized space and enforce min<=max ordering.
+     * @param anchorMin Minimum anchor coordinate.
+     * @param anchorMax Maximum anchor coordinate.
+     */
     static void NormalizeAnchorRange(Vector2D& anchorMin, Vector2D& anchorMax) {
         anchorMin.X = std::clamp(anchorMin.X, 0.0f, 1.0f);
         anchorMin.Y = std::clamp(anchorMin.Y, 0.0f, 1.0f);
@@ -109,6 +118,13 @@ namespace ECS {
         if (anchorMin.Y > anchorMax.Y) std::swap(anchorMin.Y, anchorMax.Y);
     }
 
+    /**
+     * @brief Walk up parent hierarchy to find the nearest inherited GUI canvas.
+     * @param world ECS world for component lookups.
+     * @param entity Starting entity for parent traversal.
+     * @param outCanvas Receives the resolved canvas when found.
+     * @return True when a canvas was found on self or an ancestor.
+     */
     static bool TryResolveInheritedCanvas(const World& world, Entity entity, Components::GUICanvas& outCanvas) {
         Entity current = entity;
         int depth = 0;
@@ -130,6 +146,13 @@ namespace ECS {
         return false;
     }
 
+    /**
+     * @brief Find closest parent GUI element that matches the requested render space.
+     * @param world ECS world for hierarchy and component lookups.
+     * @param entity Starting entity for parent traversal.
+     * @param targetSpace Render space that the anchor parent must match.
+     * @return Matching parent entity or NULL_ENTITY when none is found.
+     */
     static Entity FindAnchorParentEntity(const World& world, Entity entity, Components::GUIRenderSpace targetSpace) {
         Entity current = entity;
         int depth = 0;

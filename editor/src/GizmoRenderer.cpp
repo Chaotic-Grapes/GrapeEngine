@@ -23,6 +23,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    /**
+     * @brief Construct a gizmo renderer with safe editor defaults.
+     */
     GizmoRenderer::GizmoRenderer()
         : m_operation(Operation::Translate)
         , m_mode(Mode::Local)
@@ -33,6 +36,9 @@ namespace Editor {
         , m_viewportH(1.0f) {
     }
 
+    /**
+     * @brief Destroy the gizmo renderer.
+     */
     GizmoRenderer::~GizmoRenderer() {
     }
 

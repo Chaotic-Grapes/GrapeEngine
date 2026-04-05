@@ -19,6 +19,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    /**
+     * @brief Construct a picking query manager with default cache and viewport state.
+     */
     PickingQueryManager::PickingQueryManager()
         : m_nextRequestId(1)
         , m_viewportPos(0.0f, 0.0f)
@@ -28,6 +31,9 @@ namespace Editor {
         , m_lastValidatedViewportSize(1.0f, 1.0f) {
     }
 
+    /**
+     * @brief Destroy the manager and release cached request/result state.
+     */
     PickingQueryManager::~PickingQueryManager() {
         ClearCache();
     }

@@ -49,6 +49,9 @@ namespace ECS {
             bool Valid = false;
         };
 
+        /**
+         * @brief Compute 2D dot product.
+         */
         float Dot2(const Vector2D& a, const Vector2D& b) {
             return a.X * b.X + a.Y * b.Y;
         }
@@ -164,6 +167,9 @@ namespace ECS {
             return -1;
         }
 
+        /**
+         * @brief Rotate a 2D vector by angle in radians.
+         */
         Vector2D Rotate2D(const Vector2D& v, float radians) {
             const float c = std::cos(radians);
             const float s = std::sin(radians);
@@ -173,10 +179,16 @@ namespace ECS {
             };
         }
 
+        /**
+         * @brief Test whether a point lies inside an axis-aligned rectangle.
+         */
         bool PointInRect(const Vector2D& p, const Vector2D& pos, const Vector2D& size) {
             return p.X >= pos.X && p.Y >= pos.Y && p.X <= (pos.X + size.X) && p.Y <= (pos.Y + size.Y);
         }
 
+        /**
+         * @brief Check whether entity is currently eligible for GUI interaction.
+         */
         bool IsEntityInteractable(const World& world, Entity entity, const Components::GUIElement& element) {
             if (!world.IsActiveInHierarchy(entity) || !element.Visible) {
                 return false;
@@ -193,6 +205,9 @@ namespace ECS {
             return true;
         }
 
+        /**
+         * @brief Compare hit candidates using z-order then deterministic entity-id tie-break.
+         */
         bool IsHigherPriorityHit(Entity candidateEntity, int16_t candidateZ, Entity currentEntity, int16_t currentZ) {
             // Deterministic winner: higher Z first, then stable entity-id tie-break.
             if (candidateZ != currentZ) {
@@ -201,6 +216,9 @@ namespace ECS {
             return candidateEntity > currentEntity;
         }
 
+        /**
+         * @brief Apply slider step quantization and clamp to slider range.
+         */
         float QuantizeAndClampSliderValue(float value, const Components::GUISlider& slider) {
             if (slider.Step > 0.0f) {
                 value = slider.Min + std::round((value - slider.Min) / slider.Step) * slider.Step;

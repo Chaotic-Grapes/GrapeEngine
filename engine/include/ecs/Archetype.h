@@ -344,6 +344,12 @@ namespace ECS {
         }
 
     private:
+        /**
+         * @brief Build per-component chunk layout and derive chunk capacity when unspecified.
+         * @param targetBytes Preferred chunk byte budget used to estimate capacity.
+         * @details Aligns each component stream to max(64B, component alignment) to improve
+         * cache behavior and SIMD friendliness while preserving required type alignment.
+         */
         void _buildLayout(const size_t targetBytes) {
             size_t totalStride = 0;
             for (const auto& i : m_componentInfos) 
@@ -373,6 +379,9 @@ namespace ECS {
             m_totalBytes = offset;
         }
 
+        /**
+         * @brief Allocate and append a new chunk using the current archetype layout.
+         */
         void _newChunk() {
             auto ch = std::make_unique<Chunk>(m_chunkCapacity, m_layout, m_totalBytes);
             m_chunks.push_back(std::move(ch));

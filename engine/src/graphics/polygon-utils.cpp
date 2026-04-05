@@ -20,11 +20,18 @@ Details:
 #include "graphics/polygon-utils.hpp"
 #include <algorithm>  // for std::reverse
 #include <numeric>    // for std::iota
+
+/**
+ * @brief Compute signed 2D cross product for triangle orientation tests.
+ */
 static float cross(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) {
     return (b.x - a.x) * (c.y - a.y) -
         (b.y - a.y) * (c.x - a.x);
 }
 
+/**
+ * @brief Test whether a point lies inside or on the boundary of a triangle.
+ */
 static bool isPointInTriangle(const glm::vec2& p,
     const glm::vec2& a,
     const glm::vec2& b,
@@ -37,6 +44,11 @@ static bool isPointInTriangle(const glm::vec2& p,
     return !(hasNeg && hasPos);
 }
 
+/**
+ * @brief Triangulate a simple polygon using ear clipping.
+ * @param verts Polygon vertices in winding order.
+ * @return Triangle list, or partial/empty output for degenerate input.
+ */
 std::vector<Triangle> triangulateEarClipping(std::vector<glm::vec2> verts) {
     std::vector<Triangle> result;
 

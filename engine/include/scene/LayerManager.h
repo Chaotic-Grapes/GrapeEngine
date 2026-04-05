@@ -613,6 +613,10 @@ namespace Scenes {
             m_drawOrder.push_back(DebugLayer);
         }
 
+        /**
+         * @brief Grow internal layer storage until the requested layer id is addressable.
+         * @param id Layer id that must be representable by m_layers.
+         */
         void _ensureCapacity(uint16_t id) {
             while (m_layers.size() <= id) {
                 m_layers.emplace_back();

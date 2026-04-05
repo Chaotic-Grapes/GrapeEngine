@@ -33,10 +33,18 @@ extern "C" {
 
 using namespace std::chrono_literals;
 
+/**
+ * @brief Construct the scripts compiler with engine and fallback world context.
+ * @param engine Engine application pointer used for integration points.
+ * @param emptyWorld World used for temporary/script registration flows.
+ */
 ScriptsCompiler::ScriptsCompiler(Engine::Application* engine, ECS::World* emptyWorld)
     : m_engine(engine), m_emptyWorld(emptyWorld) {
 }
 
+/**
+ * @brief Destroy the scripts compiler and ensure background work is shut down.
+ */
 ScriptsCompiler::~ScriptsCompiler() {
     Shutdown();
 }

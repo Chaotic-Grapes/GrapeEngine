@@ -35,6 +35,10 @@ namespace Engine {
     std::string ProjectPaths::s_projectRoot = "";
     bool ProjectPaths::s_initialized = false;
     
+    /**
+     * @brief Initialize project root state and ensure required directories exist.
+     * @param projectRoot Absolute or relative project root path.
+     */
     void ProjectPaths::Initialize(const std::string& projectRoot) {
         if (s_initialized && s_projectRoot == projectRoot) {
             return;
@@ -62,10 +66,18 @@ namespace Engine {
         }
     }
     
+    /**
+     * @brief Check whether project paths were initialized.
+     * @return True when Initialize has completed successfully.
+     */
     bool ProjectPaths::IsInitialized() {
         return s_initialized;
     }
     
+    /**
+     * @brief Get current project root path.
+     * @return Project root path or empty string when uninitialized.
+     */
     std::string ProjectPaths::GetProjectRoot() {
         if (!s_initialized) {
             LOG_ERROR("ProjectPaths not initialized");
@@ -74,20 +86,36 @@ namespace Engine {
         return s_projectRoot;
     }
     
+    /**
+     * @brief Get the project Assets directory path.
+     * @return Full path to the Assets directory.
+     */
     std::string ProjectPaths::GetAssetsPath() {
         return GetProjectRoot() + "/Assets";
     }
     
+    /**
+     * @brief Get the ProjectSettings.json path and ensure parent folder exists.
+     * @return Full path to ProjectSettings.json.
+     */
     std::string ProjectPaths::GetSettingsPath() {
         std::filesystem::path settingsPath = std::filesystem::path(GetProjectRoot()) / "ProjectSettings.json";
         EnsureDirectoryExists(settingsPath.parent_path().string());
         return settingsPath.string();
     }
 
+    /**
+     * @brief Get the project Scenes directory path.
+     * @return Full path to the Scenes directory.
+     */
     std::string ProjectPaths::GetScenesPath() {
         return GetProjectRoot() + "/Scenes";
     }
 
+    /**
+     * @brief Get per-project temporary scripts output directory.
+     * @return Full path to temporary scripts directory, or empty string on failure.
+     */
     std::string ProjectPaths::GetTempScriptsPath() {
         try {
             // Create a stable temp directory per project
@@ -108,6 +136,10 @@ namespace Engine {
         }
     }
 
+    /**
+     * @brief Resolve the user Documents root folder on the current platform.
+     * @return Full path to Documents root, with cwd fallback when unavailable.
+     */
     std::string ProjectPaths::GetDocumentsRoot() {
 #ifdef _WIN32
         PWSTR widePath = nullptr;
@@ -129,6 +161,10 @@ namespace Engine {
         return std::filesystem::current_path().string();
     }
 
+    /**
+     * @brief Get project-specific documents root and ensure it exists.
+     * @return Full path to Documents/Grape Engine/<project-name>.
+     */
     std::string ProjectPaths::GetProjectDocumentsRoot() {
         std::filesystem::path projectRoot = GetProjectRoot();
         std::string projectName = projectRoot.filename().string();
@@ -141,6 +177,10 @@ namespace Engine {
         return projectDocs.string();
     }
 
+    /**
+     * @brief Get editor-wide documents root and ensure it exists.
+     * @return Full path to Documents/Grape Engine.
+     */
     std::string ProjectPaths::GetEditorDocumentsRoot() {
         std::filesystem::path docsRoot = GetDocumentsRoot();
         std::filesystem::path editorDocs = docsRoot / "Grape Engine";
@@ -148,22 +188,38 @@ namespace Engine {
         return editorDocs.string();
     }
 
+    /**
+     * @brief Get per-project logs directory and ensure it exists.
+     * @return Full path to logs directory.
+     */
     std::string ProjectPaths::GetLogsPath() {
         std::filesystem::path logsPath = std::filesystem::path(GetProjectDocumentsRoot()) / "logs";
         EnsureDirectoryExists(logsPath.string());
         return logsPath.string();
     }
 
+    /**
+     * @brief Get per-project save directory and ensure it exists.
+     * @return Full path to saves directory.
+     */
     std::string ProjectPaths::GetSavesPath() {
         std::filesystem::path savesPath = std::filesystem::path(GetProjectDocumentsRoot()) / "saves";
         EnsureDirectoryExists(savesPath.string());
         return savesPath.string();
     }
     
+    /**
+     * @brief Get compiled managed assembly output path.
+     * @return Full path to GameScripts.dll output.
+     */
     std::string ProjectPaths::GetCompiledScriptAssemblyPath() {
         return GetTempScriptsPath() + "/GameScripts.dll";
     }
     
+    /**
+     * @brief Get C# project output directory and ensure it exists.
+     * @return Full path to csproj directory, or empty string on failure.
+     */
     std::string ProjectPaths::GetCsProjPath() {
         try {
             std::filesystem::path csprojDir = GetTempScriptsPath() + "/csproj";
@@ -181,11 +237,21 @@ namespace Engine {
         }
     }
     
+    /**
+     * @brief Convert a project-relative path into an absolute filesystem path.
+     * @param relativePath Path relative to current project root.
+     * @return Absolute filesystem path.
+     */
     std::string ProjectPaths::ToAbsolutePath(const std::string& relativePath) {
         std::filesystem::path absolute = std::filesystem::absolute(GetProjectRoot() + "/" + relativePath);
         return absolute.string();
     }
     
+    /**
+     * @brief Convert an absolute filesystem path into project-relative form.
+     * @param absolutePath Absolute filesystem path.
+     * @return Relative path from project root, or empty string on failure.
+     */
     std::string ProjectPaths::ToRelativePath(const std::string& absolutePath) {
         try {
             std::filesystem::path abs = std::filesystem::absolute(absolutePath);
@@ -200,6 +266,11 @@ namespace Engine {
         }
     }
     
+    /**
+     * @brief Check if a path resolves within the current project root.
+     * @param path Filesystem path to evaluate.
+     * @return True when the path is contained by the project root.
+     */
     bool ProjectPaths::IsInProject(const std::string& path) {
         try {
             std::filesystem::path abs = std::filesystem::absolute(path);
@@ -214,6 +285,10 @@ namespace Engine {
         }
     }
     
+    /**
+     * @brief Create a directory tree when it does not exist.
+     * @param path Directory path to create.
+     */
     void ProjectPaths::EnsureDirectoryExists(const std::string& path) {
         try {
             std::filesystem::path dirPath(path);

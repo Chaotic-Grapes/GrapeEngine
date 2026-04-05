@@ -18,6 +18,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 
 namespace Engine {
+    /**
+     * @brief Emit a trace log entry with a service prefix.
+     * @param msg Message payload.
+     */
     void IService::Trace(const std::string& msg) {
         LOG_TRACE("[Service] " << msg);
     }

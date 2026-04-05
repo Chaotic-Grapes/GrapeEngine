@@ -126,6 +126,10 @@ namespace Engine {
     class GRAPEENGINE_API EditorCallbackRegistry {
     public:
         // Singleton access
+        /**
+         * @brief Get the process-wide callback registry singleton.
+         * @return Reference to the callback registry instance.
+         */
         static EditorCallbackRegistry& Get();
 
         // ====================================================================

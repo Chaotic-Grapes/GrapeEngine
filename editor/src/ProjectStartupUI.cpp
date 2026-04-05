@@ -114,6 +114,13 @@ namespace Editor {
         }
 
 #ifdef _WIN32
+        /**
+         * @brief Initialize the folder browser dialog with the preselected path.
+         * @param hwnd Handle to the folder browser dialog window.
+         * @param uMsg Callback message identifier.
+         * @param lpData User data carrying the initial path pointer.
+         * @return 0 to continue default dialog processing.
+         */
         int CALLBACK BrowseFolderCallbackProc(HWND hwnd, UINT uMsg, LPARAM /* lParam */, LPARAM lpData) {
             if (uMsg == BFFM_INITIALIZED && lpData) {
                 SendMessageA(hwnd, BFFM_SETSELECTION, TRUE, lpData);
