@@ -79,9 +79,11 @@ namespace ECS {
      * @complexity O(sum(layer entities) + unlayered emitters + GPU simulation work)
      */
     void ParticleSystem::OnUpdate(World& world) {
+#ifdef GRAPE_HAS_CUDA
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
         const float totalTime = static_cast<float>(TimeSystem::Instance().GetTotalTime());
         const unsigned int frameCount = static_cast<unsigned int>(TimeSystem::Instance().GetFrameCount());
+#endif
         auto* layerManager = world.GetLayerManager();
 
         std::unordered_map<uint32_t, bool> alive;
@@ -125,6 +127,9 @@ namespace ECS {
         // Phase 2: Simulate all emitters on shared stream
         // ==============================================================
         auto processEmitter = [&](Entity entity, Components::ParticleEmitter& emitter, const uint16_t resolvedLayerId) {
+#ifndef GRAPE_HAS_CUDA
+            (void)resolvedLayerId;
+#endif
                 if (!emitter.active) {
                     return;
                 }
@@ -192,9 +197,9 @@ namespace ECS {
 #endif
                 }
 
-                EmitterGPUData& gpu = it->second;
 
 #ifdef GRAPE_HAS_CUDA
+                EmitterGPUData& gpu = it->second;
                 if (!gpu.initialized) return;
 
                 int emitCount = 0;
@@ -580,6 +585,9 @@ namespace ECS {
     }
 
     void ParticleSystem::UpdateCollisionGrid(const TileMap& tileMap) {
+#ifndef GRAPE_HAS_CUDA
+        (void)tileMap;
+#endif
 #ifdef GRAPE_HAS_CUDA
         const auto& masks = tileMap.GetCollisionMasks();
         if (masks.empty()) return;
