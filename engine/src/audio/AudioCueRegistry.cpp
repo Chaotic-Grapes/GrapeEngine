@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioCueRegistry.cpp
-\author Dalton Koh , 2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Implements the shared audio cue registry used for cue lookup by id and path.
@@ -24,7 +24,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 
 namespace Audio {
-    // rebuild cue registry from an audio root folder
+    /**
+     * @brief Scans an audio root folder and rebuilds the cue registry with all supported audio files found.
+     * @param audioRoot Filesystem path to the root directory to scan recursively.
+     */
     void AudioCueRegistry::Refresh(const std::string& audioRoot) {
         // clear old registry data
         m_cues.clear();
@@ -65,7 +68,11 @@ namespace Audio {
         }
     }
 
-    // find cue info by cue id
+    /**
+     * @brief Looks up a registered cue by its hashed numeric identifier.
+     * @param id 32-bit hash id of the cue to find.
+     * @return Pointer to the matching CueInfo, or nullptr if not found.
+     */
     const AudioCueRegistry::CueInfo* AudioCueRegistry::FindById(uint32_t id) const {
         // lookup index by id
         auto it = m_byId.find(id);
@@ -75,7 +82,11 @@ namespace Audio {
         return &m_cues[it->second];
     }
 
-    // find cue info by cue path
+    /**
+     * @brief Looks up a registered cue by its normalized file path.
+     * @param path File path of the cue; separators are normalized before lookup.
+     * @return Pointer to the matching CueInfo, or nullptr if not found.
+     */
     const AudioCueRegistry::CueInfo* AudioCueRegistry::FindByPath(const std::string& path) const {
         // normalize input path before lookup
         std::string norm = NormalizePath(path);
@@ -86,7 +97,11 @@ namespace Audio {
         return &m_cues[it->second];
     }
 
-    // register one cue path if not already present
+    /**
+     * @brief Registers a cue path in the registry, creating a new entry if it does not already exist.
+     * @param path File path of the cue to register.
+     * @return Reference to the existing or newly created CueInfo for the given path.
+     */
     const AudioCueRegistry::CueInfo& AudioCueRegistry::Register(const std::string& path) {
         // normalize input path first
         std::string norm = NormalizePath(path);
@@ -107,14 +122,22 @@ namespace Audio {
         return m_cues.back();
     }
 
-    // normalize path separators for stable keys
+    /**
+     * @brief Normalizes all backslash separators in a path to forward slashes for consistent map keys.
+     * @param path Input path string to normalize.
+     * @return Path string with all backslashes replaced by forward slashes.
+     */
     std::string AudioCueRegistry::NormalizePath(std::string path) {
         // replace windows separators with slash
         std::replace(path.begin(), path.end(), '\\', '/');
         return path;
     }
 
-    // hash path to stable 32 bit cue id
+    /**
+     * @brief Hashes a normalized path string into a stable 32-bit cue identifier.
+     * @param path Normalized path string to hash.
+     * @return 32-bit hash value used as the cue's numeric id.
+     */
     uint32_t AudioCueRegistry::HashPath(const std::string& path) {
         // hash string then cast to 32 bit id
         return static_cast<uint32_t>(std::hash<std::string>{}(path));

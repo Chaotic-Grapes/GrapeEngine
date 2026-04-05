@@ -26,6 +26,17 @@ namespace Platform {
         Destroy();
     }
 
+    /**
+     * @brief Allocate and initialize a GLFWWindow, returning null on failure.
+     * @param title Window title text.
+     * @param width Requested window width in pixels.
+     * @param height Requested window height in pixels.
+     * @param vsync True to enable VSync.
+     * @param mode Requested window mode.
+     * @param resizable True if the window should be user-resizable.
+     * @param decorated True to create a decorated window frame.
+     * @return Pointer to the new window, or nullptr on failure.
+     */
     GLFWWindow* GLFWWindow::Create(const std::string& title, int width, int height,
                                     bool vsync, WindowMode mode, bool resizable, bool decorated) {
         auto* window = new GLFWWindow();
@@ -172,6 +183,9 @@ namespace Platform {
         return true;
     }
 
+    /**
+     * @brief Destroy the underlying GLFW window handle if present.
+     */
     void GLFWWindow::Destroy() {
         if (m_windowHandle) {
             glfwDestroyWindow(m_windowHandle);
@@ -179,6 +193,10 @@ namespace Platform {
         }
     }
 
+    /**
+     * @brief Return the GLFW monitor that the window's center point currently lies on.
+     * @return Pointer to the containing GLFWmonitor, or the primary monitor as fallback.
+     */
     GLFWmonitor* GLFWWindow::_getCurrentMonitor() const {
         if (!m_windowHandle) {
             return glfwGetPrimaryMonitor();
@@ -222,6 +240,9 @@ namespace Platform {
         return glfwGetPrimaryMonitor();
     }
 
+    /**
+     * @brief Snapshot the current window position and size for later restoration.
+     */
     void GLFWWindow::_storeWindowedPlacement() {
         if (!m_windowHandle) {
             return;
@@ -232,6 +253,10 @@ namespace Platform {
         m_windowedValid = true;
     }
 
+    /**
+     * @brief Restore the window to its previously stored windowed placement, synthesizing
+     *        a centered fallback if no stored placement exists.
+     */
     void GLFWWindow::_restoreWindowedPlacement() {
         if (!m_windowHandle) {
             return;
@@ -267,6 +292,9 @@ namespace Platform {
         m_borderlessLockedMonitorIndex = -1;
     }
 
+    /**
+     * @brief Snap the borderless window to cover the monitor it is currently centred on.
+     */
     void GLFWWindow::_lockBorderlessToMonitor() {
         if (!m_windowHandle || m_borderlessLockInProgress) {
             return;
@@ -332,6 +360,11 @@ namespace Platform {
         m_height = mode->height;
     }
 
+    /**
+     * @brief Enter or exit borderless windowed mode.
+     * @param borderless True to enable borderless; false to restore windowed placement.
+     * @return True on success, false if the window handle is invalid.
+     */
     bool GLFWWindow::_setBorderless(bool borderless) {
         if (!m_windowHandle) {
             return false;
@@ -350,6 +383,9 @@ namespace Platform {
         return true;
     }
 
+    /**
+     * @brief Register GLFW framebuffer-resize, focus, and window-position callbacks.
+     */
     void GLFWWindow::_setupCallbacks() {
         if (!m_windowHandle) return;
 
@@ -383,38 +419,67 @@ namespace Platform {
 
     // ==================== IWindow Implementation ====================
 
+    /**
+     * @brief Process all pending GLFW window and input events.
+     */
     void GLFWWindow::PollEvents() const {
         glfwPollEvents();
     }
 
+    /**
+     * @brief Present the back buffer to the screen.
+     */
     void GLFWWindow::SwapBuffers() const {
         if (m_windowHandle) {
             glfwSwapBuffers(m_windowHandle);
         }
     }
 
+    /**
+     * @brief Check whether the window has been requested to close.
+     * @return True if a close request is pending.
+     */
     bool GLFWWindow::ShouldClose() const {
         return m_windowHandle && glfwWindowShouldClose(m_windowHandle);
     }
 
+    /**
+     * @brief Signal the window to close on the next event loop iteration.
+     */
     void GLFWWindow::Close() const {
         if (m_windowHandle) {
             glfwSetWindowShouldClose(m_windowHandle, true);
         }
     }
 
+    /**
+     * @brief Return the framebuffer width in pixels.
+     * @return Current width in pixels.
+     */
     int GLFWWindow::GetWidth() const {
         return m_width;
     }
 
+    /**
+     * @brief Return the framebuffer height in pixels.
+     * @return Current height in pixels.
+     */
     int GLFWWindow::GetHeight() const {
         return m_height;
     }
 
+    /**
+     * @brief Return the window title string.
+     * @return Current title.
+     */
     std::string GLFWWindow::GetTitle() const {
         return m_title;
     }
 
+    /**
+     * @brief Update the window title bar text.
+     * @param title New title string.
+     */
     void GLFWWindow::SetTitle(const std::string& title) {
         m_title = title;
         if (m_windowHandle) {
@@ -422,14 +487,26 @@ namespace Platform {
         }
     }
 
+    /**
+     * @brief Check whether the window currently has keyboard focus.
+     * @return True if focused.
+     */
     bool GLFWWindow::IsFocused() const {
         return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_FOCUSED);
     }
 
+    /**
+     * @brief Check whether the window is currently minimized (iconified).
+     * @return True if minimized.
+     */
     bool GLFWWindow::IsMinimized() const {
         return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_ICONIFIED);
     }
 
+    /**
+     * @brief Minimize or restore the window.
+     * @param minimized True to iconify; false to restore.
+     */
     void GLFWWindow::SetMinimized(bool minimized) const {
         if (!m_windowHandle) return;
         if (minimized) {
@@ -440,10 +517,18 @@ namespace Platform {
         }
     }
 
+    /**
+     * @brief Check whether the window is currently maximized.
+     * @return True if maximized.
+     */
     bool GLFWWindow::IsMaximized() const {
         return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_MAXIMIZED);
     }
 
+    /**
+     * @brief Maximize or restore the window.
+     * @param maximized True to maximize; false to restore.
+     */
     void GLFWWindow::SetMaximized(bool maximized) const {
         if (!m_windowHandle)
             return;
@@ -455,10 +540,18 @@ namespace Platform {
         }
     }
 
+    /**
+     * @brief Check whether the window is currently visible.
+     * @return True if visible.
+     */
     bool GLFWWindow::IsVisible() const {
         return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_VISIBLE);
     }
 
+    /**
+     * @brief Show or hide the window.
+     * @param visible True to show; false to hide.
+     */
     void GLFWWindow::SetVisible(bool visible) const {
         if (!m_windowHandle)
             return;
@@ -470,10 +563,18 @@ namespace Platform {
         }
     }
 
+    /**
+     * @brief Check whether the window is user-resizable.
+     * @return True if resizable.
+     */
     bool GLFWWindow::IsResizable() const {
         return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_RESIZABLE);
     }
 
+    /**
+     * @brief Enable or disable user resizing for the window.
+     * @param resizable True to allow resizing; false to lock the size.
+     */
     void GLFWWindow::SetResizable(bool resizable) const {
         if (m_windowHandle) {
             glfwSetWindowAttrib(m_windowHandle, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
@@ -481,13 +582,25 @@ namespace Platform {
         const_cast<GLFWWindow*>(this)->m_resizable = resizable;
     }
 
+    /**
+     * @brief Check whether VSync is currently enabled.
+     * @return True if VSync is on.
+     */
     bool GLFWWindow::IsVSync() const { return m_vsync; }
 
+    /**
+     * @brief Enable or disable vertical synchronization.
+     * @param enabled True to enable VSync; false to disable.
+     */
     void GLFWWindow::SetVSync(bool enabled) {
         m_vsync = enabled;
         glfwSwapInterval(enabled ? 1 : 0);
     }
 
+    /**
+     * @brief Switch the window to the specified display mode (windowed, borderless, or fullscreen).
+     * @param mode Target WindowMode flags.
+     */
     void GLFWWindow::SetMode(WindowMode mode) {
         if (!m_windowHandle) {
             return;
@@ -510,27 +623,45 @@ namespace Platform {
         m_mode = WindowMode::Windowed;
     }
 
+    /**
+     * @brief Test whether the window currently has a given mode flag set.
+     * @param mode The WindowMode flag(s) to test.
+     * @return True if all specified flags are active.
+     */
     bool GLFWWindow::HasMode(WindowMode mode) const {
         return HasFlag(m_mode, mode);
     }
 
+    /**
+     * @brief Resize the window to the given dimensions.
+     * @param width New width in pixels; uses current width if <= 0.
+     * @param height New height in pixels; uses current height if <= 0.
+     */
     void GLFWWindow::Resize(int width, int height) {
         if (!m_windowHandle) return;
-        
+
         int newWidth = (width > 0) ? width : m_width;
         int newHeight = (height > 0) ? height : m_height;
-        
+
         glfwSetWindowSize(m_windowHandle, newWidth, newHeight);
         m_width = newWidth;
         m_height = newHeight;
     }
 
+    /**
+     * @brief Return the underlying GLFW window handle.
+     * @return Opaque pointer to the GLFWwindow.
+     */
     void* GLFWWindow::GetNativeHandle() const {
         return m_windowHandle;
     }
 
     // ==================== Display Mode Queries ====================
 
+    /**
+     * @brief Query the list of display modes supported by the current monitor.
+     * @return Vector of supported DisplayMode descriptors.
+     */
     std::vector<Engine::DisplayMode> GLFWWindow::GetSupportedDisplayModes() const {
         // Query available display modes using DeviceManager
         if (!m_windowHandle) {
@@ -543,6 +674,10 @@ namespace Platform {
         return modes;
     }
 
+    /**
+     * @brief Return monitor information for the display the window is currently on.
+     * @return MonitorInfo descriptor for the containing monitor.
+     */
     Engine::MonitorInfo GLFWWindow::GetMonitorInfo() const {
         if (!m_windowHandle) {
             return Engine::MonitorInfo{};
@@ -558,6 +693,11 @@ namespace Platform {
         return Engine::MonitorInfo{};
     }
 
+    /**
+     * @brief Apply a specific display mode to the window, adjusting resolution and refresh rate.
+     * @param mode The target DisplayMode to apply.
+     * @return True on success; false if the window handle is invalid.
+     */
     bool GLFWWindow::SetDisplayMode(const Engine::DisplayMode& mode) {
         if (!m_windowHandle) {
             LOG_ERROR("Window handle invalid");
@@ -589,10 +729,20 @@ namespace Platform {
         return true;
     }
 
+    /**
+     * @brief Enter or exit exclusive fullscreen mode on the current monitor.
+     * @param fullscreen True to go fullscreen; false to return to windowed.
+     * @return True on success; false if the window handle is invalid.
+     */
     bool GLFWWindow::SetFullscreen(bool fullscreen) {
         return SetFullscreenOnMonitor(fullscreen ? m_currentMonitorIndex : -1);
     }
 
+    /**
+     * @brief Enter exclusive fullscreen mode on the specified monitor, or exit fullscreen.
+     * @param monitorIndex Zero-based monitor index, or negative to exit fullscreen.
+     * @return True on success; false on invalid handle or out-of-range index.
+     */
     bool GLFWWindow::SetFullscreenOnMonitor(int monitorIndex) {
         if (!m_windowHandle) {
             LOG_ERROR("Window handle invalid");

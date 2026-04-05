@@ -11,6 +11,7 @@ Shared helpers for GUI render/layout systems.
 
 #pragma once
 
+#include <cmath>
 #include "ecs/Components.h"
 #include "ecs/World.h"
 
@@ -50,5 +51,34 @@ namespace ECS {
 
         // Default to Screen space if no GUIRenderMode found
         return Components::GUIRenderSpace::Screen;
+    }
+
+    /**
+     * @brief Resolve the effective 2D GUI rotation in radians from transform components.
+     *
+     * Prefers `LocalTransform::Rotation` because GUI authoring stores intent there.
+     * Falls back to extracting yaw-from-Z-axis from `WorldTransform` when local transform
+     * is unavailable (legacy or special runtime-only entities).
+     *
+     * @param world ECS world used for component lookup.
+     * @param entity Entity whose transform rotation is sampled.
+     * @return Rotation around Z axis in radians.
+     * @complexity O(1).
+     */
+    inline float ResolveGUIRotationRadians(const World& world, Entity entity) {
+        if (world.Has<Components::LocalTransform>(entity)) {
+            Quaternion rotation = world.Get<Components::LocalTransform>(entity).Rotation;
+            rotation.Normalize();
+            const float sinZ = 2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y);
+            const float cosZ = 1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z);
+            return std::atan2(sinZ, cosZ);
+        }
+
+        if (world.Has<Components::WorldTransform>(entity)) {
+            const Matrix4x4& m = world.Get<Components::WorldTransform>(entity).Matrix;
+            return std::atan2(m.m10, m.m00);
+        }
+
+        return 0.0f;
     }
 }

@@ -13,6 +13,13 @@ Implementation of script templates for ECS-aligned C# system generation.
 
 namespace Editor::Templates {
 
+    /**
+     * @brief Dispatch to the correct template generator and return the generated C# source.
+     * @param templateType Template to generate code for.
+     * @param className Name of the generated class.
+     * @param namespaceName Namespace to wrap the class in.
+     * @return Generated C# source code as a string.
+     */
     std::string ScriptTemplates::GenerateScript(
         ScriptTemplateType templateType,
         const std::string& className,
@@ -29,6 +36,11 @@ namespace Editor::Templates {
         }
     }
 
+    /**
+     * @brief Return a short human-readable description of the given template type for display in the UI.
+     * @param templateType Template to describe.
+     * @return Description string.
+     */
     std::string ScriptTemplates::GetTemplateDescription(ScriptTemplateType templateType)
     {
         switch (templateType)
@@ -42,6 +54,11 @@ namespace Editor::Templates {
         }
     }
 
+    /**
+     * @brief Return a null-terminated array of template display name strings.
+     * @param outCount Set to the number of entries in the returned array.
+     * @return Pointer to the array of name strings.
+     */
     const char* const* ScriptTemplates::GetTemplateNames(int& outCount)
     {
         static const char* names[] = {
@@ -52,6 +69,11 @@ namespace Editor::Templates {
         return names;
     }
 
+    /**
+     * @brief Convert a template display name string back to its ScriptTemplateType enum value.
+     * @param name Display name to look up.
+     * @return Corresponding ScriptTemplateType, defaulting to BasicSystem if not recognized.
+     */
     ScriptTemplateType ScriptTemplates::GetTemplateTypeFromName(const std::string& name)
     {
         if (name == "BasicSystem") return ScriptTemplateType::BasicSystem;
@@ -59,6 +81,12 @@ namespace Editor::Templates {
         return ScriptTemplateType::BasicSystem;
     }
 
+    /**
+     * @brief Generate a standard ISystem C# template with OnCreate/OnUpdate/OnDestroy stubs.
+     * @param className Name of the generated class.
+     * @param namespaceName Namespace to wrap the class in.
+     * @return Generated C# source code as a string.
+     */
     std::string ScriptTemplates::GenerateBasicSystemTemplate(
         const std::string& className,
         const std::string& namespaceName)
@@ -95,6 +123,12 @@ namespace Editor::Templates {
             "}\n";
     }
 
+    /**
+     * @brief Generate a C# system template decorated with [ExecuteInEditMode] for editor-only execution.
+     * @param className Name of the generated class.
+     * @param namespaceName Namespace to wrap the class in.
+     * @return Generated C# source code as a string.
+     */
     std::string ScriptTemplates::GenerateEditModeSystemTemplate(
         const std::string& className,
         const std::string& namespaceName)

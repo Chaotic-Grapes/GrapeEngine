@@ -24,6 +24,17 @@ namespace Editor {
     // Static storage for pending requests
     std::unordered_map<uint32_t, ViewportPicking::PendingRequest> ViewportPicking::s_pendingRequests;
 
+    /**
+     * @brief Submit an asynchronous GPU pick request and register a callback to receive the result.
+     * @param screenX Screen-space X coordinate of the pick position.
+     * @param screenY Screen-space Y coordinate of the pick position.
+     * @param viewportPos Top-left position of the viewport in screen space.
+     * @param viewportSize Dimensions of the viewport in pixels.
+     * @param rendererSystem The renderer system to submit the pick request to.
+     * @param callback Function invoked with the picked entity ID when the result is ready.
+     * @param userData Arbitrary pointer passed through to the callback.
+     * @return Request ID that can be used to track the pending pick, or 0 on failure.
+     */
     uint32_t ViewportPicking::RequestAsyncPick(
         float screenX,
         float screenY,
@@ -46,6 +57,10 @@ namespace Editor {
         return requestId;
     }
 
+    /**
+     * @brief Poll all pending async pick requests and invoke their callbacks when results are ready.
+     * @param rendererSystem The renderer system to query for completed pick results.
+     */
     void ViewportPicking::Update(ECS::RendererSystem* rendererSystem) {
         if (!rendererSystem || s_pendingRequests.empty()) return;
         

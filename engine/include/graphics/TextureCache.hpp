@@ -25,6 +25,11 @@ struct CachedTexture {
 
 class TextureCache {
 public:
+    /**
+     * @brief Load a texture from path, returning the cached instance on repeat requests.
+     * @param path File path to the texture image.
+     * @return Const reference to the cached Texture object.
+     */
     static const Texture& Load(const std::string& path);
 
 private:

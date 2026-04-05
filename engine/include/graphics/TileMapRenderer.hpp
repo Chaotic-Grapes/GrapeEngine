@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   TileMapRenderer.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   31st January 2026
 \author Samantha Leong
 \par    s.leong@digipen.edu
@@ -40,6 +40,14 @@ class Renderer; // forward declare your batch renderer
 class TileMapRenderer
 {
 public:
+    /**
+     * @brief Submit tile geometry from a tilemap into the renderer.
+     * @param tileMap Tilemap data describing tile positions and ids.
+     * @param tilesets Collection of tilesets referenced by the tilemap.
+     * @param renderer Batch renderer that receives the geometry.
+     * @param worldOffset World-space offset applied to tile positions.
+     * @param material Optional material override for all submitted tiles.
+     */
     void Submit(
         const TileMap& tileMap,
         const std::vector<const Tileset*>& tilesets,

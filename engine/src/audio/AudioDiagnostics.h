@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioDiagnostics.h
-\author Dalton Koh , 2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Provides helper checks for audio setup and runtime diagnostics.
@@ -32,7 +32,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // inline helper functions for diagnostics
 namespace AudioDiagnostics {
 
-    // run full scene level audio diagnostics
+    /**
+     * @brief Runs a full suite of audio diagnostics for the given scene, logging pass, warning, and error
+     *        results for the audio system, device, asset library, and AudioSource components.
+     * @param scene Pointer to the active scene to inspect; may be nullptr (returns false immediately).
+     * @return True if all diagnostic checks passed, false if any issue was detected.
+     */
     inline bool DiagnoseAudioSystem(Scenes::Scene* scene) {
         // fail early when scene is missing
         if (!scene) {
@@ -173,7 +178,12 @@ namespace AudioDiagnostics {
     }
 
 
-    // check if one entity can play audio correctly
+    /**
+     * @brief Checks whether a specific entity has all requirements in place to successfully play audio.
+     * @param scene   Pointer to the scene containing the entity; may be nullptr (returns false).
+     * @param entityId Numeric id of the entity to inspect.
+     * @return True if the entity is alive, has an AudioSource with a valid CueId present in the library.
+     */
     inline bool CanEntityPlayAudio(Scenes::Scene* scene, uint32_t entityId) {
         // fail early when scene is missing
         if (!scene) return false;

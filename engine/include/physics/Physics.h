@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Physics.h
-\author Dalton Koh Shi Hao , 2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 
 \brief

@@ -45,6 +45,8 @@ namespace ECS {
 
         /**
          * @brief Compare pair keys for equality.
+         * @param other Pair to compare against.
+         * @return True when both A and B fields match.
          */
         bool operator==(const PackedEntityPair& other) const {
             return A == other.A && B == other.B;
@@ -57,6 +59,8 @@ namespace ECS {
     struct PackedEntityPairHash {
         /**
          * @brief Compute hash code for a packed pair key.
+         * @param pair Pair to hash.
+         * @return Combined hash of the two packed entity ids.
          */
         size_t operator()(const PackedEntityPair& pair) const noexcept {
             const size_t h1 = std::hash<uint64_t>{}(pair.A);
@@ -84,66 +88,82 @@ namespace ECS {
 
         /**
          * @brief Initialize system state.
+         * @param world ECS world passed by the scheduler (unused).
          */
         void OnCreate(World& world) override { (void)world; }
 
         /**
          * @brief Execute physics update for the current frame.
+         * @param world ECS world containing entities with physics components.
          */
         void OnUpdate(World& world) override;
 
         /**
          * @brief Release runtime references and caches.
+         * @param world ECS world passed by the scheduler.
          */
         void OnDestroy(World& world) override;
 
         /**
          * @brief Describe scheduler component access and run policy.
+         * @return SystemMetadata describing component access and execution order.
          */
         SystemMetadata GetMetadata() const override;
 
         /**
-         * @brief Return scheduler system group.
+         * @brief Return the scheduler system group.
+         * @return SystemGroup::Physics.
          */
         SystemGroup GetSystemGroup() const override { return SystemGroup::Physics; }
 
         /**
          * @brief Restrict system execution to play mode.
+         * @return SystemRunMode::PlayOnly.
          */
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
         /**
          * @brief Ray cast against current runtime body cache.
+         * @param input Ray origin, direction, and max distance.
+         * @return Hit result including entity, point, normal, and fraction.
          */
         Engine::Physics2D::RayCastHit2D RayCast(const Engine::Physics2D::RayCastInput2D& input) const;
 
         /**
          * @brief Query entities whose AABBs overlap the supplied AABB.
+         * @param query AABB to test against all broadphase bodies.
+         * @return List of overlapping entities.
          */
         std::vector<Entity> OverlapAABB(const Engine::WorldAABB& query) const;
 
         /**
          * @brief Query entities whose AABBs contain the supplied point.
+         * @param point World-space point to test.
+         * @return List of entities whose AABB contains the point.
          */
         std::vector<Entity> QueryPoint(const Vector2D& point) const;
 
         /**
          * @brief Return latest physics performance and workload stats.
+         * @return Reference to the current frame's physics statistics.
          */
         const Engine::Physics2D::PhysicsStats2D& GetStats() const { return m_physicsWorld2D.GetStats(); }
 
         /**
          * @brief Return unconsumed fixed-step accumulator time for render interpolation.
+         * @return Remaining accumulator time in seconds.
          */
         float GetRemainingAccumulatorSeconds() const { return m_accumulatorSeconds; }
 
         /**
-         * @brief Internal bridge for legacy staged pipeline to refresh tilemap runtime cache.
+         * @brief Internal bridge for legacy staged pipeline to refresh the tilemap runtime cache.
+         * @param world ECS world containing tilemap component data.
          */
         void RefreshRuntimeTileMapsForPipeline(World& world) { RefreshRuntimeTileMaps(world); }
 
         /**
-         * @brief Internal bridge exposing tilemap runtime cache for legacy staged pipeline.
+         * @brief Internal bridge exposing the tilemap runtime cache for legacy staged pipeline.
+         * @return Reference to the map from entity id to RuntimeTileMapEntry.
          */
         const std::unordered_map<EntityId, RuntimeTileMapEntry>& GetRuntimeTileMapsForPipeline() const { return m_runtimeTileMaps; }
 
@@ -164,16 +184,17 @@ namespace ECS {
 
     public:
         /**
-         * @brief Reconcile runtime tilemap cache with ECS tilemap components.
-         *
-         * Internal: exposed for legacy staged physics runner.
+         * @brief Reconcile the runtime tilemap cache with ECS tilemap components.
+         *        Internal: exposed for legacy staged physics runner.
+         * @param world ECS world to read tilemap components from.
          */
         void RefreshRuntimeTileMaps(World& world);
 
     private:
 
         /**
-         * @brief Convert runtime tilemap cache into PhysicsWorld2D proxy payloads.
+         * @brief Convert the runtime tilemap cache into PhysicsWorld2D proxy payloads.
+         * @return Vector of TilemapCollisionProxy2D built from the current cache.
          */
         std::vector<Engine::Physics2D::TilemapCollisionProxy2D> BuildTilemapProxies() const;
 

@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   LightingTypes.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   31st January 2026
 \brief
 GPU-facing lighting data definitions and configuration constants used by the

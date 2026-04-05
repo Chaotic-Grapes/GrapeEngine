@@ -616,7 +616,7 @@ namespace ECS {
                     std::max(0.0f, element.ContentSize.Y - padding.Y - paddingOpposite.Y)
                 };
 
-                const float rotationRadians = slider.RotationDegrees * (3.14159265358979323846f / 180.0f);
+                const float rotationRadians = ResolveGUIRotationRadians(world, item.entity);
                 const float cosRot = std::cos(rotationRadians);
                 const float sinRot = std::sin(rotationRadians);
                 const Vector2D trackCenter = {

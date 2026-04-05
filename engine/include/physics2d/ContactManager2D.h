@@ -22,6 +22,11 @@ namespace Engine::Physics2D {
     struct PairKey2D {
         PackedEntityId A = 0;
         PackedEntityId B = 0;
+        /**
+         * @brief Test whether two pair keys are identical.
+         * @param other The key to compare against.
+         * @return True when both entity A and B fields match.
+         */
         bool operator==(const PairKey2D& other) const { return A == other.A && B == other.B; }
     };
 
@@ -31,6 +36,8 @@ namespace Engine::Physics2D {
     struct PairKeyHash {
         /**
          * @brief Hash function for packed-entity pair keys.
+         * @param pair The pair to hash.
+         * @return Combined hash of entity A and entity B fields.
          */
         size_t operator()(const PairKey2D& pair) const noexcept {
             const size_t h1 = std::hash<uint64_t>{}(pair.A);
@@ -55,11 +62,17 @@ namespace Engine::Physics2D {
     private:
         /**
          * @brief Build canonical unordered key for solid collision pairs.
+         * @param a First entity packed id.
+         * @param b Second entity packed id.
+         * @return Canonical pair key with A <= B ordering.
          */
         static PairKey2D MakeCollisionPair(PackedEntityId a, PackedEntityId b);
 
         /**
          * @brief Build ordered key for trigger-to-other relation tracking.
+         * @param triggerId Packed id of the trigger entity.
+         * @param otherId Packed id of the other entity.
+         * @return Pair key preserving trigger/other ordering.
          */
         static PairKey2D MakeTriggerPair(PackedEntityId triggerId, PackedEntityId otherId);
 

@@ -18,6 +18,10 @@ namespace {
 }
 
 namespace ECS {
+    /**
+     * @brief Describe transform system scheduling and component access requirements.
+     * @return System metadata used by the ECS scheduler.
+     */
     SystemMetadata TransformSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Transform");
         // Read accesses
@@ -147,6 +151,12 @@ namespace ECS {
             });
     }
 
+    /**
+     * @brief Recursively propagate world transforms through one hierarchy subtree.
+     * @param world ECS world containing transform/hierarchy components.
+     * @param e Root entity of the subtree segment.
+     * @param parentWorld Optional parent world matrix for composition.
+     */
     void TransformSystem::_updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld) {
         const auto& lt = world.Get<Components::LocalTransform>(e);
         auto& wt = world.Get<Components::WorldTransform>(e);

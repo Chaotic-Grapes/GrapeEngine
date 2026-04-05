@@ -42,12 +42,15 @@ namespace Engine {
         uint8_t BitsPerPixel;       // Color depth (e.g., 32)
 
         /**
-         * @brief Convert to string representation
+         * @brief Convert to string representation.
+         * @return Human-readable string describing the resolution and refresh rate.
          */
         std::string ToString() const;
 
         /**
-         * @brief Equality comparison
+         * @brief Equality comparison.
+         * @param other Display mode to compare against.
+         * @return True when resolution, refresh rate, and bit depth all match.
          */
         bool operator==(const DisplayMode& other) const;
     };
@@ -66,12 +69,14 @@ namespace Engine {
         bool IsPrimary;                             // Is this the primary monitor
 
         /**
-         * @brief Calculate DPI (dots per inch)
+         * @brief Calculate DPI (dots per inch).
+         * @return Horizontal DPI computed from physical width and pixel width.
          */
         float GetDPI() const;
 
         /**
-         * @brief Get aspect ratio
+         * @brief Get the monitor aspect ratio.
+         * @return Width divided by height of the current display mode.
          */
         float GetAspectRatio() const;
     };
@@ -90,12 +95,15 @@ namespace Engine {
         bool IsConnected;               // Is device currently connected
 
         /**
-         * @brief Convert to string representation
+         * @brief Convert to string representation.
+         * @return Human-readable string describing the device name and channels.
          */
         std::string ToString() const;
 
         /**
-         * @brief Equality comparison
+         * @brief Equality comparison.
+         * @param other Audio device to compare against.
+         * @return True when both devices share the same DeviceID.
          */
         bool operator==(const AudioDeviceInfo& other) const;
     };

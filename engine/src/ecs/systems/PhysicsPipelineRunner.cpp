@@ -427,6 +427,11 @@ namespace ECS {
         PhysicsPipelineRunner(PhysicsSystem& systemRef, World& worldRef, Scenes::LayerManager& layerMgr, float frameDt)
             : system(systemRef), world(worldRef), layerManager(layerMgr), dt(frameDt), eventDispatcher(&worldRef) {}
 
+        /**
+         * @brief Execute one fixed-step physics pipeline for the current frame delta.
+         * @details Runs substep integration, broad/narrow-phase solve, tilemap resolution,
+         * and event finalization in deterministic order.
+         */
         void Run() {
             system.RefreshRuntimeTileMaps(world);
             GatherEntities();
@@ -700,6 +705,11 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Build per-entity body cache used by broad-phase and solver passes.
+         * @details Filters entities by component requirements and physics-enabled layer state,
+         * while refreshing packed-id lookup tables for fast pair resolution.
+         */
         void BuildBodyCache() {
             bodies.clear();
             bodyByPacked.clear();
@@ -815,6 +825,11 @@ namespace ECS {
             });
         }
 
+        /**
+         * @brief Solve detected broad-phase pairs using iterative impulse resolution.
+         * @param solverIterations Number of solver iterations to run this substep.
+         * @details Handles trigger overlap tracking, collision enter dispatch, and velocity updates.
+         */
         void SolvePairs(int solverIterations) {
             for (int it = 0; it < solverIterations; ++it) {
                 int resolvedCount = 0;
@@ -900,6 +915,10 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Resolve dynamic-body collisions against runtime tilemap collision geometry.
+         * @details Applies layer filtering and material response after body-vs-body solving.
+         */
         void ResolveTilemapCollisions() {
             if (system.m_runtimeTileMaps.empty()) {
                 return;

@@ -31,17 +31,28 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Lifecycle Management
 // -------------------------------------------------------------------------
 
+/**
+ * @brief Store font references for use during rendering.
+ * @param mainFont Primary UI font.
+ * @param boldFont Bold UI font.
+ * @param symbolsFont Icon/symbol font.
+ */
 void SystemsPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
 }
 
+/** @brief Clear the system list and reset selection state. */
 void SystemsPanel::Shutdown() {
     m_systems.clear();
     m_selectedSystemName.clear();
 }
 
+/**
+ * @brief Set the ECS world used for gathering entity statistics.
+ * @param world Pointer to the ECS world (may be nullptr).
+ */
 void SystemsPanel::SetWorld(ECS::World* world) {
     m_world = world;
 }
@@ -50,6 +61,10 @@ void SystemsPanel::SetWorld(ECS::World* world) {
 // Panel Rendering
 // -------------------------------------------------------------------------
 
+/**
+ * @brief Render the full systems panel including header, systems table, and statistics.
+ * @param systemManager The engine's system manager to query for registered systems.
+ */
 void SystemsPanel::Render(ECS::SystemManager* systemManager) {
     if (!ImGui::Begin("Systems", nullptr, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
@@ -82,6 +97,7 @@ void SystemsPanel::Render(ECS::SystemManager* systemManager) {
 // Private Rendering Methods
 // -------------------------------------------------------------------------
 
+/** @brief Render the panel title and system count label. */
 void SystemsPanel::_renderHeader() {
     ImGui::PushFont(m_boldFont);
     ImGui::Text("Registered ECS Systems");
@@ -91,6 +107,7 @@ void SystemsPanel::_renderHeader() {
     ImGui::TextDisabled("(Count: %zu)", m_systems.size());
 }
 
+/** @brief Render the grouped systems table with enable/disable toggles and metadata columns. */
 void SystemsPanel::_renderSystemsTable() {
     // Group systems by execution phase for better organization
     std::map<std::string, std::vector<SystemInfo*>> groupedSystems;
@@ -203,6 +220,7 @@ void SystemsPanel::_renderSystemsTable() {
     }
 }
 
+/** @brief Render the summary statistics row showing system counts by type and enabled state. */
 void SystemsPanel::_renderStats() {
     size_t cppCount = 0;
     size_t csCount = 0;
@@ -256,6 +274,10 @@ void SystemsPanel::_renderStats() {
 // Private Data Management
 // -------------------------------------------------------------------------
 
+/**
+ * @brief Query the system manager and rebuild the cached system info list each frame.
+ * @param systemManager The engine's system manager to query.
+ */
 void SystemsPanel::_updateSystemsList(ECS::SystemManager* systemManager) {
     m_systems.clear();
 

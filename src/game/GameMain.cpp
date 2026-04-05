@@ -11,10 +11,12 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 /* End Header *******************************************************************/
 
 #include <crtdbg.h>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #include <vector>
 #ifdef _WIN32
 #define NOMINMAX
@@ -24,6 +26,7 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "services/TimeSystem.h"
+#include "services/Input.h"
 #include "platform/IPlatformContext.h"
 #include "physics/Physics.h"
 #include "scene/SceneManager.h"
@@ -36,6 +39,59 @@ extern "C" {
 }
 
 namespace {
+    /**
+     * @brief Determine the current primary window mode for restoration.
+     * @param win Window to query.
+     * @return Active mode flag set used by runtime mode restoration.
+     */
+    Platform::WindowMode QueryWindowMode(const Platform::IWindow* win) {
+        if (!win) {
+            return Platform::WindowMode::Windowed;
+        }
+        if (win->HasMode(Platform::WindowMode::Fullscreen)) {
+            return Platform::WindowMode::Fullscreen;
+        }
+        if (win->HasMode(Platform::WindowMode::Borderless)) {
+            return Platform::WindowMode::Borderless;
+        }
+        return Platform::WindowMode::Windowed;
+    }
+
+    /**
+     * @brief Check whether runtime should suspend simulation/presentation due to focus or iconify state.
+     * @param win Primary game window.
+     * @return True if runtime should suspend the main simulation step.
+     */
+    bool ShouldSuspendRuntime(const Platform::IWindow* win) {
+        if (!win) {
+            return true;
+        }
+        return win->IsMinimized() || !win->IsFocused() || !win->IsVisible();
+    }
+
+    /**
+     * @brief Poll all windows and stop the application if any close request is observed.
+     * @param engine Application runtime instance.
+     * @param platformContext Platform context containing active windows.
+     * @return void
+     */
+    void PollWindowsAndHandleClose(Engine::Application& engine, Platform::IPlatformContext* platformContext) {
+        if (!platformContext) {
+            engine.Close();
+            return;
+        }
+
+        for (auto* win : platformContext->GetAllWindows()) {
+            if (!win) {
+                continue;
+            }
+            win->PollEvents();
+            if (win->ShouldClose()) {
+                engine.Close();
+            }
+        }
+    }
+
     int ExitWithStartupError(const std::string& message, Engine::Application* engine = nullptr) {
         std::cerr << message << '\n';
         LOG_ERROR(message);
@@ -104,7 +160,10 @@ namespace {
 }
 
 /**
- * @brief Main entry point for standalone game builds
+ * @brief Main entry point for standalone game builds.
+ * @param argc Number of command-line arguments.
+ * @param argv Command-line argument array.
+ * @return Process exit code (0 for success, non-zero for startup/runtime failure).
  */
 int main(int argc, char** argv) {
     // Enable memory leak detection in debug builds
@@ -254,8 +313,67 @@ int main(int argc, char** argv) {
         }
     }
 
+    bool runtimeSuspended = false;
+    bool minimizedByRuntime = false;
+    bool audioPausedByRuntime = false;
+    Platform::WindowMode restoreMode = QueryWindowMode(window);
+
     // Game main loop
     while (engine.IsRunning()) {
+        const bool shouldSuspend = ShouldSuspendRuntime(window);
+
+        if (shouldSuspend && !runtimeSuspended) {
+            runtimeSuspended = true;
+            restoreMode = QueryWindowMode(window);
+
+            if (window && !window->IsMinimized()) {
+                window->SetMinimized(true);
+                minimizedByRuntime = true;
+            }
+
+            if (auto* audioService = engine.GetAudioService()) {
+                audioService->PauseAll();
+                audioPausedByRuntime = true;
+            }
+
+            Input::ResetAllStates();
+            LOG_INFO("Runtime suspended due to focus/interruption event.");
+        }
+
+        if (runtimeSuspended) {
+            PollWindowsAndHandleClose(engine, platformContext);
+
+            if (!engine.IsRunning()) {
+                break;
+            }
+
+            if (!ShouldSuspendRuntime(window)) {
+                if (window) {
+                    if (minimizedByRuntime && window->IsMinimized()) {
+                        window->SetMinimized(false);
+                    }
+                    window->SetMode(restoreMode);
+                }
+
+                if (audioPausedByRuntime) {
+                    if (auto* audioService = engine.GetAudioService()) {
+                        audioService->ResumeAll();
+                    }
+                }
+
+                Input::ResetAllStates();
+                engine.ResyncFrameTime();
+
+                runtimeSuspended = false;
+                minimizedByRuntime = false;
+                audioPausedByRuntime = false;
+                LOG_INFO("Runtime resumed after focus/interruption event.");
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                continue;
+            }
+        }
+
         // ============================
         // BEGIN FRAME
         // ============================
@@ -269,6 +387,12 @@ int main(int argc, char** argv) {
         // RENDER
         // ============================
         for (auto* win : platformContext->GetAllWindows()) {
+            if (!win) {
+                continue;
+            }
+            if (!win->IsVisible() || win->IsMinimized() || !win->IsFocused()) {
+                continue;
+            }
             win->SwapBuffers();
         }
 

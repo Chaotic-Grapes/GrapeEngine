@@ -46,8 +46,13 @@ Matrix3x3::Matrix3x3(float m00, float m01, float m02,
 // Assignment operators (member functions)
 // ============================================================================
 
-// Matrix multiply-assign: result[r][c] = sum of this row r dotted with other column c;
-// all temporaries computed before any write to avoid aliasing when this == &other
+/**
+ * @brief Multiplies this matrix by another in-place (matrix multiplication).
+ *        All output elements are computed into temporaries before any member is overwritten
+ *        to avoid aliasing issues when this == &other.
+ * @param other The right-hand matrix to multiply by.
+ * @return Reference to this matrix after multiplication.
+ */
 Matrix3x3& Matrix3x3::operator*=(const Matrix3x3& other) {
 	// Compute all nine output elements into temporaries before overwriting any member,
 	// because each element of *this is reused across multiple dot products
@@ -71,7 +76,11 @@ Matrix3x3& Matrix3x3::operator*=(const Matrix3x3& other) {
 	return *this;
 }
 
-// Element-wise addition
+/**
+ * @brief Adds another matrix to this matrix element-wise in-place.
+ * @param other The matrix whose elements are added to this matrix.
+ * @return Reference to this matrix after addition.
+ */
 Matrix3x3& Matrix3x3::operator+=(const Matrix3x3& other) {
 	m00 += other.m00; m01 += other.m01; m02 += other.m02;
 	m10 += other.m10; m11 += other.m11; m12 += other.m12;
@@ -79,7 +88,11 @@ Matrix3x3& Matrix3x3::operator+=(const Matrix3x3& other) {
 	return *this;
 }
 
-// Element-wise subtraction
+/**
+ * @brief Subtracts another matrix from this matrix element-wise in-place.
+ * @param other The matrix whose elements are subtracted from this matrix.
+ * @return Reference to this matrix after subtraction.
+ */
 Matrix3x3& Matrix3x3::operator-=(const Matrix3x3& other) {
 	m00 -= other.m00; m01 -= other.m01; m02 -= other.m02;
 	m10 -= other.m10; m11 -= other.m11; m12 -= other.m12;
@@ -87,7 +100,11 @@ Matrix3x3& Matrix3x3::operator-=(const Matrix3x3& other) {
 	return *this;
 }
 
-// Uniform scale of all elements by a scalar
+/**
+ * @brief Scales all elements of this matrix uniformly by a scalar in-place.
+ * @param scalar The value to multiply every element by.
+ * @return Reference to this matrix after scaling.
+ */
 Matrix3x3& Matrix3x3::operator*=(float scalar) {
 	m00 *= scalar; m01 *= scalar; m02 *= scalar;
 	m10 *= scalar; m11 *= scalar; m12 *= scalar;
@@ -95,7 +112,12 @@ Matrix3x3& Matrix3x3::operator*=(float scalar) {
 	return *this;
 }
 
-// Uniform division; multiply by reciprocal to do one division instead of nine
+/**
+ * @brief Divides all elements of this matrix uniformly by a scalar in-place.
+ *        Uses reciprocal multiplication to avoid nine separate divisions.
+ * @param scalar The value to divide every element by.
+ * @return Reference to this matrix after division.
+ */
 Matrix3x3& Matrix3x3::operator/=(float scalar) {
 	float invScalar = 1.0f / scalar;
 	m00 *= invScalar; m01 *= invScalar; m02 *= invScalar;
@@ -108,7 +130,11 @@ Matrix3x3& Matrix3x3::operator/=(float scalar) {
 // Unary operator
 // ============================================================================
 
-// Return a copy with all elements negated; useful for reversing a signed offset matrix
+/**
+ * @brief Returns a copy of this matrix with all elements negated.
+ *        Useful for reversing a signed offset matrix.
+ * @return A new Matrix3x3 with every element sign-flipped.
+ */
 Matrix3x3 Matrix3x3::operator-() const {
 	return Matrix3x3(
 		-m00, -m01, -m02,
@@ -121,7 +147,11 @@ Matrix3x3 Matrix3x3::operator-() const {
 // Matrix operations
 // ============================================================================
 
-// Return the multiplicative identity; transforms are built by multiplying against this
+/**
+ * @brief Returns the 3x3 multiplicative identity matrix.
+ *        Transforms are built by multiplying against this matrix.
+ * @return A Matrix3x3 with ones on the diagonal and zeros elsewhere.
+ */
 Matrix3x3 Matrix3x3::Identity() {
 	return Matrix3x3(
 		1.0f, 0.0f, 0.0f,
@@ -130,8 +160,14 @@ Matrix3x3 Matrix3x3::Identity() {
 	);
 }
 
-// 2D affine translation matrix; encodes (x, y) offset in the third column so that
-// multiplying by a homogeneous Vector2D (z = 1) adds the translation
+/**
+ * @brief Constructs a 2D affine translation matrix.
+ *        The offset is encoded in the third column so that multiplying a homogeneous
+ *        Vector2D (z = 1) adds the translation to the result.
+ * @param x Translation along the X axis.
+ * @param y Translation along the Y axis.
+ * @return A Matrix3x3 representing the 2D translation.
+ */
 Matrix3x3 Matrix3x3::Translation(float x, float y) {
 	return Matrix3x3(
 		1.0f, 0.0f, x,
@@ -140,7 +176,13 @@ Matrix3x3 Matrix3x3::Translation(float x, float y) {
 	);
 }
 
-// 2D non-uniform scale matrix; scales X and Y axes independently
+/**
+ * @brief Constructs a 2D non-uniform scale matrix.
+ *        Scales the X and Y axes independently.
+ * @param x Scale factor along the X axis.
+ * @param y Scale factor along the Y axis.
+ * @return A Matrix3x3 representing the 2D scale.
+ */
 Matrix3x3 Matrix3x3::Scaling(float x, float y) {
 	return Matrix3x3(
 		x, 0.0f, 0.0f,
@@ -149,10 +191,15 @@ Matrix3x3 Matrix3x3::Scaling(float x, float y) {
 	);
 }
 
-// 2D CCW rotation by angle in radians; the standard 2D rotation matrix layout is:
-// [ cos  -sin  0 ]
-// [ sin   cos  0 ]
-// [  0     0   1 ]
+/**
+ * @brief Constructs a 2D counter-clockwise rotation matrix from an angle in radians.
+ *        The standard 2D rotation layout is applied:
+ *        [ cos  -sin  0 ]
+ *        [ sin   cos  0 ]
+ *        [  0     0   1 ]
+ * @param angle Rotation angle in radians.
+ * @return A Matrix3x3 representing the 2D CCW rotation.
+ */
 Matrix3x3 Matrix3x3::RotationRad(float angle) {
 	float cosA = cosf(angle);
 	float sinA = sinf(angle);
@@ -164,13 +211,22 @@ Matrix3x3 Matrix3x3::RotationRad(float angle) {
 	);
 }
 
-// Convert degrees to radians then delegate; pi rad = 180 deg so 1 deg = pi/180 rad
+/**
+ * @brief Constructs a 2D counter-clockwise rotation matrix from an angle in degrees.
+ *        Converts degrees to radians then delegates to RotationRad.
+ * @param angle Rotation angle in degrees.
+ * @return A Matrix3x3 representing the 2D CCW rotation.
+ */
 Matrix3x3 Matrix3x3::RotationDeg(float angle) {
 	float angleRad = angle * DEG_TO_RAD;
 	return RotationRad(angleRad);
 }
 
-// Transpose: swap rows and columns; for pure rotation matrices, transpose == inverse
+/**
+ * @brief Returns the transpose of this matrix (rows and columns swapped).
+ *        For pure rotation matrices, the transpose is equivalent to the inverse.
+ * @return A new Matrix3x3 that is the transpose of this matrix.
+ */
 Matrix3x3 Matrix3x3::Transpose() const {
 	return Matrix3x3(
 		m00, m10, m20,
@@ -179,10 +235,13 @@ Matrix3x3 Matrix3x3::Transpose() const {
 	);
 }
 
-// Compute the inverse via the classical adjugate formula: A^-1 = adj(A) / det(A);
-// the adjugate is the transpose of the cofactor matrix, so each element is the
-// signed 2x2 minor of the transposed position; if determinant is zero the matrix
-// is singular and the zero matrix is returned (caller can check via the out pointer)
+/**
+ * @brief Computes the inverse of this matrix via the classical adjugate formula.
+ *        A^-1 = adj(A) / det(A). If the determinant is zero the matrix is singular
+ *        and the zero matrix is returned as a safe fallback.
+ * @param determinant Optional pointer that receives the computed determinant; may be nullptr.
+ * @return The inverse Matrix3x3, or the zero matrix if this matrix is singular.
+ */
 Matrix3x3 Matrix3x3::Inverse(float* determinant) const {
 	// Cofactor expansion along the first row to get the scalar determinant;
 	// each term is a 2x2 minor multiplied by its row-0 element
@@ -224,7 +283,12 @@ Matrix3x3 Matrix3x3::Inverse(float* determinant) const {
 // Binary operators (non-member functions)
 // ============================================================================
 
-// Element-wise addition
+/**
+ * @brief Adds two matrices element-wise.
+ * @param a The left-hand matrix.
+ * @param b The right-hand matrix.
+ * @return A new Matrix3x3 containing the element-wise sum.
+ */
 Matrix3x3 operator+(const Matrix3x3& a, const Matrix3x3& b) {
 	return Matrix3x3(
 		a.m00 + b.m00, a.m01 + b.m01, a.m02 + b.m02,
@@ -233,7 +297,12 @@ Matrix3x3 operator+(const Matrix3x3& a, const Matrix3x3& b) {
 	);
 }
 
-// Element-wise subtraction
+/**
+ * @brief Subtracts one matrix from another element-wise.
+ * @param a The left-hand matrix.
+ * @param b The right-hand matrix to subtract.
+ * @return A new Matrix3x3 containing the element-wise difference.
+ */
 Matrix3x3 operator-(const Matrix3x3& a, const Matrix3x3& b) {
 	return Matrix3x3(
 		a.m00 - b.m00, a.m01 - b.m01, a.m02 - b.m02,
@@ -242,7 +311,12 @@ Matrix3x3 operator-(const Matrix3x3& a, const Matrix3x3& b) {
 	);
 }
 
-// Scalar multiplication; each element scaled uniformly
+/**
+ * @brief Multiplies every element of a matrix by a scalar.
+ * @param matrix The matrix to scale.
+ * @param scalar The scalar factor to apply to each element.
+ * @return A new Matrix3x3 with each element uniformly scaled.
+ */
 Matrix3x3 operator*(const Matrix3x3& matrix, float scalar) {
 	return Matrix3x3(
 		matrix.m00 * scalar, matrix.m01 * scalar, matrix.m02 * scalar,
@@ -251,10 +325,22 @@ Matrix3x3 operator*(const Matrix3x3& matrix, float scalar) {
 	);
 }
 
-// Commutative scalar overload so scalar * matrix also works
+/**
+ * @brief Multiplies every element of a matrix by a scalar (scalar on the left).
+ *        Commutative overload so that scalar * matrix compiles equally.
+ * @param scalar The scalar factor to apply to each element.
+ * @param matrix The matrix to scale.
+ * @return A new Matrix3x3 with each element uniformly scaled.
+ */
 Matrix3x3 operator*(float scalar, const Matrix3x3& matrix) { return matrix * scalar; }
 
-// Full 3x3 matrix multiplication: result[r][c] = dot(row r of a, column c of b)
+/**
+ * @brief Performs full 3x3 matrix multiplication.
+ *        result[r][c] = dot(row r of a, column c of b).
+ * @param a The left-hand matrix.
+ * @param b The right-hand matrix.
+ * @return A new Matrix3x3 that is the matrix product of a and b.
+ */
 Matrix3x3 operator*(const Matrix3x3& a, const Matrix3x3& b) {
 	return Matrix3x3(
 		// Row 0
@@ -274,22 +360,40 @@ Matrix3x3 operator*(const Matrix3x3& a, const Matrix3x3& b) {
 	);
 }
 
-// Transform a 2D point by a 3x3 affine matrix; the Vector2D is implicitly extended to
-// (X, Y, 1) so the third column translation (m02, m12) is applied; treating it as a point
-// rather than a direction; the resulting W row is discarded since we return 2D
+/**
+ * @brief Transforms a 2D point by a 3x3 affine matrix.
+ *        The Vector2D is implicitly extended to (X, Y, 1) so the third-column
+ *        translation (m02, m12) is fully applied. The W row is discarded
+ *        since the return type is 2D.
+ * @param a The 3x3 affine transform matrix.
+ * @param b The 2D point to transform (treated as homogeneous with z = 1).
+ * @return The transformed Vector2D.
+ */
 Vector2D operator*(const Matrix3x3& a, const Vector2D& b) {
 	float x = a.m00 * b.X + a.m01 * b.Y + a.m02;   // z assumed = 1, so m02 * 1 = m02
 	float y = a.m10 * b.X + a.m11 * b.Y + a.m12;   // likewise m12 contributes directly
 	return Vector2D(x, y);
 }
 
-// Scalar division; multiply by reciprocal then reuse the scalar * matrix path
+/**
+ * @brief Divides every element of a matrix by a scalar.
+ *        Uses reciprocal multiplication to perform a single division.
+ * @param matrix The matrix whose elements are to be divided.
+ * @param scalar The divisor applied uniformly to every element.
+ * @return A new Matrix3x3 with each element divided by scalar.
+ */
 Matrix3x3 operator/(const Matrix3x3& matrix, float scalar) {
 	float invScalar = 1.0f / scalar;
 	return matrix * invScalar;
 }
 
-// Exact element-wise equality; not epsilon-safe, use carefully with accumulated transforms
+/**
+ * @brief Tests exact element-wise equality between two matrices.
+ *        Not epsilon-safe; use carefully with accumulated transforms.
+ * @param a The left-hand matrix.
+ * @param b The right-hand matrix.
+ * @return True if every corresponding element is exactly equal, false otherwise.
+ */
 bool operator==(const Matrix3x3& a, const Matrix3x3& b) {
 	return
 		(a.m00 == b.m00) && (a.m01 == b.m01) && (a.m02 == b.m02) &&
@@ -297,5 +401,10 @@ bool operator==(const Matrix3x3& a, const Matrix3x3& b) {
 		(a.m20 == b.m20) && (a.m21 == b.m21) && (a.m22 == b.m22);
 }
 
-// Inequality via negated equality check
+/**
+ * @brief Tests element-wise inequality between two matrices.
+ * @param a The left-hand matrix.
+ * @param b The right-hand matrix.
+ * @return True if any corresponding element differs, false if all are equal.
+ */
 bool operator!=(const Matrix3x3& a, const Matrix3x3& b) { return !(a == b); }

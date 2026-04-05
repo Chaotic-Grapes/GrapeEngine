@@ -26,11 +26,19 @@ used for effects such as HDR rendering, bloom, tone mapping, and deferred passes
 #include <iostream>
 #include <vector>
 
-// ============================================================================
-// Creates a framebuffer with color and optional depth attachments.
-// This sets up texture targets for rendering into (instead of the default window).
-// Parameters allow choosing size, HDR (floating point) mode, and number of color attachments.
-// ============================================================================
+/**
+ * @brief Creates a framebuffer with color and optional depth attachments.
+ *
+ * Sets up texture targets for rendering into (instead of the default window).
+ * Parameters allow choosing size, HDR (floating-point) mode, and number of
+ * color attachments.
+ *
+ * @param w                   Width of the framebuffer in pixels.
+ * @param h                   Height of the framebuffer in pixels.
+ * @param floatingPoint        If true, color attachments use GL_RGBA16F; otherwise GL_RGBA8.
+ * @param withDepth            If true, a depth/stencil renderbuffer is created.
+ * @param colorAttachmentCount Number of color texture attachments to create.
+ */
 void Framebuffer::Create(int w, int h,
     bool floatingPoint,
     bool withDepth,
@@ -131,20 +139,25 @@ void Framebuffer::Create(int w, int h,
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-// ============================================================================
-// Binds this framebuffer so subsequent draw calls render into it.
-// ============================================================================
+/**
+ * @brief Binds this framebuffer so subsequent draw calls render into it.
+ */
 void Framebuffer::Bind() { glBindFramebuffer(GL_FRAMEBUFFER, fbo); }
 
-// ============================================================================
-// Unbinds the framebuffer, restoring rendering to the default backbuffer.
-// ============================================================================
+/**
+ * @brief Unbinds the framebuffer, restoring rendering to the default backbuffer.
+ */
 void Framebuffer::Unbind() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
-// ============================================================================
-// Resizes the framebuffer by destroying and recreating all attachments
-// with the new width and height.
-// ============================================================================
+/**
+ * @brief Resizes the framebuffer by destroying and recreating all attachments
+ *        with the new dimensions.
+ *
+ * @param w            New width in pixels.
+ * @param h            New height in pixels.
+ * @param floatingPoint If true, color attachments use GL_RGBA16F; otherwise GL_RGBA8.
+ * @param withDepth    If true, a depth/stencil renderbuffer is recreated.
+ */
 void Framebuffer::Resize(int w, int h,
     bool floatingPoint,
     bool withDepth)
@@ -153,10 +166,10 @@ void Framebuffer::Resize(int w, int h,
     Create(w, h, floatingPoint, withDepth);
 }
 
-// ============================================================================
-// Frees all GPU resources associated with this framebuffer
-// deletes color textures, depth buffers, and the FBO itself.
-// ============================================================================
+/**
+ * @brief Frees all GPU resources associated with this framebuffer,
+ *        including color textures, depth renderbuffer, and the FBO itself.
+ */
 void Framebuffer::Destroy()
 {
     if (depth)
@@ -178,10 +191,15 @@ void Framebuffer::Destroy()
     }
 }
 
-// ============================================================================
-// Binds the framebuffer, sets viewport to its size, and clears its color
-// and depth buffers to a given RGBA color.
-// ============================================================================
+/**
+ * @brief Binds the framebuffer, sets the viewport to its dimensions, and
+ *        clears both the color and depth buffers to a specified RGBA color.
+ *
+ * @param r Red component of the clear color (0.0 - 1.0).
+ * @param g Green component of the clear color (0.0 - 1.0).
+ * @param b Blue component of the clear color (0.0 - 1.0).
+ * @param a Alpha component of the clear color (0.0 - 1.0).
+ */
 void Framebuffer::BindAndClear(float r, float g, float b, float a)
 {
     Bind();
@@ -190,10 +208,13 @@ void Framebuffer::BindAndClear(float r, float g, float b, float a)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-// ============================================================================
-// Copies (blits) the framebuffer's contents to the default backbuffer.
-// Usually used to display post-processed results to the screen.
-// ============================================================================
+/**
+ * @brief Copies (blits) the framebuffer's contents to the default backbuffer.
+ *        Typically used to display post-processed results to the screen.
+ *
+ * @param mask   Bitfield of buffers to copy (e.g., GL_COLOR_BUFFER_BIT).
+ * @param filter Interpolation filter to use if sizes differ (e.g., GL_NEAREST).
+ */
 void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
 {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
@@ -204,10 +225,13 @@ void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }
 
-// ============================================================================
-// Binds one of the framebuffer's color textures to a given texture unit,
-// so it can be sampled in a shader (e.g., for post-processing).
-// ============================================================================
+/**
+ * @brief Binds one of the framebuffer's color attachment textures to a
+ *        specific texture unit so it can be sampled in a shader.
+ *
+ * @param index Zero-based index of the color attachment to bind.
+ * @param unit  OpenGL texture unit index (e.g., 0 maps to GL_TEXTURE0).
+ */
 void Framebuffer::BindColorTexture(int index, int unit) const
 {
     if (index < 0 || index >= static_cast<int>(colorAttachments.size()))

@@ -70,9 +70,11 @@ public:
     void update(float deltaTime);
     // Return UV rectangle for the current frame.
     glm::vec4 currentUV() const;
+    // Build a Sprite for the current frame placed at pos with the given size.
     Sprite currentFrame(const glm::vec2& pos, const glm::vec2& size) const;
     // Advance by dt and return a Sprite ready to render.
     Sprite play(glm::vec2 pos, glm::vec2 size, float dt);
+    // Set playback speed in frames per second.
     void setFPS(float fps) { m_frameTime = 1.0f / fps; }
     // Restrict playback to a sub-range of frames in the sheet.
     void setFrameWindow(int startFrame, int count);
@@ -81,7 +83,7 @@ public:
     // Set per-row frame counts for non-uniform spritesheets.
     void setRowFrameCounts(const std::vector<int>& counts);
 
-    // Emissive support
+    // Set the emissive texture and its HDR strength multiplier for this animation.
     void setEmissive(GLuint emissiveTexId, float strength) {
         m_emissiveTextureId = emissiveTexId;
         m_emissiveStrength = strength;

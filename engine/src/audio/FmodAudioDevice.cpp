@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   FmodAudioDevice.cpp
-\author Dalton Koh,2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Implements the FMOD audio device backend used by the engine runtime.
@@ -36,10 +36,21 @@ namespace {
     // (out of the screen). FMOD uses Y as up. Convert engine vectors into
     // FMOD space by swapping Y/Z while preserving X so left/right panning
     // stays intuitive (world +X -> right ear).
+    /**
+     * @brief Converts an engine Vec3 into an FMOD_VECTOR, swapping Y and Z to match FMOD's coordinate system.
+     * @param v Engine-space vector where X is right, Y is screen-horizontal, and Z is up.
+     * @return FMOD_VECTOR with axes remapped for correct spatial audio positioning.
+     */
     inline FMOD_VECTOR ToFmodVec(const Audio::Vec3& v) {
         return FMOD_VECTOR{ v.x, v.z, v.y };
     }
 
+    /**
+     * @brief Normalizes an FMOD_VECTOR, returning a fallback direction when the input is near-zero length.
+     * @param v        Vector to normalize.
+     * @param fallback Vector returned when the squared length of v is too small to normalize safely.
+     * @return Normalized version of v, or fallback if v is effectively zero.
+     */
     inline FMOD_VECTOR NormalizeOrDefault(FMOD_VECTOR v, FMOD_VECTOR fallback) {
         const float len2 = v.x * v.x + v.y * v.y + v.z * v.z;
         if (len2 <= 1e-8f) {
@@ -52,11 +63,22 @@ namespace {
         return v;
     }
 
+    /**
+     * @brief Computes the dot product of two FMOD_VECTORs.
+     * @param a First vector.
+     * @param b Second vector.
+     * @return Scalar dot product of a and b.
+     */
     inline float Dot(FMOD_VECTOR a, FMOD_VECTOR b) {
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
 
-    // check fmod results and log failures
+    /**
+     * @brief Checks an FMOD_RESULT and logs an error with optional context when the result is not FMOD_OK.
+     * @param r   FMOD result code to evaluate.
+     * @param ctx Optional string describing the operation that produced the result.
+     * @return True if r equals FMOD_OK, false otherwise.
+     */
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
         // return true on success
         if (r == FMOD_OK) return true;
@@ -66,7 +88,11 @@ namespace {
         return false;
     }
 
-    // read channel playing state
+    /**
+     * @brief Queries whether an FMOD channel is currently producing audio output.
+     * @param ch Pointer to the FMOD channel to check; may be nullptr.
+     * @return True if ch is non-null and reports an active playing state.
+     */
     inline bool _is_playing(FMOD::Channel* ch) {
         // null channels are not playing
         if (!ch) return false;
@@ -75,6 +101,11 @@ namespace {
         return playing;
     }
 
+    /**
+     * @brief Returns the FMOD channel mode flags appropriate for 2D or 3D spatialization.
+     * @param spatial3D True to select 3D linear-rolloff mode; false selects 2D mode.
+     * @return Composed FMOD_MODE value suitable for use with playSound or setMode.
+     */
     inline FMOD_MODE SpatialChannelMode(bool spatial3D) {
         if (!spatial3D) {
             return FMOD_2D;
@@ -86,7 +117,10 @@ namespace {
 
 namespace Audio {
 
-    // initialize fmod and bus routing
+    /**
+     * @brief Creates the FMOD system, initializes it on the default output device, and sets up bus routing.
+     * @return True if FMOD was initialized successfully and bus routing is ready; false on any failure.
+     */
     bool FmodAudioDevice::Initialize() {
         // reset bus objects before startup
         m_busGroups.fill(nullptr);
@@ -114,7 +148,11 @@ namespace Audio {
         return true;
     }
 
-    // initialize fmod on a requested output device
+    /**
+     * @brief Creates the FMOD system and initializes it on a specific output device identified by index or display name.
+     * @param deviceID Numeric index string or display name of the desired output device.
+     * @return True if FMOD was initialized on the requested device and bus routing is ready; false on any failure.
+     */
     bool FmodAudioDevice::InitializeWithDevice(const std::string& deviceID) {
         // reset bus objects before startup
         m_busGroups.fill(nullptr);
@@ -177,7 +215,9 @@ namespace Audio {
         return true;
     }
 
-    // update fmod and cleanup dead single instances
+    /**
+     * @brief Pumps the FMOD system update and evicts stale entries from the single-instance channel map.
+     */
     void FmodAudioDevice::Update() {
         // Pump FMOD update.
         if (m_system) m_system->update();
@@ -191,7 +231,9 @@ namespace Audio {
         }
     }
 
-    // release all runtime audio resources
+    /**
+     * @brief Releases all FMOD channels, sounds, bus DSP nodes, and the FMOD system itself.
+     */
     void FmodAudioDevice::Shutdown() {
         // Free channel user data.
         for (const auto& [id, ch] : m_channels) {
@@ -220,7 +262,13 @@ namespace Audio {
         m_master = nullptr;
     }
 
-    // load one cue either from memory or file path
+    /**
+     * @brief Loads an audio cue, preferring in-memory loading via ResourceManager with a file-path fallback.
+     * @param cueId    String identifier used to reference the cue after loading.
+     * @param filePath Filesystem path or resource key for the audio asset.
+     * @param params   Sound creation parameters such as streaming and 3D flags.
+     * @return True if the cue is loaded (including if it was already loaded); false on failure.
+     */
     bool FmodAudioDevice::LoadCue(const std::string& cueId,
         const std::string& filePath,
         const SoundParams& params)
@@ -253,7 +301,10 @@ namespace Audio {
         return true;
     }
 
-    // unload one cue and clear active single map entry
+    /**
+     * @brief Releases the FMOD sound object for a cue and removes it from the cue and single-instance maps.
+     * @param cueId String identifier of the cue to unload.
+     */
     void FmodAudioDevice::UnloadCue(const std::string& cueId) {
         // release cue sound if it exists
         if (const auto it = m_cues.find(cueId); it != m_cues.end()) {
@@ -263,13 +314,23 @@ namespace Audio {
         m_activeByCue.erase(cueId);
     }
 
-    // check whether a cue is loaded
+    /**
+     * @brief Returns whether a cue with the given id has been loaded into the device.
+     * @param cueId String identifier of the cue to check.
+     * @return True if the cue entry exists in the internal cue map.
+     */
     bool FmodAudioDevice::HasCue(const std::string& cueId) const {
         // lookup cue map
         return m_cues.count(cueId) > 0;
     }
 
-    // start playback for one cue
+    /**
+     * @brief Starts playback of a loaded cue on a channel routed to the specified bus.
+     * @param cueId String identifier of the cue to play; must have been loaded first.
+     * @param s     Playback settings including volume, pitch, pan, loop, and spatial options.
+     * @param bus   Mixing bus to route this channel through.
+     * @return A valid PlaybackHandle for the new channel, or an invalid handle on failure.
+     */
     PlaybackHandle FmodAudioDevice::Play(const std::string& cueId,
         const PlaySettings& s,
         Bus bus)
@@ -320,7 +381,11 @@ namespace Audio {
         return h;
     }
 
-    // stop playback for one handle
+    /**
+     * @brief Stops the channel associated with a playback handle according to the specified stop mode.
+     * @param handle Handle identifying the channel to stop.
+     * @param mode   StopMode::Immediate halts playback at once; other modes zero volume first.
+     */
     void FmodAudioDevice::Stop(PlaybackHandle handle, StopMode mode) {
         // resolve channel from handle
         if (auto* ch = _channelFromHandle(handle)) {
@@ -329,7 +394,14 @@ namespace Audio {
         }
     }
 
-    // start playback with single instance policy
+    /**
+     * @brief Starts or manages a single tracked playback instance for a cue, applying the specified policy.
+     * @param cueId  String identifier of the cue to play.
+     * @param s      Playback settings including volume, pitch, pan, loop, and spatial options.
+     * @param policy Rule governing behavior when an active instance already exists.
+     * @param bus    Mixing bus to route the channel through.
+     * @return A valid PlaybackHandle for the active or new instance, or an invalid handle on failure.
+     */
     PlaybackHandle FmodAudioDevice::PlaySingle(const std::string& cueId,
         const PlaySettings& s,
         PlayPolicy policy,
@@ -403,7 +475,11 @@ namespace Audio {
         return h;
     }
 
-    // stop active instance tracked for one cue
+    /**
+     * @brief Stops the single tracked instance for a cue and removes it from the active-cue map.
+     * @param cueId String identifier of the cue whose active instance should be stopped.
+     * @param mode  StopMode::Immediate halts playback at once; other modes zero volume first.
+     */
     void FmodAudioDevice::StopCue(const std::string& cueId, StopMode mode) {
         // find active cue handle entry
         auto it = m_activeByCue.find(cueId);
@@ -415,7 +491,11 @@ namespace Audio {
         m_activeByCue.erase(it);
     }
 
-    // query active playback for one cue
+    /**
+     * @brief Returns whether the single tracked instance for a cue is currently producing audio.
+     * @param cueId String identifier of the cue to query.
+     * @return True if a tracked channel exists for the cue and reports an active playing state.
+     */
     bool FmodAudioDevice::IsCuePlaying(const std::string& cueId) const {
         // find tracked cue handle
         auto it = m_activeByCue.find(cueId);
@@ -426,19 +506,31 @@ namespace Audio {
         return false;
     }
 
-    // set runtime volume for one handle
+    /**
+     * @brief Sets the volume of a channel identified by a playback handle directly on the FMOD channel.
+     * @param handle Handle of the channel to modify.
+     * @param volume New volume level; FMOD accepts values in [0, 1] for standard range.
+     */
     void FmodAudioDevice::SetInstanceVolume(PlaybackHandle handle, float volume) {
         // write channel volume if handle resolves
         if (auto* ch = _channelFromHandle(handle)) ch->setVolume(volume);
     }
 
-    // set runtime pitch for one handle
+    /**
+     * @brief Sets the pitch of a channel identified by a playback handle directly on the FMOD channel.
+     * @param handle Handle of the channel to modify.
+     * @param pitch  Pitch multiplier (1.0 = original pitch, 0.5 = one octave down, 2.0 = one octave up).
+     */
     void FmodAudioDevice::SetInstancePitch(PlaybackHandle handle, float pitch) {
         // write channel pitch if handle resolves
         if (auto* ch = _channelFromHandle(handle)) ch->setPitch(pitch);
     }
 
-    // set runtime pan for one handle
+    /**
+     * @brief Sets the stereo pan of a channel, forcing 2D mode to ensure pan is applied correctly.
+     * @param handle Handle of the channel to modify.
+     * @param pan    Pan value in [-1, 1]; -1 is full left, 0 is center, 1 is full right.
+     */
     void FmodAudioDevice::SetInstancePan(PlaybackHandle handle, float pan) {
         // write channel pan if handle resolves
         if (auto* ch = _channelFromHandle(handle)) {
@@ -449,7 +541,11 @@ namespace Audio {
         }
     }
 
-    // set low pass gain for one handle
+    /**
+     * @brief Sets the per-channel built-in low-pass gain on a playback instance's FMOD channel.
+     * @param handle Handle of the channel to modify.
+     * @param gain   Gain value in [0, 1]; clamped before being applied to the FMOD channel.
+     */
     void FmodAudioDevice::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
         // clamp and apply to channel low pass
         if (auto* ch = _channelFromHandle(handle)) {
@@ -458,7 +554,12 @@ namespace Audio {
         }
     }
 
-    // set 3d attributes for one handle
+    /**
+     * @brief Updates the 3D world-space position and velocity of a channel on the FMOD device.
+     * @param handle Handle of the channel to reposition.
+     * @param pos    World-space emitter position; converted to FMOD coordinate space internally.
+     * @param vel    World-space emitter velocity used for Doppler shift calculation.
+     */
     void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         // write position and velocity vectors
         if (auto* ch = _channelFromHandle(handle)) {
@@ -468,6 +569,12 @@ namespace Audio {
         }
     }
 
+    /**
+     * @brief Sets the 3D rolloff min and max distances for a specific channel, clamping invalid values.
+     * @param handle      Handle of the channel to modify.
+     * @param minDistance Minimum audible distance (clamped to >= 0); full volume within this range.
+     * @param maxDistance Maximum audible distance (clamped to >= minDistance); silent beyond this.
+     */
     void FmodAudioDevice::SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance) {
         if (auto* ch = _channelFromHandle(handle)) {
             const float minD = minDistance < 0.0f ? 0.0f : minDistance;
@@ -476,6 +583,11 @@ namespace Audio {
         }
     }
 
+    /**
+     * @brief Reads the minimum 3D rolloff distance from a channel's current FMOD state.
+     * @param handle Handle of the channel to query.
+     * @return Current minimum distance, or the device default if the channel cannot be resolved.
+     */
     float FmodAudioDevice::GetInstance3DMinDistance(PlaybackHandle handle) const {
         auto* self = const_cast<FmodAudioDevice*>(this);
         if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
@@ -488,6 +600,11 @@ namespace Audio {
         return m_default3DMinDistance;
     }
 
+    /**
+     * @brief Reads the maximum 3D rolloff distance from a channel's current FMOD state.
+     * @param handle Handle of the channel to query.
+     * @return Current maximum distance, or the device default if the channel cannot be resolved.
+     */
     float FmodAudioDevice::GetInstance3DMaxDistance(PlaybackHandle handle) const {
         auto* self = const_cast<FmodAudioDevice*>(this);
         if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
@@ -500,6 +617,11 @@ namespace Audio {
         return m_default3DMaxDistance;
     }
 
+    /**
+     * @brief Sets the 3D speaker spread angle for a channel, clamping to [0, 360] degrees.
+     * @param handle Handle of the channel to modify.
+     * @param spread Spread angle in degrees; 0 produces a mono point source, 360 spreads across all speakers.
+     */
     void FmodAudioDevice::SetInstance3DSpread(PlaybackHandle handle, float spread) {
         if (auto* ch = _channelFromHandle(handle)) {
             const float clamped = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
@@ -507,6 +629,11 @@ namespace Audio {
         }
     }
 
+    /**
+     * @brief Reads the 3D speaker spread angle from a channel's current FMOD state.
+     * @param handle Handle of the channel to query.
+     * @return Current spread angle in degrees, or the device default if the channel cannot be resolved.
+     */
     float FmodAudioDevice::GetInstance3DSpread(PlaybackHandle handle) const {
         auto* self = const_cast<FmodAudioDevice*>(this);
         if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
@@ -518,6 +645,11 @@ namespace Audio {
         return m_default3DSpread;
     }
 
+    /**
+     * @brief Sets the 3D spatialization blend level for a channel, clamping to [0, 1].
+     * @param handle Handle of the channel to modify.
+     * @param level  Blend factor; 0 is fully 2D panned, 1 is fully 3D spatialized.
+     */
     void FmodAudioDevice::SetInstance3DLevel(PlaybackHandle handle, float level) {
         if (auto* ch = _channelFromHandle(handle)) {
             const float clamped = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
@@ -525,6 +657,11 @@ namespace Audio {
         }
     }
 
+    /**
+     * @brief Reads the 3D spatialization blend level from a channel's current FMOD state.
+     * @param handle Handle of the channel to query.
+     * @return Current 3D level blend factor, or the device default if the channel cannot be resolved.
+     */
     float FmodAudioDevice::GetInstance3DLevel(PlaybackHandle handle) const {
         auto* self = const_cast<FmodAudioDevice*>(this);
         if (FMOD::Channel* ch = self->_channelFromHandle(handle)) {
@@ -536,6 +673,11 @@ namespace Audio {
         return m_default3DLevel;
     }
 
+    /**
+     * @brief Stores new default 3D rolloff distances used when spawning channels without explicit distance overrides.
+     * @param minDistance Default minimum distance (clamped to >= 0).
+     * @param maxDistance Default maximum distance (clamped to >= minDistance).
+     */
     void FmodAudioDevice::SetDefault3DMinMaxDistance(float minDistance, float maxDistance) {
         const float minD = minDistance < 0.0f ? 0.0f : minDistance;
         const float maxD = maxDistance < minD ? minD : maxDistance;
@@ -543,31 +685,59 @@ namespace Audio {
         m_default3DMaxDistance = maxD;
     }
 
+    /**
+     * @brief Returns the stored default minimum 3D rolloff distance.
+     * @return Default minimum distance value.
+     */
     float FmodAudioDevice::GetDefault3DMinDistance() const {
         return m_default3DMinDistance;
     }
 
+    /**
+     * @brief Returns the stored default maximum 3D rolloff distance.
+     * @return Default maximum distance value.
+     */
     float FmodAudioDevice::GetDefault3DMaxDistance() const {
         return m_default3DMaxDistance;
     }
 
+    /**
+     * @brief Stores a new default 3D speaker spread angle applied to channels created without explicit spread values.
+     * @param spread Spread angle in degrees, clamped to [0, 360].
+     */
     void FmodAudioDevice::SetDefault3DSpread(float spread) {
         m_default3DSpread = spread < 0.0f ? 0.0f : (spread > 360.0f ? 360.0f : spread);
     }
 
+    /**
+     * @brief Returns the stored default 3D speaker spread angle.
+     * @return Default spread angle in degrees.
+     */
     float FmodAudioDevice::GetDefault3DSpread() const {
         return m_default3DSpread;
     }
 
+    /**
+     * @brief Stores a new default 3D spatialization blend level applied to channels created without an explicit level.
+     * @param level Blend factor clamped to [0, 1].
+     */
     void FmodAudioDevice::SetDefault3DLevel(float level) {
         m_default3DLevel = level < 0.0f ? 0.0f : (level > 1.0f ? 1.0f : level);
     }
 
+    /**
+     * @brief Returns the stored default 3D spatialization blend level.
+     * @return Default 3D level blend factor.
+     */
     float FmodAudioDevice::GetDefault3DLevel() const {
         return m_default3DLevel;
     }
 
-    // check if one handle is currently playing
+    /**
+     * @brief Returns whether the channel for a given playback handle is currently producing audio.
+     * @param handle Handle to look up and check.
+     * @return True if the handle resolves to an active FMOD channel that reports a playing state.
+     */
     bool FmodAudioDevice::IsHandlePlaying(PlaybackHandle handle) const {
         // resolve mutable access for helper call
         auto* self = const_cast<FmodAudioDevice*>(this);
@@ -577,7 +747,11 @@ namespace Audio {
         return false;
     }
 
-    // set bus low pass gain and apply dsp state
+    /**
+     * @brief Sets the low-pass filter gain on a bus DSP node, clamping and applying the value immediately.
+     * @param bus  Target bus whose low-pass DSP should be updated.
+     * @param gain Gain value in [0, 1]; the DSP is bypassed when gain is near 1.0.
+     */
     void FmodAudioDevice::SetBusLowPassGain(Bus bus, float gain) {
         // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
@@ -589,7 +763,11 @@ namespace Audio {
         _applyBusLowPassGain(bus);
     }
 
-    // read current bus low pass gain
+    /**
+     * @brief Returns the currently stored low-pass filter gain for a bus.
+     * @param bus Target bus to query.
+     * @return Stored gain value in [0, 1], or 1.0 if the bus index is out of range.
+     */
     float FmodAudioDevice::GetBusLowPassGain(Bus bus) const {
         // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
@@ -599,6 +777,11 @@ namespace Audio {
         return m_busLowPassGain[index];
     }
 
+    /**
+     * @brief Sets the resonance (Q factor) on a bus low-pass DSP node, clamping and reapplying the filter.
+     * @param bus       Target bus to modify.
+     * @param resonance Resonance value; clamped to the supported FMOD range before application.
+     */
     void FmodAudioDevice::SetBusLowPassResonance(Bus bus, float resonance) {
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
@@ -609,6 +792,11 @@ namespace Audio {
         _applyBusLowPassGain(bus);
     }
 
+    /**
+     * @brief Returns the currently stored low-pass resonance value for a bus.
+     * @param bus Target bus to query.
+     * @return Stored resonance value, or 1.0 if the bus index is out of range.
+     */
     float FmodAudioDevice::GetBusLowPassResonance(Bus bus) const {
         const size_t index = static_cast<size_t>(bus);
         if (index >= kBusCount) {
@@ -617,7 +805,10 @@ namespace Audio {
         return m_busLowPassResonance[index];
     }
 
-    // set listener transform for spatial audio
+    /**
+     * @brief Updates the FMOD listener attributes for 3D audio spatialization.
+     * @param l Listener parameters containing world-space position, velocity, forward, and up vectors.
+     */
     void FmodAudioDevice::SetListener(const ListenerParams& l) {
         // require initialized fmod system
         if (!m_system) return;
@@ -634,7 +825,10 @@ namespace Audio {
         m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
     }
 
-    // set master output volume
+    /**
+     * @brief Sets the master channel group volume, clamping to [0, 1] and caching the value.
+     * @param volume New master volume; values outside [0, 1] are clamped before application.
+     */
     void FmodAudioDevice::SetMasterVolume(float volume) {
         // clamp volume to valid range
         // Clamp and apply.
@@ -642,25 +836,35 @@ namespace Audio {
         if (m_master) m_master->setVolume(m_masterVolume);
     }
 
-    // read master output volume
+    /**
+     * @brief Returns the cached master output volume.
+     * @return Current master volume in [0, 1].
+     */
     float FmodAudioDevice::GetMasterVolume() const {
         // return cached master value
         return m_masterVolume;
     }
 
-    // pause all output through master group
+    /**
+     * @brief Pauses all audio output by pausing the FMOD master channel group.
+     */
     void FmodAudioDevice::PauseAll() {
         // pause master channel group
         if (m_master) m_master->setPaused(true);
     }
 
-    // resume all output through master group
+    /**
+     * @brief Resumes all audio output by unpausing the FMOD master channel group.
+     */
     void FmodAudioDevice::ResumeAll() {
         // resume master channel group
         if (m_master) m_master->setPaused(false);
     }
 
-    // return list of loaded cue ids and source paths
+    /**
+     * @brief Fills a vector with (cueId, sourcePath) pairs for every currently loaded cue.
+     * @param out Output vector that receives the cue id and source path for each loaded entry.
+     */
     void FmodAudioDevice::GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const {
         // reset output container then fill
         // Return cue id -> path list.
@@ -670,7 +874,13 @@ namespace Audio {
             out.emplace_back(id, entry.SourcePath);
     }
 
-    // find existing sound or create a new one from file path
+    /**
+     * @brief Returns an existing FMOD sound for a cue or creates and caches a new one from the file path.
+     * @param cueId  String identifier for the sound entry in the cue map.
+     * @param path   Filesystem path used to create the FMOD sound when not already cached.
+     * @param params Sound creation parameters such as streaming and 3D flags.
+     * @return Pointer to the FMOD sound, or nullptr if the system is unavailable or creation fails.
+     */
     FMOD::Sound* FmodAudioDevice::_getOrCreateSound(const std::string& cueId,
         const std::string& path,
         const SoundParams& params)
@@ -691,7 +901,11 @@ namespace Audio {
         return s;
     }
 
-    // resolve channel pointer from playback handle
+    /**
+     * @brief Resolves a PlaybackHandle to its corresponding FMOD channel pointer.
+     * @param h Handle to look up in the channel map.
+     * @return Pointer to the FMOD channel, or nullptr if the handle is invalid or not found.
+     */
     FMOD::Channel* FmodAudioDevice::_channelFromHandle(PlaybackHandle h) {
         // reject invalid handles
         // Resolve channel by handle id.
@@ -701,7 +915,13 @@ namespace Audio {
         return it->second;
     }
 
-    // create sound from resource manager memory bytes
+    /**
+     * @brief Creates an FMOD sound from raw bytes retrieved via ResourceManager, bypassing file I/O.
+     * @param cueId  Unused; present for signature consistency with other sound creation helpers.
+     * @param path   Resource key used to retrieve audio bytes from the ResourceManager.
+     * @param params Sound creation parameters such as 3D flags.
+     * @return Pointer to the newly created FMOD sound, or nullptr if data is unavailable or creation fails.
+     */
     FMOD::Sound* FmodAudioDevice::_createSoundFromMemory(const std::string& cueId,
         const std::string& path,
         const SoundParams& params)
@@ -729,7 +949,10 @@ namespace Audio {
         return s;
     }
 
-    // create channel groups and low pass dsp per bus
+    /**
+     * @brief Creates an FMOD channel group and attaches a low-pass DSP node for each bus, parenting them under master.
+     * @return True if all channel groups and DSP nodes were created and attached successfully; false on any failure.
+     */
     bool FmodAudioDevice::_initializeBusRouting() {
         // require system and master group
         if (!m_system || !m_master) {
@@ -786,7 +1009,9 @@ namespace Audio {
         return true;
     }
 
-    // release low pass dsp and bus groups
+    /**
+     * @brief Removes and releases all bus low-pass DSP nodes and non-master channel groups.
+     */
     void FmodAudioDevice::_shutdownBusRouting() {
         // release dsp objects first
         // Release DSPs first, then release non-master channel groups.
@@ -814,7 +1039,11 @@ namespace Audio {
         }
     }
 
-    // resolve the channel group for one bus
+    /**
+     * @brief Returns the FMOD channel group associated with a bus, falling back to master on invalid indices.
+     * @param bus Target bus whose channel group is needed.
+     * @return Pointer to the bus channel group, or the master group if the index is out of range or the group is null.
+     */
     FMOD::ChannelGroup* FmodAudioDevice::_channelGroupForBus(Bus bus) const {
         // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
@@ -825,7 +1054,10 @@ namespace Audio {
         return group ? group : m_master;
     }
 
-    // apply stored low pass gain to one bus dsp
+    /**
+     * @brief Applies the stored low-pass gain and resonance to the DSP node for a bus, bypassing it when near unity.
+     * @param bus Target bus whose DSP node should be updated.
+     */
     void FmodAudioDevice::_applyBusLowPassGain(Bus bus) {
         // convert bus enum to array index
         const size_t index = static_cast<size_t>(bus);
@@ -847,7 +1079,11 @@ namespace Audio {
         FMOD_OK_OR_LOG(dsp->setParameterFloat(FMOD_DSP_LOWPASS_RESONANCE, resonance), "DSP::setParameterFloat LOWPASS_RESONANCE");
     }
 
-    // clamp low pass gain to range zero to one
+    /**
+     * @brief Clamps a low-pass gain value to [0, 1], returning 1.0 for non-finite inputs.
+     * @param gain Input gain to clamp.
+     * @return Clamped gain in [0, 1].
+     */
     float FmodAudioDevice::_clampLowPassGain(float gain) {
         if (!std::isfinite(gain)) {
             return 1.0f;
@@ -856,6 +1092,11 @@ namespace Audio {
         return (gain < 0.0f) ? 0.0f : (gain > 1.0f ? 1.0f : gain);
     }
 
+    /**
+     * @brief Clamps a low-pass resonance value to the supported FMOD range, returning the minimum for non-finite inputs.
+     * @param resonance Input resonance to clamp.
+     * @return Clamped resonance within [kMinBusLowPassResonance, kMaxBusLowPassResonance].
+     */
     float FmodAudioDevice::_clampLowPassResonance(float resonance) {
         if (!std::isfinite(resonance)) {
             return 1.0f;
@@ -864,7 +1105,11 @@ namespace Audio {
             : (resonance > kMaxBusLowPassResonance ? kMaxBusLowPassResonance : resonance);
     }
 
-    // map low pass gain to cutoff frequency
+    /**
+     * @brief Maps a normalized low-pass gain [0, 1] to a cutoff frequency in Hz using exponential interpolation.
+     * @param gain Normalized gain value; 0 maps to the minimum cutoff, 1 maps to the maximum cutoff.
+     * @return Cutoff frequency in Hz within [kMinBusLowPassCutoffHz, kMaxBusLowPassCutoffHz].
+     */
     float FmodAudioDevice::_lowPassGainToCutoffHz(float gain) {
         // clamp gain before mapping
         const float clamped = _clampLowPassGain(gain);

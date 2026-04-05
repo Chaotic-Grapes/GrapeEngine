@@ -17,4 +17,10 @@ the function decomposes it into a set of non-overlapping triangles.
 #include <vector>
 
 struct Triangle { glm::vec2 a, b, c; };
+
+/**
+ * @brief Decompose a polygon into triangles using the ear-clipping algorithm.
+ * @param verts Ordered polygon vertices (counter-clockwise preferred).
+ * @return List of non-overlapping triangles covering the polygon area.
+ */
 std::vector<Triangle> triangulateEarClipping(std::vector<glm::vec2> verts);

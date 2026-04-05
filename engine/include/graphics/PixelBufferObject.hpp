@@ -15,7 +15,7 @@ The PixelBufferObject class provides functions to:
 - Efficiently read back color or picking data without stalling the GPU.
 - Manage buffer lifetime through move semantics and explicit destruction.
 
-This class is primarily used in the engine’s object picking system, enabling
+This class is primarily used in the engineï¿½s object picking system, enabling
 non-blocking entity ID readbacks from off-screen framebuffers via double-buffered
 asynchronous PBOs.
 */
@@ -36,28 +36,71 @@ public:
     PixelBufferObject(const PixelBufferObject&) = delete;
     PixelBufferObject& operator=(const PixelBufferObject&) = delete;
 
-    // Enable move
+    /**
+     * @brief Move constructor; transfers buffer ownership without reallocating GPU memory.
+     * @param other Source PBO to move from (left in a null state).
+     */
     PixelBufferObject(PixelBufferObject&& other) noexcept;
+
+    /**
+     * @brief Move assignment; transfers buffer ownership without reallocating GPU memory.
+     * @param other Source PBO to move from (left in a null state).
+     * @return Reference to this PBO after assignment.
+     */
     PixelBufferObject& operator=(PixelBufferObject&& other) noexcept;
 
-    // Create a PBO with specified size and usage (GL_STREAM_READ/GL_STREAM_DRAW, etc.)
+    /**
+     * @brief Create a PBO and allocate GPU memory with the given size and usage hint.
+     * @param size Buffer size in bytes.
+     * @param usage OpenGL usage hint (e.g. GL_STREAM_READ or GL_STREAM_DRAW).
+     */
     void Create(GLsizeiptr size, GLenum usage = GL_STREAM_READ);
 
-    // Bind or unbind the PBO to a given target (default: GL_PIXEL_PACK_BUFFER)
+    /**
+     * @brief Bind the PBO to the given target.
+     * @param target OpenGL PBO binding target (default: GL_PIXEL_PACK_BUFFER).
+     */
     void Bind(GLenum target = GL_PIXEL_PACK_BUFFER) const;
+
+    /**
+     * @brief Unbind any PBO from the given target.
+     * @param target OpenGL PBO binding target (default: GL_PIXEL_PACK_BUFFER).
+     */
     void Unbind(GLenum target = GL_PIXEL_PACK_BUFFER) const;
 
-    // Map buffer memory for CPU access (returns pointer or nullptr on failure)
+    /**
+     * @brief Map the buffer memory for CPU read/write access.
+     * @param access Mapping access mode (e.g. GL_READ_ONLY, GL_WRITE_ONLY).
+     * @return CPU-visible pointer to the mapped buffer, or nullptr on failure.
+     */
     void* Map(GLenum access = GL_READ_ONLY);
+
+    /**
+     * @brief Unmap the previously mapped buffer memory.
+     */
     void Unmap();
 
-    // Convenience: read a single uint32_t value from mapped data
+    /**
+     * @brief Read a single uint32_t value from the mapped buffer data.
+     * @return The uint32_t value at the start of the mapped region.
+     */
     uint32_t ReadUInt32();
 
-    // Delete GPU buffer manually
+    /**
+     * @brief Delete the GPU buffer and reset all state.
+     */
     void Destroy();
 
+    /**
+     * @brief Return the underlying OpenGL buffer object handle.
+     * @return OpenGL buffer object ID.
+     */
     inline GLuint ID() const { return m_id; }
+
+    /**
+     * @brief Return the allocated buffer size in bytes.
+     * @return Buffer size in bytes.
+     */
     inline GLsizeiptr Size() const { return m_size; }
 
 private:

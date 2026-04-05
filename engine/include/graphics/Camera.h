@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Camera.h
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
 \brief
 A refactored class. Standalone camera class for rendering. This is NOT an ECS 

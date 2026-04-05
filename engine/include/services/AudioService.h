@@ -1,24 +1,13 @@
-/**
-* @Name: Dalton koh, 2403250
-* @email: d.koh@digipen.edu
-* @file AudioService.h
-* @brief Engine service wrapper around the FMOD-based Audio::FmodAudioDevice.
-*
-* @details
-* Provides a lightweight Service (IService) that owns and drives the FMOD
-* audio device. Responsibilities:
-* - Lifecycle: Initialize()/Update()/Terminate() of the underlying device
-* - Pass-through helpers for common one-liners: LoadCue/Play/Stop
-* - Centralized access point for audio from gameplay systems via Services API
-*
-* The service keeps a unique_ptr<Audio::FmodAudioDevice> and exposes a raw
-* pointer getter for read-only device access when needed.
-*
-* @dependencies
-* - core/IService.h : base service interface used by the engine
-* - audio/FmodAudioDevice.h : concrete FMOD-backed audio device
-* - <memory> : unique ownership of the device instance
-* 
+/* Start Header *****************************************************************/
+/*!
+\file   AudioService.h
+\author Dalton Koh (100%)
+\par    d.koh@digipen.edu
+\brief
+Engine service wrapper around the FMOD-based Audio::FmodAudioDevice.
+Provides a lightweight IService that owns and drives the FMOD audio device,
+with pass-through helpers for LoadCue, Play, Stop, and bus volume control.
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.

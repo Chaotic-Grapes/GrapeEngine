@@ -101,13 +101,33 @@ public:
             : 0;
     }
 
+    /**
+     * @brief Get the underlying OpenGL framebuffer object id.
+     * @return OpenGL FBO handle.
+     */
     GLuint GetID() const { return fbo; }
-    int     Width() const { return width; }
-    int     Height() const { return height; }
+
+    /**
+     * @brief Get framebuffer width in pixels.
+     * @return Width in pixels.
+     */
+    int Width() const { return width; }
+
+    /**
+     * @brief Get framebuffer height in pixels.
+     * @return Height in pixels.
+     */
+    int Height() const { return height; }
 
     // CONVENIENCE HELPERS
 
-    /** @brief Binds and clears the framebuffer in one call. */
+    /**
+     * @brief Bind this framebuffer and clear it to the given color.
+     * @param r Red clear color component.
+     * @param g Green clear color component.
+     * @param b Blue clear color component.
+     * @param a Alpha clear color component.
+     */
     void BindAndClear(float r = 0.f, float g = 0.f, float b = 0.f, float a = 1.f);
 
     /** @brief Binds the default framebuffer (screen). */
@@ -121,6 +141,10 @@ public:
     void BlitToDefault(GLbitfield mask = GL_COLOR_BUFFER_BIT,
         GLenum filter = GL_NEAREST) const;
 
-    /** @brief Binds a specific color attachment texture to a given texture unit. */
+    /**
+     * @brief Bind a specific color attachment texture to a given texture unit.
+     * @param index Color attachment index.
+     * @param unit OpenGL texture unit slot to bind to.
+     */
     void BindColorTexture(int index = 0, int unit = 0) const;
 };

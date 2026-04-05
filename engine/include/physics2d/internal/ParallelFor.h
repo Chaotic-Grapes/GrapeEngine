@@ -2,8 +2,8 @@
 /*!
 \file   ParallelFor.h
 \author Dalton Koh Shi Hao (100%)
-\par d.koh@digipen.edu
-\brief Deterministic static-partition parallel-for helper for physics stages.
+\par    d.koh@digipen.edu
+\brief  Deterministic static-partition parallel-for helper for physics stages.
 */
 /* End Header *******************************************************************/
 
@@ -23,8 +23,14 @@ namespace Engine::Physics2D::Internal {
     namespace Detail {
         class StaticWorkerPool {
         public:
+            /**
+             * @brief Construct an empty worker pool; worker threads are created lazily on demand.
+             */
             StaticWorkerPool() = default;
 
+            /**
+             * @brief Stop all workers and join threads before pool destruction.
+             */
             ~StaticWorkerPool() {
                 {
                     // Signal workers to stop and join them before destruction.

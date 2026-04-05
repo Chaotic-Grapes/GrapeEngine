@@ -187,6 +187,7 @@ namespace ECS {
 
         /**
          * @brief Get the total number of systems in the graph.
+         * @return Number of systems registered in the graph.
          */
         size_t GetSystemCount() const { return m_systems.size(); }
 
@@ -257,18 +258,21 @@ namespace ECS {
 
         /**
          * @brief Check if component access between systems conflicts.
-         * @return True if the systems have a read/write conflict
+         * @param systemA First system.
+         * @param systemB Second system.
+         * @return True if the systems have a read/write conflict.
          */
         bool _hasComponentConflict(const ISystem* systemA, const ISystem* systemB) const;
 
         /**
          * @brief Perform depth-first search to detect cycles.
-         * @return True if cycle is found
+         * @return True if a cycle is found in the dependency graph.
          */
         bool _hasCycle() const;
 
         /**
          * @brief Topological sort using Kahn's algorithm.
+         * @return Vector of execution levels where systems within each level can run in parallel.
          */
         std::vector<std::vector<ISystem*>> _topologicalSort() const;
     };

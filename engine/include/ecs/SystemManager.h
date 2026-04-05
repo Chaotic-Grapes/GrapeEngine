@@ -993,15 +993,30 @@ namespace ECS {
             return "ECS.UnknownGroup";
         }
 
+        /**
+         * @brief Check whether a run mode bit is currently active in the manager mask.
+         * @param mode Run mode to test.
+         * @return True if the mode bit is enabled; otherwise false.
+         */
         bool IsRunModeActive(SystemRunMode mode) const {
             auto bit = 1u << static_cast<uint32_t>(mode);
             return (m_activeRunModesMask & bit) != 0;
         }
 
+        /**
+         * @brief Check whether a system has completed creation and is tracked as created.
+         * @param system System instance pointer to query.
+         * @return True if the system exists in the created set; otherwise false.
+         */
         bool IsSystemCreated(const ISystem* system) const {
             return system && (m_createdSystems.find(const_cast<ISystem*>(system)) != m_createdSystems.end());
         }
 
+        /**
+         * @brief Check whether a system is currently marked as running.
+         * @param system System instance pointer to query.
+         * @return True if the system is in the running set; otherwise false.
+         */
         bool IsSystemRunning(const ISystem* system) const {
             return system && (m_runningSystems.find(const_cast<ISystem*>(system)) != m_runningSystems.end());
         }
@@ -1020,6 +1035,11 @@ namespace ECS {
             return GetSystemMetadataRunMode(system);
         }
 
+        /**
+         * @brief Stop a system only when it is currently running.
+         * @param system System instance to transition out of running state.
+         * @param world World passed through to OnStopRunning.
+         */
         void _stopIfRunning(ISystem* system, World& world) {
             if (!IsSystemRunning(system)) {
                 return;
@@ -1028,6 +1048,11 @@ namespace ECS {
             m_runningSystems.erase(system);
         }
 
+        /**
+         * @brief Apply deferred enabled/disabled state changes queued by system name.
+         * @details Deferred application keeps enable-state mutation out of active iteration
+         * paths and applies all pending updates as a single batch.
+         */
         void _applyPendingEnabledChanges() {
             if (m_pendingEnabledByName.empty()) {
                 return;
@@ -1086,6 +1111,11 @@ namespace ECS {
             _profileEnd();
         }
 
+        /**
+         * @brief Create all system groups for a specific run mode using deterministic group order.
+         * @param mode Run mode whose systems should be created.
+         * @param world Active world passed to system creation callbacks.
+         */
         void _createAllGroupsForMode(SystemRunMode mode, World& world) {
             const SystemGroup orderedGroups[] = {
                 SystemGroup::PreUpdate,
@@ -1104,6 +1134,11 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Destroy all system groups for a specific run mode using deterministic group order.
+         * @param mode Run mode whose systems should be destroyed.
+         * @param world Active world passed to system destruction callbacks.
+         */
         void _destroyAllGroupsForMode(SystemRunMode mode, World& world) {
             const SystemGroup orderedGroups[] = {
                 SystemGroup::PreUpdate,

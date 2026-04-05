@@ -17,7 +17,7 @@
  *   - audio/FmodAudioDevice.h  : concrete FMOD wrapper (Initialize/Update/Shutdown)
  *   - services/AudioService.h  : matching service interface
  *   - core/Logger.h            : Trace/LOG_* helpers (optional)
- * 
+ *
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
@@ -38,14 +38,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 Audio::FmodAudioDevice* gAudioDevice = nullptr;
 
 namespace Services {
+
     /**
-      * @brief Create and initialize the FMOD device. Safe to call once at startup.
-      *
-      * Behavior:
-      * - Allocates a new FmodAudioDevice and calls its Initialize().
-      * - If initialization fails, logs and resets the unique_ptr to keep state clean.
-      * - On success, logs a short confirmation.
-      */
+     * @brief Create and initialize the FMOD device. Safe to call once at startup.
+     *
+     * Allocates a new FmodAudioDevice and calls its Initialize(). If initialization
+     * fails, logs and resets the unique_ptr to keep state clean. On success, logs a
+     * short confirmation and subscribes to window focus change events to mute/unmute audio.
+     */
     void AudioService::Initialize() {
         // Construct the device (unique ownership).
         m_device = std::make_unique<Audio::FmodAudioDevice>();
@@ -89,10 +89,9 @@ namespace Services {
     /**
      * @brief Per-frame tick for the audio system. No-ops if service disabled.
      *
-     * Notes:
-     * - FMOD requires update() to be called periodically to mix audio and
-     *   advance streaming/async callbacks.
-     * - Guarded by IsEnabled() so you can temporarily disable the service.
+     * FMOD requires Update() to be called periodically to mix audio and advance
+     * streaming/async callbacks. Guarded by IsEnabled() so the service can be
+     * temporarily disabled without stopping the engine loop.
      */
     void AudioService::Update() {
         if (m_device && IsEnabled()) {
@@ -107,11 +106,9 @@ namespace Services {
     /**
      * @brief Clean shutdown of the audio device. Safe to call multiple times.
      *
-     * Behavior:
-     * - Calls FmodAudioDevice::Shutdown() if the device exists
-     *   (stops channels, releases sounds, closes & releases FMOD::System).
-     * - Resets the unique_ptr to free the device object.
-     * - Logs a short termination message.
+     * Unsubscribes from window focus events, calls FmodAudioDevice::Shutdown() if the
+     * device exists (stops channels, releases sounds, closes and releases FMOD::System),
+     * then resets both the device and engine unique_ptrs.
      */
     void AudioService::Terminate() {
         // Unsubscribe from window focus events
@@ -133,14 +130,30 @@ namespace Services {
     // Device Management
     // -----------------------------------------------------------------
 
+    /**
+     * @brief Enumerate all available audio output devices via the DeviceManager.
+     * @return Vector of AudioDeviceInfo describing each available output device.
+     */
     std::vector<Engine::AudioDeviceInfo> AudioService::GetAvailableOutputDevices() const {
         return Engine::DeviceManager::EnumerateAudioOutputDevices();
     }
 
+    /**
+     * @brief Enumerate all available audio input devices via the DeviceManager.
+     * @return Vector of AudioDeviceInfo describing each available input device.
+     */
     std::vector<Engine::AudioDeviceInfo> AudioService::GetAvailableInputDevices() const {
         return Engine::DeviceManager::EnumerateAudioInputDevices();
     }
 
+    /**
+     * @brief Return metadata for the currently active audio output device.
+     *
+     * Performs a direct lookup by the stored device ID when one is set; otherwise
+     * falls back to the system default output device.
+     *
+     * @return AudioDeviceInfo for the active device, or the system default if none is set.
+     */
     Engine::AudioDeviceInfo AudioService::GetCurrentDevice() const {
         if (!m_currentAudioDeviceID.empty()) {
             // Use the direct lookup method instead of enumerating all devices
@@ -153,6 +166,12 @@ namespace Services {
         return Engine::DeviceManager::GetDefaultAudioOutputDevice();
     }
 
+    /**
+     * @brief Switch the active audio output to the specified device.
+     * @param deviceID Platform-specific device identifier string.
+     * @return True if the switch succeeded, false if the device was not found, not
+     *         connected, or FMOD reinitialization failed.
+     */
     bool AudioService::SetAudioDevice(const std::string& deviceID) {
         if (!m_device) {
             LOG_ERROR("Cannot set audio device: AudioService not initialized");
@@ -185,6 +204,13 @@ namespace Services {
         return false;
     }
 
+    /**
+     * @brief Handle an audio device disconnection event by falling back to the default device.
+     *
+     * Queries the system default output device and attempts to reinitialize FMOD against it.
+     * Logs a warning on entry and an error if no default device is available or if
+     * reinitialization fails.
+     */
     void AudioService::OnAudioDeviceDisconnected() {
         if (!m_device) return;
 
@@ -207,6 +233,17 @@ namespace Services {
         }
     }
 
+    /**
+     * @brief Reinitialize the FMOD backend against a new output device.
+     *
+     * Stops all playing audio, captures the list of loaded cues, shuts down the current
+     * FMOD system, and reinitializes it with the specified device. Previously loaded cues
+     * are reloaded with default parameters and the master volume is restored.
+     *
+     * @param deviceID Platform-specific device identifier for the target output device.
+     * @return True if FMOD reinitialized successfully on the new device (or on the default
+     *         device as a fallback), false if initialization failed entirely.
+     */
     bool AudioService::_reinitializeAudioDevice(const std::string& deviceID) {
         if (!m_device) return false;
 
@@ -226,7 +263,7 @@ namespace Services {
         // Reinitialize FMOD with new device ID (passed to FmodAudioDevice)
         if (!m_device->InitializeWithDevice(deviceID)) {
             LOG_ERROR("Failed to reinitialize FMOD with device: " << deviceID);
-            
+
             // Try to fallback to default initialization
             if (!m_device->Initialize()) {
                 LOG_CRITICAL("Failed to reinitialize FMOD even with default device!");

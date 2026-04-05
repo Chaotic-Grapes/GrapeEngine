@@ -82,21 +82,25 @@ namespace Platform {
         
         /**
          * @brief Get window width in pixels
+         * @return Window width in pixels.
          */
         virtual int GetWidth() const = 0;
 
         /**
          * @brief Get window height in pixels
+         * @return Window height in pixels.
          */
         virtual int GetHeight() const = 0;
 
         /**
          * @brief Get window title
+         * @return Current window title string.
          */
         virtual std::string GetTitle() const = 0;
 
         /**
          * @brief Set window title
+         * @param title New title string to display in the window title bar.
          */
         virtual void SetTitle(const std::string& title) = 0;
 
@@ -104,46 +108,55 @@ namespace Platform {
         
         /**
          * @brief Check if window has input focus
+         * @return True if the window currently has keyboard/mouse focus.
          */
         virtual bool IsFocused() const = 0;
 
         /**
          * @brief Check if window is minimized
+         * @return True if the window is currently minimized.
          */
         virtual bool IsMinimized() const = 0;
 
         /**
          * @brief Set window minimized state
+         * @param minimized True to minimize the window, false to restore.
          */
         virtual void SetMinimized(bool minimized) const = 0;
 
         /**
          * @brief Check if window is maximized
+         * @return True if the window is currently maximized.
          */
         virtual bool IsMaximized() const = 0;
 
         /**
          * @brief Set window maximized state
+         * @param maximized True to maximize the window, false to restore.
          */
         virtual void SetMaximized(bool maximized) const = 0;
 
         /**
          * @brief Check if window is visible
+         * @return True if the window is currently shown.
          */
         virtual bool IsVisible() const = 0;
 
         /**
          * @brief Set window visibility
+         * @param visible True to show the window, false to hide it.
          */
         virtual void SetVisible(bool visible) const = 0;
 
         /**
          * @brief Check if window is resizable
+         * @return True if the window can be resized by the user.
          */
         virtual bool IsResizable() const = 0;
 
         /**
          * @brief Set window resizable state
+         * @param resizable True to allow user resizing, false to fix the window size.
          */
         virtual void SetResizable(bool resizable) const = 0;
 
@@ -151,11 +164,13 @@ namespace Platform {
         
         /**
          * @brief Check if VSync is enabled
+         * @return True if vertical synchronization is currently active.
          */
         virtual bool IsVSync() const = 0;
 
         /**
          * @brief Enable or disable VSync
+         * @param enabled True to enable vertical synchronization, false to disable.
          */
         virtual void SetVSync(bool enabled) = 0;
 
@@ -172,7 +187,8 @@ namespace Platform {
 
         /**
          * @brief Check if window has specific mode flags
-         * @param mode Mode flags to check
+         * @param mode Mode flags to check.
+         * @return True if all specified mode flags are active.
          */
         virtual bool HasMode(WindowMode mode) const = 0;
 
@@ -238,19 +254,36 @@ namespace Platform {
         virtual void* GetNativeHandle() const = 0;
     };
 
-    // Bitwise operators for WindowMode
+    /**
+     * @brief Combine two WindowMode flags with bitwise OR.
+     * @param a First mode flags.
+     * @param b Second mode flags.
+     * @return Union of the two flag sets.
+     */
     inline WindowMode operator|(WindowMode a, WindowMode b) {
         return static_cast<WindowMode>(
             static_cast<uint8_t>(a) | static_cast<uint8_t>(b)
         );
     }
 
+    /**
+     * @brief Intersect two WindowMode flags with bitwise AND.
+     * @param a First mode flags.
+     * @param b Second mode flags.
+     * @return Intersection of the two flag sets.
+     */
     inline WindowMode operator&(WindowMode a, WindowMode b) {
         return static_cast<WindowMode>(
             static_cast<uint8_t>(a) & static_cast<uint8_t>(b)
         );
     }
 
+    /**
+     * @brief Test whether a specific WindowMode flag is set.
+     * @param flags Combined flags to test.
+     * @param flag Single flag to check for.
+     * @return True if the flag is present in flags.
+     */
     inline bool HasFlag(WindowMode flags, WindowMode flag) {
         return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(flag)) != 0;
     }

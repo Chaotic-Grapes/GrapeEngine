@@ -84,17 +84,53 @@ struct ParticleParams {
 
 namespace CudaParticles {
 
-    // Update alive particles and write alive flags (fused markAlive).
-    // d_aliveFlags is written here so Compact can skip its own mark pass.
+    /**
+     * @brief Advance alive particles one simulation step and write per-particle alive flags.
+     *        d_aliveFlags is populated here so Compact can skip its own mark pass.
+     * @param posVel Device array of particle position (xy) and velocity (zw).
+     * @param lifeColor Device array of particle lifetime and color data.
+     * @param sizeRot Device array of particle size and rotation data.
+     * @param d_aliveFlags Device array receiving 1 for each alive particle, 0 for dead.
+     * @param params Particle simulation parameters for this frame.
+     * @param stream CUDA stream to use for asynchronous execution.
+     */
     void Update(float4* posVel, float4* lifeColor, float4* sizeRot,
         int* d_aliveFlags,
         const ParticleParams& params, cudaStream_t stream = 0);
 
+    /**
+     * @brief Emit new particles into available dead slots.
+     * @param posVel Device array of particle position (xy) and velocity (zw).
+     * @param lifeColor Device array of particle lifetime and color data.
+     * @param sizeRot Device array of particle size and rotation data.
+     * @param params Particle emission parameters including emitter position and count.
+     * @param stream CUDA stream to use for asynchronous execution.
+     * @return Number of particles successfully emitted.
+     */
     int  Emit(float4* posVel, float4* lifeColor, float4* sizeRot,
         const ParticleParams& params, cudaStream_t stream = 0);
 
-    // Compact expects d_aliveFlags to already be populated (by Update).
-    // h_totalAlive is pinned host memory for deferred async readback.
+    /**
+     * @brief Compact alive particles to a contiguous range using pre-populated alive flags.
+     *        Expects d_aliveFlags to already be written by Update.
+     *        h_totalAlive is pinned host memory for deferred async readback.
+     * @param posVel Device array of particle position and velocity data.
+     * @param lifeColor Device array of particle lifetime and color data.
+     * @param sizeRot Device array of particle size and rotation data.
+     * @param aliveCount Current alive particle count before compaction.
+     * @param maxParticles Maximum particle capacity of the buffers.
+     * @param d_aliveFlags Device array of alive flags populated by Update.
+     * @param d_offsets Device scratch array for prefix-sum offsets.
+     * @param d_totalAlive Device scalar receiving the post-compaction alive count.
+     * @param h_totalAlive Pinned host scalar for deferred asynchronous readback.
+     * @param d_tempPV Temporary device buffer for position/velocity during compaction.
+     * @param d_tempLC Temporary device buffer for life/color during compaction.
+     * @param d_tempSR Temporary device buffer for size/rotation during compaction.
+     * @param d_scanTemp Temporary device buffer for the prefix-sum scan.
+     * @param scanTempBytes Size in bytes of d_scanTemp (from GetScanTempBytes).
+     * @param stream CUDA stream to use for asynchronous execution.
+     * @return Alive particle count after compaction.
+     */
     int  Compact(float4* posVel, float4* lifeColor, float4* sizeRot,
         int aliveCount, int maxParticles,
         int* d_aliveFlags, int* d_offsets, int* d_totalAlive,
@@ -103,10 +139,26 @@ namespace CudaParticles {
         void* d_scanTemp, size_t scanTempBytes,
         cudaStream_t stream = 0);
 
+    /**
+     * @brief Interleave SoA particle buffers into the mapped OpenGL VBO for rendering.
+     * @param dst Destination device pointer mapped from the GL VBO.
+     * @param posVel Source device array of particle position and velocity data.
+     * @param lifeColor Source device array of particle lifetime and color data.
+     * @param sizeRot Source device array of particle size and rotation data.
+     * @param count Number of alive particles to interleave.
+     * @param stream CUDA stream to use for asynchronous execution.
+     */
     void Interleave(float4* dst, const float4* posVel,
         const float4* lifeColor, const float4* sizeRot,
         int count, cudaStream_t stream = 0);
 
+    /**
+     * @brief Query the temporary device memory required for the prefix-sum scan.
+     * @param count Number of elements to scan.
+     * @param d_in Device input array (used to determine algorithm requirements).
+     * @param d_out Device output array (used to determine algorithm requirements).
+     * @return Required scratch buffer size in bytes.
+     */
     size_t GetScanTempBytes(int count, int* d_in, int* d_out);
 
 } // namespace CudaParticles

@@ -97,48 +97,116 @@
 
         class ParticleSystem : public ISystem {
         public:
+            /**
+             * @brief Return system metadata for scheduler registration.
+             * @return SystemMetadata describing component access and execution order.
+             */
             SystemMetadata GetMetadata() const override;
 
+            /**
+             * @brief Initialize GPU resources for all existing emitter entities.
+             * @param world ECS world containing entities with particle emitter components.
+             */
             void OnCreate(World& world) override;
+
+            /**
+             * @brief Simulate and render all active particle emitters this frame.
+             * @param world ECS world containing entities with particle emitter components.
+             */
             void OnUpdate(World& world) override;
+
+            /**
+             * @brief Release all GPU resources owned by particle emitters.
+             * @param world ECS world passed by the scheduler.
+             */
             void OnDestroy(World& world) override;
 
-            // Render all emitters on the requested layer using current GPU buffers.
+            /**
+             * @brief Render all emitters on the requested layer using current GPU buffers.
+             * @param layerId Layer identifier to filter emitters for rendering.
+             * @param shader Shader program used to render particle instances.
+             * @param viewProj Combined view-projection matrix for the current camera.
+             * @param lights Light manager providing lighting data for the particle shader.
+             * @param world ECS world used to resolve emitter entity components.
+             */
             void DrawEmittersByLayer(uint16_t layerId, Shader& shader,
                 const glm::mat4& viewProj,
                 Graphics::LightManager& lights, World& world);
 
+            /**
+             * @brief Render one specific emitter identified by its ECS entity index.
+             * @param entityIndex ECS entity index of the emitter to render.
+             * @param shader Shader program used to render particle instances.
+             * @param world ECS world used to resolve the emitter entity components.
+             */
             void DrawEmitterForEntity(uint32_t entityIndex, Shader& shader, World& world);
 
-            // Register one preset and return its index for emitter references.
+            /**
+             * @brief Register one preset and return its index for emitter references.
+             * @param preset Particle preset configuration to register.
+             * @return Index of the newly registered preset.
+             */
             uint32_t RegisterPreset(const ParticlePreset& preset) {
                 m_presets.push_back(preset);
                 return (uint32_t)(m_presets.size() - 1);
             }
 
-            // Retrieve a preset by index.
+            /**
+             * @brief Retrieve a preset by index.
+             * @param id Index of the preset to retrieve.
+             * @return Reference to the ParticlePreset at that index.
+             */
             const ParticlePreset& GetPreset(uint32_t id) const {
                 return m_presets[id];
             }
 
+            /**
+             * @brief Return the number of registered particle presets.
+             * @return Count of presets registered via RegisterPreset.
+             */
             size_t GetPresetCount() const { return m_presets.size(); }
 
-            // Upload/refresh shared tile collision grid used for particle collisions.
+            /**
+             * @brief Upload and refresh the shared tile collision grid used for particle collisions.
+             * @param tileMap Tile map whose solid-cell data will be copied to the GPU.
+             */
             void UpdateCollisionGrid(const TileMap& tileMap);
 
+            /**
+             * @brief Return the per-emitter render data map for read-only use by the renderer.
+             * @return Reference to the map from entity index to EmitterRenderData.
+             */
             const std::unordered_map<uint32_t, EmitterRenderData>& GetRenderData() const {
                 return m_renderData;
             }
 
-            // Queue a burst spawn request for a specific emitter entity.
+            /**
+             * @brief Queue a burst spawn request for a specific emitter entity.
+             * @param entityIndex ECS entity index of the emitter to burst.
+             * @param count Number of particles to spawn in the burst.
+             */
             void TriggerBurst(uint32_t entityIndex, int count);
 
         private:
-            // Allocate and initialize GPU simulation/render resources for one emitter.
+            /**
+             * @brief Allocate and initialize GPU simulation and render resources for one emitter.
+             * @param entityIndex ECS entity index of the emitter to initialize.
+             * @param maxParticles Maximum particle capacity to allocate.
+             */
             void InitEmitter(uint32_t entityIndex, int maxParticles);
-            // Destroy GPU simulation/render resources for one emitter.
+
+            /**
+             * @brief Destroy GPU simulation and render resources for one emitter.
+             * @param entityIndex ECS entity index of the emitter to destroy.
+             */
             void DestroyEmitter(uint32_t entityIndex);
-            // Build quad geometry and VAO bindings for an emitter render slot.
+
+            /**
+             * @brief Build quad geometry and VAO bindings for an emitter render slot.
+             * @param gpu GPU state struct to populate with the new VAO and VBO.
+             * @param slot Double-buffer slot index (0 or 1) to initialize.
+             * @param maxParticles Number of particles the VAO must accommodate.
+             */
             void CreateQuadVAO(EmitterGPUData& gpu, int slot, int maxParticles);
 
             std::vector<ParticlePreset>                         m_presets;

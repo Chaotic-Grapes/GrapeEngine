@@ -68,7 +68,9 @@ namespace ECS {
      * @complexity O(sum(layer entities) + unlayered flocks + GPU simulation work)
      */
     void BoidSystem::OnUpdate(World& world) {
+#ifdef GRAPE_HAS_CUDA
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+#endif
         auto* layerManager = world.GetLayerManager();
 
         // ----------------------------------------------------------
@@ -402,10 +404,9 @@ namespace ECS {
             glGenBuffers(1, &gpu.instanceVBO[i]);
             glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVBO[i]);
             glBufferData(GL_ARRAY_BUFFER,
-                sizeof(float4) * count,
+                sizeof(float) * 4 * count,
                 nullptr,
                 GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 #ifdef GRAPE_HAS_CUDA
             gpu.cudaVBO[i] = CudaGL::RegisterBuffer(gpu.instanceVBO[i]);
@@ -445,6 +446,10 @@ namespace ECS {
             << entityIndex << " with " << count << " boids");
     }
 
+    /**
+     * @brief Release GPU/CUDA resources associated with a boid flock entity.
+     * @param entityIndex Packed entity index used as flock key.
+     */
     void BoidSystem::DestroyFlock(uint32_t entityIndex) {
         auto it = m_flocks.find(entityIndex);
         if (it == m_flocks.end()) return;
@@ -480,6 +485,11 @@ namespace ECS {
         LOG_INFO("[BoidSystem] Destroyed flock for entity " << entityIndex);
     }
 
+    /**
+     * @brief Create or bind quad geometry VAO for one buffered flock render slot.
+     * @param gpu Flock GPU resource bundle.
+     * @param slot Buffer slot index (double-buffered instance data).
+     */
     void BoidSystem::CreateQuadVAO(FlockGPUData& gpu, int slot) {
         float quadVertices[] = {
             -0.5f, -0.5f,  0.0f, 0.0f,
@@ -518,6 +528,9 @@ namespace ECS {
 
     void BoidSystem::UpdateCollisionGrid(const TileMap& tileMap)
     {
+#ifndef GRAPE_HAS_CUDA
+        (void)tileMap;
+#endif
 #ifdef GRAPE_HAS_CUDA
         const auto& masks = tileMap.GetCollisionMasks();
 
@@ -553,6 +566,12 @@ namespace ECS {
 #endif
     }
 
+    /**
+     * @brief Draw all prepared boid flocks assigned to a specific layer.
+     * @param layerId Layer id to render.
+     * @param shader Bound shader receiving boid material and texture uniforms.
+     * @param viewProj Current view-projection matrix (unused by this path).
+     */
     void BoidSystem::DrawFlocksByLayer(uint16_t layerId, Shader& shader, const glm::mat4& viewProj) {
         (void)viewProj;
 
@@ -619,6 +638,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Draw one boid flock for an explicit entity key.
+     * @param entityIndex Packed entity index used for render-data lookup.
+     * @param shader Bound shader receiving boid material and texture uniforms.
+     */
     void BoidSystem::DrawFlockForEntity(uint32_t entityIndex, Shader& shader) {
         auto it = m_renderData.find(entityIndex);
         if (it == m_renderData.end()) return;

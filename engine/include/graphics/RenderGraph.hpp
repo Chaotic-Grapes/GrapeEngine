@@ -124,13 +124,11 @@ public:
 
     /**
      * @brief Execute all registered passes in submission order.
-     * @return void
      */
     void Execute();
 
     /**
-     * @brief Clear pass list while keeping allocated resources alive.
-     * @return void
+     * @brief Clear the pass list while keeping allocated resources alive.
      */
     void Reset();
 

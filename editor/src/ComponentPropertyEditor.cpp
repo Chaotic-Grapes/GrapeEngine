@@ -5311,7 +5311,6 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
     if (!data.contains("CornerRadius")) data["CornerRadius"] = 0.0f;
     if (!data.contains("KnobSize")) data["KnobSize"] = { {"X", 16.0f}, {"Y", 16.0f} };
     if (!data.contains("Padding")) data["Padding"] = { {"X", 6.0f}, {"Y", 6.0f}, {"Z", 6.0f}, {"W", 6.0f} };
-    if (!data.contains("RotationDegrees")) data["RotationDegrees"] = 0.0f;
     if (!data.contains("Horizontal")) data["Horizontal"] = true;
     if (!data.contains("Disabled")) data["Disabled"] = false;
     if (!data.contains("ValueChanged")) data["ValueChanged"] = false;
@@ -5322,7 +5321,7 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
         "Track Texture", "Track Filter",
         "Fill Texture", "Fill Filter",
         "Knob Texture", "Knob Filter",
-        "Corner Radius", "Knob Size", "Padding", "Rotation", "Horizontal", "Disabled", "Value Changed"
+        "Corner Radius", "Knob Size", "Padding", "Horizontal", "Disabled", "Value Changed"
     });
 
     // Render float row
@@ -5367,7 +5366,6 @@ void ComponentUI::RenderGUISlider(nlohmann::json& data, ECS::Entity entity, ECS:
     // Render vector 2 drow
     EditorUI::RenderVector2DRow("Knob Size", data["KnobSize"], "X", "Y", 1.0f);
     EditorUI::RenderVector4DRow("Padding", data["Padding"], "X", "Y", "Z", "W", 1.0f);
-    EditorUI::RenderFloatRow("Rotation", "deg", data, "RotationDegrees", 0.1f);
 
     // Render checkbox property
     EditorUI::RenderCheckboxProperty("Horizontal", data, "Horizontal");

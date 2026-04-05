@@ -23,6 +23,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    /**
+     * @brief Construct a gizmo renderer with safe editor defaults.
+     */
     GizmoRenderer::GizmoRenderer()
         : m_operation(Operation::Translate)
         , m_mode(Mode::Local)
@@ -33,9 +36,13 @@ namespace Editor {
         , m_viewportH(1.0f) {
     }
 
+    /**
+     * @brief Destroy the gizmo renderer.
+     */
     GizmoRenderer::~GizmoRenderer() {
     }
 
+    // Set the screen-space rectangle that ImGuizmo will draw within
     void GizmoRenderer::SetViewport(float x, float y, float w, float h) {
         m_viewportX = x;
         m_viewportY = y;
@@ -43,18 +50,22 @@ namespace Editor {
         m_viewportH = h;
     }
 
+    // Set the active gizmo operation (Translate, Rotate, or Scale)
     void GizmoRenderer::SetOperation(Operation op) {
         m_operation = op;
     }
 
+    // Set the transform space (Local or World) used when manipulating the gizmo
     void GizmoRenderer::SetMode(Mode mode) {
         m_mode = mode;
     }
 
+    // Switch between orthographic (false) and perspective (true) projection mode for gizmo rendering
     void GizmoRenderer::SetPerspective(bool isPerspective) {
         m_isPerspective = isPerspective;
     }
 
+    // Submit the gizmo to ImGuizmo using the given view/projection matrices; returns true if the user manipulated it this frame
     bool GizmoRenderer::Render(
         const glm::mat4& viewMatrix,
         const glm::mat4& projMatrix,
@@ -148,14 +159,17 @@ namespace Editor {
         return isManipulating;
     }
 
+    // Return true if the user is actively manipulating the gizmo this frame
     bool GizmoRenderer::IsBeingUsed() const {
         return ImGuizmo::IsUsing();
     }
 
+    // Return true if the mouse cursor is hovering over any part of the gizmo
     bool GizmoRenderer::IsMouseOver() const {
         return ImGuizmo::IsOver();
     }
 
+    // Return true if the gizmo is being used or hovered, indicating input should not pass through to the viewport
     bool GizmoRenderer::ShouldBlockInput() const {
         return ImGuizmo::IsUsing() || ImGuizmo::IsOver();
     }

@@ -10,7 +10,7 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-project(GrapeEngineLib VERSION 1.0.0 LANGUAGES CXX CUDA)
+project(GrapeEngineLib VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 23)

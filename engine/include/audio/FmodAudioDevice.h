@@ -1,30 +1,17 @@
-/*
-* @Name: Dalton koh, 2403250
-* @email: d.koh@digipen.edu
-* @file FmodAudioDevice.h
-* @brief Thin FMOD Core wrapper: cue loading, instance playback, simple 3D controls.
-*
-* @details
-* Exposes a minimal device interface used by game systems:
-* - Initialize/Update/Shutdown: lifecycle of the FMOD::System
-* - Cue management: LoadCue/UnloadCue/HasCue (by string ID)
-* - Playback: Play returns a small PlaybackHandle that identifies a channel
-* - Controls: Stop/SetInstanceVolume/SetInstancePitch/SetInstancePosition
-* - Listener: SetListener to update 3D listener attributes
-* - Master volume: global gain control cached locally for UI/serialization
-* Internally caches FMOD::Sound objects per cue and active FMOD::Channel per handle.
-*
-* @sources
-* - FMOD Core Programmer�s Guide (System, Sound, Channel, ChannelGroup usage).
-*
-* @dependencies
-* - <fmod.hpp>, <unordered_map>, <string>, and Audio::SoundTypes
-* 
+/* Start Header *****************************************************************/
+/*!
+File   FmodAudioDevice.h
+Author Dalton Koh (100%)
+\par   d.koh@digipen.edu
+Brief
+Thin FMOD Core wrapper providing cue loading, instance playback, and simple 3D
+audio controls.
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
-/* End Header *******************************************************************/
+/* End Header ******************************************************************/
 
 
 #ifndef FMODAUDIODEVICE_H
@@ -190,25 +177,112 @@ namespace Audio {
          * @param vel World velocity.
          */
         void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
+
+        /**
+         * @brief Set per-instance 3D min/max rolloff distances.
+         * @param handle Playback handle.
+         * @param minDistance Distance at which volume is at maximum.
+         * @param maxDistance Distance beyond which the sound is fully attenuated.
+         */
         void SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance);
+
+        /**
+         * @brief Get per-instance 3D minimum rolloff distance.
+         * @param handle Playback handle.
+         * @return Minimum rolloff distance in world units.
+         */
         float GetInstance3DMinDistance(PlaybackHandle handle) const;
+
+        /**
+         * @brief Get per-instance 3D maximum rolloff distance.
+         * @param handle Playback handle.
+         * @return Maximum rolloff distance in world units.
+         */
         float GetInstance3DMaxDistance(PlaybackHandle handle) const;
+
+        /**
+         * @brief Set per-instance 3D stereo spread angle.
+         * @param handle Playback handle.
+         * @param spread Spread angle in degrees [0, 360].
+         */
         void SetInstance3DSpread(PlaybackHandle handle, float spread);
+
+        /**
+         * @brief Get per-instance 3D stereo spread angle.
+         * @param handle Playback handle.
+         * @return Current spread angle in degrees.
+         */
         float GetInstance3DSpread(PlaybackHandle handle) const;
+
+        /**
+         * @brief Set per-instance 3D spatial blend level.
+         * @param handle Playback handle.
+         * @param level Blend level in [0, 1] where 1 is fully 3D.
+         */
         void SetInstance3DLevel(PlaybackHandle handle, float level);
+
+        /**
+         * @brief Get per-instance 3D spatial blend level.
+         * @param handle Playback handle.
+         * @return Current 3D blend level.
+         */
         float GetInstance3DLevel(PlaybackHandle handle) const;
+
+        /**
+         * @brief Check if a playback handle is currently playing.
+         * @param handle Playback handle to test.
+         * @return True if the handle refers to an active channel.
+         */
         bool IsHandlePlaying(PlaybackHandle handle) const;
 
-        // Default 3D settings applied to newly played Spatial3D instances.
+        /**
+         * @brief Set default 3D min/max rolloff distances for new Spatial3D instances.
+         * @param minDistance Default minimum rolloff distance.
+         * @param maxDistance Default maximum rolloff distance.
+         */
         void SetDefault3DMinMaxDistance(float minDistance, float maxDistance);
+
+        /**
+         * @brief Get default 3D minimum rolloff distance.
+         * @return Default minimum rolloff distance in world units.
+         */
         float GetDefault3DMinDistance() const;
+
+        /**
+         * @brief Get default 3D maximum rolloff distance.
+         * @return Default maximum rolloff distance in world units.
+         */
         float GetDefault3DMaxDistance() const;
+
+        /**
+         * @brief Set default 3D stereo spread angle for new Spatial3D instances.
+         * @param spread Default spread angle in degrees [0, 360].
+         */
         void SetDefault3DSpread(float spread);
+
+        /**
+         * @brief Get default 3D stereo spread angle.
+         * @return Default spread angle in degrees.
+         */
         float GetDefault3DSpread() const;
+
+        /**
+         * @brief Set default 3D spatial blend level for new Spatial3D instances.
+         * @param level Default blend level in [0, 1].
+         */
         void SetDefault3DLevel(float level);
+
+        /**
+         * @brief Get default 3D spatial blend level.
+         * @return Default 3D blend level.
+         */
         float GetDefault3DLevel() const;
 
-        // Bus-level controls routed through FMOD channel groups and DSPs.
+        /**
+         * @brief Set bus low-pass gain.
+         * @param bus Mixer bus.
+         * @param gain Low-pass gain factor.
+         */
         void SetBusLowPassGain(Bus bus, float gain);
 
         /**
@@ -217,7 +291,19 @@ namespace Audio {
          * @return Low-pass gain factor.
          */
         float GetBusLowPassGain(Bus bus) const;
+
+        /**
+         * @brief Set bus low-pass resonance.
+         * @param bus Mixer bus.
+         * @param resonance Resonance factor.
+         */
         void SetBusLowPassResonance(Bus bus, float resonance);
+
+        /**
+         * @brief Get bus low-pass resonance.
+         * @param bus Mixer bus.
+         * @return Current resonance factor.
+         */
         float GetBusLowPassResonance(Bus bus) const;
 
         /**
@@ -354,6 +440,11 @@ namespace Audio {
          * @return Clamped gain value.
          */
         static float _clampLowPassGain(float gain);
+        /**
+         * @brief Clamp low-pass resonance into valid device-supported range.
+         * @param resonance Requested resonance value.
+         * @return Clamped resonance value.
+         */
         static float _clampLowPassResonance(float resonance);
 
         /**

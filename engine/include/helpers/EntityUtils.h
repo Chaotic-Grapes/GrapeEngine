@@ -28,11 +28,20 @@ namespace ECS {
     // Trying to keep it separate
     class EntityUtils {
     public:
-        // Pack as [63..32]=Generation, [31..0]=Index
+        /**
+         * @brief Pack an entity into a 64-bit integer as [63..32]=Generation, [31..0]=Index.
+         * @param e Entity to pack.
+         * @return 64-bit packed representation.
+         */
         static uint64_t Pack(Entity e) {
             return (uint64_t(e.Generation) << 32) | uint64_t(e.Index);
         }
 
+        /**
+         * @brief Unpack a 64-bit integer back into an Entity.
+         * @param id Packed entity id produced by Pack.
+         * @return Reconstructed Entity with Index and Generation fields set.
+         */
         static Entity Unpack(uint64_t id) {
             Entity e;
             e.Index = static_cast<uint32_t>(id & 0xFFFFFFFFull);
@@ -40,7 +49,13 @@ namespace ECS {
             return e;
         }
 
-        // Validate id against world; returns true if alive and sets out
+        /**
+         * @brief Validate a packed entity id against the world and return the live entity.
+         * @param world ECS world to check liveness against.
+         * @param id Packed entity id to resolve.
+         * @param out Receives the live entity on success; set to NULL_ENTITY on failure.
+         * @return True if the entity is alive; false if it has been destroyed or never existed.
+         */
         static bool TryResolve(const World& world, uint64_t id, Entity& out) {
             Entity e = Unpack(id);
             if (world.IsAlive(e)) {

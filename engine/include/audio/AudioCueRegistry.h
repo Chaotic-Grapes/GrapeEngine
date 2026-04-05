@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioCueRegistry.h
-\author Dalton Koh , 2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Declares the shared audio cue registry used for cue id and path lookup.

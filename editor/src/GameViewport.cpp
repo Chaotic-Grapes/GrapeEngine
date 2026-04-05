@@ -33,11 +33,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/Viewport.hpp"
 #include "helpers/TransformUtils.h"
 #include "services/Input.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include <algorithm>
 
 namespace {
     constexpr const char* kGameViewportName = "Game";
 
+    // Return the target aspect ratio for the given selection index, or the viewport's actual ratio if freeAspect is set
     float ResolveSelectedAspectRatio(int selectedAspectRatio, bool freeAspect, int width, int height) {
         if (freeAspect) {
             return (height > 0) ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
@@ -55,6 +58,7 @@ namespace {
     }
 }
 
+// Initialize the game viewport, create its named renderer viewport, and set viewport type to Game
 void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
     ECS::World* world, Scenes::SceneManager* sceneManager) {
     BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
@@ -64,18 +68,28 @@ void GameViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 }
 
 GameViewport::~GameViewport() {
+    m_immersiveMode = false;
+    (void)_syncImmersiveWindowState();
     Graphics::ViewportManager::Destroy(kGameViewportName);
 }
 
 // -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
+
+/**
+ * @brief Handle immersive input toggles and synchronize window mode transitions.
+ * @note F12 toggles immersive mode and Escape exits immersive mode.
+ *       Immersive mode forces the main window to borderless and restores the
+ *       exact previous mode when disabled.
+ */
 void GameViewport::HandleInWorldInteraction() {
     if (Input::IsKeyPressed(KEY_F12)) {
         if (m_immersiveMode) {
             m_immersiveMode = false;
             m_requestRestore = true;
-        } else {
+        } 
+        else {
             m_immersiveMode = true;
             m_requestRestore = false;
         }
@@ -85,15 +99,106 @@ void GameViewport::HandleInWorldInteraction() {
         m_requestRestore = true;
     }
 
+    (void)_syncImmersiveWindowState();
+
     if (!HasValidWorld()) return;
 
     // Game viewport doesn't handle entity dragging or editor camera input
     m_isViewportHovered = false;
 }
 
+/**
+ * @brief Synchronize platform window mode with immersive viewport state.
+ * @return True when the required transition was applied or not needed.
+ * @complexity O(1).
+ */
+bool GameViewport::_syncImmersiveWindowState() {
+    auto* context = Engine::CORE ? Engine::CORE->GetPlatformContext() : nullptr;
+    auto* window = context ? context->GetMainWindow() : nullptr;
+    if (!window) {
+        return false;
+    }
+
+    if (m_immersiveMode) {
+        if (m_immersiveWindowModeApplied) {
+            return true;
+        }
+
+        if (!_capturePreImmersiveWindowState(*window)) {
+            return false;
+        }
+
+        window->SetMode(Platform::WindowMode::Borderless);
+        m_immersiveWindowModeApplied = true;
+        return true;
+    }
+
+    if (!m_immersiveWindowModeApplied) {
+        return true;
+    }
+
+    const bool restored = _restorePreImmersiveWindowState(*window);
+    m_immersiveWindowModeApplied = false;
+    return restored;
+}
+
+/**
+ * @brief Capture the editor window mode and maximized state before immersive mode.
+ * @param window Main platform window used by the editor.
+ * @return True if state capture completed.
+ * @complexity O(1).
+ */
+bool GameViewport::_capturePreImmersiveWindowState(Platform::IWindow& window) {
+    if (window.HasMode(Platform::WindowMode::Fullscreen)) {
+        m_preImmersiveWindowMode = Platform::WindowMode::Fullscreen;
+    }
+    else if (window.HasMode(Platform::WindowMode::Borderless)) {
+        m_preImmersiveWindowMode = Platform::WindowMode::Borderless;
+    }
+    else {
+        m_preImmersiveWindowMode = Platform::WindowMode::Windowed;
+    }
+
+    m_preImmersiveWindowMaximized = window.IsMaximized();
+    m_preImmersiveWindowStateValid = true;
+    return true;
+}
+
+/**
+ * @brief Restore the editor window mode captured before immersive mode.
+ * @param window Main platform window used by the editor.
+ * @return True if restore completed or there was no captured state.
+ * @complexity O(1).
+ */
+bool GameViewport::_restorePreImmersiveWindowState(Platform::IWindow& window) {
+    if (!m_preImmersiveWindowStateValid) {
+        return true;
+    }
+
+    if (m_preImmersiveWindowMode == Platform::WindowMode::Fullscreen) {
+        window.SetMode(Platform::WindowMode::Fullscreen);
+        m_preImmersiveWindowStateValid = false;
+        return true;
+    }
+
+    if (m_preImmersiveWindowMode == Platform::WindowMode::Borderless) {
+        window.SetMode(Platform::WindowMode::Borderless);
+        m_preImmersiveWindowStateValid = false;
+        return true;
+    }
+
+    // Windowed restore must preserve prior maximized layout explicitly.
+    window.SetMode(Platform::WindowMode::Windowed);
+    window.SetMaximized(m_preImmersiveWindowMaximized);
+    m_preImmersiveWindowStateValid = false;
+    return true;
+}
+
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
+
+// Render the game viewport window
 void GameViewport::ShowEditorWindows() {
     _renderViewport();
 }
@@ -101,6 +206,8 @@ void GameViewport::ShowEditorWindows() {
 // -------------------------------------------------------------------------
 // Private Rendering Implementation
 // -------------------------------------------------------------------------
+
+// Sync the active Camera3D to the game viewport and configure the GUI viewport for input mapping
 void GameViewport::PrepareFrame() {
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem) {
@@ -179,6 +286,7 @@ void GameViewport::PrepareFrame() {
     );
 }
 
+// Copy Camera3D and WorldTransform/LocalTransform data into the runtime game camera used for rendering
 bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Camera3D& camera, float targetAspect) {
     if (!m_world || entity.IsNull()) {
         return false;
@@ -238,6 +346,7 @@ bool GameViewport::_syncGameCamera(ECS::Entity entity, const ECS::Components::Ca
     return false;
 }
 
+// Draw the Game ImGui window, handle immersive fullscreen, aspect ratio letterboxing, and the camera texture
 void GameViewport::_renderViewport() {
     ImGuiWindowFlags windowFlags = 0;
     const bool renderImmersive = m_immersiveMode;

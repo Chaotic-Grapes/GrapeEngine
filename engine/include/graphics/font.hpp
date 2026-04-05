@@ -55,11 +55,17 @@ public:
 
     // Return glyph metrics/UVs for one character from the atlas cache.
     Glyph const& getGlyph(char c) const;
+    // Return the OpenGL texture id of the SDF atlas.
     GLuint getAtlasTexture() const { return m_atlasTex; }
+    // Return the width and height of the SDF atlas in pixels.
     glm::ivec2 getAtlasSize() const { return m_atlasSize; }
+    // Return the pixel size this font was built at.
     int getPixelSize() const { return m_pixelSize; }
+    // Return the recommended line height in pixels.
     float getLineHeight() const { return m_lineHeight; }
+    // Return the ascent (baseline to top) in pixels.
     float getAscent() const { return m_ascent; }
+    // Return the descent (baseline to bottom) in pixels (typically negative).
     float getDescent() const { return m_descent; }
 
 private:

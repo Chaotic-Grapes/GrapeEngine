@@ -209,6 +209,9 @@ namespace Scenes {
          * @brief Create a layer at a specific ID. Used for redo semantics where
          * a previously created layer should be restored at the same slot.
          * If the slot is already occupied the function will return false.
+         * @param id The slot index to create the layer at.
+         * @param name The name to assign to the new layer.
+         * @return True if the layer was created; false if the slot was already occupied.
          */
         bool CreateLayerAt(uint16_t id, const std::string& name) {
             _ensureCapacity(id);
@@ -419,6 +422,8 @@ namespace Scenes {
          * @brief Update all colliders in a layer to use the layer's current collision mask.
          * Called automatically by SetLayerMask when a world is provided, but can be called
          * manually if needed to force synchronization.
+         * @param layerId The layer whose collision mask should be pushed to its colliders.
+         * @param world ECS world containing the collider components to update.
          */
         void _syncCollidersForLayer(uint16_t layerId, ECS::World* world);
 
@@ -608,6 +613,10 @@ namespace Scenes {
             m_drawOrder.push_back(DebugLayer);
         }
 
+        /**
+         * @brief Grow internal layer storage until the requested layer id is addressable.
+         * @param id Layer id that must be representable by m_layers.
+         */
         void _ensureCapacity(uint16_t id) {
             while (m_layers.size() <= id) {
                 m_layers.emplace_back();

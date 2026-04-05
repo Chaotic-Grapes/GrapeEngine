@@ -77,14 +77,37 @@ struct BoidParams {
 
 namespace CudaBoids {
 
-    // After the kernel, the caller swaps bufferIndex (no copy needed).
-    // Both buffers are GL VBOs accessed via CUDA interop.
+    /**
+     * @brief Launch the boid steering kernel for one simulation step.
+     *        After the kernel, the caller swaps bufferIndex; no copy is needed.
+     *        Both buffers are GL VBOs accessed via CUDA-OpenGL interop.
+     * @param d_posVel Device buffer to write updated boid positions and velocities.
+     * @param d_posVelPrev Device buffer containing boid positions and velocities from the previous frame.
+     * @param params Boid simulation parameters for this frame.
+     * @param stream CUDA stream to use for asynchronous execution.
+     */
     void Launch(float4* d_posVel,
         const float4* d_posVelPrev,
         const BoidParams& params,
         cudaStream_t stream = 0);
 
-    // Initialize boid positions/velocities randomly within bounds.
+    /**
+     * @brief Initialize boid positions and velocities randomly within world bounds.
+     * @param d_posVel Device buffer to write the initial position (xy) and velocity (zw) for each boid.
+     * @param count Number of boids to initialize.
+     * @param minX Minimum x bound for initial position scatter.
+     * @param minY Minimum y bound for initial position scatter.
+     * @param maxX Maximum x bound for initial position scatter.
+     * @param maxY Maximum y bound for initial position scatter.
+     * @param maxSpeed Maximum initial speed magnitude.
+     * @param entitySeed Per-entity seed value for reproducible initialization.
+     * @param collisionMasks Device pointer to tile collision mask data (optional).
+     * @param collisionWidth Width of the collision grid in tiles.
+     * @param collisionHeight Height of the collision grid in tiles.
+     * @param collisionOriginX X origin of the collision grid in world units.
+     * @param collisionOriginY Y origin of the collision grid in world units.
+     * @param tileSize Size of each tile in world units.
+     */
     void InitRandom(float4* d_posVel,
         int count,
         float minX, float minY,

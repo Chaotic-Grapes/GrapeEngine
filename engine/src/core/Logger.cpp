@@ -102,7 +102,12 @@ void Logger::Log(const LogLevel level, const std::string& message, LogSource sou
 	}
 }
 
-
+/**
+ * @brief Logs a message from a stringstream payload.
+ * @param level Severity level.
+ * @param oss Stream containing the formatted message.
+ * @param source Source channel for routing.
+ */
 void Logger::Log(const LogLevel level, const std::stringstream& oss, LogSource source) {
 	Log(level, oss.str(), source); // forward to the string version
 }
@@ -234,26 +239,50 @@ void Logger::_logCritical(const std::string& message) {
 		m_errorStream << "[" << _getCurrentTimestamp() << "] [CRT] " << message << '\n';
 }
 
+/**
+ * @brief Forward TRACE logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logTrace(const std::stringstream& oss) {
 	_logTrace(oss.str());
 }
 
+/**
+ * @brief Forward INFO logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logInfo(const std::stringstream& oss) {
 	_logInfo(oss.str());
 }
 
+/**
+ * @brief Forward DEBUG logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logDebug(const std::stringstream& oss) {
 	_logDebug(oss.str());
 }
 
+/**
+ * @brief Forward WARNING logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logWarning(const std::stringstream& oss) {
 	_logWarning(oss.str());
 }
 
+/**
+ * @brief Forward ERROR logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logError(const std::stringstream& oss) {
 	_logError(oss.str());
 }
 
+/**
+ * @brief Forward CRITICAL logging from stream payload to string overload.
+ * @param oss Stream containing message text.
+ */
 void Logger::_logCritical(const std::stringstream& oss) {
 	_logCritical(oss.str());
 }

@@ -40,12 +40,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <unordered_set>
 
+// Store font references for use during rendering
 void LayersPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
 }
 
+// Swap the order of two layers in the scene and record an undoable command for the move
 void LayersPanel::MoveLayer(uint16_t fromId, uint16_t toId) {
     if (!m_scene) return;
     auto &lm = m_scene->GetLayers();
@@ -66,6 +68,7 @@ void LayersPanel::MoveLayer(uint16_t fromId, uint16_t toId) {
     }
 }
 
+// Render the full Layers panel including header, layer list, footer buttons, and collision matrix
 void LayersPanel::Render() {
     if (m_mainFont) ImGui::PushFont(m_mainFont);
     ImGui::Begin("Layers");
@@ -105,6 +108,7 @@ LayersPanel::~LayersPanel() {
     }
 }
 
+// Attach the panel to a new scene, clearing all pending UI state from the previous scene
 void LayersPanel::SetScene(Scenes::Scene* scene) {
     m_scene = scene;
     m_pendingImport.clear();      // Clear pending layer import data
@@ -113,6 +117,7 @@ void LayersPanel::SetScene(Scenes::Scene* scene) {
     m_renameBuffers.clear();      // Clear rename buffers when scene changes
 }
 
+// Assign the given entity to the specified layer and mark the scene dirty
 void LayersPanel::SetLayer(EntityId entity, uint16_t layerId) {
     if (!m_scene) return;
     ECS::Entity e{ entity, 0 };
@@ -151,6 +156,7 @@ static void DrawVerticalTextClockwise(const std::string &text) {
 }
 
 // --- Render helper implementations ---
+// Render the new-layer input field and Add Layer button at the top of the panel
 void LayersPanel::_renderHeader() {
     auto& lm = m_scene->GetLayers();
 
@@ -192,6 +198,7 @@ void LayersPanel::_renderHeader() {
     ImGui::Separator();
 }
 
+// Render the footer save/load JSON and delete layer buttons
 void LayersPanel::_renderFooterButtons() {
     auto& lm = m_scene->GetLayers();
 
@@ -407,6 +414,7 @@ void LayersPanel::_renderFooterButtons() {
     ImGui::Separator();
 }
 
+// Render the layer-vs-layer collision toggle matrix as a scrollable checkbox grid
 void LayersPanel::_renderCollisionMatrix() {
     auto& lm = m_scene->GetLayers();
     ImGui::Separator();
@@ -558,6 +566,7 @@ void LayersPanel::_renderCollisionMatrix() {
     ImGui::EndChild();
 }
 
+// Render the scrollable list of layers with rename inputs, visibility toggles, and drag-to-reorder
 void LayersPanel::_renderLayersList() {
     auto& lm = m_scene->GetLayers();
     lm.PruneDeadEntities(m_scene->GetWorld());
@@ -727,6 +736,7 @@ void LayersPanel::_renderLayersList() {
     }
 }
 
+// Render the import-overwrite confirmation dialog that appears before applying loaded JSON layer data
 void LayersPanel::_renderImportConfirm() {
     if (m_showImportConfirm) {
         ImGui::OpenPopup("OverwriteLayersConfirm");

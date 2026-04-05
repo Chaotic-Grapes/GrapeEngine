@@ -1,23 +1,17 @@
-/*
-* @Name: Dalton koh, 2403250
-* @email: d.koh@digipen.edu
-* @file SoundTypes.h
-* @brief Common audio enums and POD parameter structs shared by the audio layer.
-*
-* @details
-* This header defines lightweight types used by the FMOD-backed audio device:
-* - PlayMode / StopMode: simple policies controlling playback and stopping.
-* - SoundParams: immutable cue properties (streaming, default volume, 2D/3D).
-* - PlaySettings: per-play call overrides (loop, volume, pitch).
-* - Vec3 / ListenerParams: minimal 3D vector and listener state for 3D audio.
-* All types are POD/trivially copyable so they can be stored in ECS components.
-*
-* @sources
-* - FMOD Core API concepts (looping, 2D vs 3D sounds, listener attributes).
-*
-* @dependencies
-* - None (only plain C++ types).
-*
+/* Start Header *****************************************************************/
+/*!
+\file   SoundTypes.h
+\author Dalton Koh (100%)
+\par    d.koh@digipen.edu
+\brief
+Common audio enums and POD parameter structs shared by the audio layer.
+Defines lightweight types used by the FMOD-backed audio device:
+- PlayMode / StopMode: simple policies controlling playback and stopping.
+- SoundParams: immutable cue properties (streaming, default volume, 2D/3D).
+- PlaySettings: per-play call overrides (loop, volume, pitch).
+- Vec3 / ListenerParams: minimal 3D vector and listener state for 3D audio.
+All types are POD/trivially copyable so they can be stored in ECS components.
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.

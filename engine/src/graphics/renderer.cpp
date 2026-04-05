@@ -50,6 +50,9 @@ void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
     }
 }
 
+/**
+ * @brief Clear all per-frame texture slot assignment caches.
+ */
 void Renderer::clearTextureSlots() {
     albedoTextureSlots.clear();
     emissiveTextureSlots.clear();
@@ -57,6 +60,9 @@ void Renderer::clearTextureSlots() {
     mraTextureSlots.clear();
 }
 
+/**
+ * @brief Flush the active batch and immediately begin a new one.
+ */
 void Renderer::flush() {
     flushCountThisFrame++;
 
@@ -72,6 +78,13 @@ void Renderer::flush() {
     beginFrame();
 }
 
+/**
+ * @brief Resolve or allocate an albedo texture slot for the current batch.
+ * @param textureId OpenGL texture id.
+ * @param filter Requested sampler filter mode.
+ * @param flushed Output flag set true when caller must flush and retry.
+ * @return Slot index on success, or -1 when no free slot is available.
+ */
 int Renderer::getOrAssignTextureSlot(GLuint textureId, Graphics::TextureFilter filter, bool& flushed) {
     flushed = false;
 
@@ -93,6 +106,12 @@ int Renderer::getOrAssignTextureSlot(GLuint textureId, Graphics::TextureFilter f
     return (int)albedoTextureSlots.size() - 1;
 }
 
+/**
+ * @brief Resolve or allocate an emissive texture slot for the current batch.
+ * @param textureId OpenGL texture id.
+ * @param flushed Output flag set true when caller must flush and retry.
+ * @return Slot index on success, or -1 when no free slot is available.
+ */
 int Renderer::getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed) {
     flushed = false;
 
@@ -114,6 +133,12 @@ int Renderer::getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed) {
     return (int)emissiveTextureSlots.size() - 1;
 }
 
+/**
+ * @brief Resolve or allocate a normal-map texture slot for the current batch.
+ * @param textureId OpenGL texture id.
+ * @param flushed Output flag set true when caller must flush and retry.
+ * @return Slot index on success, or -1 when no free slot is available.
+ */
 int Renderer::getOrAssignNormalTextureSlot(GLuint textureId, bool& flushed) {
     flushed = false;
 
@@ -135,6 +160,12 @@ int Renderer::getOrAssignNormalTextureSlot(GLuint textureId, bool& flushed) {
     return (int)normalTextureSlots.size() - 1;
 }
 
+/**
+ * @brief Resolve or allocate an MRA texture slot for the current batch.
+ * @param textureId OpenGL texture id.
+ * @param flushed Output flag set true when caller must flush and retry.
+ * @return Slot index on success, or -1 when no free slot is available.
+ */
 int Renderer::getOrAssignMRATextureSlot(GLuint textureId, bool& flushed) {
     flushed = false;
 
@@ -156,6 +187,9 @@ int Renderer::getOrAssignMRATextureSlot(GLuint textureId, bool& flushed) {
     return (int)mraTextureSlots.size() - 1;
 }
 
+/**
+ * @brief Bind all currently assigned batch textures to their fixed slot ranges.
+ */
 void Renderer::bindTextureSlots() const {
     // Bind albedo textures to slots 0-15
     for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
@@ -276,12 +310,18 @@ Renderer::~Renderer() {
     if (m_samplerLinear) glDeleteSamplers(1, &m_samplerLinear);
 }
 
+/**
+ * @brief Start collecting draw data for a new batch/frame segment.
+ */
 void Renderer::beginFrame() {
     cpuBuffer.clear();
     cpuIndices.clear();
     clearTextureSlots(); // reset slot cache per frame
 }
 
+/**
+ * @brief Upload and draw the current batch, then leave buffers ready for reuse.
+ */
 void Renderer::endFrame() {
     if (cpuBuffer.empty() || cpuIndices.empty()) return;
 

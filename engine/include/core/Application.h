@@ -48,26 +48,26 @@ namespace Engine {
     class GRAPEENGINE_API Application {
     public:
         /**
-         * @brief Get SceneManager for scene lifecycle operations.
-         * @return Reference to scene manager singleton owned by application.
-         */
-        /**
-         * @brief Access the SceneManager for creating/loading/unloading scenes
+         * @brief Access the SceneManager for creating/loading/unloading scenes.
+         * @return Reference to the scene manager owned by this application.
          */
         Scenes::SceneManager& GetSceneManager() { return m_sceneManager; }
 
         /**
-         * @brief Get the project settings (const)
+         * @brief Get the project settings (const).
+         * @return Const reference to the loaded project settings.
          */
         const ProjectSettings& GetProjectSettings() const { return m_projectSettings; }
 
         /**
-         * @brief Get the project settings (mutable)
+         * @brief Get the project settings (mutable).
+         * @return Mutable reference to the loaded project settings.
          */
         ProjectSettings& GetProjectSettings() { return m_projectSettings; }
 
         /**
-         * @brief Check if project settings have been loaded
+         * @brief Check if project settings have been loaded.
+         * @return True if project settings were successfully loaded from disk.
          */
         bool HasProjectSettings() const { return m_hasProjectSettings; }
 
@@ -91,18 +91,26 @@ namespace Engine {
         void Update();
 
         /**
-         * @brief Check if engine is still running
-         * @return true if engine should continue running
+         * @brief Resynchronize frame timing without advancing simulation state.
+         * @return void
+         * @note Call this after long OS interruptions (e.g., ALT+TAB/CTRL+ALT+DEL) to avoid a large first-frame delta.
+         */
+        void ResyncFrameTime();
+
+        /**
+         * @brief Check if engine is still running.
+         * @return True if the engine should continue its main loop.
          */
         bool IsRunning() const { return !m_shouldStop; }
 
         /**
-         * @brief Shutdown the engine and release resources
+         * @brief Shutdown the engine and release resources.
          */
         void Shutdown();
 
         /**
-         * @brief Get current engine mode
+         * @brief Get current engine mode.
+         * @return EngineMode::Game or EngineMode::Editor depending on initialization.
          */
         EngineMode GetMode() const { return m_mode; }
 
@@ -131,22 +139,26 @@ namespace Engine {
         const Services::AudioService* GetAudioService() const { return m_audio; }
         
         /**
-         * @brief Get access to the SystemManager for registering/updating systems
+         * @brief Get access to the SystemManager for registering/updating systems.
+         * @return Mutable reference to the global system manager.
          */
         ECS::SystemManager& GetSystemManager() { return m_systemManager; }
 
         /**
-         * @brief Get access to the ScriptManager service (may be null if CLR failed to initialize)
+         * @brief Get access to the ScriptManager service.
+         * @return Pointer to the script manager, or nullptr if CLR failed to initialize.
          */
         ECS::ScriptManager* GetScriptManager() { return m_scriptManager; }
 
         /**
          * @brief Get access to save-game manager service.
+         * @return Mutable reference to the save-game manager.
          */
         Services::SaveGameManager& GetSaveGameManager() { return m_saveGameManager; }
 
         /**
          * @brief Get const access to save-game manager service.
+         * @return Const reference to the save-game manager.
          */
         const Services::SaveGameManager& GetSaveGameManager() const { return m_saveGameManager; }
 

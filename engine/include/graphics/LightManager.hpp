@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   LightManager.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \date   31st January 2026
 \brief
 Declaration of the LightManager, responsible for managing dynamic lighting data
@@ -61,7 +61,7 @@ namespace Graphics {
         void Upload();              // upload CPU light data to GPU if changed
         void Bind(Shader& shader);  // bind buffers + uniforms to active shader
 
-        // Authoring API (called by RendererSystem after reading ECS Light2D)
+        // Set a single directional light for this frame (direction, color, intensity).
         void SetDirectionalLight(const glm::vec3& direction,
             const glm::vec3& color,
             float intensity);
@@ -69,16 +69,18 @@ namespace Graphics {
         // Remove the currently configured directional light for this frame.
         void ClearDirectionalLight();
 
+        // Add a point light with position, range, color, and intensity to this frame.
         void AddPointLight(const glm::vec3& position,
             float range,
             const glm::vec3& color,
             float intensity);
 
-        // Debug / stats stuff
+        // Return the number of point lights collected this frame.
         uint32_t GetPointLightCount() const {
             return static_cast<uint32_t>(m_pointLights.size());
         }
 
+        // Return true if a directional light has been set for this frame.
         bool HasDirectionalLight() const {
             return m_hasDirectional;
         }
