@@ -23,14 +23,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Engine {
 
     // ==================== Static State ====================
-    
+
     namespace {
         FMOD::System* g_fmodSystem = nullptr;
         bool g_deviceChangeDetectionActive = false;
         bool g_audioDevicesChanged = false;
         int32_t g_lastAudioDeviceCount = 0;
         std::string g_lastDefaultAudioDevice;
-        
+
         // Audio device caching
         std::vector<AudioDeviceInfo> g_cachedOutputDevices;
         std::vector<AudioDeviceInfo> g_cachedInputDevices;
@@ -39,32 +39,54 @@ namespace Engine {
     }
 
     // ==================== DisplayMode Implementation ====================
-    
+
+    /**
+     * @brief Produce a human-readable summary of the display mode.
+     * @return String in the form "WxH @ RHz (B-bit)".
+     */
     std::string DisplayMode::ToString() const {
         std::ostringstream oss;
         oss << Width << "x" << Height << " @ " << RefreshRate << "Hz (" << static_cast<int>(BitsPerPixel) << "-bit)";
         return oss.str();
     }
 
+    /**
+     * @brief Test two DisplayMode values for equality.
+     * @param other The mode to compare against.
+     * @return True when Width, Height, and RefreshRate all match.
+     */
     bool DisplayMode::operator==(const DisplayMode& other) const {
         return Width == other.Width && Height == other.Height && RefreshRate == other.RefreshRate;
     }
 
     // ==================== MonitorInfo Implementation ====================
-    
+
+    /**
+     * @brief Compute the dots-per-inch of this monitor from its pixel width and physical width.
+     * @return DPI value, or 96.0 when physical width metadata is unavailable.
+     */
     float MonitorInfo::GetDPI() const {
         if (WidthMM <= 0) return 96.0f;  // Default DPI
         // DPI = (pixels * 25.4) / millimeters
         return (CurrentMode.Width * 25.4f) / WidthMM;
     }
 
+    /**
+     * @brief Compute the aspect ratio of the monitor's current display mode.
+     * @return Width divided by height, or 16/9 when height is zero.
+     */
     float MonitorInfo::GetAspectRatio() const {
         if (CurrentMode.Height == 0) return 16.0f / 9.0f;
         return static_cast<float>(CurrentMode.Width) / CurrentMode.Height;
     }
 
     // ==================== AudioDeviceInfo Implementation ====================
-    
+
+    /**
+     * @brief Produce a human-readable summary of the audio device.
+     * @return String containing the device name, channel count, and sample rate,
+     *         with optional "[DEFAULT]" and "[DISCONNECTED]" tags.
+     */
     std::string AudioDeviceInfo::ToString() const {
         std::ostringstream oss;
         oss << DeviceName << " (" << Channels << "ch @ " << SampleRate << "Hz)";
@@ -73,12 +95,17 @@ namespace Engine {
         return oss.str();
     }
 
+    /**
+     * @brief Test two AudioDeviceInfo values for equality by device ID.
+     * @param other The device to compare against.
+     * @return True when DeviceID strings match.
+     */
     bool AudioDeviceInfo::operator==(const AudioDeviceInfo& other) const {
         return DeviceID == other.DeviceID;
     }
 
     // ==================== DeviceManager - Display Implementation ====================
-    
+
     /**
      * @brief Enumerates all connected monitors and their display modes.
      * @return A vector containing one MonitorInfo entry per connected monitor.
@@ -142,7 +169,7 @@ namespace Engine {
                     );
 
                     // Avoid duplicates
-                    if (std::find(info.SupportedModes.begin(), info.SupportedModes.end(), mode) 
+                    if (std::find(info.SupportedModes.begin(), info.SupportedModes.end(), mode)
                         == info.SupportedModes.end()) {
                         info.SupportedModes.push_back(mode);
                     }
@@ -156,6 +183,11 @@ namespace Engine {
         return monitors;
     }
 
+    /**
+     * @brief Return the primary (first) connected monitor.
+     * @return MonitorInfo for the primary monitor, or a default-constructed value if no
+     *         monitors are found.
+     */
     MonitorInfo DeviceManager::GetPrimaryMonitor() {
         auto monitors = EnumerateMonitors();
         if (!monitors.empty()) {
@@ -164,6 +196,12 @@ namespace Engine {
         return MonitorInfo{};
     }
 
+    /**
+     * @brief Return the supported display modes for a monitor identified by index.
+     * @param monitorIndex Zero-based index into the enumerated monitor list.
+     * @return Vector of supported DisplayMode values, or an empty vector if the index is
+     *         out of range.
+     */
     std::vector<DisplayMode> DeviceManager::GetDisplayModes(int32_t monitorIndex) {
         auto monitors = EnumerateMonitors();
         if (monitorIndex >= 0 && monitorIndex < static_cast<int32_t>(monitors.size())) {
@@ -172,6 +210,12 @@ namespace Engine {
         return {};
     }
 
+    /**
+     * @brief Return the supported display modes for a monitor identified by name.
+     * @param monitorName Name string as reported by GLFW for the target monitor.
+     * @return Vector of supported DisplayMode values, or an empty vector if no monitor
+     *         with that name is found.
+     */
     std::vector<DisplayMode> DeviceManager::GetDisplayModesByName(const std::string& monitorName) {
         auto monitors = EnumerateMonitors();
         for (const auto& monitor : monitors) {
@@ -182,6 +226,10 @@ namespace Engine {
         return {};
     }
 
+    /**
+     * @brief Return the number of currently connected monitors.
+     * @return Monitor count as reported by GLFW.
+     */
     int32_t DeviceManager::GetMonitorCount() {
         int count = 0;
         glfwGetMonitors(&count);
@@ -189,8 +237,11 @@ namespace Engine {
     }
 
     // ==================== DeviceManager - Audio Implementation ====================
-    
-    // Helper: Get or initialize FMOD system
+
+    /**
+     * @brief Get or lazily initialize a shared FMOD system used for device enumeration.
+     * @return Pointer to the initialized FMOD::System, or nullptr if creation failed.
+     */
     static FMOD::System* GetFmodSystem() {
         if (g_fmodSystem) {
             return g_fmodSystem;
@@ -205,7 +256,7 @@ namespace Engine {
 
             int numDrivers = 0;
             g_fmodSystem->getNumDrivers(&numDrivers);
-            
+
             if (numDrivers > 0) {
                 // Initialize with dummy buffer just for enumeration
                 g_fmodSystem->init(numDrivers, FMOD_INIT_NORMAL, nullptr);
@@ -214,6 +265,14 @@ namespace Engine {
         return g_fmodSystem;
     }
 
+    /**
+     * @brief Enumerate all available audio output devices via FMOD.
+     *
+     * Results are cached after the first call and returned from cache on subsequent
+     * calls unless a device change has been detected.
+     *
+     * @return Vector of AudioDeviceInfo for each enumerated output device.
+     */
     std::vector<AudioDeviceInfo> DeviceManager::EnumerateAudioOutputDevices() {
         // Return cached result if available and devices haven't changed
         if (g_outputDevicesCached && (!g_deviceChangeDetectionActive || !g_audioDevicesChanged)) {
@@ -248,7 +307,7 @@ namespace Engine {
             if (result == FMOD_OK) {
                 AudioDeviceInfo info;
                 info.DeviceName = name;
-                
+
                 // Create unique ID from index and name
                 char idStr[256] = {};
                 snprintf(idStr, sizeof(idStr), "output_%d_%s", i, name);
@@ -272,6 +331,15 @@ namespace Engine {
         return devices;
     }
 
+    /**
+     * @brief Enumerate available audio input devices.
+     *
+     * Results are cached after the first call. The current implementation returns a
+     * single stub "Default Microphone" entry; per-platform enumeration can be added
+     * in the future.
+     *
+     * @return Vector of AudioDeviceInfo for each enumerated input device.
+     */
     std::vector<AudioDeviceInfo> DeviceManager::EnumerateAudioInputDevices() {
         // Return cached result if available and devices haven't changed
         if (g_inputDevicesCached && (!g_deviceChangeDetectionActive || !g_audioDevicesChanged)) {
@@ -289,7 +357,7 @@ namespace Engine {
         // FMOD's input device enumeration is complex and platform-dependent
         // For basic implementation, we return an empty list or a default mic
         // This can be extended per-platform in the future
-        
+
         AudioDeviceInfo defaultMic;
         defaultMic.DeviceID = "input_default";
         defaultMic.DeviceName = "Default Microphone";
@@ -297,7 +365,7 @@ namespace Engine {
         defaultMic.Channels = 1;
         defaultMic.IsDefault = true;
         defaultMic.IsConnected = true;
-        
+
         devices.push_back(defaultMic);
         LOG_INFO("Audio input device: " << defaultMic.ToString());
 
@@ -309,6 +377,15 @@ namespace Engine {
         return devices;
     }
 
+    /**
+     * @brief Return the default audio output device.
+     *
+     * Searches the enumerated output list for the device flagged as default and falls
+     * back to the first available device when none is explicitly flagged.
+     *
+     * @return AudioDeviceInfo for the default output device, or a default-constructed
+     *         value if no output devices are found.
+     */
     AudioDeviceInfo DeviceManager::GetDefaultAudioOutputDevice() {
         auto devices = EnumerateAudioOutputDevices();
         for (const auto& device : devices) {
@@ -325,6 +402,15 @@ namespace Engine {
         return AudioDeviceInfo{};
     }
 
+    /**
+     * @brief Return the default audio input device.
+     *
+     * Searches the enumerated input list for the device flagged as default and falls
+     * back to the first available device when none is explicitly flagged.
+     *
+     * @return AudioDeviceInfo for the default input device, or a default-constructed
+     *         value if no input devices are found.
+     */
     AudioDeviceInfo DeviceManager::GetDefaultAudioInputDevice() {
         auto devices = EnumerateAudioInputDevices();
         for (const auto& device : devices) {
@@ -341,6 +427,11 @@ namespace Engine {
         return AudioDeviceInfo{};
     }
 
+    /**
+     * @brief Look up a specific audio device by its device ID across both output and input lists.
+     * @param deviceID Platform-specific device identifier string to search for.
+     * @return AudioDeviceInfo matching the given ID, or a default-constructed value if not found.
+     */
     AudioDeviceInfo DeviceManager::GetAudioDeviceInfo(const std::string& deviceID) {
         auto outputDevices = EnumerateAudioOutputDevices();
         for (const auto& device : outputDevices) {
@@ -360,23 +451,45 @@ namespace Engine {
     }
 
     // ==================== Device Change Detection ====================
-    
+
+    /**
+     * @brief Begin polling for audio device additions, removals, and default changes.
+     *
+     * Records the current device count and default device ID as a baseline. Subsequent
+     * calls to HasAudioDevicesChanged() compare against this baseline.
+     */
     void DeviceManager::StartAudioDeviceChangeDetection() {
         g_deviceChangeDetectionActive = true;
         auto devices = EnumerateAudioOutputDevices();
         g_lastAudioDeviceCount = static_cast<int32_t>(devices.size());
-        
+
         auto defaultDevice = GetDefaultAudioOutputDevice();
         g_lastDefaultAudioDevice = defaultDevice.DeviceID;
 
         LOG_INFO("Audio device change detection started");
     }
 
+    /**
+     * @brief Stop polling for audio device changes.
+     *
+     * After this call, HasAudioDevicesChanged() will always return false until
+     * StartAudioDeviceChangeDetection() is called again.
+     */
     void DeviceManager::StopAudioDeviceChangeDetection() {
         g_deviceChangeDetectionActive = false;
         LOG_INFO("Audio device change detection stopped");
     }
 
+    /**
+     * @brief Check whether audio devices have changed since the last detection snapshot.
+     *
+     * Compares the current device count and default device ID against the values recorded
+     * at the last call to StartAudioDeviceChangeDetection() or the previous
+     * HasAudioDevicesChanged() call that detected a change.
+     *
+     * @return True if the device count or default device has changed, false otherwise or
+     *         if change detection is not active.
+     */
     bool DeviceManager::HasAudioDevicesChanged() {
         if (!g_deviceChangeDetectionActive) {
             return false;
@@ -384,7 +497,7 @@ namespace Engine {
 
         auto devices = EnumerateAudioOutputDevices();
         int32_t currentCount = static_cast<int32_t>(devices.size());
-        
+
         // Check if device count changed
         if (currentCount != g_lastAudioDeviceCount) {
             g_lastAudioDeviceCount = currentCount;

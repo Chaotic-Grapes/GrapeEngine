@@ -56,6 +56,11 @@ namespace Engine {
     Application* CORE = nullptr;
 
     namespace {
+
+        /** @brief Converts a window mode string from project settings into a platform enum value.
+         *  @param mode String representation of the window mode ("Fullscreen", "Borderless", or any other value for Windowed).
+         *  @return The corresponding Platform::WindowMode enum value.
+         */
         Platform::WindowMode ResolveWindowMode(const std::string& mode) {
             if (mode == "Fullscreen") {
                 return Platform::WindowMode::Fullscreen;
@@ -66,8 +71,14 @@ namespace Engine {
             return Platform::WindowMode::Windowed;
         }
 
-        // Applies software frame cap from project settings to TimeSystem.
-        // When VSync is enabled, disable software FPS capping.
+        /** @brief Applies the software frame cap from project settings to the TimeSystem.
+         *
+         *  When VSync is enabled the software FPS cap is disabled (set to 0). Otherwise the
+         *  MaxFPS value from the project settings is forwarded to TimeSystem.
+         *
+         *  @param settings      Project settings that carry the MaxFPS value.
+         *  @param vsyncEnabled  True when the platform window has VSync active.
+         */
         void ApplyFrameCapFromProjectSettings(const ProjectSettings& settings, bool vsyncEnabled) {
             if (vsyncEnabled) {
                 TimeSystem::Instance().SetMaximumFPS(0.0);
@@ -79,6 +90,15 @@ namespace Engine {
         }
     }
 
+    /** @brief Initializes the engine and all subsystems.
+     *
+     *  Sets up crash dumping, the time system, the platform context (windowing, input, rendering),
+     *  all engine services, and broadcasts the ApplicationStart event. Safe to call only once;
+     *  subsequent calls are ignored.
+     *
+     *  @param mode           Operating mode: EngineMode::Editor or EngineMode::Game.
+     *  @param enableConsole  When true a console window is allocated; otherwise it is hidden.
+     */
     void Application::Initialize(EngineMode mode, bool enableConsole) {
         if (m_initialized) {
             LOG_WARNING("Application already initialized");
@@ -146,6 +166,12 @@ namespace Engine {
         Messaging::MessageSystem::Notify(Messaging::ApplicationStart{});
     }
 
+    /** @brief Executes one full engine frame.
+     *
+     *  Advances the time system, processes input, updates the scene manager and all active ECS
+     *  systems, handles scene lifecycle transitions in game mode, updates the audio service, and
+     *  checks whether any platform window has requested a close.
+     */
     void Application::Update() {
         if (!m_initialized) {
             LOG_ERROR("Application::Update called before Initialize");
@@ -262,6 +288,12 @@ namespace Engine {
         }
     }
 
+    /** @brief Tears down all engine subsystems and releases all resources.
+     *
+     *  Broadcasts the ApplicationExit event, destroys ECS systems, clears the resource cache,
+     *  shuts down scripting and audio services, and shuts down the platform context. Idempotent
+     *  when called on an already-shutdown application.
+     */
     void Application::Shutdown() {
         if (!m_initialized) {
             return;
@@ -312,10 +344,22 @@ namespace Engine {
         LOG_INFO("Engine shutdown complete");
     }
 
+    /** @brief Requests that the engine main loop stop at the end of the current frame.
+     */
     void Application::Close() {
         m_shouldStop = true;
     }
 
+    /** @brief Loads project settings from disk and applies them to the active window.
+     *
+     *  Reads ProjectSettings.json from the given project root (or the path resolved by ProjectPaths
+     *  when the argument is empty). In Game mode the loaded settings are immediately forwarded to
+     *  the main platform window (title, VSync, mode, resolution).
+     *
+     *  @param projectRoot Optional override directory that contains ProjectSettings.json. Pass an
+     *                     empty string to use the path returned by ProjectPaths::GetSettingsPath().
+     *  @return True if the settings file was read and applied successfully, false otherwise.
+     */
     bool Application::LoadProjectSettings(const std::string& projectRoot) {
         if (!ProjectPaths::IsInitialized()) {
             LOG_ERROR("ProjectPaths not initialized; cannot load project settings");
@@ -354,6 +398,16 @@ namespace Engine {
         return m_hasProjectSettings;
     }
 
+    /** @brief Serializes the current project settings to disk.
+     *
+     *  Writes the in-memory ProjectSettings to ProjectSettings.json inside the given project root
+     *  directory (or the ProjectPaths default when the argument is empty). Parent directories are
+     *  created automatically if they do not yet exist.
+     *
+     *  @param projectRoot Optional override directory in which to write ProjectSettings.json. Pass
+     *                     an empty string to use the path returned by ProjectPaths::GetSettingsPath().
+     *  @return True if the file was written successfully, false on any error.
+     */
     bool Application::SaveProjectSettings(const std::string& projectRoot) {
         try {
             if (!ProjectPaths::IsInitialized()) {
@@ -388,6 +442,14 @@ namespace Engine {
         }
     }
 
+    /** @brief Updates ECS systems for the specified run-mode mask within the given world.
+     *
+     *  Allows the editor to drive system execution explicitly (play / pause / step / edit
+     *  state transitions) rather than relying on the automatic game-mode update path.
+     *
+     *  @param modes Bitmask of run modes (SystemRunMode flags) that should execute this frame.
+     *  @param world The ECS world whose systems will be ticked.
+     */
     void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world) {
         // Public API for editor to directly control which modes execute
         // This allows editor to implement play/pause/step/edit state transitions
@@ -397,6 +459,12 @@ namespace Engine {
         m_systemManager.UpdateSystemsByMask(modes, world);
     }
 
+    /** @brief Creates and initializes all engine services (audio, scripting, ECS systems).
+     *
+     *  Instantiates the AudioService, registers C++ component types for C# interop, initializes
+     *  the ScriptManager and loads the scripting assembly, then calls _registerSystems() to
+     *  register all built-in ECS systems with the system manager.
+     */
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
@@ -436,6 +504,12 @@ namespace Engine {
         _registerSystems();
     }
 
+    /** @brief Registers all built-in ECS systems with the system manager and builds dependency graphs.
+     *
+     *  Systems are registered in execution-order groups (Update, Physics, Render). Dependency graphs
+     *  are built after registration so the system manager can schedule parallel execution correctly.
+     *  BoidSystem registration is conditional on CUDA availability.
+     */
     void Application::_registerSystems() {
         // Register all ECS systems in order
         // Systems will execute based on their SystemGroup and executionOrder
@@ -473,6 +547,10 @@ namespace Engine {
         LOG_INFO("SystemManager: Registered " << m_systemManager.GetSystemCount() << " systems");
     }
 
+    /** @brief Allocates and shows a console window on Windows and redirects stdout/stderr to it.
+     *
+     *  No-op on non-Windows platforms.
+     */
     void Application::_enableConsole() {
 #ifdef _WIN32
 #include <windows.h>
@@ -484,6 +562,10 @@ namespace Engine {
 #endif
     }
 
+    /** @brief Hides the console window on Windows.
+     *
+     *  No-op on non-Windows platforms.
+     */
     void Application::_disableConsole() {
 #ifdef _WIN32
         if (const HWND console = GetConsoleWindow())
@@ -491,12 +573,29 @@ namespace Engine {
 #endif
     }
 
+    /** @brief Placeholder for legacy fixed-step physics dispatch (currently a no-op).
+     *
+     *  Fixed-step physics is fully owned by PhysicsSystem::OnUpdate and does not require a
+     *  separate dispatch call from the application layer.
+     *
+     *  @param world The ECS world (unused).
+     */
     void Application::_updatePhysics(ECS::World& /*world*/) {
         // Fixed-step physics is owned by PhysicsSystem::OnUpdate.
     }
 
     // ==================== Device Management ====================
 
+    /** @brief Changes the rendering resolution if it is supported by the primary monitor.
+     *
+     *  Validates the requested resolution against the list of modes reported by
+     *  DeviceManager::EnumerateMonitors(), then applies the viewport change via the render device.
+     *
+     *  @param width       Desired horizontal resolution in pixels.
+     *  @param height      Desired vertical resolution in pixels.
+     *  @param refreshRate Desired refresh rate (currently unused, reserved for future use).
+     *  @return True if the resolution was applied successfully, false otherwise.
+     */
     bool Application::SetResolution(int width, int height, int /*refreshRate*/) {
         if (!m_platformContext) {
             LOG_ERROR("Platform context unavailable");
@@ -538,6 +637,15 @@ namespace Engine {
         return false;
     }
 
+    /** @brief Switches the main window into or out of fullscreen on the specified monitor.
+     *
+     *  Delegates to the platform window implementation. On GLFW the monitor index is passed
+     *  directly; on other platforms the generic IWindow::SetFullscreen() call is used.
+     *
+     *  @param fullscreen   True to enter fullscreen, false to return to windowed mode.
+     *  @param monitorIndex Zero-based index of the target monitor as enumerated by DeviceManager.
+     *  @return True if the mode change was successful, false otherwise.
+     */
     bool Application::SetFullscreenMode(bool fullscreen, int monitorIndex) {
         if (!m_platformContext) {
             LOG_ERROR("Platform context unavailable");
@@ -572,6 +680,16 @@ namespace Engine {
         return false;
     }
 
+    /** @brief Records the preferred audio output device for this session.
+     *
+     *  Validates that the device with the given ID exists and is connected, then stores the
+     *  preference. Full FMOD device re-initialization is noted as a TODO; only the preference
+     *  is persisted at this time.
+     *
+     *  @param deviceID Platform-specific device identifier string obtained from DeviceManager.
+     *  @return True if the device was found, is connected, and the preference was stored;
+     *          false on any validation or service error.
+     */
     bool Application::SetAudioDevice(const std::string& deviceID) {
         // Validate device exists
         auto device = DeviceManager::GetAudioDeviceInfo(deviceID);
@@ -603,6 +721,11 @@ namespace Engine {
         return false;
     }
 
+    /** @brief Returns information about the primary monitor.
+     *
+     *  @return A MonitorInfo struct describing the primary monitor; a default-constructed
+     *          MonitorInfo{} if no monitors are found.
+     */
     MonitorInfo Application::GetCurrentMonitorInfo() const {
         auto monitors = DeviceManager::EnumerateMonitors();
         if (!monitors.empty()) {
@@ -611,6 +734,13 @@ namespace Engine {
         return MonitorInfo{};
     }
 
+    /** @brief Returns information about the currently active audio output device.
+     *
+     *  If a specific device ID has been set via SetAudioDevice() and that device still exists,
+     *  its AudioDeviceInfo is returned. Otherwise the system default output device is returned.
+     *
+     *  @return AudioDeviceInfo for the active or default audio output device.
+     */
     AudioDeviceInfo Application::GetCurrentAudioDevice() const {
         // If we have a specific device set, return its info
         if (!m_currentAudioDeviceID.empty()) {

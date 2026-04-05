@@ -38,6 +38,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+/**
+ * @brief Simple diagnostic CUDA kernel that writes index * 2 into each output element.
+ * @param out Device array that receives computed values.
+ * @param n   Number of elements to process.
+ */
 __global__ void testKernel(float* out, int n) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
@@ -45,6 +50,11 @@ __global__ void testKernel(float* out, int n) {
     }
 }
 
+/**
+ * @brief Run a minimal CUDA diagnostic: allocate device memory, launch a kernel,
+ *        copy results back, verify correctness, and print a pass/fail message.
+ * @return True if the CUDA pipeline functioned correctly; false otherwise.
+ */
 bool CudaTestRun() {
     const int N = 256;
     float* d_data = nullptr;

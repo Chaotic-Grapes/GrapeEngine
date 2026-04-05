@@ -57,8 +57,11 @@ namespace Engine {
 
 
     /**
-    * @brief Build a line segment and compute its outward unit normal.
-    */
+     * @brief Build a line segment and compute its outward unit normal.
+     * @param p0 Start point of the segment.
+     * @param p1 End point of the segment.
+     * @return LineSegment with P0, P1, and a unit outward Normal.
+     */
     Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D& p1) {
         LineSegment s;  // Output segment
         s.P0 = p0;      // Start point
@@ -75,8 +78,11 @@ namespace Engine {
     }
 
     /**
-    * @brief Construct an AABB from center and size (width, height).
-    */
+     * @brief Construct an AABB from center and size (width, height).
+     * @param center Center position of the AABB.
+     * @param size Full width and height of the AABB.
+     * @return AABB with Min/Max corners derived from center and size.
+     */
     Collision::AABB Collision::MakeAABBCenterSize(const Vector2D& center, const Vector2D& size) {
         const Vector2D half = Vector2D(size.X * 0.5f, size.Y * 0.5f);// Half extents
 
@@ -87,9 +93,14 @@ namespace Engine {
 
 
     /**
-    * @brief Solve a t-quadratic: a t^2 + b t + c = 0. Returns sorted roots.
-    * @return true if real roots exist, false otherwise.
-    */
+     * @brief Solve a t-quadratic: a t^2 + b t + c = 0. Returns sorted roots.
+     * @param a Quadratic coefficient.
+     * @param b Linear coefficient.
+     * @param c Constant term.
+     * @param t0 Output smaller root (only valid when returns true).
+     * @param t1 Output larger root (only valid when returns true).
+     * @return true if real roots exist, false otherwise.
+     */
     bool Collision::_solveQuadratic(const float a, const float b, const float c, float& t0, float& t1) {
         // Handle near-linear case -> |a| ~ 0.
         if (std::fabs(a) < EPS) {
@@ -126,13 +137,18 @@ namespace Engine {
 
 
     /**
-    * @brief Sweep a moving point (circle center) against a static point.
-    * 
-    * @return true if the swept center hits the point-expanded circle.
-    *
-    * This is used to handle corner hits when sweeping a circle against a
-    * segment: you test each endpoint as a circle of radius R (Minkowski sum).
-    */
+     * @brief Sweep a moving point (circle center) against a static point.
+     *
+     * Used to handle corner hits when sweeping a circle against a segment:
+     * each endpoint is tested as a circle of radius R (Minkowski sum).
+     * @param c0 Circle center at sweep start.
+     * @param c1 Circle center at sweep end.
+     * @param p Static point to test against.
+     * @param radius Collision radius.
+     * @param tHit Output parametric hit time in [0,1] (valid when returns true).
+     * @param normalAtHit Output unit normal at hit (valid when returns true).
+     * @return true if the swept center hits the point-expanded circle.
+     */
 
     bool Collision::_pointSweepHitCircle(const Vector2D& c0, const Vector2D& c1,
         const Vector2D& p, const float radius, float& tHit, Vector2D& normalAtHit)
@@ -168,12 +184,17 @@ namespace Engine {
        Moving Circle vs Static Segment (swept)
        ================================================================ */
     
-   /**
-   * @brief Continuous test: moving circle vs. static segment with plane hit
-   * and optional endpoint checks (corner hits).
-   * 
-   * @return true if a collision occurs during the sweep.
-   */
+    /**
+     * @brief Continuous test: moving circle vs. static segment with plane hit and optional endpoint checks.
+     * @param circle Circle shape with current center and radius.
+     * @param intendedEnd Intended end position of the circle center after the sweep.
+     * @param segment Static line segment to test against.
+     * @param outContactPoint Output contact point on the segment surface (valid when returns true).
+     * @param outNormal Output surface normal at contact (valid when returns true).
+     * @param outTime Output parametric hit time in [0,1] (valid when returns true).
+     * @param checkEdges When true, segment endpoints are also tested as circular corners.
+     * @return true if a collision occurs during the sweep.
+     */
 
     bool Collision::CircleVsSegmentSweep(
         const Circle& circle,
@@ -263,10 +284,13 @@ namespace Engine {
        Response: reflect remaining motion about the normal
        ================================================================ */
 
-   /**
-   * @brief Reflect the remaining motion vector about a normal and update the
-   * intended end position accordingly.
-   */
+    /**
+     * @brief Reflect the remaining motion vector about a normal and update the intended end position.
+     * @param contactPoint Contact point on the segment surface.
+     * @param normal Surface normal used for reflection.
+     * @param inOutIntendedEnd Intended end position; updated to the reflected destination.
+     * @param outReflectedDirection Output unit vector of the reflected direction.
+     */
 
     void Collision::CircleSegmentResponse(
         const Vector2D& contactPoint,
@@ -292,12 +316,16 @@ namespace Engine {
        Point vs Segment (closest point + tolerance test)
        ================================================================ */
 
-   /**
-   * @brief Compute closest point on a segment to a query point and test if
-   * the distance is within a given tolerance.
-   * 
-   * @return true if the point is within tolerance of the segment.
-   */
+    /**
+     * @brief Compute closest point on a segment to a query point and test if the distance is within tolerance.
+     * @param p Query point in world space.
+     * @param s0 Segment start point.
+     * @param s1 Segment end point.
+     * @param tolerance Maximum allowed distance from the segment.
+     * @param outTime Optional output parametric closest-point position on the segment in [0,1].
+     * @param outClosest Optional output closest point on the segment.
+     * @return true if the point is within tolerance of the segment.
+     */
 
     bool Collision::PointVsSegment(
         const Vector2D& p,
@@ -331,11 +359,14 @@ namespace Engine {
        AABB vs AABB
        ================================================================ */
 
-   /**
-   * @brief Overlap test between two AABBs with optional manifold output.
-   * 
-   * @return true if overlapping, false otherwise.
-   */
+    /**
+     * @brief Overlap test between two AABBs with optional manifold output.
+     * @param a First AABB.
+     * @param b Second AABB.
+     * @param outNormal Optional output collision normal from `a` to `b`.
+     * @param outPenetration Optional output penetration depth.
+     * @return true if overlapping, false otherwise.
+     */
 
     bool Collision::AABBvsAABB(
         const AABB& a,

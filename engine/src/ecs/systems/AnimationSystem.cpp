@@ -36,6 +36,15 @@ namespace {
 namespace {
     constexpr int kMaxAnimSegments = ECS::Components::SpriteSheetAnimation2D::MaxSegments;
 
+    /**
+     * @brief Build per-segment start indices and frame counts from animation segment descriptors.
+     * @param anim Animation component describing the segments.
+     * @param totalCols Total columns in the sprite sheet layout.
+     * @param totalRows Total rows in the sprite sheet layout.
+     * @param starts Output array receiving the absolute start frame index for each segment.
+     * @param counts Output array receiving the frame count for each segment.
+     * @return Total number of frames across all valid segments.
+     */
     int BuildSegmentSpans(const ECS::Components::SpriteSheetAnimation2D& anim,
         int totalCols, int totalRows,
         int(&starts)[kMaxAnimSegments], int(&counts)[kMaxAnimSegments]) {
@@ -66,6 +75,14 @@ namespace {
         return totalCount;
     }
 
+    /**
+     * @brief Convert a local clip-relative frame index into an absolute sprite sheet frame index.
+     * @param starts Array of absolute start indices produced by BuildSegmentSpans.
+     * @param counts Array of frame counts produced by BuildSegmentSpans.
+     * @param segmentCount Number of valid segments in the arrays.
+     * @param localFrame Zero-based frame index within the combined clip.
+     * @return Absolute sprite sheet frame index, or -1 when localFrame is out of range.
+     */
     int ResolveSegmentAbsoluteFrame(const int(&starts)[kMaxAnimSegments], const int(&counts)[kMaxAnimSegments],
         int segmentCount, int localFrame) {
         int cursor = 0;
@@ -82,6 +99,10 @@ namespace {
 }
 
 namespace ECS {
+    /**
+     * @brief Return scheduler metadata describing component access and run mode.
+     * @return SystemMetadata for the AnimationSystem.
+     */
     SystemMetadata AnimationSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Animation");
         // Define which components this system reads from
@@ -100,7 +121,10 @@ namespace ECS {
         return builder.Build();
     }
 
-    // Logic here is the similar to AnimationPreviewSystem
+    /**
+     * @brief Advance animation state and update SpriteRenderer2D UV coordinates for all animated entities.
+     * @param world ECS world containing animation state and sprite renderer components.
+     */
     void AnimationSystem::OnUpdate(World& world) {
         // Get the delta time since the last frame for animation timing
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());

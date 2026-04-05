@@ -18,14 +18,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace {
     /**
      * @brief Append an event to the entity's event buffer, creating it if necessary.
-     * If the buffer is full, the event is not added.
-     * @param world Pointer to the ECS world
-     * @param entity The entity to add the event to
-     * @param entityId The packed ID of the entity
-     * @param trackedEntities Vector to track entities that received event buffers
-     * @param evt The event to append
-     * @tparam TBuffer The type of the event buffer component
-     * @tparam TEvent The type of the event to append
+     *        If the buffer is full, the event is not added.
+     * @tparam TBuffer The type of the event buffer component.
+     * @tparam TEvent The type of the event to append.
+     * @param world Pointer to the ECS world.
+     * @param entity The entity to add the event to.
+     * @param entityId The packed ID of the entity.
+     * @param trackedEntities Vector to track entities that received event buffers.
+     * @param evt The event to append.
      */
     template <typename TBuffer, typename TEvent>
     void AppendEvent(ECS::World* world,
@@ -61,6 +61,16 @@ namespace ECS::Events {
     EventDispatcher::~EventDispatcher() {
     }
 
+    /**
+     * @brief Dispatch a collision event to both participating entities, appending it to each
+     *        entity's CollisionEventBuffer with appropriate normal/velocity inversion for entity2.
+     * @param entity1Id Packed ID of the first entity involved in the collision.
+     * @param entity2Id Packed ID of the second entity involved in the collision.
+     * @param contactPoint World-space point of contact.
+     * @param contactNormal Collision normal pointing from entity2 toward entity1.
+     * @param relativeVelocity Relative velocity at the point of contact.
+     * @param impulseMagnitude Magnitude of the collision impulse applied.
+     */
     void EventDispatcher::FireCollisionEvent(
         PackedEntityId entity1Id,
         PackedEntityId entity2Id,
@@ -97,6 +107,11 @@ namespace ECS::Events {
         AppendEvent<CollisionEventBuffer>(world, entity2, entity2Id, collisionEventEntities, event2);
     }
 
+    /**
+     * @brief Fire a trigger-enter event on the trigger entity, recording the other entity as the entering body.
+     * @param triggerId Packed ID of the trigger entity.
+     * @param otherEntityId Packed ID of the entity that entered the trigger.
+     */
     void EventDispatcher::FireTriggerEnterEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
@@ -111,6 +126,11 @@ namespace ECS::Events {
         AppendEvent<TriggerEventBuffer>(world, trigger, triggerId, triggerEventEntities, event);
     }
 
+    /**
+     * @brief Fire a trigger-stay event on the trigger entity, recording the other entity as the overlapping body.
+     * @param triggerId Packed ID of the trigger entity.
+     * @param otherEntityId Packed ID of the entity staying inside the trigger.
+     */
     void EventDispatcher::FireTriggerStayEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
@@ -125,6 +145,12 @@ namespace ECS::Events {
         AppendEvent<TriggerEventBuffer>(world, trigger, triggerId, triggerEventEntities, event);
     }
 
+    /**
+     * @brief Dispatch a collision-exit event to both participating entities.
+     * @param entity1Id Packed ID of the first entity.
+     * @param entity2Id Packed ID of the second entity.
+     * @param lastContactPoint The last known contact point before separation.
+     */
     void EventDispatcher::FireCollisionExitEvent(
         PackedEntityId entity1Id,
         PackedEntityId entity2Id,
@@ -152,6 +178,11 @@ namespace ECS::Events {
         AppendEvent<CollisionExitEventBuffer>(world, entity2, entity2Id, collisionExitEventEntities, event2);
     }
 
+    /**
+     * @brief Fire a trigger-exit event on the trigger entity, recording the other entity as the leaving body.
+     * @param triggerId Packed ID of the trigger entity.
+     * @param otherEntityId Packed ID of the entity that exited the trigger.
+     */
     void EventDispatcher::FireTriggerExitEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
@@ -164,6 +195,10 @@ namespace ECS::Events {
         AppendEvent<TriggerExitEventBuffer>(world, trigger, triggerId, triggerExitEventEntities, event);
     }
 
+    /**
+     * @brief Remove all per-frame event buffer components from every entity that received events
+     *        this frame and clear the internal tracking lists.
+     */
     void EventDispatcher::ClearFrameEvents() {
         if (!world)
             return;

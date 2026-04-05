@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   AudioEngine.cpp
-\author Dalton Koh 2403250
+\author Dalton Koh (100%)
 \par    d.koh@digipen.edu
 \brief
 Implements the audio engine runtime layer that tracks active playback handles
@@ -24,7 +24,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Audio {
     AudioEngine* gAudioEngine = nullptr;
 
-    // load one cue on the active device
+    /**
+     * @brief Loads a named audio cue on the active device from the given file path.
+     * @param cueId    String identifier used to reference this cue at runtime.
+     * @param filePath Filesystem path to the audio asset.
+     * @param params   Sound creation parameters such as streaming and 3D flags.
+     * @return True if the cue was loaded successfully, false if the device is unavailable or loading failed.
+     */
     bool AudioEngine::LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params) {
         // return false when no device exists
         if (!m_device) {
@@ -33,7 +39,10 @@ namespace Audio {
         return m_device->LoadCue(cueId, filePath, params);
     }
 
-    // unload one cue on the active device
+    /**
+     * @brief Unloads a previously loaded audio cue from the active device, freeing its resources.
+     * @param cueId String identifier of the cue to unload.
+     */
     void AudioEngine::UnloadCue(const std::string& cueId) {
         // ignore when no device exists
         if (!m_device) {
@@ -42,7 +51,11 @@ namespace Audio {
         m_device->UnloadCue(cueId);
     }
 
-    // check whether a cue exists
+    /**
+     * @brief Queries whether a cue with the given id is currently loaded on the device.
+     * @param cueId String identifier of the cue to check.
+     * @return True if the cue is loaded and available for playback.
+     */
     bool AudioEngine::HasCue(const std::string& cueId) const {
         // return false when no device exists
         if (!m_device) {
@@ -51,7 +64,13 @@ namespace Audio {
         return m_device->HasCue(cueId);
     }
 
-    // play a cue and cache runtime state
+    /**
+     * @brief Starts playback of a cue and caches the resulting instance state for runtime mixing.
+     * @param cueId    String identifier of the cue to play.
+     * @param settings Playback parameters including volume, pitch, pan, looping, and spatial flags.
+     * @param bus      Mixing bus to route this instance through.
+     * @return A valid PlaybackHandle identifying the new instance, or an invalid handle on failure.
+     */
     PlaybackHandle AudioEngine::Play(const std::string& cueId, const PlaySettings& settings, Bus bus) {
         // return empty handle when no device exists
         if (!m_device) {
@@ -77,7 +96,14 @@ namespace Audio {
         return handle;
     }
 
-    // play cue with single instance policy
+    /**
+     * @brief Starts or manages playback of a cue under a single-instance policy.
+     * @param cueId    String identifier of the cue to play.
+     * @param settings Playback parameters including volume, pitch, pan, looping, and spatial flags.
+     * @param policy   Rule that governs behavior when the cue is already playing (restart, resume, ignore, or new instance).
+     * @param bus      Mixing bus to route this instance through.
+     * @return A valid PlaybackHandle for the active instance, or an invalid handle on failure.
+     */
     PlaybackHandle AudioEngine::PlaySingle(const std::string& cueId, const PlaySettings& settings, PlayPolicy policy, Bus bus) {
         // return empty handle when no device exists
         if (!m_device) {
@@ -102,7 +128,11 @@ namespace Audio {
         return handle;
     }
 
-    // stop one handle and clear cached state
+    /**
+     * @brief Stops a specific playback instance and removes it from the runtime state cache.
+     * @param handle Handle of the instance to stop.
+     * @param mode   Whether to stop immediately or fade out first.
+     */
     void AudioEngine::Stop(PlaybackHandle handle, StopMode mode) {
         // ignore when no device exists
         if (!m_device) {
@@ -113,7 +143,11 @@ namespace Audio {
         m_instances.erase(handle.Id);
     }
 
-    // stop an active cue mapping
+    /**
+     * @brief Stops the single-instance playback currently mapped to a cue identifier.
+     * @param cueId String identifier of the cue whose active instance should be stopped.
+     * @param mode  Whether to stop immediately or fade out first.
+     */
     void AudioEngine::StopCue(const std::string& cueId, StopMode mode) {
         // ignore when no device exists
         if (!m_device) {
@@ -122,7 +156,11 @@ namespace Audio {
         m_device->StopCue(cueId, mode);
     }
 
-    // query cue playback from device
+    /**
+     * @brief Queries the device to determine whether any instance of a cue is currently playing.
+     * @param cueId String identifier of the cue to query.
+     * @return True if the cue is actively playing on the device.
+     */
     bool AudioEngine::IsCuePlaying(const std::string& cueId) const {
         // return false when no device exists
         if (!m_device) {
@@ -131,7 +169,11 @@ namespace Audio {
         return m_device->IsCuePlaying(cueId);
     }
 
-    // set cached base volume for a handle
+    /**
+     * @brief Updates the cached base volume for a playback instance; the final volume is applied during the next Update tick.
+     * @param handle Handle of the instance to modify.
+     * @param volume New base volume in the range [0, 1].
+     */
     void AudioEngine::SetInstanceVolume(PlaybackHandle handle, float volume) {
         // update cache only when handle exists
         if (auto it = m_instances.find(handle.Id); it != m_instances.end()) {
@@ -139,7 +181,11 @@ namespace Audio {
         }
     }
 
-    // set pitch in cache and on device
+    /**
+     * @brief Updates the pitch of a playback instance in the cache and immediately on the device.
+     * @param handle Handle of the instance to modify.
+     * @param pitch  New pitch multiplier (1.0 = normal speed).
+     */
     void AudioEngine::SetInstancePitch(PlaybackHandle handle, float pitch) {
         // ignore when no device exists
         if (!m_device) {
@@ -152,7 +198,11 @@ namespace Audio {
         m_device->SetInstancePitch(handle, pitch);
     }
 
-    // set pan in cache and on device for 2d sources
+    /**
+     * @brief Updates the stereo pan of a 2D playback instance in the cache and immediately on the device.
+     * @param handle Handle of the instance to modify.
+     * @param pan    Pan value in the range [-1, 1] where -1 is full left and 1 is full right.
+     */
     void AudioEngine::SetInstancePan(PlaybackHandle handle, float pan) {
         // ignore when no device exists
         if (!m_device) {
@@ -166,7 +216,11 @@ namespace Audio {
         }
     }
 
-    // set per instance low pass gain on device
+    /**
+     * @brief Sets the per-instance low-pass filter gain directly on the device channel.
+     * @param handle Handle of the instance to modify.
+     * @param gain   Low-pass gain in the range [0, 1] where 1 is fully open (no filtering).
+     */
     void AudioEngine::SetInstanceLowPassGain(PlaybackHandle handle, float gain) {
         // ignore when no device exists
         if (!m_device) {
@@ -175,7 +229,12 @@ namespace Audio {
         m_device->SetInstanceLowPassGain(handle, gain);
     }
 
-    // set 3d position and velocity for one handle
+    /**
+     * @brief Updates the 3D world-space position and velocity of a playback instance on the device.
+     * @param handle Handle of the instance to move.
+     * @param pos    World-space position of the audio emitter.
+     * @param vel    World-space velocity of the audio emitter used for Doppler calculation.
+     */
     void AudioEngine::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         // ignore when no device exists
         if (!m_device) {
@@ -184,6 +243,12 @@ namespace Audio {
         m_device->SetInstancePosition(handle, pos, vel);
     }
 
+    /**
+     * @brief Sets the minimum and maximum 3D rolloff distances for a specific playback instance.
+     * @param handle      Handle of the instance to modify.
+     * @param minDistance Distance at which the sound reaches full volume.
+     * @param maxDistance Distance beyond which the sound is inaudible.
+     */
     void AudioEngine::SetInstance3DMinMaxDistance(PlaybackHandle handle, float minDistance, float maxDistance) {
         if (!m_device) {
             return;
@@ -191,6 +256,11 @@ namespace Audio {
         m_device->SetInstance3DMinMaxDistance(handle, minDistance, maxDistance);
     }
 
+    /**
+     * @brief Returns the minimum 3D rolloff distance currently set for a playback instance.
+     * @param handle Handle of the instance to query.
+     * @return Minimum distance value, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetInstance3DMinDistance(PlaybackHandle handle) const {
         if (!m_device) {
             return 1.0f;
@@ -198,6 +268,11 @@ namespace Audio {
         return m_device->GetInstance3DMinDistance(handle);
     }
 
+    /**
+     * @brief Returns the maximum 3D rolloff distance currently set for a playback instance.
+     * @param handle Handle of the instance to query.
+     * @return Maximum distance value, or 25.0 if the device is unavailable.
+     */
     float AudioEngine::GetInstance3DMaxDistance(PlaybackHandle handle) const {
         if (!m_device) {
             return 25.0f;
@@ -205,6 +280,11 @@ namespace Audio {
         return m_device->GetInstance3DMaxDistance(handle);
     }
 
+    /**
+     * @brief Sets the 3D speaker spread angle for a specific playback instance.
+     * @param handle Handle of the instance to modify.
+     * @param spread Spread angle in degrees [0, 360]; 0 collapses to mono point source.
+     */
     void AudioEngine::SetInstance3DSpread(PlaybackHandle handle, float spread) {
         if (!m_device) {
             return;
@@ -212,6 +292,11 @@ namespace Audio {
         m_device->SetInstance3DSpread(handle, spread);
     }
 
+    /**
+     * @brief Returns the 3D speaker spread angle currently set for a playback instance.
+     * @param handle Handle of the instance to query.
+     * @return Spread angle in degrees, or 0.0 if the device is unavailable.
+     */
     float AudioEngine::GetInstance3DSpread(PlaybackHandle handle) const {
         if (!m_device) {
             return 0.0f;
@@ -219,6 +304,11 @@ namespace Audio {
         return m_device->GetInstance3DSpread(handle);
     }
 
+    /**
+     * @brief Sets the 3D spatialization blend level for a specific playback instance.
+     * @param handle Handle of the instance to modify.
+     * @param level  Blend factor in [0, 1]; 0 is fully 2D panned, 1 is fully 3D spatialized.
+     */
     void AudioEngine::SetInstance3DLevel(PlaybackHandle handle, float level) {
         if (!m_device) {
             return;
@@ -226,6 +316,11 @@ namespace Audio {
         m_device->SetInstance3DLevel(handle, level);
     }
 
+    /**
+     * @brief Returns the 3D spatialization blend level currently set for a playback instance.
+     * @param handle Handle of the instance to query.
+     * @return 3D level blend factor, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetInstance3DLevel(PlaybackHandle handle) const {
         if (!m_device) {
             return 1.0f;
@@ -233,6 +328,11 @@ namespace Audio {
         return m_device->GetInstance3DLevel(handle);
     }
 
+    /**
+     * @brief Sets the default minimum and maximum 3D rolloff distances applied to newly spawned instances.
+     * @param minDistance Default distance at which sounds reach full volume.
+     * @param maxDistance Default distance beyond which sounds become inaudible.
+     */
     void AudioEngine::SetDefault3DMinMaxDistance(float minDistance, float maxDistance) {
         if (!m_device) {
             return;
@@ -240,6 +340,10 @@ namespace Audio {
         m_device->SetDefault3DMinMaxDistance(minDistance, maxDistance);
     }
 
+    /**
+     * @brief Returns the default minimum 3D rolloff distance used for new playback instances.
+     * @return Default minimum distance, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetDefault3DMinDistance() const {
         if (!m_device) {
             return 1.0f;
@@ -247,6 +351,10 @@ namespace Audio {
         return m_device->GetDefault3DMinDistance();
     }
 
+    /**
+     * @brief Returns the default maximum 3D rolloff distance used for new playback instances.
+     * @return Default maximum distance, or 25.0 if the device is unavailable.
+     */
     float AudioEngine::GetDefault3DMaxDistance() const {
         if (!m_device) {
             return 25.0f;
@@ -254,6 +362,10 @@ namespace Audio {
         return m_device->GetDefault3DMaxDistance();
     }
 
+    /**
+     * @brief Sets the default 3D speaker spread angle applied to newly spawned instances.
+     * @param spread Default spread angle in degrees [0, 360].
+     */
     void AudioEngine::SetDefault3DSpread(float spread) {
         if (!m_device) {
             return;
@@ -261,6 +373,10 @@ namespace Audio {
         m_device->SetDefault3DSpread(spread);
     }
 
+    /**
+     * @brief Returns the default 3D speaker spread angle used for new playback instances.
+     * @return Default spread angle in degrees, or 0.0 if the device is unavailable.
+     */
     float AudioEngine::GetDefault3DSpread() const {
         if (!m_device) {
             return 0.0f;
@@ -268,6 +384,10 @@ namespace Audio {
         return m_device->GetDefault3DSpread();
     }
 
+    /**
+     * @brief Sets the default 3D spatialization blend level applied to newly spawned instances.
+     * @param level Default blend factor in [0, 1].
+     */
     void AudioEngine::SetDefault3DLevel(float level) {
         if (!m_device) {
             return;
@@ -275,6 +395,10 @@ namespace Audio {
         m_device->SetDefault3DLevel(level);
     }
 
+    /**
+     * @brief Returns the default 3D spatialization blend level used for new playback instances.
+     * @return Default 3D level factor, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetDefault3DLevel() const {
         if (!m_device) {
             return 1.0f;
@@ -282,7 +406,10 @@ namespace Audio {
         return m_device->GetDefault3DLevel();
     }
 
-    // set current listener data on device
+    /**
+     * @brief Forwards listener position, velocity, and orientation to the active audio device for 3D spatialization.
+     * @param listener Struct containing the listener's world-space position, velocity, forward, and up vectors.
+     */
     void AudioEngine::SetListener(const ListenerParams& listener) {
         // ignore when no device exists
         if (!m_device) {
@@ -291,7 +418,11 @@ namespace Audio {
         m_device->SetListener(listener);
     }
 
-    // set bus volume and clear bus fade
+    /**
+     * @brief Sets the volume of a mixing bus immediately, cancelling any active fade on that bus.
+     * @param bus    Target bus to adjust.
+     * @param volume New volume in [0, 1]; values outside this range are clamped.
+     */
     void AudioEngine::SetBusVolume(Bus bus, float volume) {
         // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
@@ -303,7 +434,11 @@ namespace Audio {
         m_busStates[index].Fade.Active = false;
     }
 
-    // read current bus volume
+    /**
+     * @brief Returns the current volume of a mixing bus.
+     * @param bus Target bus to query.
+     * @return Current bus volume in [0, 1], or 1.0 if the bus index is out of range.
+     */
     float AudioEngine::GetBusVolume(Bus bus) const {
         // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
@@ -313,7 +448,12 @@ namespace Audio {
         return m_busStates[index].Volume;
     }
 
-    // start a volume fade on one bus
+    /**
+     * @brief Initiates a linear volume fade on a mixing bus from its current volume to a target.
+     * @param bus          Target bus to fade.
+     * @param targetVolume Destination volume at the end of the fade.
+     * @param duration     Duration of the fade in seconds.
+     */
     void AudioEngine::FadeBusVolume(Bus bus, float targetVolume, float duration) {
         // convert enum to bus array index
         const size_t index = static_cast<size_t>(bus);
@@ -331,7 +471,11 @@ namespace Audio {
         state.Fade.StopOnComplete = false;
     }
 
-    // set low pass gain on one bus
+    /**
+     * @brief Sets the low-pass filter gain for a mixing bus DSP node.
+     * @param bus  Target bus to filter.
+     * @param gain Low-pass gain in [0, 1] where 1 is fully open and 0 is maximum filtering.
+     */
     void AudioEngine::SetBusLowPassGain(Bus bus, float gain) {
         // ignore when no device exists
         if (!m_device) {
@@ -340,7 +484,11 @@ namespace Audio {
         m_device->SetBusLowPassGain(bus, gain);
     }
 
-    // get low pass gain on one bus
+    /**
+     * @brief Returns the current low-pass filter gain for a mixing bus.
+     * @param bus Target bus to query.
+     * @return Current low-pass gain, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetBusLowPassGain(Bus bus) const {
         // return default when no device exists
         if (!m_device) {
@@ -349,6 +497,11 @@ namespace Audio {
         return m_device->GetBusLowPassGain(bus);
     }
 
+    /**
+     * @brief Sets the resonance (Q factor) of the low-pass filter DSP node on a mixing bus.
+     * @param bus       Target bus to modify.
+     * @param resonance Resonance value; higher values produce a more pronounced peak at the cutoff frequency.
+     */
     void AudioEngine::SetBusLowPassResonance(Bus bus, float resonance) {
         if (!m_device) {
             return;
@@ -356,6 +509,11 @@ namespace Audio {
         m_device->SetBusLowPassResonance(bus, resonance);
     }
 
+    /**
+     * @brief Returns the current low-pass filter resonance value for a mixing bus.
+     * @param bus Target bus to query.
+     * @return Current resonance value, or 1.0 if the device is unavailable.
+     */
     float AudioEngine::GetBusLowPassResonance(Bus bus) const {
         if (!m_device) {
             return 1.0f;
@@ -363,7 +521,13 @@ namespace Audio {
         return m_device->GetBusLowPassResonance(bus);
     }
 
-    // start fade for one instance
+    /**
+     * @brief Initiates a volume fade on a single playback instance, optionally stopping it when the fade completes.
+     * @param handle         Handle of the instance to fade.
+     * @param targetVolume   Destination volume at the end of the fade.
+     * @param duration       Duration of the fade in seconds.
+     * @param stopOnComplete If true, the instance is automatically stopped once the fade reaches the target.
+     */
     void AudioEngine::FadeInstance(PlaybackHandle handle, float targetVolume, float duration, bool stopOnComplete) {
         // find cached state for handle
         auto it = m_instances.find(handle.Id);
@@ -380,7 +544,10 @@ namespace Audio {
         state.Fade.StopOnComplete = stopOnComplete;
     }
 
-    // fade all active instances to zero
+    /**
+     * @brief Schedules a terminal fade-to-zero on every active playback instance, stopping each when done.
+     * @param duration Duration of the fade-out in seconds.
+     */
     void AudioEngine::FadeOutAll(float duration) {
         // Mark all active instances for terminal fade -> stop.
         for (auto& [id, state] : m_instances) {
@@ -393,7 +560,11 @@ namespace Audio {
         }
     }
 
-    // fade all instances on a bus to zero
+    /**
+     * @brief Schedules a terminal fade-to-zero on all playback instances routed through a specific bus.
+     * @param bus      Target bus whose instances should be faded out and stopped.
+     * @param duration Duration of the fade-out in seconds.
+     */
     void AudioEngine::FadeOutBus(Bus bus, float duration) {
         // iterate all instances and filter by bus
         for (auto& [id, state] : m_instances) {
@@ -409,7 +580,10 @@ namespace Audio {
         }
     }
 
-    // check for active terminal fade outs
+    /**
+     * @brief Returns whether any tracked instance currently has an active terminal (stop-on-complete) fade-out.
+     * @return True if at least one instance is fading out to silence and will be stopped on completion.
+     */
     bool AudioEngine::HasActiveFadeOuts() const {
         // find any fade that will stop on complete
         for (const auto& [id, state] : m_instances) {
@@ -420,7 +594,10 @@ namespace Audio {
         return false;
     }
 
-    // return max remaining time across terminal fades
+    /**
+     * @brief Returns the longest remaining time among all active terminal fade-out operations.
+     * @return Maximum remaining fade duration in seconds, or 0.0 if no terminal fades are active.
+     */
     float AudioEngine::GetMaxFadeOutRemaining() const {
         // track highest remaining fade time
         float maxRemaining = 0.0f;
@@ -435,7 +612,11 @@ namespace Audio {
         return maxRemaining;
     }
 
-    // check if a handle is currently fading
+    /**
+     * @brief Returns whether a specific playback instance currently has an active volume fade in progress.
+     * @param handle Handle of the instance to query.
+     * @return True if the instance exists in the cache and its fade flag is active.
+     */
     bool AudioEngine::IsHandleFading(PlaybackHandle handle) const {
         // resolve handle in cache
         auto it = m_instances.find(handle.Id);
@@ -445,13 +626,19 @@ namespace Audio {
         return it->second.Fade.Active;
     }
 
-    // check if a handle is tracked as active
+    /**
+     * @brief Returns whether a playback handle is still tracked as an active instance in the engine cache.
+     * @param handle Handle to check.
+     * @return True if the handle exists in the instance map.
+     */
     bool AudioEngine::IsHandleActive(PlaybackHandle handle) const {
         // active means cached handle exists
         return m_instances.find(handle.Id) != m_instances.end();
     }
 
-    // stop all active fades immediately
+    /**
+     * @brief Immediately stops and removes all playback instances that currently have an active fade.
+     */
     void AudioEngine::StopAllFades() {
         // ignore when no device exists
         if (!m_device) {
@@ -472,7 +659,10 @@ namespace Audio {
         }
     }
 
-    // run one update tick for audio runtime state
+    /**
+     * @brief Advances all bus fades, instance fades, and runtime volume application for one frame tick.
+     * @param deltaTime Elapsed time since the last update in seconds.
+     */
     void AudioEngine::Update(float deltaTime) {
         // ignore when no device exists
         if (!m_device) {
@@ -485,7 +675,11 @@ namespace Audio {
         _pruneStoppedInstances();
     }
 
-    // compute instance volume before bus and master mix
+    /**
+     * @brief Computes the pre-mix volume for an instance, interpolating through any active fade.
+     * @param instance Const reference to the instance state to evaluate.
+     * @return Interpolated volume in instance-local space before bus and master gain are applied.
+     */
     float AudioEngine::_computePreMixVolume(const InstanceState& instance) const {
         if (instance.Fade.Active) {
             // Fade interpolation runs in instance-local volume space before bus/master gain.
@@ -498,7 +692,11 @@ namespace Audio {
         return instance.BaseVolume;
     }
 
-    // compute combined master and bus volume multiplier
+    /**
+     * @brief Computes the combined master and per-bus volume multiplier for an instance.
+     * @param instance Const reference to the instance state used to identify the bus.
+     * @return Product of the master bus volume and the instance's assigned bus volume.
+     */
     float AudioEngine::_computeBusVolume(const InstanceState& instance) const {
         // multiply master and bus gains
         float master = GetBusVolume(Bus::Master);
@@ -506,7 +704,10 @@ namespace Audio {
         return master * bus;
     }
 
-    // advance all active bus fades
+    /**
+     * @brief Advances the fade timer for every active bus fade and updates bus volume accordingly.
+     * @param deltaTime Elapsed time since the last update in seconds.
+     */
     void AudioEngine::_updateBusFades(float deltaTime) {
         // walk all buses and update active fades
         for (size_t i = 0; i < static_cast<size_t>(Bus::Count); ++i) {
@@ -527,7 +728,11 @@ namespace Audio {
         }
     }
 
-    // advance instance fades and apply final runtime volume
+    /**
+     * @brief Advances instance fade timers, applies final mixed volumes to device channels, and
+     *        stops instances whose terminal fades have completed.
+     * @param deltaTime Elapsed time since the last update in seconds.
+     */
     void AudioEngine::_updateInstanceFades(float deltaTime) {
         // collect ids that should stop after loop
         std::vector<uint64_t> toStop;
@@ -577,7 +782,9 @@ namespace Audio {
         }
     }
 
-    // remove handles that are no longer playing
+    /**
+     * @brief Removes all instance cache entries whose underlying device channels have stopped playing.
+     */
     void AudioEngine::_pruneStoppedInstances() {
         // collect dead handles first
         std::vector<uint64_t> toRemove;

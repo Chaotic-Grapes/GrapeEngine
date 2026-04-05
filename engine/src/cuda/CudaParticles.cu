@@ -5,11 +5,11 @@
 \date     28th February 2026
 \brief
 CUDA particle system kernels. Four kernels:
-  1. emitKernel   — spawn new particles with randomized properties
-  2. updateKernel — simulate physics, color/size interpolation, lifetime,
+  1. emitKernel   ï¿½ spawn new particles with randomized properties
+  2. updateKernel ï¿½ simulate physics, color/size interpolation, lifetime,
                     AND write alive flags (fused markAlive)
-  3. compactKernel + prefix scan — remove dead particles
-  4. interleaveKernel — pack 3 SoA arrays into interleaved VBO
+  3. compactKernel + prefix scan ï¿½ remove dead particles
+  4. interleaveKernel ï¿½ pack 3 SoA arrays into interleaved VBO
 
 All kernel launches accept a cudaStream_t for per-emitter overlap.
 Compact uses deferred readback: reads LAST frame's totalAlive from pinned
@@ -34,6 +34,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cstdio>
 #include <cub/cub.cuh>
 
+/**
+ * @brief CUDA kernel that computes the total number of alive particles after compaction.
+ *
+ * Executed as a single-thread (<<<1,1>>>) kernel. Reads the last element of
+ * the exclusive-scan offset array and adds the corresponding alive flag to
+ * produce the total count of surviving particles.
+ *
+ * @param offsets       Device array of exclusive-scan offsets (one per particle).
+ * @param aliveFlags    Device array of per-particle alive flags (1 = alive, 0 = dead).
+ * @param totalAliveOut Device scalar that receives the computed total alive count.
+ * @param count         Total number of particles (length of @p offsets and @p aliveFlags).
+ */
 __global__ void computeTotalAliveKernel(const int* __restrict__ offsets,
     const int* __restrict__ aliveFlags,
     int* __restrict__ totalAliveOut,
@@ -47,8 +59,24 @@ __global__ void computeTotalAliveKernel(const int* __restrict__ offsets,
 }
 
 // ============================================================
-// Emit kernel — each thread spawns one particle
+// Emit kernelï¿½ each thread spawns one particle
 // ============================================================
+
+/**
+ * @brief CUDA kernel that spawns new particles with randomised properties.
+ *
+ * Each thread initialises one particle at index @p baseIndex + threadId.
+ * Position is sampled from the emitter shape (Point, Circle, or Line),
+ * velocity is computed from a cone defined by @p params.emissionAngle and
+ * @p params.emissionSpread, and lifetime, rotation speed, and initial color
+ * are randomised using per-particle cuRAND states seeded by the frame count.
+ *
+ * @param posVel    Device SoA array (float4: x, y, vx, vy) to write new particles into.
+ * @param lifeColor Device SoA array (float4: life, maxLife, colorR, colorG).
+ * @param sizeRot   Device SoA array (float4: colorB, colorA, size, rotation).
+ * @param params    Particle emission and simulation parameters.
+ * @param baseIndex Starting index in the particle buffers for this batch of emissions.
+ */
 __global__ void emitKernel(float4* __restrict__ posVel,
     float4* __restrict__ lifeColor,
     float4* __restrict__ sizeRot,
@@ -110,7 +138,7 @@ __global__ void emitKernel(float4* __restrict__ posVel,
 }
 
 // ============================================================
-// Update kernel — each thread updates one alive particle
+// Update kernel ï¿½ each thread updates one alive particle
 // Also writes alive flags (fused markAlive)
 // ============================================================
 __global__ void updateKernel(float4* __restrict__ posVel,
@@ -130,7 +158,7 @@ __global__ void updateKernel(float4* __restrict__ posVel,
     float life = lc.x;
     float maxLife = lc.y;
 
-    // Already dead — mark and skip
+    // Already dead ï¿½ mark and skip
     if (life <= 0.0f) {
         aliveFlags[idx] = 0;
         return;
@@ -155,7 +183,7 @@ __global__ void updateKernel(float4* __restrict__ posVel,
         vel.y *= factor;
     }
 
-    // Turbulence — deterministic per-particle noise
+    // Turbulence ï¿½ deterministic per-particle noise
     if (params.turbulence > 0.0f) {
         unsigned int hash = (idx * 2654435761u) ^ (params.frameCount * 2246822519u);
         float noiseX = ((float)(hash % 1000u) / 1000.0f - 0.5f) * 2.0f;
@@ -164,7 +192,7 @@ __global__ void updateKernel(float4* __restrict__ posVel,
         vel.y += noiseY * params.turbulence * params.dt;
     }
 
-    // Wobble (sinusoidal horizontal drift — for bubbles)
+    // Wobble (sinusoidal horizontal drift ï¿½ for bubbles)
     if (params.wobbleFrequency > 0.0f && params.wobbleAmplitude > 0.0f) {
         // Each particle gets a phase offset based on its index
         float phase = (float)(idx * 73856093u % 10000u) / 10000.0f * 6.2831853f;
@@ -209,13 +237,13 @@ __global__ void updateKernel(float4* __restrict__ posVel,
                     if (xSolid) vel.x *= -params.bounciness;
                     if (ySolid) vel.y *= -params.bounciness;
                     if (!xSolid && !ySolid) {
-                        // Diagonal hit — bounce both
+                        // Diagonal hit ï¿½ bounce both
                         vel.x *= -params.bounciness;
                         vel.y *= -params.bounciness;
                     }
                 }
                 else {
-                    // No bounce, no die — just stop
+                    // No bounce, no die ï¿½ just stop
                     pos.x = pv.x;
                     pos.y = pv.y;
                     vel.x = 0.0f;
@@ -292,7 +320,7 @@ __global__ void scatterKernel(const float4* __restrict__ srcPV,
 }
 
 // ============================================================
-// Interleave kernel — pack SoA into interleaved VBO
+// Interleave kernel ï¿½ pack SoA into interleaved VBO
 // ============================================================
 __global__ void interleaveKernel(float4* __restrict__ dst,
     const float4* __restrict__ posVel,
@@ -315,6 +343,15 @@ __global__ void interleaveKernel(float4* __restrict__ dst,
 // ============================================================
 namespace CudaParticles {
 
+    /**
+     * @brief Launch the particle update kernel, advancing physics and writing alive flags.
+     * @param posVel     Device SoA buffer (float4: x, y, vx, vy) for all particles.
+     * @param lifeColor  Device SoA buffer (float4: life, maxLife, colorR, colorG).
+     * @param sizeRot    Device SoA buffer (float4: colorB, colorA, size, rotation).
+     * @param d_aliveFlags Device array that receives per-particle alive flags (1 = alive).
+     * @param params     Simulation parameters including aliveCount and timestep.
+     * @param stream     CUDA stream to launch the kernel on.
+     */
     void Update(float4* posVel,
         float4* lifeColor,
         float4* sizeRot,
@@ -337,6 +374,15 @@ namespace CudaParticles {
 #endif
     }
 
+    /**
+     * @brief Launch the emit kernel to spawn new particles and return the updated alive count.
+     * @param posVel    Device SoA buffer (float4: x, y, vx, vy).
+     * @param lifeColor Device SoA buffer (float4: life, maxLife, colorR, colorG).
+     * @param sizeRot   Device SoA buffer (float4: colorB, colorA, size, rotation).
+     * @param params    Emission parameters including aliveCount, emitCount, and burstCount.
+     * @param stream    CUDA stream to launch the kernel on.
+     * @return New alive particle count after emission.
+     */
     int Emit(float4* posVel,
         float4* lifeColor,
         float4* sizeRot,
@@ -372,6 +418,25 @@ namespace CudaParticles {
         return baseIndex + toEmit;
     }
 
+    /**
+     * @brief Remove dead particles from the SoA buffers using a CUB exclusive-scan compaction.
+     * @param posVel        Device SoA buffer (float4: x, y, vx, vy).
+     * @param lifeColor     Device SoA buffer (float4: life, maxLife, colorR, colorG).
+     * @param sizeRot       Device SoA buffer (float4: colorB, colorA, size, rotation).
+     * @param aliveCount    Current number of particles to process.
+     * @param maxParticles  Maximum buffer capacity (unused, reserved).
+     * @param d_aliveFlags  Device array of per-particle alive flags (produced by Update).
+     * @param d_offsets     Device scratch buffer for exclusive-scan output offsets.
+     * @param d_totalAlive  Device scalar receiving this frame's alive count.
+     * @param h_totalAlive  Pinned host scalar for deferred readback (last frame's count on entry).
+     * @param d_tempPV      Device scratch buffer for compacted posVel data.
+     * @param d_tempLC      Device scratch buffer for compacted lifeColor data.
+     * @param d_tempSR      Device scratch buffer for compacted sizeRot data.
+     * @param d_scanTemp    Device temp storage for CUB scan.
+     * @param scanTempBytes Size in bytes of d_scanTemp.
+     * @param stream        CUDA stream for all operations.
+     * @return Last frame's alive count (deferred readback; current frame's result available next call).
+     */
     int Compact(float4* posVel,
         float4* lifeColor,
         float4* sizeRot,
@@ -415,7 +480,7 @@ namespace CudaParticles {
         // then kick off async copy for THIS frame (read next frame).
         // On first frame h_totalAlive is 0, which is correct.
         // ============================================================
-        int totalAlive = *h_totalAlive;  // no sync — last frame's copy is long done
+        int totalAlive = *h_totalAlive;  // no sync ï¿½ last frame's copy is long done
 
         // Kick off async copy of THIS frame's result (will be read next frame)
         cudaMemcpyAsync(h_totalAlive, d_totalAlive, sizeof(int),
@@ -457,6 +522,15 @@ namespace CudaParticles {
         return totalAlive;
     }
 
+    /**
+     * @brief Pack three SoA float4 arrays into an interleaved VBO-ready buffer.
+     * @param dst      Device destination buffer (3 float4 values per particle).
+     * @param posVel   Device SoA buffer (float4: x, y, vx, vy).
+     * @param lifeColor Device SoA buffer (float4: life, maxLife, colorR, colorG).
+     * @param sizeRot  Device SoA buffer (float4: colorB, colorA, size, rotation).
+     * @param count    Number of particles to interleave.
+     * @param stream   CUDA stream to launch the kernel on.
+     */
     void Interleave(float4* dst,
         const float4* posVel,
         const float4* lifeColor,
@@ -479,6 +553,13 @@ namespace CudaParticles {
 #endif
     }
 
+    /**
+     * @brief Query the CUB temporary storage size needed for ExclusiveSum on @p count elements.
+     * @param count Number of elements to scan.
+     * @param d_in  Device input array pointer (used only for type deduction).
+     * @param d_out Device output array pointer (used only for type deduction).
+     * @return Required scratch buffer size in bytes.
+     */
     size_t GetScanTempBytes(int count, int* d_in, int* d_out)
     {
         size_t bytes = 0;

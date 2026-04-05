@@ -41,7 +41,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fmod_dsp_effects.h>
 
 namespace {
-    // convert raw bus value to a valid enum
+    /**
+     * @brief Convert a raw integer bus index to a valid Audio::Bus enum value.
+     * @param raw Unchecked bus index read from the AudioSource component.
+     * @return Validated Audio::Bus value; defaults to Audio::Bus::SFX when raw is out of range.
+     */
     Audio::Bus ToBus(uint8_t raw) {
         const auto count = static_cast<uint8_t>(Audio::Bus::Count);
         if (raw >= count) {
@@ -59,7 +63,10 @@ namespace ECS {
         , m_hasStarted{true} 
     { }
 
-    // initialize state and register scene event hooks
+    /**
+     * @brief Initialize audio state and subscribe to scene lifecycle events.
+     * @param world ECS world (unused but required by ISystem interface).
+     */
     void AudioSystem::OnCreate(World& world) {
         (void)world;
         m_world = &world;
@@ -113,7 +120,10 @@ namespace ECS {
 
     }
 
-    // process all audio source entities for this frame
+    /**
+     * @brief Process all AudioSource entities, managing playback lifecycle and spatial audio updates.
+     * @param world ECS world containing AudioSource and WorldTransform components.
+     */
     void AudioSystem::OnUpdate(World& world)
     {
         m_world = &world;
@@ -504,7 +514,10 @@ namespace ECS {
         }
     }
 
-    // shutdown audio state owned by this system
+    /**
+     * @brief Stop all active sounds and release DSP resources owned by this system.
+     * @param world ECS world (unused but required by ISystem interface).
+     */
     void AudioSystem::OnDestroy(World& world) {
         (void)world;
         m_world = nullptr;

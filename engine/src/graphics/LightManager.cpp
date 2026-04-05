@@ -50,6 +50,10 @@ namespace Graphics {
         Shutdown();
     }
 
+    /**
+     * @brief Initializes GPU buffers required for lighting.
+     *        Creates the SSBO for point lights if not already initialized.
+     */
     void LightManager::Initialize()
     {
         if (m_initialized)
@@ -69,6 +73,9 @@ namespace Graphics {
         m_initialized = true;
     }
 
+    /**
+     * @brief Releases all GPU buffers and resets the initialization state.
+     */
     void LightManager::Shutdown()
     {
         if (m_pointLightSSBO) {
@@ -83,6 +90,10 @@ namespace Graphics {
     // Per-frame flow
     // ------------------------------------------------------------
 
+    /**
+     * @brief Resets per-frame light state. Call at the start of each frame
+     *        before submitting new light data.
+     */
     void LightManager::BeginFrame()
     {
         m_pointLights.clear();
@@ -90,6 +101,13 @@ namespace Graphics {
         m_dirty = false;
     }
 
+    /**
+     * @brief Sets the scene's directional light properties.
+     *
+     * @param direction World-space direction the light travels (will be normalized).
+     * @param color     RGB color of the directional light.
+     * @param intensity Multiplier applied to the light's color.
+     */
     void LightManager::SetDirectionalLight(const glm::vec3& direction,
         const glm::vec3& color,
         float intensity)
@@ -101,12 +119,24 @@ namespace Graphics {
         m_dirty = true;
     }
 
+    /**
+     * @brief Disables the directional light for the current frame.
+     */
     void LightManager::ClearDirectionalLight()
     {
         m_hasDirectional = false;
         m_dirty = true;
     }
 
+    /**
+     * @brief Adds a point light to the scene for the current frame.
+     *        Ignored if the maximum point light count is already reached.
+     *
+     * @param position  World-space position of the point light.
+     * @param range     Effective radius of the light's influence.
+     * @param color     RGB color of the point light.
+     * @param intensity Multiplier applied to the light's color.
+     */
     void LightManager::AddPointLight(const glm::vec3& position,
         float range,
         const glm::vec3& color,
@@ -123,6 +153,10 @@ namespace Graphics {
         m_dirty = true;
     }
 
+    /**
+     * @brief Uploads dirty light data to GPU SSBOs.
+     *        No-op if the manager is not initialized or data has not changed.
+     */
     void LightManager::Upload()
     {
         if (!m_initialized || !m_dirty)
@@ -136,6 +170,13 @@ namespace Graphics {
     // Binding
     // ------------------------------------------------------------
 
+    /**
+     * @brief Binds all light SSBOs and uniform data to a shader for rendering.
+     *        Activates the shader, binds the point light SSBO, and uploads
+     *        count, directional light, and lighting-enabled uniforms.
+     *
+     * @param shader The shader to receive the lighting uniforms and buffer bindings.
+     */
     void LightManager::Bind(Shader& shader)
     {
         if (!m_initialized)
@@ -171,6 +212,10 @@ namespace Graphics {
     // Internals
     // ------------------------------------------------------------
 
+    /**
+     * @brief Uploads the current point light list to the GPU SSBO via
+     *        glBufferSubData. No-op if the point light list is empty.
+     */
     void LightManager::UpdatePointLightBuffer()
     {
         if (m_pointLights.empty())

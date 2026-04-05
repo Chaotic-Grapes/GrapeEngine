@@ -265,6 +265,12 @@ INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, floa
     Audio::gAudioEngine->SetInstancePosition(handle, position, velocity);
 }
 
+/**
+ * @brief Set the 3D minimum and maximum distances for a playing sound instance.
+ * @param handleId The handle ID of the playback instance.
+ * @param minDistance Distance at which the sound is at full volume.
+ * @param maxDistance Distance at which the sound is at minimum volume.
+ */
 INTEROP_API void EngineInterop_Audio_SetInstance3DMinMaxDistance(uint64_t handleId, float minDistance, float maxDistance) {
     if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
@@ -276,6 +282,11 @@ INTEROP_API void EngineInterop_Audio_SetInstance3DMinMaxDistance(uint64_t handle
     Audio::gAudioEngine->SetInstance3DMinMaxDistance(handle, minDistance, maxDistance);
 }
 
+/**
+ * @brief Get the 3D minimum distance for a playing sound instance.
+ * @param handleId The handle ID of the playback instance.
+ * @return Minimum distance value (default 1.0f if unavailable).
+ */
 INTEROP_API float EngineInterop_Audio_GetInstance3DMinDistance(uint64_t handleId) {
     if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
@@ -287,6 +298,11 @@ INTEROP_API float EngineInterop_Audio_GetInstance3DMinDistance(uint64_t handleId
     return Audio::gAudioEngine->GetInstance3DMinDistance(handle);
 }
 
+/**
+ * @brief Get the 3D maximum distance for a playing sound instance.
+ * @param handleId The handle ID of the playback instance.
+ * @return Maximum distance value (default 25.0f if unavailable).
+ */
 INTEROP_API float EngineInterop_Audio_GetInstance3DMaxDistance(uint64_t handleId) {
     if (!Audio::gAudioEngine) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");

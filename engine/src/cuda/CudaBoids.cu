@@ -35,17 +35,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <thrust/sort.h>
 #include <cstdio>
 
-/*!
-\brief
-Device-side helper that computes tile-based collision avoidance steering.
-
-Combines:
-    - Proximity-based repulsion from nearby solid tiles
-    - Predictive lookahead sampling along velocity direction
-    - Perpendicular steering when a wall is detected ahead
-
-Returns a steering vector that pushes the boid away from obstacles.
-*/
+/**
+ * @brief Computes tile-based collision avoidance steering for a boid.
+ *
+ * Combines proximity-based repulsion from nearby solid tiles, predictive
+ * lookahead sampling along the velocity direction, and perpendicular
+ * steering when a wall is detected ahead.
+ *
+ * @param pos Current world-space position of the boid.
+ * @param vel Current velocity of the boid.
+ * @param p   Boid simulation parameters including collision mask and tile data.
+ * @return Steering force vector that pushes the boid away from obstacles.
+ */
 __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidParams& p)
 {
     float2 steer = make_float2(0.0f, 0.0f);
@@ -119,6 +120,18 @@ __device__ float2 ComputeCollisionAvoidance(float2 pos, float2 vel, const BoidPa
 // ============================================================
 // Spatial hash helper
 // ============================================================
+
+/**
+ * @brief Computes a spatial hash index for a 2D grid cell.
+ *
+ * Maps a (cx, cy) integer cell coordinate to a bucket index in the hash
+ * table using a pair of large prime multipliers.
+ *
+ * @param cx        Integer X coordinate of the grid cell.
+ * @param cy        Integer Y coordinate of the grid cell.
+ * @param tableSize Total number of buckets in the hash table.
+ * @return Hash bucket index in the range [0, tableSize).
+ */
 __device__ __forceinline__ uint32_t HashCell(int cx, int cy, int tableSize) {
     uint32_t h = ((uint32_t)cx * 92837111u) ^ ((uint32_t)cy * 689287499u);
     return h % (uint32_t)tableSize;
@@ -127,6 +140,22 @@ __device__ __forceinline__ uint32_t HashCell(int cx, int cy, int tableSize) {
 // ============================================================
 // Kernel 1: assign each boid to a hash cell
 // ============================================================
+
+/**
+ * @brief CUDA kernel that assigns each boid to a spatial hash cell.
+ *
+ * Each thread reads one boid's position from @p posVel, computes the
+ * grid cell it occupies, hashes that cell, and writes the resulting cell
+ * ID and the boid's own index into the output arrays for subsequent
+ * sorting and neighbour lookup.
+ *
+ * @param posVel        Device array of boid position+velocity (float4: x, y, vx, vy).
+ * @param d_cellIds     Output array that receives the hashed cell ID for each boid.
+ * @param d_boidIds     Output array that receives the boid index for each boid.
+ * @param cellSize      World-space size of a single hash cell.
+ * @param hashTableSize Total number of buckets in the hash table.
+ * @param count         Total number of boids to process.
+ */
 __global__ void assignCellsKernel(
     const float4* __restrict__ posVel,
     uint32_t* __restrict__ d_cellIds,
@@ -149,6 +178,19 @@ __global__ void assignCellsKernel(
 // ============================================================
 // Kernel 2: build cell start table
 // ============================================================
+
+/**
+ * @brief CUDA kernel that builds the cell-start lookup table for spatial hashing.
+ *
+ * After the (cellId, boidId) pairs have been sorted by cell ID, each thread
+ * checks whether it is the first entry for its cell and, if so, records its
+ * index as the start position for that cell in @p d_cellStart.
+ *
+ * @param d_cellIds   Device array of sorted cell IDs (one per boid).
+ * @param d_cellStart Output table; entry [c] holds the first sorted index that
+ *                    belongs to cell c, or 0xFFFFFFFF if the cell is empty.
+ * @param count       Total number of boids (length of @p d_cellIds).
+ */
 __global__ void buildCellStartKernel(
     const uint32_t* __restrict__ d_cellIds,
     uint32_t* __restrict__ d_cellStart,
@@ -167,6 +209,25 @@ __global__ void buildCellStartKernel(
 // ============================================================
 // Boids simulation kernel
 // ============================================================
+
+/**
+ * @brief CUDA kernel that advances the boid flocking simulation by one time step.
+ *
+ * Each thread simulates one boid. Using the spatially-hashed neighbour
+ * tables built by @p assignCellsKernel and @p buildCellStartKernel, each
+ * thread queries a 3x3 neighbourhood of hash cells to accumulate
+ * separation, alignment, and cohesion steering forces. The kernel also
+ * applies per-boid jitter, speed burst behaviour, tile collision avoidance
+ * via ComputeCollisionAvoidance(), hard collision resolution with wall
+ * sliding, and world-space wraparound bounds.
+ *
+ * @param posVel     Output device array of updated boid position+velocity
+ *                   (float4: x, y, vx, vy).
+ * @param posVelPrev Input device array of previous-frame boid state
+ *                   (float4: x, y, vx, vy), read-only.
+ * @param params     Boid simulation parameters (counts, weights, bounds,
+ *                   hash tables, collision data, etc.).
+ */
 __global__ void boidsKernel(float4* __restrict__ posVel,
     const float4* __restrict__ posVelPrev,
     BoidParams params) {
@@ -398,6 +459,31 @@ __global__ void boidsKernel(float4* __restrict__ posVel,
 // ============================================================
 // Random initialization kernel
 // ============================================================
+
+/**
+ * @brief CUDA kernel that randomly initialises boid positions and velocities.
+ *
+ * Each thread uses cuRAND to place one boid at a random position within
+ * the supplied world-space rectangle, retrying up to 32 times to avoid
+ * spawning inside a solid tile.  A random heading and speed in
+ * [0.3, 1.0] * maxSpeed are also assigned.
+ *
+ * @param posVel            Output device array (float4: x, y, vx, vy).
+ * @param count             Total number of boids to initialise.
+ * @param minX              Minimum X bound of the spawn area.
+ * @param minY              Minimum Y bound of the spawn area.
+ * @param maxX              Maximum X bound of the spawn area.
+ * @param maxY              Maximum Y bound of the spawn area.
+ * @param maxSpeed          Maximum initial speed assigned to each boid.
+ * @param seed              Base cuRAND seed; combined with the boid index.
+ * @param collisionMasks    Optional device pointer to solid-tile bitmask array,
+ *                          or nullptr to skip collision checks.
+ * @param collisionWidth    Width of the collision mask grid in tiles.
+ * @param collisionHeight   Height of the collision mask grid in tiles.
+ * @param collisionOriginX  X origin offset of the collision grid in tiles.
+ * @param collisionOriginY  Y origin offset of the collision grid in tiles.
+ * @param tileSize          World-space size of one tile in pixels/units.
+ */
 __global__ void initRandomKernel(float4* posVel,
     int count,
     float minX, float minY,
@@ -447,6 +533,22 @@ __global__ void initRandomKernel(float4* posVel,
 // ============================================================
 namespace CudaBoids {
 
+    /**
+     * @brief Launches the full boid simulation pipeline for one frame.
+     *
+     * Executes five sequential steps on the given CUDA stream:
+     * 1. assignCellsKernel  — map boids to spatial hash cells.
+     * 2. thrust::sort_by_key — sort (cellId, boidId) pairs.
+     * 3. cudaMemsetAsync     — reset the cell-start table.
+     * 4. buildCellStartKernel — populate the cell-start lookup table.
+     * 5. boidsKernel         — run separation/alignment/cohesion and integrate.
+     *
+     * @param d_posVel     Output device buffer for updated boid state (float4 per boid).
+     * @param d_posVelPrev Input device buffer containing previous-frame boid state.
+     * @param params       Boid simulation parameters, including pre-allocated hash
+     *                     table device pointers and all tuning weights.
+     * @param stream       CUDA stream on which all work is enqueued.
+     */
     void Launch(float4* d_posVel,
         const float4* d_posVelPrev,
         const BoidParams& params,
@@ -491,6 +593,33 @@ namespace CudaBoids {
 #endif
     }
 
+    /**
+     * @brief Randomly initialises boid positions and velocities on the device.
+     *
+     * Launches initRandomKernel with a per-entity seed derived from
+     * @p entitySeed, then synchronises the default stream so that the caller
+     * can immediately use the populated buffer.  Boids are placed within the
+     * rectangle [@p minX, @p maxX] x [@p minY, @p maxY] and will retry up to
+     * 32 times to avoid spawning inside a solid tile when @p collisionMasks is
+     * provided.
+     *
+     * @param d_posVel         Device buffer to receive initialised boid state
+     *                         (float4: x, y, vx, vy) for @p count boids.
+     * @param count            Number of boids to initialise.
+     * @param minX             Minimum X bound of the spawn rectangle.
+     * @param minY             Minimum Y bound of the spawn rectangle.
+     * @param maxX             Maximum X bound of the spawn rectangle.
+     * @param maxY             Maximum Y bound of the spawn rectangle.
+     * @param maxSpeed         Maximum initial speed assigned to each boid.
+     * @param entitySeed       Per-entity seed mixed into the cuRAND base seed.
+     * @param collisionMasks   Optional device pointer to solid-tile bitmask; pass
+     *                         nullptr to skip spawn collision checks.
+     * @param collisionWidth   Width of the collision mask grid in tiles.
+     * @param collisionHeight  Height of the collision mask grid in tiles.
+     * @param collisionOriginX X origin offset of the collision grid in tiles.
+     * @param collisionOriginY Y origin offset of the collision grid in tiles.
+     * @param tileSize         World-space size of one tile in pixels/units.
+     */
     void InitRandom(float4* d_posVel,
         int count,
         float minX, float minY,
