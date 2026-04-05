@@ -1,31 +1,34 @@
-#pragma once
+/* Start Header *****************************************************************/
+/*!
+\file   WaterDistortionPass.hpp
+\author Choi Meng Yew (100%)
+\date   5th April 2026
+\brief
+Declares the WaterDistortionPass, a fullscreen post-processing pass
+used to simulate underwater-style screen distortion.
 
-/* WaterDistortionPass.h
- *
- * Drop-in post-processing pass. Reads fullscreen.vert + underwater.frag
- * and the Perlin noise texture you already have.
- *
- * Quick-start in RendererSystem:
- *
- *  // OnCreate:
- *  m_waterPass = std::make_unique<WaterDistortionPass>();
- *  m_waterPass->Init("assets/textures/Noise.png",
- *                    "assets/shaders/fullscreen.vert",
- *                    "assets/shaders/underwater.frag");
- *
- *  // In the RenderGraph, add a pass AFTER "LDR" is written:
- *  m_renderGraph->AddPass("WaterDistort", {"LDR"}, {"LDR"},
- *      [this](ResourceAccessor& res)
- *      {
- *          auto* ldr = res.GetFramebuffer("LDR");
- *          if (!ldr || !m_waterPass->IsEnabled()) return;
- *          m_waterPass->Execute(ldr->GetColorTexture(0), *ldr,
- *                               ldr->Width(), ldr->Height());
- *      });
- *
- *  // OnDestroy:
- *  m_waterPass.reset();
- */
+The pass applies layered procedural distortion using a tiling noise
+texture and shader-based UV warping. It supports both unmasked
+fullscreen distortion and masked distortion, where a greyscale mask
+controls which regions of the screen are affected.
+
+Responsibilities:
+- Initialize shader, noise texture, fullscreen quad, and scratch framebuffer
+- Apply distortion as a post-process using ping-pong rendering
+- Upload runtime-tunable parameters such as drift, ripple, tint, caustics, and depth fade
+- Support optional mask-based application for selective water regions
+- Manage OpenGL resources used by the pass
+
+The WaterDistortionPass is designed to integrate into the renderer as a
+modular post-processing stage after the main LDR scene has been rendered.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#pragma once
 
 #include "graphics/texture.hpp"
 #include "graphics/framebuffer.hpp"
