@@ -1,54 +1,45 @@
-#pragma once
+/* Start Header *****************************************************************/
+/*!
+\file   GodRayPass.hpp
+\author Choi Meng Yew
+\date   5th April 2026
+\brief
+Radial-blur god ray post-processing pass for simulating light shafts from a
+directional light source.
 
-/* GodRayPass.hpp
- *
- * Radial-blur god ray post-processing pass.
- * Light source position is derived automatically from the scene directional
- * light managed by LightManager - no manual UV position needed.
- *
- * Three internal stages:
- *   1. godray_mask.frag      - extract occluder mask from HDR scene
- *   2. godray_blur.frag      - radial blur toward projected light source
- *   3. godray_composite.frag - additive blend of rays onto LDR scene
- *
- * Quick-start in RendererSystem:
- *
- *  // OnCreate (after lightManager.Initialize()):
- *  m_godRayPass = std::make_unique<GodRayPass>();
- *  m_godRayPass->Init();
- *
- *  // In CollectLights(), after SetDirectionalLight(), forward direction:
- *  if (m_godRayPass)
- *      m_godRayPass->SetLightDirection(out.Direction);
- *
- *  // RenderGraph path - add AFTER "ToneMap", BEFORE "WaterDistort":
- *  m_renderGraph->AddPass("GodRays", {"HDR","LDR"}, {"LDR"},
- *      [this, &viewProj](ResourceAccessor& res)
- *      {
- *          auto* hdr = res.GetFramebuffer("HDR");
- *          auto* ldr = res.GetFramebuffer("LDR");
- *          if (!hdr || !ldr || !m_godRayPass->IsEnabled()) return;
- *          m_godRayPass->UpdateLightPos(viewProj, m_lightManager);
- *          m_godRayPass->Execute(hdr->GetColorTexture(0),
- *                                ldr->GetColorTexture(0),
- *                                *ldr, ldr->Width(), ldr->Height());
- *      });
- *
- *  // Multi-viewport path - after ToneMap(), before water pass:
- *  if (m_godRayPass && m_godRayPass->IsEnabled())
- *  {
- *      m_godRayPass->UpdateLightPos(viewProj, m_lightManager);
- *      m_godRayPass->Execute(vp.HDR->GetColorTexture(0),
- *                            vp.LDR->GetColorTexture(0),
- *                            *vp.LDR, vp.Size.x, vp.Size.y);
- *  }
- *
- *  // OnDestroy:
- *  m_godRayPass.reset();
- *
- *  // Update camera world pos each frame for world-anchored shaft noise:
- *  m_godRayPass->Settings().cameraWorldPos = glm::vec2(camX, camY);
- */
+Details:
+This file defines the GodRayPass system, which performs a multi-stage
+post-processing effect to generate volumetric light shafts ("god rays")
+in screen space.
+
+The pass operates entirely on GPU-rendered textures and integrates into
+the RenderGraph after tone mapping. The light source position is derived
+automatically from the scene’s directional light via LightManager,
+removing the need for manual configuration.
+
+The implementation consists of three stages:
+- Occluder Mask: Extracts bright occluders from the HDR scene
+- Radial Blur: Accumulates light scattering toward the projected light source
+- Composite: Additively blends the resulting light shafts onto the LDR scene
+
+Additionally, this file defines:
+- GodRaySettings, a POD configuration structure controlling sampling,
+  decay, density, tint, and compositing strength
+- GPU-side execution logic using fullscreen quad rendering
+- Framebuffer management for intermediate mask and blur passes
+- Light projection logic from world space to screen-space UV coordinates
+
+This system is rendering-focused and contains no gameplay or ECS logic.
+It serves as a GPU-driven post-processing stage that operates on existing
+render targets to enhance visual realism.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#pragma once
 
 #include "graphics/framebuffer.hpp"
 #include "graphics/LightManager.hpp"
