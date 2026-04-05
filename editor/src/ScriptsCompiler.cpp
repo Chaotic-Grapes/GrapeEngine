@@ -16,10 +16,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scripting/ScriptsCompiler.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
@@ -32,6 +34,61 @@ extern "C" {
 }
 
 using namespace std::chrono_literals;
+
+namespace {
+    std::string TrimCopy(const std::string& text) {
+        const size_t start = text.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) {
+            return {};
+        }
+        const size_t end = text.find_last_not_of(" \t\r\n");
+        return text.substr(start, end - start + 1);
+    }
+
+    bool IsCompilerErrorLine(const std::string& line) {
+        std::string lower = line;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        return lower.rfind("error ", 0) == 0 ||
+               lower.find(": error ") != std::string::npos ||
+               lower.find(" error cs") != std::string::npos;
+    }
+
+    void LogScriptCompileErrorsToConsole(const std::string& diagnostics) {
+        std::vector<std::string> allLines;
+        std::vector<std::string> errorLines;
+
+        size_t pos = 0;
+        while (pos <= diagnostics.size()) {
+            const size_t next = diagnostics.find('\n', pos);
+            const size_t length = (next == std::string::npos) ? diagnostics.size() - pos : next - pos;
+            const std::string rawLine = diagnostics.substr(pos, length);
+            const std::string line = TrimCopy(rawLine);
+
+            if (!line.empty()) {
+                allLines.push_back(line);
+                if (IsCompilerErrorLine(line)) {
+                    errorLines.push_back(line);
+                }
+            }
+
+            if (next == std::string::npos) {
+                break;
+            }
+            pos = next + 1;
+        }
+
+        const std::vector<std::string>& linesToLog = errorLines.empty() ? allLines : errorLines;
+        for (const std::string& line : linesToLog) {
+            Logger::Get().Log(LogLevel::ERROR, line, LogSource::SCRIPT);
+        }
+
+        if (linesToLog.empty()) {
+            Logger::Get().Log(LogLevel::ERROR, "Script compilation failed", LogSource::SCRIPT);
+        }
+    }
+}
 
 ScriptsCompiler::ScriptsCompiler(Engine::Application* engine, ECS::World* emptyWorld)
     : m_engine(engine), m_emptyWorld(emptyWorld) {
@@ -109,6 +166,7 @@ void ScriptsCompiler::Start() {
                 LOG_INFO("[ScriptsCompiler] Initial script compilation succeeded at: " << scriptsOutput.string());
                 _doLoadAndRegisterSystems(scriptsOutput.string());
             } else {
+                LogScriptCompileErrorsToConsole(diagnostics);
                 m_scriptManager->SetCompileStatus(4, 100, diagnostics.c_str());
             }
 
@@ -357,6 +415,7 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
         
         if (!compileSuccess) {
             LOG_ERROR("[ScriptsCompiler] Hot reload: compilation failed - " << diagnostics);
+            LogScriptCompileErrorsToConsole(diagnostics);
             {
                 std::lock_guard<std::mutex> lock(m_stateMutex);
                 m_hotReloadState = HotReloadState::Failed;
