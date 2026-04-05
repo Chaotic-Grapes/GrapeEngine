@@ -1,7 +1,7 @@
 #version 460 core
 layout (location = 0) out vec4 FragColor;
 
-in vec2 vTexCoord;
+in vec2 vUV;
 
 uniform sampler2D uOccluder;
 uniform vec2  uLightPosNDC;
@@ -38,7 +38,7 @@ float fbm(vec2 p) {
 
 void main()
 {
-    vec2 uv  = vTexCoord;
+    vec2 uv  = vUV;
     vec2 dir = (uv - uLightPosNDC) * (1.0 / float(uSamples)) * uDensity;
 
     float illumination = 1.0;
@@ -52,7 +52,7 @@ void main()
         illumination *= uDecay;
     }
 
-    vec2 shaftDir = normalize(vTexCoord - uLightPosNDC);
+    vec2 shaftDir = normalize(vUV - uLightPosNDC);
 
     // World-space anchor: offset noise by camera position
     // so the pattern stays fixed to the world, not the screen.
@@ -60,7 +60,7 @@ void main()
     // larger = noise moves more per world unit (smaller effective tile size)
     vec2 worldOffset = uCameraWorldPos * 0.001;
 
-    vec2 noiseUV = vTexCoord * 3.0
+    vec2 noiseUV = vUV * 3.0
                  + worldOffset
                  + shaftDir * uTime * 0.04
                  + vec2(uTime * 0.01, 0.0);
