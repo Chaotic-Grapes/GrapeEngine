@@ -4,6 +4,12 @@ setlocal EnableExtensions
 set "JOBS=%~1"
 if "%JOBS%"=="" set "JOBS=%NUMBER_OF_PROCESSORS%"
 
+set "ENABLE_CUDA=ON"
+echo.
+set /p "CUDA_CHOICE=Enable CUDA build? [Y/n]: "
+if /I "%CUDA_CHOICE%"=="n" set "ENABLE_CUDA=OFF"
+if /I "%CUDA_CHOICE%"=="no" set "ENABLE_CUDA=OFF"
+
 call :check_tool cmake || exit /b 1
 
 echo.
@@ -11,6 +17,7 @@ echo ==========================================================
 echo           GrapeEngine Build (Release + Debug)
 echo ----------------------------------------------------------
 echo   Jobs: %JOBS%
+echo   CUDA: %ENABLE_CUDA%
 echo ==========================================================
 echo.
 call :build_editor || exit /b 1
@@ -26,7 +33,7 @@ exit /b 0
 :build_editor
 echo.
 echo [Editor] Configure
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF -DENABLE_CUDA=%ENABLE_CUDA%
 if errorlevel 1 (
     echo ERROR: Editor configure failed.
     echo.
