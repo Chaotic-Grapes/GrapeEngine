@@ -66,8 +66,22 @@ JSON-based entity and configuration serialization (via nlohmann/json), supportin
 **Audio:** FMOD
 **Libraries:** GLM, GLFW, GLAD, Dear ImGui, nlohmann/json, stb_image
 
-```text └── GrapeEngine/ ├── assets/ # Shared engine assets (textures, shaders, etc.) ├── cmake/ # CMake modules and configuration ├── editor/ # Editor source and headers ├── engine/ │ ├── include/ # ecs, physics2d, graphics, cuda, scripting, services, audio, serialization │ └── src/ # corresponding implementations ├── externals/ # Third-party dependencies ├── managed/ # C# scripting API and tools ├── runtime/ # Runtime assets/binaries for game export ├── TestSuite/ # Sample project and demo scenes ├── CMakeLists.txt ├── run.bat # Configure/build editor in Debug + Release └── clean.bat ```
-
+```text
+└── GrapeEngine/
+   ├── assets/         # Shared engine assets (textures, shaders, etc.)
+   ├── cmake/          # CMake modules and configuration
+   ├── editor/         # Editor source and headers
+   ├── engine/
+   │   ├── include/    # ecs, physics2d, graphics, cuda, scripting, services, audio, serialization
+   │   └── src/        # corresponding implementations
+   ├── externals/      # Third-party dependencies
+   ├── managed/        # C# scripting API and tools
+   ├── runtime/        # Runtime assets/binaries for game export
+   ├── TestSuite/      # Sample project and demo scenes
+   ├── CMakeLists.txt
+   ├── run.bat         # Configure/build editor in Debug + Release
+   └── clean.bat
+```
 
 ## Team Roster & Credits
 
